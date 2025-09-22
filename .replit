@@ -1,5 +1,5 @@
 entrypoint = "main.py"
-modules = ["python-3.11"]
+modules = ["python-3.11", "nodejs-20"]
 
 [nix]
 channel = "stable-25_05"
@@ -16,3 +16,4 @@ deploymentTarget = "cloudrun"
 
 [agent]
 expertMode = true
+integrations = ["notion:1.0.0"]
