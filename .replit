@@ -17,3 +17,26 @@ deploymentTarget = "cloudrun"
 [agent]
 expertMode = true
 integrations = ["notion:1.0.0"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Notion Database Reader"
+
+[[workflows.workflow]]
+name = "Notion Database Reader"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm start"
+
+[workflows.workflow.metadata]
+outputType = "console"
