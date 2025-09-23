@@ -122,14 +122,24 @@ app.get('/api/search-books', async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          property: '제목',
-          rich_text: {
-            contains: query
-          }
+          or: [
+            {
+              property: '제목',
+              rich_text: {
+                contains: query
+              }
+            },
+            {
+              property: 'Name',
+              title: {
+                contains: query
+              }
+            }
+          ]
         },
         sorts: [
           {
-            property: '제목',
+            property: 'Name',
             direction: 'ascending'
           }
         ],
