@@ -369,14 +369,50 @@ app.post('/save-progress', async (req, res) => {
     const studentPageId = studentData.results[0].id;
     console.log('찾은 학생 페이지 ID:', studentPageId);
     
-    const properties = {
-      '🕐 날짜': {
-        date: { start: today }
+    // 오늘 날짜에 해당하는 기존 일지 찾기 (MAKE가 아침에 생성한 껍데기 일지)
+    console.log('오늘 날짜의 기존 일지 찾는 중...');
+    const existingLogResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
       },
-      '학생 명부 관리': {
-        relation: [{ id: studentPageId }]
-      }
-    };
+      body: JSON.stringify({
+        filter: {
+          and: [
+            {
+              property: '🕐 날짜',
+              date: {
+                equals: today
+              }
+            },
+            {
+              property: '학생 명부 관리',
+              relation: {
+                contains: studentPageId
+              }
+            }
+          ]
+        }
+      })
+    });
+    
+    if (!existingLogResponse.ok) {
+      throw new Error(`기존 일지 조회 실패: ${existingLogResponse.status}`);
+    }
+    
+    const existingLogData = await existingLogResponse.json();
+    
+    if (existingLogData.results.length === 0) {
+      throw new Error(`오늘 날짜(${today})의 기존 일지를 찾을 수 없습니다. MAKE 자동화가 실행되었는지 확인해주세요.`);
+    }
+    
+    const existingPageId = existingLogData.results[0].id;
+    console.log('찾은 기존 일지 페이지 ID:', existingPageId);
+    
+    // 업데이트할 properties (날짜와 학생 관계는 이미 설정되어 있으므로 제외)
+    const properties = {};
 
     // 폼 데이터를 Notion 속성으로 변환
     if (formData['어휘정답']) {
@@ -421,32 +457,31 @@ app.post('/save-progress', async (req, res) => {
       properties['오늘의 학습 소감'] = { rich_text: [{ text: { content: formData['오늘의 학습 소감'] } }] };
     }
 
-    console.log('최종 properties 객체:', JSON.stringify(properties, null, 2));
-    console.log('진도 데이터베이스 ID:', PROGRESS_DB_ID);
+    console.log('최종 업데이트 properties 객체:', JSON.stringify(properties, null, 2));
+    console.log('업데이트할 기존 일지 ID:', existingPageId);
     
-    // REST API로 Notion 데이터베이스에 새 페이지 생성
-    console.log('Notion 페이지 생성 API 호출 중...');
-    const createResponse = await fetch(`https://api.notion.com/v1/pages`, {
-      method: 'POST',
+    // REST API로 기존 Notion 페이지 업데이트
+    console.log('Notion 페이지 업데이트 API 호출 중...');
+    const updateResponse = await fetch(`https://api.notion.com/v1/pages/${existingPageId}`, {
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
-        parent: { database_id: PROGRESS_DB_ID },
         properties: properties
       })
     });
     
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      console.error('페이지 생성 실패 상세:', errorText);
-      throw new Error(`페이지 생성 실패: ${createResponse.status} - ${errorText}`);
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      console.error('페이지 업데이트 실패 상세:', errorText);
+      throw new Error(`페이지 업데이트 실패: ${updateResponse.status} - ${errorText}`);
     }
     
-    const result = await createResponse.json();
-    console.log('저장 성공! 생성된 페이지 ID:', result.id);
+    const result = await updateResponse.json();
+    console.log('업데이트 성공! 기존 일지 ID:', result.id);
     res.json({ success: true, message: '학습 데이터가 성공적으로 저장되었습니다!' });
   } catch (error) {
     console.error('=== 저장 오류 발생 ===');
