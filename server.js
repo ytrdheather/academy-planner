@@ -13,20 +13,49 @@ const app = express();
 const PORT = 5000;
 
 // 미들웨어 설정
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? false : 'http://localhost:5000',
+  credentials: true
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(session({
-  secret: 'readitude-secret-key',
+  secret: process.env.SESSION_SECRET || 'readitude-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24시간
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24시간
+  }
 }));
+
+// 환경 변수 검증 (필수)
+const requiredEnvVars = {
+  STUDENT_DATABASE_ID: '학생 로그인 정보 데이터베이스',
+  PROGRESS_DATABASE_ID: '학습 진도 데이터베이스',
+  TEACHER_ACCESS_TOKEN: '선생님 접근 토큰'
+};
+
+const missingVars = Object.keys(requiredEnvVars).filter(key => !process.env[key]);
+if (missingVars.length > 0 && process.env.NODE_ENV === 'production') {
+  console.error('❌ 프로덕션 환경에서 필수 환경 변수가 설정되지 않았습니다:');
+  missingVars.forEach(key => {
+    console.error(`   ${key}: ${requiredEnvVars[key]}`);
+  });
+  console.error('   이 변수들을 설정한 후 서버를 다시 시작하세요.');
+  process.exit(1);
+} else if (missingVars.length > 0) {
+  console.warn('⚠️  개발 환경: 일부 환경 변수가 설정되지 않았습니다 (기본값 사용):');
+  missingVars.forEach(key => {
+    console.warn(`   ${key}: ${requiredEnvVars[key]}`);
+  });
+}
 
 // 학생 데이터베이스 ID (원생 관리)
 const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
-const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada'; // 동일한 DB에서 시작
+const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
 
 // 로그인 페이지
 app.get('/', (req, res) => {
@@ -69,8 +98,8 @@ app.post('/login', async (req, res) => {
           },
           {
             property: '비밀번호',
-            number: {
-              equals: parseInt(password)
+            rich_text: {
+              equals: password.toString()
             }
           }
         ]
@@ -178,8 +207,22 @@ app.post('/save-progress', async (req, res) => {
   }
 });
 
+// 선생님 인증 미들웨어
+function requireTeacherAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const validToken = process.env.TEACHER_ACCESS_TOKEN || 'dev-teacher-token';
+  
+  if (!authHeader || authHeader !== `Bearer ${validToken}`) {
+    return res.status(401).json({ 
+      error: '선생님 인증이 필요합니다.',
+      hint: process.env.NODE_ENV !== 'production' ? 'Bearer dev-teacher-token 헤더를 추가하세요' : undefined
+    });
+  }
+  next();
+}
+
 // 전체 학생 진도 조회 (선생님용)
-app.get('/api/student-progress', async (req, res) => {
+app.get('/api/student-progress', requireTeacherAuth, async (req, res) => {
   try {
     const notion = await getUncachableNotionClient();
 
@@ -216,7 +259,7 @@ app.get('/api/student-progress', async (req, res) => {
 });
 
 // 특정 학생 진도 조회 (선생님용)
-app.get('/api/student-progress/:studentId', async (req, res) => {
+app.get('/api/student-progress/:studentId', requireTeacherAuth, async (req, res) => {
   try {
     const notion = await getUncachableNotionClient();
     const { studentId } = req.params;

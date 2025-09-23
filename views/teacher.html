@@ -146,7 +146,13 @@
             
             try {
                 const url = studentId ? `/api/student-progress/${studentId}` : '/api/student-progress';
-                const response = await fetch(url);
+                // 개발 환경용 토큰 (실제 운영시에는 환경변수로 설정 필요)
+                const token = localStorage.getItem('teacherToken') || 'dev-teacher-token';
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.error) {
