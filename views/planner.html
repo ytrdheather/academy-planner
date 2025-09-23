@@ -27,6 +27,50 @@
         .success { background-color: #d4edda; color: #155724; }
         .error { background-color: #f8d7da; color: #721c24; }
         .auto-save-status { font-size: 12px; color: #6c757d; margin-left: 10px; }
+        .autocomplete-container { position: relative; }
+        .autocomplete-suggestions { 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            right: 0; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-top: none; 
+            border-radius: 0 0 6px 6px; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            z-index: 1000; 
+            display: none; 
+        }
+        .autocomplete-suggestion { 
+            padding: 10px 15px; 
+            cursor: pointer; 
+            border-bottom: 1px solid #f0f0f0; 
+        }
+        .autocomplete-suggestion:hover { 
+            background-color: #f8f9fa; 
+        }
+        .autocomplete-suggestion:last-child { 
+            border-bottom: none; 
+        }
+        .book-title { 
+            font-weight: bold; 
+            color: #333; 
+        }
+        .book-author { 
+            font-size: 12px; 
+            color: #666; 
+            margin-top: 2px; 
+        }
+        .book-level { 
+            font-size: 11px; 
+            background: #e9ecef; 
+            color: #6c757d; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            margin-top: 3px; 
+            display: inline-block; 
+        }
     </style>
 </head>
 <body>
@@ -100,7 +144,10 @@
             <h2>📚 원서 독서</h2>
             <div class="input-group">
                 <label for="englishBookTitle">오늘 읽은 영어 책</label>
-                <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요">
+                <div class="autocomplete-container">
+                    <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
+                    <div id="bookSuggestions" class="autocomplete-suggestions"></div>
+                </div>
             </div>
              <div class="input-group input-row">
                 <div>
@@ -243,6 +290,107 @@
                     });
             }
         }
+
+        // 책 제목 자동완성 기능
+        let searchTimeout;
+        let currentBooks = [];
+        
+        function initializeBookAutocomplete() {
+            const bookInput = document.getElementById('englishBookTitle');
+            const suggestionsList = document.getElementById('bookSuggestions');
+            
+            bookInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                // 기존 타이머 클리어
+                clearTimeout(searchTimeout);
+                
+                if (query.length < 1) {
+                    hideSuggestions();
+                    return;
+                }
+                
+                // 300ms 후에 검색 실행 (타이핑 완료 후 검색)
+                searchTimeout = setTimeout(() => {
+                    searchBooks(query);
+                }, 300);
+            });
+            
+            // 입력 필드에서 포커스 아웃시 제안 목록 숨기기 (약간의 지연 후)
+            bookInput.addEventListener('blur', function() {
+                setTimeout(() => {
+                    hideSuggestions();
+                }, 200);
+            });
+            
+            // 클릭 외부 영역 클릭시 제안 목록 숨기기
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('.autocomplete-container')) {
+                    hideSuggestions();
+                }
+            });
+        }
+        
+        async function searchBooks(query) {
+            try {
+                const response = await fetch(`/api/search-books?query=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error('검색 실패');
+                }
+                
+                const books = await response.json();
+                currentBooks = books;
+                showSuggestions(books);
+                
+            } catch (error) {
+                console.error('책 검색 오류:', error);
+                hideSuggestions();
+            }
+        }
+        
+        function showSuggestions(books) {
+            const suggestionsList = document.getElementById('bookSuggestions');
+            
+            if (books.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            
+            let html = '';
+            books.forEach((book, index) => {
+                html += `
+                    <div class="autocomplete-suggestion" onclick="selectBook(${index})">
+                        <div class="book-title">${book.title}</div>
+                        ${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}
+                        ${book.level ? `<div class="book-level">${book.level}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            suggestionsList.innerHTML = html;
+            suggestionsList.style.display = 'block';
+        }
+        
+        function hideSuggestions() {
+            const suggestionsList = document.getElementById('bookSuggestions');
+            suggestionsList.style.display = 'none';
+        }
+        
+        function selectBook(index) {
+            const book = currentBooks[index];
+            const bookInput = document.getElementById('englishBookTitle');
+            
+            bookInput.value = book.title;
+            hideSuggestions();
+            
+            // 자동 저장 트리거
+            saveFormData();
+        }
+        
+        // 페이지 로드시 자동완성 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeBookAutocomplete();
+        });
     </script>
 </body>
 </html>
