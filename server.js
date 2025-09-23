@@ -99,9 +99,7 @@ const PROGRESS_DB_ID = formatNotionId(process.env.PROGRESS_DATABASE_ID || '25409
 const BOOK_LIST_DB_ID = formatNotionId(process.env.BOOK_LIST_DATABASE_ID || '9ef2bbaeec19466daa0d0c0677b9eb90');
 const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf82d56634574d7e83d893fbf1b1a4e3');
 
-console.log('🗂️ 포맷된 데이터베이스 ID들:');
-console.log('  학생 DB:', STUDENT_DB_ID);
-console.log('  진도 DB:', PROGRESS_DB_ID);
+// 데이터베이스 연결 확인 완료
 
 // 로그인 페이지
 app.get('/', (req, res) => {
