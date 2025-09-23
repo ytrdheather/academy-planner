@@ -101,6 +101,7 @@ const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf8
 
 // 데이터베이스 연결 확인 완료
 
+
 // 책 제목 자동완성 API
 app.get('/api/search-books', async (req, res) => {
   const { query } = req.query;
@@ -122,24 +123,14 @@ app.get('/api/search-books', async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          or: [
-            {
-              property: '제목',
-              rich_text: {
-                contains: query
-              }
-            },
-            {
-              property: 'Name',
-              title: {
-                contains: query
-              }
-            }
-          ]
+          property: 'Title',
+          title: {
+            contains: query
+          }
         },
         sorts: [
           {
-            property: 'Name',
+            property: 'Title',
             direction: 'ascending'
           }
         ],
@@ -148,25 +139,24 @@ app.get('/api/search-books', async (req, res) => {
     });
     
     if (!response.ok) {
-      throw new Error(`도서 검색 실패: ${response.status}`);
+      const errorText = await response.text();
+      console.error('도서 검색 API 상세 오류:', errorText);
+      throw new Error(`도서 검색 실패: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
     const books = data.results.map(page => {
-      // 제목은 Title 타입 또는 Rich Text 타입일 수 있음
-      const title = page.properties['제목']?.title?.[0]?.plain_text || 
-                   page.properties['제목']?.rich_text?.[0]?.plain_text ||
-                   page.properties.Name?.title?.[0]?.plain_text || '';
-      const author = page.properties['저자']?.rich_text?.[0]?.plain_text || '';
-      const level = page.properties['레벨']?.select?.name || '';
+      const title = page.properties.Title?.title?.[0]?.plain_text || '';
+      const level = page.properties.Level?.select?.name || '';
+      const series = page.properties.Series?.rich_text?.[0]?.plain_text || '';
       
       return {
         title,
-        author,
         level,
-        display: author ? `${title} (${author})` : title
+        series,
+        display: level ? `${title} (${level})` : title
       };
-    }).filter(book => book.title); // 제목이 없는 책은 제외
+    }).filter(book => book.title && book.title.toLowerCase().includes(query.toLowerCase())); // 클라이언트 사이드에서도 한번 더 필터링
     
     res.json(books);
     
@@ -447,6 +437,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.log('🔗 Notion 연결 상태를 확인중...');
     const notion = await getUncachableNotionClient();
     console.log('✅ Notion 연결 성공!');
+    
   } catch (error) {
     console.error('❌ Notion 연결 실패:', error.message);
     console.log('💡 해결 방법: Replit의 Secrets에서 Notion 연결을 확인해주세요');
