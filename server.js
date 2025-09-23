@@ -53,11 +53,24 @@ if (missingVars.length > 0 && process.env.NODE_ENV === 'production') {
   });
 }
 
-// 학생 데이터베이스 ID (원생 관리)
-const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || '25409320bce280f8ace1ddcdd022b360';
-const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
-const BOOK_LIST_DB_ID = process.env.BOOK_LIST_DATABASE_ID || '9ef2bbaeec19466daa0d0c0677b9eb90';
-const SAYU_BOOK_DB_ID = process.env.SAYU_BOOK_DATABASE_ID || 'cf82d56634574d7e83d893fbf1b1a4e3';
+// 데이터베이스 ID를 Notion 형식으로 변환하는 함수
+function formatNotionId(id) {
+  // 대시가 없는 경우 Notion 형식으로 변환 (8-4-4-4-12)
+  if (id && !id.includes('-') && id.length === 32) {
+    return `${id.substring(0, 8)}-${id.substring(8, 12)}-${id.substring(12, 16)}-${id.substring(16, 20)}-${id.substring(20, 32)}`;
+  }
+  return id;
+}
+
+// 학생 데이터베이스 ID (원생 관리)  
+const STUDENT_DB_ID = formatNotionId(process.env.STUDENT_DATABASE_ID || '25409320bce280f8ace1ddcdd022b360');
+const PROGRESS_DB_ID = formatNotionId(process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada');
+const BOOK_LIST_DB_ID = formatNotionId(process.env.BOOK_LIST_DATABASE_ID || '9ef2bbaeec19466daa0d0c0677b9eb90');
+const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf82d56634574d7e83d893fbf1b1a4e3');
+
+console.log('🗂️ 포맷된 데이터베이스 ID들:');
+console.log('  학생 DB:', STUDENT_DB_ID);
+console.log('  진도 DB:', PROGRESS_DB_ID);
 
 // 로그인 페이지
 app.get('/', (req, res) => {
