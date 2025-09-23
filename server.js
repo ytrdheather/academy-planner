@@ -129,70 +129,43 @@ app.post('/login', async (req, res) => {
   const { studentId, password } = req.body;
   
   try {
-    console.log('🔍 로그인 시도:', studentId);
-    console.log('📊 사용중인 데이터베이스 ID:', STUDENT_DB_ID);
+    // 학생 정보 조회 - REST API 직접 호출
+    const accessToken = await getAccessToken();
     
-    const notion = await getUncachableNotionClient();
-    console.log('✅ Notion 클라이언트 생성 성공:', typeof notion, !!notion.databases);
-    console.log('🔍 Notion 클라이언트 구조:', Object.keys(notion));
-    console.log('📋 databases 객체 타입:', typeof notion.databases);
-    console.log('📋 databases 객체 메서드:', Object.keys(notion.databases));
-    console.log('📋 query 메서드 존재?', typeof notion.databases.query);
-    
-    // 학생 정보 조회 - 다양한 방법 시도
-    let response;
-    
-    console.log('🔍 데이터베이스 조회 방법들 확인:');
-    console.log('- notion.databases.query:', typeof notion.databases.query);
-    console.log('- notion.search:', typeof notion.search);
-    
-    try {
-      // 방법 3: 직접 REST API 호출
-      console.log('🔄 방법 3: REST API 직접 호출');
-      const accessToken = await getAccessToken();
-      
-      const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Notion-Version': '2022-06-28'
-        },
-        body: JSON.stringify({
-          filter: {
-            and: [
-              {
-                property: '학생 ID',
-                rich_text: {
-                  equals: studentId
-                }
-              },
-              {
-                property: '비밀번호',
-                rich_text: {
-                  equals: password.toString()
-                }
+    const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          and: [
+            {
+              property: '학생 ID',
+              rich_text: {
+                equals: studentId
               }
-            ]
-          }
-        })
-      });
-      
-      console.log('🌐 REST API 응답 상태:', restResponse.status);
-      
-      if (!restResponse.ok) {
-        const errorText = await restResponse.text();
-        console.error('🚨 REST API 오류:', errorText);
-        throw new Error(`REST API 호출 실패: ${restResponse.status}`);
-      }
-      
-      response = await restResponse.json();
-      console.log('✅ REST API 응답 성공, 결과:', response.results.length, '개');
-      
-    } catch (methodError) {
-      console.error('🚨 메서드 실행 오류:', methodError.message);
-      throw methodError;
+            },
+            {
+              property: '비밀번호',
+              rich_text: {
+                equals: password.toString()
+              }
+            }
+          ]
+        }
+      })
+    });
+    
+    if (!restResponse.ok) {
+      const errorText = await restResponse.text();
+      console.error('로그인 API 오류:', errorText);
+      throw new Error(`로그인 API 호출 실패: ${restResponse.status}`);
     }
+    
+    const response = await restResponse.json();
 
     if (response.results.length > 0) {
       req.session.studentId = studentId;
