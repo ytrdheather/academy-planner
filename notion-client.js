@@ -41,5 +41,10 @@ async function getAccessToken() {
 // Always call this function again to get a fresh client.
 export async function getUncachableNotionClient() {
   const accessToken = await getAccessToken();
-  return new Client({ auth: accessToken });
+  console.log('🔑 Access Token 길이:', accessToken ? accessToken.length : '없음');
+  console.log('🔑 Token 시작:', accessToken ? accessToken.substring(0, 20) + '...' : '없음');
+  
+  const client = new Client({ auth: accessToken });
+  console.log('📋 Client 생성 완료, databases 속성:', typeof client.databases);
+  return client;
 }
