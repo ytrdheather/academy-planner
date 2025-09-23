@@ -448,7 +448,73 @@ app.post('/save-progress', async (req, res) => {
     if (formData['Writing']) {
       properties['Writing'] = { select: { name: formData['Writing'] } };
     }
-    // 영어 책과 3독 독서는 rollup/relation 필드라 직접 저장하지 않고 별도 처리 필요
+    // 영어 책 relation 연결 (오늘 읽은 영어 책)
+    if (formData['오늘 읽은 영어 책']) {
+      console.log('영어 책 검색 중:', formData['오늘 읽은 영어 책']);
+      
+      // 영어 책 데이터베이스에서 해당 책 찾기
+      const englishBookResponse = await fetch(`https://api.notion.com/v1/databases/${BOOK_LIST_DB_ID}/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28'
+        },
+        body: JSON.stringify({
+          filter: {
+            property: 'Title',
+            title: {
+              equals: formData['오늘 읽은 영어 책']
+            }
+          }
+        })
+      });
+      
+      if (englishBookResponse.ok) {
+        const englishBookData = await englishBookResponse.json();
+        if (englishBookData.results.length > 0) {
+          const bookPageId = englishBookData.results[0].id;
+          console.log('찾은 영어 책 페이지 ID:', bookPageId);
+          properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] };
+        } else {
+          console.log('영어 책을 찾을 수 없음:', formData['오늘 읽은 영어 책']);
+        }
+      }
+    }
+    
+    // 3독 독서 제목 relation 연결
+    if (formData['3독 독서 제목']) {
+      console.log('3독 독서 책 검색 중:', formData['3독 독서 제목']);
+      
+      // 사유독평 책 데이터베이스에서 해당 책 찾기
+      const sayuBookResponse = await fetch(`https://api.notion.com/v1/databases/${SAYU_BOOK_DB_ID}/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28'
+        },
+        body: JSON.stringify({
+          filter: {
+            property: '3독 요약 사유독평 도서 보유 목록',
+            title: {
+              equals: formData['3독 독서 제목']
+            }
+          }
+        })
+      });
+      
+      if (sayuBookResponse.ok) {
+        const sayuBookData = await sayuBookResponse.json();
+        if (sayuBookData.results.length > 0) {
+          const bookPageId = sayuBookData.results[0].id;
+          console.log('찾은 3독 독서 책 페이지 ID:', bookPageId);
+          properties['3독 독서 제목'] = { relation: [{ id: bookPageId }] };
+        } else {
+          console.log('3독 독서 책을 찾을 수 없음:', formData['3독 독서 제목']);
+        }
+      }
+    }
     
     if (formData['📕 책 읽는 거인']) {
       properties['📕 책 읽는 거인'] = { select: { name: formData['📕 책 읽는 거인'] } };
