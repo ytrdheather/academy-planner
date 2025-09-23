@@ -122,15 +122,26 @@ app.post('/login', async (req, res) => {
           }
         });
       } else {
-        // 방법 2: search 사용
-        console.log('🔄 방법 2: search 사용');
+        // 방법 2: search로 페이지 찾기
+        console.log('🔄 방법 2: search로 페이지 찾기');
         response = await notion.search({
           query: studentId,
           filter: {
-            value: 'database',
+            value: 'page',
             property: 'object'
-          }
+          },
+          page_size: 10
         });
+        
+        console.log('🔍 검색 결과:', response.results.length, '개');
+        
+        // 검색 결과에서 해당 데이터베이스의 페이지만 필터링
+        const filteredResults = response.results.filter(page => {
+          return page.parent && page.parent.database_id === STUDENT_DB_ID;
+        });
+        
+        console.log('🎯 필터링된 결과:', filteredResults.length, '개');
+        response.results = filteredResults;
       }
     } catch (methodError) {
       console.error('🚨 메서드 실행 오류:', methodError.message);
