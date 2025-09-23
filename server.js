@@ -135,6 +135,16 @@ app.post('/login', async (req, res) => {
         
         console.log('🔍 검색 결과:', response.results.length, '개');
         
+        // 검색 결과 상세 분석
+        response.results.forEach((page, index) => {
+          console.log(`📄 페이지 ${index + 1}:`);
+          console.log(`  - ID: ${page.id}`);
+          console.log(`  - Parent 타입: ${page.parent?.type}`);
+          console.log(`  - Parent DB ID: ${page.parent?.database_id}`);
+          console.log(`  - 우리 DB ID: ${STUDENT_DB_ID}`);
+          console.log(`  - 일치 여부: ${page.parent?.database_id === STUDENT_DB_ID}`);
+        });
+        
         // 검색 결과에서 해당 데이터베이스의 페이지만 필터링
         const filteredResults = response.results.filter(page => {
           return page.parent && page.parent.database_id === STUDENT_DB_ID;
