@@ -123,14 +123,14 @@ app.get('/api/search-sayu-books', async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          property: 'Title',
-          title: {
+          property: '책제목',
+          rich_text: {
             contains: query
           }
         },
         sorts: [
           {
-            property: 'Title',
+            property: '책제목',
             direction: 'ascending'
           }
         ],
@@ -146,9 +146,9 @@ app.get('/api/search-sayu-books', async (req, res) => {
     
     const data = await response.json();
     const books = data.results.map(page => {
-      const title = page.properties.Title?.title?.[0]?.plain_text || '';
-      const author = page.properties.Author?.rich_text?.[0]?.plain_text || '';
-      const category = page.properties.Category?.select?.name || '';
+      const title = page.properties['책제목']?.rich_text?.[0]?.plain_text || '';
+      const author = page.properties['저자']?.rich_text?.[0]?.plain_text || '';
+      const category = page.properties['장르']?.select?.name || '';
       
       return {
         title,
