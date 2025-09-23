@@ -83,7 +83,11 @@ app.post('/login', async (req, res) => {
   const { studentId, password } = req.body;
   
   try {
+    console.log('🔍 로그인 시도:', studentId);
+    console.log('📊 사용중인 데이터베이스 ID:', STUDENT_DB_ID);
+    
     const notion = await getUncachableNotionClient();
+    console.log('✅ Notion 클라이언트 생성 성공:', typeof notion, !!notion.databases);
     
     // 학생 정보 조회
     const response = await notion.databases.query({
@@ -303,8 +307,18 @@ app.get('/api/student-progress/:studentId', requireTeacherAuth, async (req, res)
 });
 
 // 서버 시작
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 학습 플래너 서버가 포트 ${PORT}에서 실행 중입니다!`);
   console.log(`📝 학생용: http://localhost:${PORT}`);
   console.log(`👩‍🏫 선생님용: http://localhost:${PORT}/teacher`);
+  
+  // Notion 연결 상태 확인
+  try {
+    console.log('🔗 Notion 연결 상태를 확인중...');
+    const notion = await getUncachableNotionClient();
+    console.log('✅ Notion 연결 성공!');
+  } catch (error) {
+    console.error('❌ Notion 연결 실패:', error.message);
+    console.log('💡 해결 방법: Replit의 Secrets에서 Notion 연결을 확인해주세요');
+  }
 });
