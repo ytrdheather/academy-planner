@@ -102,7 +102,71 @@ const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf8
 // 데이터베이스 연결 확인 완료
 
 
-// 책 제목 자동완성 API
+// 사유독평 책 제목 자동완성 API (3독 독서용)
+app.get('/api/search-sayu-books', async (req, res) => {
+  const { query } = req.query;
+  
+  try {
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+    
+    const accessToken = await getAccessToken();
+    
+    // 사유독평 합본 리스트에서 검색
+    const response = await fetch(`https://api.notion.com/v1/databases/${SAYU_BOOK_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: 'Title',
+          title: {
+            contains: query
+          }
+        },
+        sorts: [
+          {
+            property: 'Title',
+            direction: 'ascending'
+          }
+        ],
+        page_size: 10
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('사유독평 도서 검색 API 상세 오류:', errorText);
+      throw new Error(`사유독평 도서 검색 실패: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    const books = data.results.map(page => {
+      const title = page.properties.Title?.title?.[0]?.plain_text || '';
+      const author = page.properties.Author?.rich_text?.[0]?.plain_text || '';
+      const category = page.properties.Category?.select?.name || '';
+      
+      return {
+        title,
+        author,
+        category,
+        display: author ? `${title} (${author})` : title
+      };
+    }).filter(book => book.title && book.title.toLowerCase().includes(query.toLowerCase()));
+    
+    res.json(books);
+    
+  } catch (error) {
+    console.error('사유독평 책 검색 오류:', error);
+    res.status(500).json({ error: '사유독평 책 검색 중 오류가 발생했습니다.' });
+  }
+});
+
+// 영어 원서 제목 자동완성 API
 app.get('/api/search-books', async (req, res) => {
   const { query } = req.query;
   

@@ -178,7 +178,10 @@
             <h2>📕 책 읽는 거인</h2>
             <div class="input-group">
                 <label for="giantBookTitle">3독 독서 제목</label>
-                <input type="text" id="giantBookTitle" name="3독 독서 제목" placeholder="책 제목을 입력하세요">
+                <div class="autocomplete-container">
+                    <input type="text" id="giantBookTitle" name="3독 독서 제목" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
+                    <div id="sayuBookSuggestions" class="autocomplete-suggestions"></div>
+                </div>
             </div>
             <div class="input-group">
                 <label for="readingGiantStatus">완료 여부</label>
@@ -431,9 +434,164 @@
             saveFormData();
         }
         
+        // saveFormData 함수 정의 (자동저장용)
+        function saveFormData() {
+            const formData = new FormData(document.getElementById('plannerForm'));
+            const data = {};
+            
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            // 로컬 스토리지에 저장
+            localStorage.setItem('plannerData', JSON.stringify(data));
+            
+            // 상태 메시지 표시
+            const status = document.getElementById('autoSaveStatus');
+            if (status) {
+                status.textContent = '저장됨';
+                setTimeout(() => {
+                    status.textContent = '';
+                }, 2000);
+            }
+        }
+
+        // 사유독평 책 자동완성 관련 변수
+        let sayuSearchTimeout;
+        let currentSayuBooks = [];
+        
+        function initializeSayuBookAutocomplete() {
+            const bookInput = document.getElementById('giantBookTitle');
+            const suggestionsList = document.getElementById('sayuBookSuggestions');
+            
+            bookInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                clearTimeout(sayuSearchTimeout);
+                
+                if (query.length < 2) {
+                    hideSayuSuggestions();
+                    return;
+                }
+                
+                showSayuLoadingState();
+                
+                sayuSearchTimeout = setTimeout(() => {
+                    searchSayuBooks(query);
+                }, 500);
+            });
+            
+            bookInput.addEventListener('blur', function() {
+                setTimeout(() => {
+                    hideSayuSuggestions();
+                }, 200);
+            });
+            
+            bookInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    hideSayuSuggestions();
+                    return;
+                }
+                
+                const suggestions = document.querySelectorAll('#sayuBookSuggestions .autocomplete-suggestion');
+                const activeIndex = Array.from(suggestions).findIndex(s => s.classList.contains('active'));
+                
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const nextIndex = activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0;
+                    setSayuActiveSuggestion(nextIndex);
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const prevIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1;
+                    setSayuActiveSuggestion(prevIndex);
+                } else if (event.key === 'Enter' && activeIndex >= 0) {
+                    event.preventDefault();
+                    selectSayuBook(activeIndex);
+                }
+            });
+            
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('#sayuBookSuggestions') && !event.target.closest('#giantBookTitle')) {
+                    hideSayuSuggestions();
+                }
+            });
+        }
+        
+        async function searchSayuBooks(query) {
+            try {
+                const response = await fetch(`/api/search-sayu-books?query=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error('검색 실패');
+                }
+                
+                const books = await response.json();
+                currentSayuBooks = books;
+                showSayuSuggestions(books);
+                
+            } catch (error) {
+                console.error('사유독평 책 검색 오류:', error);
+                hideSayuSuggestions();
+            }
+        }
+        
+        function showSayuLoadingState() {
+            const suggestionsList = document.getElementById('sayuBookSuggestions');
+            suggestionsList.innerHTML = '<div class="autocomplete-suggestion">🔍 검색 중...</div>';
+            suggestionsList.style.display = 'block';
+        }
+        
+        function showSayuSuggestions(books) {
+            const suggestionsList = document.getElementById('sayuBookSuggestions');
+            
+            if (books.length === 0) {
+                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>';
+                suggestionsList.style.display = 'block';
+                return;
+            }
+            
+            let html = '';
+            books.forEach((book, index) => {
+                html += `
+                    <div class="autocomplete-suggestion" onclick="selectSayuBook(${index})">
+                        <div class="book-title">${book.title}</div>
+                        ${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}
+                        ${book.category ? `<div class="book-level">${book.category}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            suggestionsList.innerHTML = html;
+            suggestionsList.style.display = 'block';
+        }
+        
+        function setSayuActiveSuggestion(index) {
+            const suggestions = document.querySelectorAll('#sayuBookSuggestions .autocomplete-suggestion');
+            suggestions.forEach(s => s.classList.remove('active'));
+            if (suggestions[index]) {
+                suggestions[index].classList.add('active');
+            }
+        }
+        
+        function hideSayuSuggestions() {
+            const suggestionsList = document.getElementById('sayuBookSuggestions');
+            suggestionsList.style.display = 'none';
+        }
+        
+        function selectSayuBook(index) {
+            const book = currentSayuBooks[index];
+            const bookInput = document.getElementById('giantBookTitle');
+            
+            bookInput.value = book.title;
+            hideSayuSuggestions();
+            
+            bookInput.dispatchEvent(new Event('input', { bubbles: true }));
+            saveFormData();
+        }
+
         // 페이지 로드시 자동완성 초기화
         document.addEventListener('DOMContentLoaded', function() {
             initializeBookAutocomplete();
+            initializeSayuBookAutocomplete();
         });
     </script>
 </body>
