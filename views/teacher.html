@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>선생님 페이지 - 학생 진도 관리</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: #f8f9fa; 
+            color: #212529; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+        }
+        h1 { 
+            text-align: center; 
+            color: #0056b3; 
+            border-bottom: 2px solid #e9ecef; 
+            padding-bottom: 15px; 
+        }
+        .search-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .search-section input {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-right: 10px;
+            width: 200px;
+        }
+        .search-section button {
+            padding: 10px 20px;
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .search-section button:hover {
+            background-color: #004494;
+        }
+        .progress-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .progress-table th, .progress-table td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+        }
+        .progress-table th {
+            background-color: #0056b3;
+            color: white;
+            font-weight: 600;
+        }
+        .progress-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .progress-table tr:hover {
+            background-color: #e9ecef;
+        }
+        .score-good { color: #28a745; font-weight: bold; }
+        .score-bad { color: #dc3545; font-weight: bold; }
+        .status-complete { color: #28a745; }
+        .status-incomplete { color: #dc3545; }
+        .loading { text-align: center; padding: 40px; color: #6c757d; }
+        .no-data { text-align: center; padding: 40px; color: #6c757d; }
+        .back-button {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .back-button:hover {
+            background-color: #5a6268;
+        }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #0056b3;
+        }
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">← 로그인 페이지로</a>
+        <h1>👩‍🏫 선생님 페이지 - 학생 진도 관리</h1>
+        
+        <div class="search-section">
+            <input type="text" id="studentIdSearch" placeholder="학생 ID 입력 (전체 조회시 공백)">
+            <button onclick="searchProgress()">진도 조회</button>
+            <button onclick="loadAllProgress()">전체 학생 조회</button>
+        </div>
+
+        <div id="progressData">
+            <div class="loading">학생 진도 데이터를 불러오는 중...</div>
+        </div>
+    </div>
+
+    <script>
+        async function searchProgress() {
+            const studentId = document.getElementById('studentIdSearch').value.trim();
+            await loadProgress(studentId);
+        }
+
+        async function loadAllProgress() {
+            await loadProgress();
+        }
+
+        async function loadProgress(studentId = '') {
+            const container = document.getElementById('progressData');
+            container.innerHTML = '<div class="loading">데이터를 불러오는 중...</div>';
+            
+            try {
+                const url = studentId ? `/api/student-progress/${studentId}` : '/api/student-progress';
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    container.innerHTML = `<div class="no-data">오류: ${data.error}</div>`;
+                    return;
+                }
+                
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="no-data">진도 데이터가 없습니다.</div>';
+                    return;
+                }
+
+                // 통계 요약 생성
+                const stats = generateStats(data);
+                
+                // 테이블 생성
+                let html = '<div class="stats-summary">';
+                html += `<div class="stat-card"><h3>총 학습 기록</h3><div class="number">${data.length}건</div></div>`;
+                html += `<div class="stat-card"><h3>참여 학생</h3><div class="number">${stats.uniqueStudents}명</div></div>`;
+                html += `<div class="stat-card"><h3>평균 단어 점수</h3><div class="number">${stats.avgVocabScore}점</div></div>`;
+                html += `<div class="stat-card"><h3>평균 문법 점수</h3><div class="number">${stats.avgGrammarScore}점</div></div>`;
+                html += '</div>';
+                
+                html += '<table class="progress-table">';
+                html += '<thead><tr>';
+                html += '<th>학생 ID</th><th>날짜</th><th>단어 점수</th><th>문법 점수</th>';
+                html += '<th>독해 결과</th><th>영어독서</th><th>읽은 책</th><th>학습 소감</th>';
+                html += '</tr></thead><tbody>';
+                
+                data.forEach(record => {
+                    html += '<tr>';
+                    html += `<td>${record.studentId}</td>`;
+                    html += `<td>${new Date(record.date).toLocaleDateString('ko-KR')}</td>`;
+                    html += `<td class="${record.vocabScore >= 80 ? 'score-good' : 'score-bad'}">${record.vocabScore}점</td>`;
+                    html += `<td class="${record.grammarScore >= 80 ? 'score-good' : 'score-bad'}">${record.grammarScore}점</td>`;
+                    html += `<td class="${record.readingResult === 'pass' ? 'status-complete' : 'status-incomplete'}">${record.readingResult}</td>`;
+                    html += `<td class="${record.englishReading === '완료함' ? 'status-complete' : 'status-incomplete'}">${record.englishReading}</td>`;
+                    html += `<td>${record.bookTitle || '-'}</td>`;
+                    html += `<td>${record.feeling ? record.feeling.substring(0, 50) + (record.feeling.length > 50 ? '...' : '') : '-'}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('진도 조회 오류:', error);
+                container.innerHTML = '<div class="no-data">진도 데이터를 불러오는 중 오류가 발생했습니다.</div>';
+            }
+        }
+
+        function generateStats(data) {
+            const uniqueStudents = new Set(data.map(d => d.studentId)).size;
+            const vocabScores = data.filter(d => d.vocabScore > 0).map(d => d.vocabScore);
+            const grammarScores = data.filter(d => d.grammarScore > 0).map(d => d.grammarScore);
+            
+            const avgVocabScore = vocabScores.length > 0 ? 
+                Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0;
+            const avgGrammarScore = grammarScores.length > 0 ? 
+                Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0;
+            
+            return {
+                uniqueStudents,
+                avgVocabScore,
+                avgGrammarScore
+            };
+        }
+
+        // 페이지 로드 시 전체 진도 조회
+        window.addEventListener('load', () => {
+            loadAllProgress();
+        });
+    </script>
+</body>
+</html>

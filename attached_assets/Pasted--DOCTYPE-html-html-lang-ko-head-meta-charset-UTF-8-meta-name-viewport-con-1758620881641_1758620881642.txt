@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 학습 플래너</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8f9fa; color: #212529; margin: 0; padding: 20px; }
+        .planner-container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        h1, h2 { text-align: center; color: #0056b3; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; margin-top: 30px; }
+        h1:first-of-type { margin-top: 0; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #495057; }
+        .input-group input[type="text"], .input-group input[type="number"], .input-group select, .input-group textarea {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; box-sizing: border-box; font-size: 16px;
+        }
+        .input-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        textarea { resize: vertical; min-height: 80px; }
+        .submit-button { width: 100%; padding: 12px; border: none; background-color: #28a745; color: white; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: 600; margin-top: 20px; }
+        .submit-button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <div class="planner-container">
+        <h1>오늘의 학습 플래너 ✍️</h1>
+        
+        <form id="plannerForm">
+            <h2>📝 시험 결과</h2>
+            <div class="input-group input-row">
+                <div>
+                    <label for="vocabCorrect">단어 (맞은 개수)</label>
+                    <input type="number" id="vocabCorrect" name="어휘정답">
+                </div>
+                <div>
+                    <label for="vocabTotal">단어 (전체 개수)</label>
+                    <input type="number" id="vocabTotal" name="어휘총문제">
+                </div>
+            </div>
+            <div class="input-group input-row">
+                <div>
+                    <label for="grammarTotal">문법 (전체 개수)</label>
+                    <input type="number" id="grammarTotal" name="문법 전체 개수">
+                </div>
+                <div>
+                    <label for="grammarWrong">문법 (틀린 개수)</label>
+                    <input type="number" id="grammarWrong" name="문법숙제오답">
+                </div>
+            </div>
+             <div class="input-group input-row">
+                <div>
+                    <label for="readingWrong">독해 (틀린 개수)</label>
+                    <input type="number" id="readingWrong" name="독해오답갯수">
+                </div>
+                <div>
+                    <label for="readingHavruta">독해 하브루타</label>
+                    <select id="readingHavruta" name="독해하브루타">
+                        <option value="숙제없음">숙제없음</option>
+                        <option value="완료함">완료함</option>
+                        <option value="못하고감">못하고감</option>
+                    </select>
+                </div>
+            </div>
+
+            <h2>🎧 리스닝 학습</h2>
+            <div class="input-group input-row">
+                <div>
+                    <label for="dubbing">영어 더빙 학습</label>
+                    <select id="dubbing" name="영어 더빙 학습 완료">
+                        <option value="진행하지 않음">진행하지 않음</option>
+                        <option value="완료">완료</option>
+                        <option value="미완료">미완료</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="dubbingWorkbook">더빙 워크북</label>
+                    <select id="dubbingWorkbook" name="더빙 워크북 완료">
+                        <option value="진행하지 않음">진행하지 않음</option>
+                        <option value="완료">완료</option>
+                        <option value="미완료">미완료</option>
+                    </select>
+                </div>
+            </div>
+
+            <h2>📚 원서 독서</h2>
+            <div class="input-group">
+                <label for="englishBookTitle">오늘 읽은 영어 책</label>
+                <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (나중에 검색 기능으로 바뀝니다)">
+            </div>
+             <div class="input-group input-row">
+                <div>
+                    <label for="englishReading">영어독서</label>
+                    <select id="englishReading" name="📖 영어독서">
+                        <option value="못함">못함</option>
+                        <option value="완료함">완료함</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="readingVocab">어휘학습</label>
+                    <select id="readingVocab" name="어휘학습">
+                        <option value="못함">못함</option>
+                        <option value="완료함">완료함</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="writing">Writing</label>
+                    <select id="writing" name="Writing">
+                        <option value="SKIP">SKIP</option>
+                        <option value="3 SENTENCE">3 SENTENCE</option>
+                        <option value="북 리포트">북 리포트</option>
+                    </select>
+                </div>
+            </div>
+            
+            <h2>📕 책 읽는 거인</h2>
+            <div class="input-group">
+                <label for="giantBookTitle">3독 독서 제목</label>
+                <input type="text" id="giantBookTitle" name="3독 독서 제목" placeholder="책 제목을 입력하세요 (나중에 검색 기능으로 바뀝니다)">
+            </div>
+            <div class="input-group">
+                <label for="readingGiantStatus">완료 여부</label>
+                 <select id="readingGiantStatus" name="📕 책 읽는 거인">
+                    <option value="진행하지 않음">진행하지 않음</option>
+                    <option value="미완료">미완료</option>
+                    <option value="완료">완료</option>
+                </select>
+            </div>
+
+
+            <h2>💬 오늘의 소감</h2>
+            <div class="input-group">
+                <label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label>
+                <textarea id="feedback" name="오늘의 학습 소감" rows="4"></textarea>
+            </div>
+
+            <button type="submit" class="submit-button">오늘의 학습 저장하기</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -28,15 +28,24 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Notion Database Reader"
+args = "Study Planner Server"
 
 [[workflows.workflow]]
-name = "Notion Database Reader"
+name = "Study Planner Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm start"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 42071
+externalPort = 3000

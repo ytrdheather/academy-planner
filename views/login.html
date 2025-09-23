@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>리디튜드 학습 플래너 - 로그인</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #212529; 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container { 
+            max-width: 400px; 
+            width: 100%;
+            background: white; 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            text-align: center; 
+            color: #0056b3; 
+            margin-bottom: 30px; 
+            font-size: 28px;
+        }
+        .input-group { 
+            margin-bottom: 20px; 
+        }
+        .input-group label { 
+            display: block; 
+            font-weight: 600; 
+            margin-bottom: 8px; 
+            color: #495057; 
+        }
+        .input-group input { 
+            width: 100%; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 2px solid #e9ecef; 
+            box-sizing: border-box; 
+            font-size: 16px; 
+            transition: border-color 0.3s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #0056b3;
+        }
+        .login-button { 
+            width: 100%; 
+            padding: 12px; 
+            border: none; 
+            background-color: #0056b3; 
+            color: white; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 18px; 
+            font-weight: 600; 
+            margin-top: 10px; 
+            transition: background-color 0.3s;
+        }
+        .login-button:hover { 
+            background-color: #004494; 
+        }
+        .error-message {
+            color: #dc3545;
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 6px;
+            display: none;
+        }
+        .success-message {
+            color: #155724;
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #d4edda;
+            border-radius: 6px;
+            display: none;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 48px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">📚</div>
+        <h1>리디튜드 학습 플래너</h1>
+        
+        <form id="loginForm">
+            <div class="input-group">
+                <label for="studentId">학생 ID</label>
+                <input type="text" id="studentId" name="studentId" required>
+            </div>
+            <div class="input-group">
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="login-button">로그인</button>
+        </form>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <div style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 14px;">
+            <a href="/teacher" style="color: #0056b3; text-decoration: none;">선생님 페이지</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentId = document.getElementById('studentId').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ studentId, password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    successDiv.textContent = result.message;
+                    successDiv.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = '/planner';
+                    }, 1000);
+                } else {
+                    errorDiv.textContent = result.message;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = '로그인 중 오류가 발생했습니다.';
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
