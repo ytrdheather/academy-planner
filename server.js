@@ -101,6 +101,68 @@ const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf8
 
 // 데이터베이스 연결 확인 완료
 
+// 책 제목 자동완성 API
+app.get('/api/search-books', async (req, res) => {
+  const { query } = req.query;
+  
+  try {
+    if (!query || query.length < 1) {
+      return res.json([]);
+    }
+    
+    const accessToken = await getAccessToken();
+    
+    // 리디튜드 영통 도서리스트에서 검색
+    const response = await fetch(`https://api.notion.com/v1/databases/${BOOK_LIST_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: '제목',
+          rich_text: {
+            contains: query
+          }
+        },
+        sorts: [
+          {
+            property: '제목',
+            direction: 'ascending'
+          }
+        ],
+        page_size: 10
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`도서 검색 실패: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const books = data.results.map(page => {
+      const title = page.properties['제목']?.rich_text?.[0]?.plain_text || '';
+      const author = page.properties['저자']?.rich_text?.[0]?.plain_text || '';
+      const level = page.properties['레벨']?.select?.name || '';
+      
+      return {
+        title,
+        author,
+        level,
+        display: author ? `${title} (${author})` : title
+      };
+    });
+    
+    res.json(books);
+    
+  } catch (error) {
+    console.error('책 검색 오류:', error);
+    res.status(500).json({ error: '책 검색 중 오류가 발생했습니다.' });
+  }
+});
+
 // 로그인 페이지
 app.get('/', (req, res) => {
   if (req.session.studentId) {
