@@ -326,8 +326,10 @@ app.post('/save-progress', async (req, res) => {
   }
 
   try {
-    console.log('Notion 클라이언트 생성 중...');
-    const notion = await getUncachableNotionClient();
+    console.log('액세스 토큰 획득 중...');
+    const accessToken = await getAccessToken();
+    console.log('액세스 토큰 획득 완료');
+    
     const formData = req.body;
     
     // 오늘 날짜로 새 항목 생성
@@ -336,22 +338,35 @@ app.post('/save-progress', async (req, res) => {
     // 학생 정보부터 찾기 - relation 필드를 위해 학생의 실제 페이지 ID 필요
     console.log('학생 페이지 ID 찾는 중... 학생 ID:', req.session.studentId);
     
-    // 학생 데이터베이스에서 이 학생의 페이지 ID 찾기
-    const studentResponse = await notion.databases.query({
-      database_id: STUDENT_DB_ID,
-      filter: {
-        property: '학생 ID',
-        rich_text: {
-          equals: req.session.studentId
+    // REST API로 학생 데이터베이스에서 이 학생의 페이지 ID 찾기
+    const studentResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: '학생 ID',
+          rich_text: {
+            equals: req.session.studentId
+          }
         }
-      }
+      })
     });
     
-    if (studentResponse.results.length === 0) {
+    if (!studentResponse.ok) {
+      throw new Error(`학생 정보 조회 실패: ${studentResponse.status}`);
+    }
+    
+    const studentData = await studentResponse.json();
+    
+    if (studentData.results.length === 0) {
       throw new Error(`학생 ID ${req.session.studentId}를 찾을 수 없습니다.`);
     }
     
-    const studentPageId = studentResponse.results[0].id;
+    const studentPageId = studentData.results[0].id;
     console.log('찾은 학생 페이지 ID:', studentPageId);
     
     const properties = {
@@ -409,13 +424,28 @@ app.post('/save-progress', async (req, res) => {
     console.log('최종 properties 객체:', JSON.stringify(properties, null, 2));
     console.log('진도 데이터베이스 ID:', PROGRESS_DB_ID);
     
-    // Notion 데이터베이스에 새 페이지 생성
-    console.log('Notion API 호출 중...');
-    const result = await notion.pages.create({
-      parent: { database_id: PROGRESS_DB_ID },
-      properties: properties
+    // REST API로 Notion 데이터베이스에 새 페이지 생성
+    console.log('Notion 페이지 생성 API 호출 중...');
+    const createResponse = await fetch(`https://api.notion.com/v1/pages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        parent: { database_id: PROGRESS_DB_ID },
+        properties: properties
+      })
     });
     
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      console.error('페이지 생성 실패 상세:', errorText);
+      throw new Error(`페이지 생성 실패: ${createResponse.status} - ${errorText}`);
+    }
+    
+    const result = await createResponse.json();
     console.log('저장 성공! 생성된 페이지 ID:', result.id);
     res.json({ success: true, message: '학습 데이터가 성공적으로 저장되었습니다!' });
   } catch (error) {
