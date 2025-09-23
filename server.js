@@ -317,20 +317,49 @@ app.post('/logout', (req, res) => {
 
 // 학습 데이터 저장
 app.post('/save-progress', async (req, res) => {
+  console.log('=== 저장 요청 시작 ===');
+  console.log('세션 학생 ID:', req.session.studentId);
+  console.log('받은 폼 데이터:', JSON.stringify(req.body, null, 2));
+  
   if (!req.session.studentId) {
     return res.json({ success: false, message: '로그인이 필요합니다.' });
   }
 
   try {
+    console.log('Notion 클라이언트 생성 중...');
     const notion = await getUncachableNotionClient();
     const formData = req.body;
     
     // 오늘 날짜로 새 항목 생성
     const today = new Date().toISOString().split('T')[0];
     
+    // 학생 정보부터 찾기 - relation 필드를 위해 학생의 실제 페이지 ID 필요
+    console.log('학생 페이지 ID 찾는 중... 학생 ID:', req.session.studentId);
+    
+    // 학생 데이터베이스에서 이 학생의 페이지 ID 찾기
+    const studentResponse = await notion.databases.query({
+      database_id: STUDENT_DB_ID,
+      filter: {
+        property: '학생 ID',
+        rich_text: {
+          equals: req.session.studentId
+        }
+      }
+    });
+    
+    if (studentResponse.results.length === 0) {
+      throw new Error(`학생 ID ${req.session.studentId}를 찾을 수 없습니다.`);
+    }
+    
+    const studentPageId = studentResponse.results[0].id;
+    console.log('찾은 학생 페이지 ID:', studentPageId);
+    
     const properties = {
       '🕐 날짜': {
         date: { start: today }
+      },
+      '학생 명부 관리': {
+        relation: [{ id: studentPageId }]
       }
     };
 
@@ -377,16 +406,26 @@ app.post('/save-progress', async (req, res) => {
       properties['오늘의 학습 소감'] = { rich_text: [{ text: { content: formData['오늘의 학습 소감'] } }] };
     }
 
+    console.log('최종 properties 객체:', JSON.stringify(properties, null, 2));
+    console.log('진도 데이터베이스 ID:', PROGRESS_DB_ID);
+    
     // Notion 데이터베이스에 새 페이지 생성
-    await notion.pages.create({
+    console.log('Notion API 호출 중...');
+    const result = await notion.pages.create({
       parent: { database_id: PROGRESS_DB_ID },
       properties: properties
     });
-
+    
+    console.log('저장 성공! 생성된 페이지 ID:', result.id);
     res.json({ success: true, message: '학습 데이터가 성공적으로 저장되었습니다!' });
   } catch (error) {
-    console.error('저장 오류:', error);
-    res.json({ success: false, message: '저장 중 오류가 발생했습니다.' });
+    console.error('=== 저장 오류 발생 ===');
+    console.error('오류 메시지:', error.message);
+    console.error('오류 스택:', error.stack);
+    if (error.body) {
+      console.error('Notion API 오류 상세:', JSON.stringify(error.body, null, 2));
+    }
+    res.json({ success: false, message: '저장 중 오류가 발생했습니다: ' + error.message });
   }
 });
 
