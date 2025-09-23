@@ -54,7 +54,7 @@ if (missingVars.length > 0 && process.env.NODE_ENV === 'production') {
 }
 
 // 학생 데이터베이스 ID (원생 관리)
-const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
+const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || '25409320bce280f8ace1ddcdd022b360';
 const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
 
 // 로그인 페이지
