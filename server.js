@@ -99,6 +99,7 @@ const PROGRESS_DB_ID = formatNotionId(process.env.PROGRESS_DATABASE_ID || '25409
 const BOOK_LIST_DB_ID = formatNotionId(process.env.BOOK_LIST_DATABASE_ID || '9ef2bbaeec19466daa0d0c0677b9eb90');
 const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf82d56634574d7e83d893fbf1b1a4e3');
 
+
 // 데이터베이스 연결 확인 완료
 
 
@@ -123,14 +124,14 @@ app.get('/api/search-sayu-books', async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          property: '책제목',
-          rich_text: {
+          property: '3독 요약 사유독평 도서 보유 목록',
+          title: {
             contains: query
           }
         },
         sorts: [
           {
-            property: '책제목',
+            property: '3독 요약 사유독평 도서 보유 목록',
             direction: 'ascending'
           }
         ],
@@ -146,14 +147,14 @@ app.get('/api/search-sayu-books', async (req, res) => {
     
     const data = await response.json();
     const books = data.results.map(page => {
-      const title = page.properties['책제목']?.rich_text?.[0]?.plain_text || '';
-      const author = page.properties['저자']?.rich_text?.[0]?.plain_text || '';
-      const category = page.properties['장르']?.select?.name || '';
+      const title = page.properties['3독 요약 사유독평 도서 보유 목록']?.title?.[0]?.plain_text || '';
+      const author = page.properties[' 지은이']?.rich_text?.[0]?.plain_text || '';
+      const publisher = page.properties[' 출판사']?.rich_text?.[0]?.plain_text || '';
       
       return {
         title,
         author,
-        category,
+        publisher,
         display: author ? `${title} (${author})` : title
       };
     }).filter(book => book.title && book.title.toLowerCase().includes(query.toLowerCase()));

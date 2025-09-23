@@ -555,7 +555,7 @@
                     <div class="autocomplete-suggestion" onclick="selectSayuBook(${index})">
                         <div class="book-title">${book.title}</div>
                         ${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}
-                        ${book.category ? `<div class="book-level">${book.category}</div>` : ''}
+                        ${book.publisher ? `<div class="book-level">출판사: ${book.publisher}</div>` : ''}
                     </div>
                 `;
             });
