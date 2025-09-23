@@ -100,6 +100,7 @@ const BOOK_LIST_DB_ID = formatNotionId(process.env.BOOK_LIST_DATABASE_ID || '9ef
 const SAYU_BOOK_DB_ID = formatNotionId(process.env.SAYU_BOOK_DATABASE_ID || 'cf82d56634574d7e83d893fbf1b1a4e3');
 
 
+
 // 데이터베이스 연결 확인 완료
 
 
@@ -146,6 +147,7 @@ app.get('/api/search-sayu-books', async (req, res) => {
     }
     
     const data = await response.json();
+    
     const books = data.results.map(page => {
       const title = page.properties['3독 요약 사유독평 도서 보유 목록']?.title?.[0]?.plain_text || '';
       const author = page.properties[' 지은이']?.rich_text?.[0]?.plain_text || '';
@@ -160,10 +162,9 @@ app.get('/api/search-sayu-books', async (req, res) => {
     }).filter(book => book.title && book.title.toLowerCase().includes(query.toLowerCase()));
     
     res.json(books);
-    
   } catch (error) {
     console.error('사유독평 책 검색 오류:', error);
-    res.status(500).json({ error: '사유독평 책 검색 중 오류가 발생했습니다.' });
+    res.status(500).json({ error: '책 검색 중 오류가 발생했습니다.' });
   }
 });
 
@@ -328,10 +329,7 @@ app.post('/save-progress', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     
     const properties = {
-      '학생 ID': {
-        rich_text: [{ text: { content: req.session.studentId } }]
-      },
-      '날짜': {
+      '🕐 날짜': {
         date: { start: today }
       }
     };
@@ -353,7 +351,7 @@ app.post('/save-progress', async (req, res) => {
       properties['독해오답갯수'] = { number: parseInt(formData['독해오답갯수']) || 0 };
     }
     if (formData['독해하브루타']) {
-      properties['독해하브루타'] = { select: { name: formData['독해하브루타'] } };
+      properties['독해하브'] = { select: { name: formData['독해하브루타'] } };
     }
     if (formData['영어 더빙 학습 완료']) {
       properties['영어 더빙 학습 완료'] = { status: { name: formData['영어 더빙 학습 완료'] } };
@@ -370,14 +368,10 @@ app.post('/save-progress', async (req, res) => {
     if (formData['Writing']) {
       properties['Writing'] = { select: { name: formData['Writing'] } };
     }
-    if (formData['오늘 읽은 영어 책']) {
-      properties['오늘 읽은 영어 책'] = { rich_text: [{ text: { content: formData['오늘 읽은 영어 책'] } }] };
-    }
+    // 영어 책과 3독 독서는 rollup/relation 필드라 직접 저장하지 않고 별도 처리 필요
+    
     if (formData['📕 책 읽는 거인']) {
       properties['📕 책 읽는 거인'] = { select: { name: formData['📕 책 읽는 거인'] } };
-    }
-    if (formData['3독 독서 제목']) {
-      properties['3독 독서 제목'] = { rich_text: [{ text: { content: formData['3독 독서 제목'] } }] };
     }
     if (formData['오늘의 학습 소감']) {
       properties['오늘의 학습 소감'] = { rich_text: [{ text: { content: formData['오늘의 학습 소감'] } }] };
