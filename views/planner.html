@@ -47,7 +47,8 @@
             cursor: pointer; 
             border-bottom: 1px solid #f0f0f0; 
         }
-        .autocomplete-suggestion:hover { 
+        .autocomplete-suggestion:hover, 
+        .autocomplete-suggestion.active { 
             background-color: #f8f9fa; 
         }
         .autocomplete-suggestion:last-child { 
@@ -305,15 +306,18 @@
                 // 기존 타이머 클리어
                 clearTimeout(searchTimeout);
                 
-                if (query.length < 1) {
+                if (query.length < 2) {
                     hideSuggestions();
                     return;
                 }
                 
-                // 300ms 후에 검색 실행 (타이핑 완료 후 검색)
+                // 검색 중 표시
+                showLoadingState();
+                
+                // 500ms 후에 검색 실행 (타이핑 완료 후 검색)
                 searchTimeout = setTimeout(() => {
                     searchBooks(query);
-                }, 300);
+                }, 500);
             });
             
             // 입력 필드에서 포커스 아웃시 제안 목록 숨기기 (약간의 지연 후)
@@ -321,6 +325,30 @@
                 setTimeout(() => {
                     hideSuggestions();
                 }, 200);
+            });
+            
+            // ESC 키로 제안 목록 숨기기
+            bookInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    hideSuggestions();
+                    return;
+                }
+                
+                const suggestions = document.querySelectorAll('.autocomplete-suggestion');
+                const activeIndex = Array.from(suggestions).findIndex(s => s.classList.contains('active'));
+                
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const nextIndex = activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0;
+                    setActiveSuggestion(nextIndex);
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const prevIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1;
+                    setActiveSuggestion(prevIndex);
+                } else if (event.key === 'Enter' && activeIndex >= 0) {
+                    event.preventDefault();
+                    selectBook(activeIndex);
+                }
             });
             
             // 클릭 외부 영역 클릭시 제안 목록 숨기기
@@ -348,11 +376,18 @@
             }
         }
         
+        function showLoadingState() {
+            const suggestionsList = document.getElementById('bookSuggestions');
+            suggestionsList.innerHTML = '<div class="autocomplete-suggestion">🔍 검색 중...</div>';
+            suggestionsList.style.display = 'block';
+        }
+        
         function showSuggestions(books) {
             const suggestionsList = document.getElementById('bookSuggestions');
             
             if (books.length === 0) {
-                hideSuggestions();
+                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>';
+                suggestionsList.style.display = 'block';
                 return;
             }
             
@@ -371,6 +406,14 @@
             suggestionsList.style.display = 'block';
         }
         
+        function setActiveSuggestion(index) {
+            const suggestions = document.querySelectorAll('.autocomplete-suggestion');
+            suggestions.forEach(s => s.classList.remove('active'));
+            if (suggestions[index]) {
+                suggestions[index].classList.add('active');
+            }
+        }
+        
         function hideSuggestions() {
             const suggestionsList = document.getElementById('bookSuggestions');
             suggestionsList.style.display = 'none';
@@ -383,7 +426,8 @@
             bookInput.value = book.title;
             hideSuggestions();
             
-            // 자동 저장 트리거
+            // input 이벤트 발생시켜서 자동 저장 트리거
+            bookInput.dispatchEvent(new Event('input', { bubbles: true }));
             saveFormData();
         }
         

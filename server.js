@@ -106,7 +106,7 @@ app.get('/api/search-books', async (req, res) => {
   const { query } = req.query;
   
   try {
-    if (!query || query.length < 1) {
+    if (!query || query.length < 2) {
       return res.json([]);
     }
     
@@ -143,7 +143,10 @@ app.get('/api/search-books', async (req, res) => {
     
     const data = await response.json();
     const books = data.results.map(page => {
-      const title = page.properties['제목']?.rich_text?.[0]?.plain_text || '';
+      // 제목은 Title 타입 또는 Rich Text 타입일 수 있음
+      const title = page.properties['제목']?.title?.[0]?.plain_text || 
+                   page.properties['제목']?.rich_text?.[0]?.plain_text ||
+                   page.properties.Name?.title?.[0]?.plain_text || '';
       const author = page.properties['저자']?.rich_text?.[0]?.plain_text || '';
       const level = page.properties['레벨']?.select?.name || '';
       
@@ -153,7 +156,7 @@ app.get('/api/search-books', async (req, res) => {
         level,
         display: author ? `${title} (${author})` : title
       };
-    });
+    }).filter(book => book.title); // 제목이 없는 책은 제외
     
     res.json(books);
     
