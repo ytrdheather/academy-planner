@@ -6,6 +6,37 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getUncachableNotionClient } from './notion-client.js';
 
+// getAccessToken 함수 추가 (notion-client.js에서 가져오기)
+async function getAccessToken() {
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  }
+
+  const connectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=notion',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+
+  if (!connectionSettings || !accessToken) {
+    throw new Error('Notion not connected');
+  }
+  return accessToken;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -116,56 +147,48 @@ app.post('/login', async (req, res) => {
     console.log('- notion.search:', typeof notion.search);
     
     try {
-      // 방법 1: 표준 query 시도
-      if (notion.databases.query) {
-        console.log('🔄 방법 1: databases.query 사용');
-        response = await notion.databases.query({
-          database_id: STUDENT_DB_ID,
+      // 방법 3: 직접 REST API 호출
+      console.log('🔄 방법 3: REST API 직접 호출');
+      const accessToken = await getAccessToken();
+      
+      const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28'
+        },
+        body: JSON.stringify({
           filter: {
             and: [
               {
                 property: '학생 ID',
-                rich_text: { equals: studentId }
+                rich_text: {
+                  equals: studentId
+                }
               },
               {
                 property: '비밀번호',
-                rich_text: { equals: password.toString() }
+                rich_text: {
+                  equals: password.toString()
+                }
               }
             ]
           }
-        });
-      } else {
-        // 방법 2: search로 페이지 찾기
-        console.log('🔄 방법 2: search로 페이지 찾기');
-        response = await notion.search({
-          query: studentId,
-          filter: {
-            value: 'page',
-            property: 'object'
-          },
-          page_size: 10
-        });
-        
-        console.log('🔍 검색 결과:', response.results.length, '개');
-        
-        // 검색 결과 상세 분석
-        response.results.forEach((page, index) => {
-          console.log(`📄 페이지 ${index + 1}:`);
-          console.log(`  - ID: ${page.id}`);
-          console.log(`  - Parent 타입: ${page.parent?.type}`);
-          console.log(`  - Parent DB ID: ${page.parent?.database_id}`);
-          console.log(`  - 우리 DB ID: ${STUDENT_DB_ID}`);
-          console.log(`  - 일치 여부: ${page.parent?.database_id === STUDENT_DB_ID}`);
-        });
-        
-        // 검색 결과에서 해당 데이터베이스의 페이지만 필터링
-        const filteredResults = response.results.filter(page => {
-          return page.parent && page.parent.database_id === STUDENT_DB_ID;
-        });
-        
-        console.log('🎯 필터링된 결과:', filteredResults.length, '개');
-        response.results = filteredResults;
+        })
+      });
+      
+      console.log('🌐 REST API 응답 상태:', restResponse.status);
+      
+      if (!restResponse.ok) {
+        const errorText = await restResponse.text();
+        console.error('🚨 REST API 오류:', errorText);
+        throw new Error(`REST API 호출 실패: ${restResponse.status}`);
       }
+      
+      response = await restResponse.json();
+      console.log('✅ REST API 응답 성공, 결과:', response.results.length, '개');
+      
     } catch (methodError) {
       console.error('🚨 메서드 실행 오류:', methodError.message);
       throw methodError;
