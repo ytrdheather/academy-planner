@@ -91,6 +91,9 @@ app.post('/login', async (req, res) => {
     const notion = await getUncachableNotionClient();
     console.log('✅ Notion 클라이언트 생성 성공:', typeof notion, !!notion.databases);
     console.log('🔍 Notion 클라이언트 구조:', Object.keys(notion));
+    console.log('📋 databases 객체 타입:', typeof notion.databases);
+    console.log('📋 databases 객체 메서드:', Object.keys(notion.databases));
+    console.log('📋 query 메서드 존재?', typeof notion.databases.query);
     
     // 학생 정보 조회
     const response = await notion.databases.query({
