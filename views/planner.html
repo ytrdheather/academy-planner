@@ -34,11 +34,11 @@
             background: #ffffff;
             color: #6b46c1;
             padding: 30px;
-            min-height: 120px;
+            min-height: 140px;
             border-bottom: 2px solid #e2e8f0;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
         }
         .header-buttons { 
             position: absolute; 
@@ -54,22 +54,19 @@
             line-height: 1.3; 
             margin: 0;
             font-weight: 700;
-            text-align: center;
+            text-align: left;
             color: #6b46c1;
         }
         
         .header-logo {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 120px;
+            width: 240px;
             height: auto;
+            margin: 0 auto;
         }
         
         .header-content {
-            text-align: center;
-            margin-top: 60px;
+            text-align: left;
+            flex: 1;
         }
         
         /* 카드형 섹션 스타일 */
@@ -92,18 +89,6 @@
             position: relative;
         }
         
-        .homework-section h2::after {
-            content: '';
-            position: absolute;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 100px;
-            height: 30px;
-            background: url('/assets/logo.png') no-repeat center;
-            background-size: contain;
-            opacity: 0.8;
-        }
         
         .input-group { margin-bottom: 20px; }
         .input-group label { 
@@ -258,10 +243,11 @@
 <body>
     <div class="planner-container">
         <div class="header">
-            <img src="/assets/logo.png" alt="리디튜드 로고" class="header-logo">
             <div class="header-content">
                 <h1 id="welcomeMessage" class="welcome-title">오늘의 학습 플래너 ✍️</h1>
             </div>
+            <img src="/assets/logo.png" alt="리디튜드 로고" class="header-logo">
+            <div style="flex: 1;"></div>
             <div class="header-buttons">
                 <button id="autoSaveBtn" class="auto-save-button">임시 저장</button>
                 <span id="autoSaveStatus" class="auto-save-status"></span>
