@@ -62,7 +62,7 @@
             width: 240px;
             height: auto;
             margin: 0 auto;
-            margin-right: 10px;
+            margin-right: 80px;
         }
         
         .header-content {
@@ -245,7 +245,7 @@
     <div class="planner-container">
         <div class="header">
             <div class="header-content">
-                <h1 id="welcomeMessage" class="welcome-title">오늘의 학습 플래너 ✍️</h1>
+                <h1 id="welcomeMessage" class="welcome-title">오늘의 학습 플래너</h1>
             </div>
             <img src="/assets/logo.png" alt="리디튜드 로고" class="header-logo">
             <div style="flex: 1;"></div>
@@ -456,7 +456,7 @@
                     const data = await response.json();
                     const welcomeMsg = document.getElementById('welcomeMessage');
                     const realName = data.studentRealName || data.studentName || data.studentId;
-                    welcomeMsg.innerHTML = `오늘도 열심히 한 리디튜더<br>${realName}(이)의 학습 플래너 📚✍️`;
+                    welcomeMsg.innerHTML = `오늘도 열심히 한 리디튜더<br>${realName}(이)의 학습 플래너`;
                 }
             } catch (error) {
                 console.error('학생 정보 로드 실패:', error);
