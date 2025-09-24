@@ -77,7 +77,7 @@
 <body>
     <div class="planner-container">
         <div class="header">
-            <h1>오늘의 학습 플래너 ✍️</h1>
+            <h1 id="welcomeMessage">오늘의 학습 플래너 ✍️</h1>
             <div>
                 <button id="autoSaveBtn" class="auto-save-button">임시 저장</button>
                 <span id="autoSaveStatus" class="auto-save-status"></span>
@@ -209,6 +209,20 @@
     </div>
 
     <script>
+        // 페이지 로드 시 학생 이름 가져와서 표시
+        async function loadStudentInfo() {
+            try {
+                const response = await fetch('/api/student-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    const welcomeMsg = document.getElementById('welcomeMessage');
+                    welcomeMsg.textContent = `안녕하세요, ${data.studentName}님! 📚 오늘의 학습 플래너 ✍️`;
+                }
+            } catch (error) {
+                console.error('학생 정보 로드 실패:', error);
+            }
+        }
+
         // 자동 저장 기능
         let autoSaveInterval;
         
@@ -594,6 +608,7 @@
 
         // 페이지 로드시 자동완성 초기화
         document.addEventListener('DOMContentLoaded', function() {
+            loadStudentInfo(); // 학생 이름 로드
             initializeBookAutocomplete();
             initializeSayuBookAutocomplete();
         });

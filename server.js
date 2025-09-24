@@ -248,6 +248,18 @@ app.get('/planner', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'planner.html'));
 });
 
+// 세션에서 학생 정보 가져오기 API
+app.get('/api/student-info', (req, res) => {
+  if (!req.session.studentId) {
+    return res.status(401).json({ error: '로그인이 필요합니다' });
+  }
+  
+  res.json({
+    studentId: req.session.studentId,
+    studentName: req.session.studentName || req.session.studentId
+  });
+});
+
 // 선생님 페이지
 app.get('/teacher', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'teacher.html'));
