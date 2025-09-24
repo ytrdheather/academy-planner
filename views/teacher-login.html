@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>선생님 로그인 - 리디튜드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Square+Round:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Nanum Square Round', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+        
+        .logo-container {
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 200px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        
+        .title {
+            color: #6b46c1;
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: #8b5cf6;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+        
+        .teacher-badge {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            display: inline-block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #6b46c1;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Nanum Square Round', sans-serif;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #6b46c1;
+            box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+            background: white;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #6b46c1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Nanum Square Round', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            box-shadow: 0 4px 15px rgba(107, 70, 193, 0.3);
+        }
+        
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(107, 70, 193, 0.4);
+        }
+        
+        .login-button:active {
+            transform: translateY(0);
+        }
+        
+        .student-link {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .student-link a {
+            color: #6b46c1;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: color 0.3s ease;
+        }
+        
+        .student-link a:hover {
+            color: #8b5cf6;
+        }
+        
+        .error-message {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            border: 1px solid #f87171;
+            display: none;
+        }
+        
+        .loading {
+            display: none;
+            margin-top: 15px;
+            color: #6b46c1;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-container">
+            <img src="/assets/logo.png" alt="리디튜드 로고" class="logo">
+            <h1 class="title">리디튜드</h1>
+            <p class="subtitle">Read with Attitude</p>
+            <div class="teacher-badge">👩‍🏫 선생님 전용</div>
+        </div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        
+        <form id="teacherLoginForm">
+            <div class="form-group">
+                <label for="teacherId">선생님 아이디</label>
+                <input type="text" id="teacherId" name="teacherId" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="teacherPassword">비밀번호</label>
+                <input type="password" id="teacherPassword" name="teacherPassword" required>
+            </div>
+            
+            <button type="submit" class="login-button">선생님 로그인</button>
+            
+            <div class="loading" id="loading">로그인 중...</div>
+        </form>
+        
+        <div class="student-link">
+            <a href="/">← 학생 로그인으로 돌아가기</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('teacherLoginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const teacherId = document.getElementById('teacherId').value;
+            const teacherPassword = document.getElementById('teacherPassword').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const loadingDiv = document.getElementById('loading');
+            
+            // 로딩 상태 표시
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/teacher-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        teacherId: teacherId,
+                        teacherPassword: teacherPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 로그인 성공 시 선생님 대시보드로 이동
+                    window.location.href = '/teacher';
+                } else {
+                    // 오류 메시지 표시
+                    errorDiv.textContent = result.message || '로그인에 실패했습니다.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('로그인 오류:', error);
+                errorDiv.textContent = '로그인 처리 중 오류가 발생했습니다.';
+                errorDiv.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

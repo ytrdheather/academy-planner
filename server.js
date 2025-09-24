@@ -263,7 +263,65 @@ app.get('/api/student-info', (req, res) => {
 });
 
 // 선생님 페이지
+// 선생님 로그인 페이지
+app.get('/teacher-login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'teacher-login.html'));
+});
+
+// 선생님 로그인 처리
+app.post('/teacher-login', async (req, res) => {
+  const { teacherId, teacherPassword } = req.body;
+  
+  // 선생님 계정 정보 (환경변수 또는 기본값)
+  const validTeacherId = process.env.TEACHER_ID || 'readitude';
+  const validTeacherPassword = process.env.TEACHER_PASSWORD || 'rdtd112!@';
+  
+  if (teacherId === validTeacherId && teacherPassword === validTeacherPassword) {
+    // 보안: 세션 고정 공격 방지를 위한 세션 ID 재생성
+    req.session.regenerate((err) => {
+      if (err) {
+        console.error('세션 재생성 오류:', err);
+        return res.json({ success: false, message: '로그인 처리 중 오류가 발생했습니다.' });
+      }
+      
+      // 세션에 선생님 로그인 정보 저장
+      req.session.isTeacher = true;
+      req.session.teacherId = teacherId;
+      
+      // 세션 저장 후 응답
+      req.session.save((err) => {
+        if (err) {
+          console.error('세션 저장 오류:', err);
+          return res.json({ success: false, message: '로그인 처리 중 오류가 발생했습니다.' });
+        }
+        res.json({ success: true, message: '로그인 성공' });
+      });
+    });
+  } else {
+    res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+  }
+});
+
+// 선생님 로그아웃
+app.post('/teacher-logout', (req, res) => {
+  // 보안: 완전한 세션 파기 및 쿠키 삭제
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('세션 파기 오류:', err);
+      return res.json({ success: false, message: '로그아웃 처리 중 오류가 발생했습니다.' });
+    }
+    
+    // 세션 쿠키 삭제
+    res.clearCookie('connect.sid'); // 기본 세션 쿠키 이름
+    res.json({ success: true, message: '로그아웃 되었습니다.' });
+  });
+});
+
+// 선생님 대시보드 (세션 확인 필요)
 app.get('/teacher', (req, res) => {
+  if (!req.session.isTeacher) {
+    return res.redirect('/teacher-login');
+  }
   res.sendFile(path.join(__dirname, 'views', 'teacher.html'));
 });
 
@@ -623,18 +681,28 @@ app.post('/save-progress', async (req, res) => {
   }
 });
 
-// 선생님 인증 미들웨어
+// 선생님 API 인증 미들웨어 (세션 기반만 허용)
 function requireTeacherAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const validToken = process.env.TEACHER_ACCESS_TOKEN || 'dev-teacher-token';
-  
-  if (!authHeader || authHeader !== `Bearer ${validToken}`) {
-    return res.status(401).json({ 
-      error: '선생님 인증이 필요합니다.',
-      hint: process.env.NODE_ENV !== 'production' ? 'Bearer dev-teacher-token 헤더를 추가하세요' : undefined
-    });
+  // 세션 확인
+  if (req.session && req.session.isTeacher) {
+    return next();
   }
-  next();
+  
+  // 보안: 프로덕션에서는 세션 기반 인증만 허용
+  // 개발 환경에서만 토큰 기반 허용 (보안 강화)
+  if (process.env.NODE_ENV !== 'production') {
+    const authHeader = req.headers.authorization;
+    const validToken = process.env.TEACHER_ACCESS_TOKEN;
+    
+    if (validToken && authHeader === `Bearer ${validToken}`) {
+      return next();
+    }
+  }
+  
+  return res.status(401).json({ 
+    error: '선생님 인증이 필요합니다. 로그인해주세요.',
+    redirect: '/teacher-login'
+  });
 }
 
 // 전체 학생 진도 조회 (선생님용)

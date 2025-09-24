@@ -116,7 +116,10 @@
 </head>
 <body>
     <div class="container">
-        <a href="/" class="back-button">← 로그인 페이지로</a>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <a href="/" class="back-button">← 홈페이지로</a>
+            <button onclick="logout()" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">로그아웃</button>
+        </div>
         <h1>👩‍🏫 선생님 페이지 - 학생 진도 관리</h1>
         
         <div class="search-section">
@@ -146,12 +149,9 @@
             
             try {
                 const url = studentId ? `/api/student-progress/${studentId}` : '/api/student-progress';
-                // 개발 환경용 토큰 (실제 운영시에는 환경변수로 설정 필요)
-                const token = localStorage.getItem('teacherToken') || 'dev-teacher-token';
+                // 세션 기반 인증 (토큰 헤더 불필요)
                 const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    credentials: 'include' // 세션 쿠키 포함
                 });
                 const data = await response.json();
                 
@@ -221,6 +221,26 @@
             };
         }
 
+        // 로그아웃 함수
+        async function logout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                try {
+                    const response = await fetch('/teacher-logout', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        window.location.href = '/teacher-login';
+                    }
+                } catch (error) {
+                    console.error('로그아웃 오류:', error);
+                    // 오류가 발생해도 로그인 페이지로 이동
+                    window.location.href = '/teacher-login';
+                }
+            }
+        }
+        
         // 페이지 로드 시 전체 진도 조회
         window.addEventListener('load', () => {
             loadAllProgress();
