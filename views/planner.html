@@ -13,7 +13,7 @@
             font-family: "NanumSquareRound", "나눔스퀘어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
         }
         body { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #ffffff;
             min-height: 100vh;
             color: #2d3748; 
             margin: 0; 
@@ -22,11 +22,11 @@
         .planner-container { 
             max-width: 700px; 
             margin: auto; 
-            background: rgba(255, 255, 255, 0.95); 
+            background: #ffffff; 
             padding: 0; 
             border-radius: 20px; 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
             overflow: hidden;
         }
         .header { 
@@ -70,6 +70,20 @@
             margin: 0 0 20px 0;
             font-size: 20px;
             font-weight: 700;
+            position: relative;
+        }
+        
+        .homework-section h2::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100px;
+            height: 30px;
+            background: url('/assets/logo.png') no-repeat center;
+            background-size: contain;
+            opacity: 0.8;
         }
         
         .input-group { margin-bottom: 20px; }
@@ -99,22 +113,23 @@
         textarea { resize: vertical; min-height: 80px; }
         
         .submit-button { 
-            width: 100%; 
-            padding: 16px; 
+            width: 300px; 
+            padding: 12px; 
             border: none; 
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
             color: white; 
             border-radius: 12px; 
             cursor: pointer; 
-            font-size: 18px; 
+            font-size: 16px; 
             font-weight: 600; 
-            margin: 25px;
+            margin: 25px auto;
+            display: block;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
         }
         .submit-button:hover { 
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
         }
         
         .auto-save-button { 
@@ -233,7 +248,7 @@
         </div>
         
         <form id="plannerForm">
-            <div class="section-card">
+            <div class="section-card homework-section">
                 <h2>📋 숙제 확인 <small style="color: #a0a0a0; font-weight: normal; font-size: 12px;">(오늘 숙제가 없는 것은 빈칸으로 두세요.)</small></h2>
             <div class="input-group input-row">
                 <div>

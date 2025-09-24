@@ -51,6 +51,7 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use('/assets', express.static('assets'));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'readitude-secret-key-change-in-production',
   resave: false,
