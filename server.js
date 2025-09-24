@@ -421,6 +421,9 @@ app.post('/save-progress', async (req, res) => {
     if (formData['어휘총문제']) {
       properties['어휘총문제'] = { number: parseInt(formData['어휘총문제']) || 0 };
     }
+    if (formData['어휘유닛']) {
+      properties['어휘유닛'] = { rich_text: [{ text: { content: formData['어휘유닛'] } }] };
+    }
     if (formData['문법 전체 개수']) {
       properties['문법 전체 개수'] = { number: parseInt(formData['문법 전체 개수']) || 0 };
     }
