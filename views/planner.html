@@ -445,15 +445,31 @@
     </div>
 
     <script>
-        // 페이지 로드 시 학생 이름 가져와서 표시
+        // 페이지 로드 시 학생 이름과 날짜 표시
         async function loadStudentInfo() {
             try {
                 const response = await fetch('/api/student-info');
                 if (response.ok) {
                     const data = await response.json();
-                    const welcomeMsg = document.getElementById('welcomeMessage');
+                    const studentNameElement = document.getElementById('studentName');
+                    const currentDateElement = document.getElementById('currentDate');
                     const realName = data.studentRealName || data.studentName || data.studentId;
-                    welcomeMsg.innerHTML = `오늘도 열심히 한 리디튜더<br>${realName}(이)의 학습 플래너`;
+                    
+                    // 학생 이름 업데이트
+                    if (studentNameElement) {
+                        studentNameElement.textContent = `${realName}(이)의`;
+                    }
+                    
+                    // 현재 날짜 업데이트
+                    if (currentDateElement) {
+                        const today = new Date();
+                        const dateString = today.toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: 'long', 
+                            day: 'numeric'
+                        });
+                        currentDateElement.textContent = `날짜 : ${dateString}`;
+                    }
                 }
             } catch (error) {
                 console.error('학생 정보 로드 실패:', error);
