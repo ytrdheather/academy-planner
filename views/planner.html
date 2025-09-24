@@ -216,7 +216,8 @@
                 if (response.ok) {
                     const data = await response.json();
                     const welcomeMsg = document.getElementById('welcomeMessage');
-                    welcomeMsg.textContent = `안녕하세요, ${data.studentName}님! 📚 오늘의 학습 플래너 ✍️`;
+                    const realName = data.studentRealName || data.studentName || data.studentId;
+                    welcomeMsg.textContent = `오늘도 열심히 한 리디튜더 ${realName}(이)의 학습 플래너 📚✍️`;
                 }
             } catch (error) {
                 console.error('학생 정보 로드 실패:', error);

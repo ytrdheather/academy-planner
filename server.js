@@ -256,7 +256,8 @@ app.get('/api/student-info', (req, res) => {
   
   res.json({
     studentId: req.session.studentId,
-    studentName: req.session.studentName || req.session.studentId
+    studentName: req.session.studentName || req.session.studentId,
+    studentRealName: req.session.studentRealName || req.session.studentName || req.session.studentId
   });
 });
 
@@ -310,7 +311,33 @@ app.post('/login', async (req, res) => {
 
     if (response.results.length > 0) {
       req.session.studentId = studentId;
-      req.session.studentName = response.results[0].properties['학생 ID']?.rich_text?.[0]?.plain_text || studentId;
+      
+      // 학생 데이터베이스의 모든 필드 확인 (디버깅용)
+      console.log('학생 데이터베이스 필드들:', Object.keys(response.results[0].properties));
+      
+      // 실제 이름 필드 찾기 ('이름', 'Name', '학생이름' 등 시도)
+      const studentRecord = response.results[0].properties;
+      let realName = null;
+      
+      // 가능한 이름 필드들 시도
+      const nameFields = ['이름', 'Name', '학생이름', '학생 이름', '성명'];
+      for (const field of nameFields) {
+        if (studentRecord[field]?.rich_text?.[0]?.plain_text) {
+          realName = studentRecord[field].rich_text[0].plain_text;
+          console.log(`찾은 이름 필드: ${field} = ${realName}`);
+          break;
+        }
+        if (studentRecord[field]?.title?.[0]?.plain_text) {
+          realName = studentRecord[field].title[0].plain_text;
+          console.log(`찾은 이름 필드 (title): ${field} = ${realName}`);
+          break;
+        }
+      }
+      
+      req.session.studentName = realName || studentId;
+      req.session.studentRealName = realName; // 실제 이름 별도 저장
+      console.log('세션에 저장된 학생 이름:', req.session.studentName);
+      
       res.json({ success: true, message: '로그인 성공!' });
     } else {
       res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
