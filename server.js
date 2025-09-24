@@ -453,23 +453,23 @@ app.post('/save-progress', async (req, res) => {
     // 업데이트할 properties (날짜와 학생 관계는 이미 설정되어 있으므로 제외)
     const properties = {};
 
-    // 숙제 확인 필드들 (상태 속성)
-    if (formData['⭕ 지난 문법 숙제 검사']) {
+    // 숙제 확인 필드들 (상태 속성) - "해당없음"은 저장하지 않음
+    if (formData['⭕ 지난 문법 숙제 검사'] && formData['⭕ 지난 문법 숙제 검사'] !== '해당없음') {
       properties['⭕ 지난 문법 숙제 검사'] = { status: { name: formData['⭕ 지난 문법 숙제 검사'] } };
     }
-    if (formData['1️⃣ 어휘 클카 암기 숙제']) {
+    if (formData['1️⃣ 어휘 클카 암기 숙제'] && formData['1️⃣ 어휘 클카 암기 숙제'] !== '해당없음') {
       properties['1️⃣ 어휘 클카 암기 숙제'] = { status: { name: formData['1️⃣ 어휘 클카 암기 숙제'] } };
     }
-    if (formData['2️⃣ 독해 단어 클카 숙제']) {
+    if (formData['2️⃣ 독해 단어 클카 숙제'] && formData['2️⃣ 독해 단어 클카 숙제'] !== '해당없음') {
       properties['2️⃣ 독해 단어 클카 숙제'] = { status: { name: formData['2️⃣ 독해 단어 클카 숙제'] } };
     }
-    if (formData['4️⃣ Summary 숙제']) {
+    if (formData['4️⃣ Summary 숙제'] && formData['4️⃣ Summary 숙제'] !== '해당없음') {
       properties['4️⃣ Summary 숙제'] = { status: { name: formData['4️⃣ Summary 숙제'] } };
     }
-    if (formData['5️⃣ 매일 독해 숙제']) {
+    if (formData['5️⃣ 매일 독해 숙제'] && formData['5️⃣ 매일 독해 숙제'] !== '해당없음') {
       properties['5️⃣ 매일 독해 숙제'] = { status: { name: formData['5️⃣ 매일 독해 숙제'] } };
     }
-    if (formData['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']) {
+    if (formData['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)'] && formData['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)'] !== '해당없음') {
       properties['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)'] = { status: { name: formData['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)'] } };
     }
 
