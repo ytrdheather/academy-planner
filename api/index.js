@@ -488,16 +488,17 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('6️⃣ 영어 일기 원본:', JSON.stringify(props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']));
       console.log('수행율 원본:', JSON.stringify(props['수행율']));
       
-      // 6가지 숙제 카테고리 상태 확인 (select 속성에서 name 추출)
-      const grammarHomework = props['⭕ 지난 문법 숙제 검사']?.select?.name || '해당없음';
-      const vocabCards = props['1️⃣ 어휘 클카 암기 숙제']?.select?.name || '해당없음';
-      const readingCards = props['2️⃣ 독해 단어 클카 숙제']?.select?.name || '해당없음';
-      const summary = props['4️⃣ Summary 숙제']?.select?.name || '해당없음';
-      const readingHomework = props['5️⃣ 매일 독해 숙제']?.select?.name || '해당없음';
-      const diary = props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.select?.name || '해당없음';
+      // 6가지 숙제 카테고리 상태 확인 (status 속성에서 name 추출)
+      const grammarHomework = props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당없음';
+      const vocabCards = props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당없음';
+      const readingCards = props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당없음';
+      const summary = props['4️⃣ Summary 숙제']?.status?.name || '해당없음';
+      const readingHomework = props['5️⃣ 매일 독해 숙제']?.status?.name || '해당없음';
+      const diary = props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.status?.name || '해당없음';
       
-      // 수행율 정보 (formula 속성에서 추출)
-      const performanceRate = props['수행율']?.formula?.number || 0;
+      // 수행율 정보 (formula string에서 추출)
+      const performanceRateString = props['수행율']?.formula?.string || '0%';
+      const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
       
       console.log('추출된 값들:');
       console.log('  ⭕ 지난 문법 숙제 검사:', grammarHomework);
