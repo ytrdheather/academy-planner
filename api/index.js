@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getUncachableNotionClient } from '../notion-client.js';
+import { Client } from '@notionhq/client';
 
 // JWT 시크릿 키 (프로덕션에서 필수)
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -17,7 +18,31 @@ if (!JWT_SECRET) {
   console.warn('⚠️ 개발 환경: JWT_SECRET이 설정되지 않음. 고정된 개발용 시크릿 사용.');
 }
 
-// getAccessToken 함수 추가 (notion-client.js에서 가져오기)
+// Vercel 호환 Notion 클라이언트 생성 함수
+async function getVercelCompatibleNotionClient() {
+  try {
+    // 1. 직접 NOTION_ACCESS_TOKEN 사용 (추천 - Vercel 배포용)
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+      return new Client({ auth: process.env.NOTION_ACCESS_TOKEN });
+    }
+    
+    // 2. Replit 커넥터 사용 (개발 환경에서만)
+    if (process.env.REPL_IDENTITY || process.env.REPLIT_CONNECTORS_HOSTNAME) {
+      console.log('Replit 모드: 커넥터 사용');
+      return await getUncachableNotionClient();
+    }
+    
+    // 3. 둘 다 없으면 null 반환 (샘플 데이터 사용)
+    console.log('⚠️ Notion 토큰이 없음: 샘플 데이터 사용');
+    return null;
+  } catch (error) {
+    console.error('Notion 커넥션 오류:', error.message);
+    return null;
+  }
+}
+
+// 레거시 getAccessToken 함수 (백워드 호환성용)
 async function getAccessToken() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
   const xReplitToken = process.env.REPL_IDENTITY 
@@ -109,6 +134,11 @@ const requiredEnvVars = {
   STUDENT_DATABASE_ID: '학생 로그인 정보 데이터베이스',
   PROGRESS_DATABASE_ID: '학습 진도 데이터베이스'
 };
+
+// Notion 연결 체크
+if (!process.env.NOTION_ACCESS_TOKEN && !process.env.REPL_IDENTITY) {
+  console.warn('⚠️  Notion 연결: NOTION_ACCESS_TOKEN 또는 REPL_IDENTITY가 설정되지 않음 (샘플 데이터 사용)');
+}
 
 const missingVars = Object.keys(requiredEnvVars).filter(key => !process.env[key]);
 if (missingVars.length > 0 && process.env.NODE_ENV !== 'production') {
@@ -225,7 +255,7 @@ app.post('/login', async (req, res) => {
   console.log('학생 로그인 시도:', { studentId, password: '***' });
   
   try {
-    const notion = await getUncachableNotionClient();
+    const notion = await getVercelCompatibleNotionClient();
     console.log('Notion 클라이언트 타입:', typeof notion, notion && notion.constructor && notion.constructor.name);
     
     // Notion 클라이언트가 제대로 생성되었는지 확인
@@ -404,7 +434,7 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
     
     console.log(`${userName}(${userRole}) 진도 조회 시작... 필터: ${period || 'all'}`);
     
-    const notion = await getUncachableNotionClient();
+    const notion = await getVercelCompatibleNotionClient();
     console.log('Notion 클라이언트 타입:', typeof notion, notion && notion.constructor && notion.constructor.name);
     
     // Notion 클라이언트가 제대로 생성되었는지 확인
@@ -561,7 +591,7 @@ app.get('/api/student-progress/:studentId', requireAuth, async (req, res) => {
     
     console.log(`${userName}(${userRole}) 학생 ${studentId} 상세 진도 조회 시작...`);
     
-    const notion = await getUncachableNotionClient();
+    const notion = await getVercelCompatibleNotionClient();
     
     // Notion 클라이언트가 없는 경우 샘플 데이터 반환
     if (!notion || typeof notion.databases?.query !== 'function') {

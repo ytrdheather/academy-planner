@@ -215,6 +215,95 @@
             color: #495057;
         }
         
+        /* 성적 추이 차트 */
+        .performance-chart {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0, 86, 179, 0.1);
+        }
+        .performance-chart h3 {
+            color: #0056b3;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .performance-bars {
+            display: flex;
+            align-items: end;
+            height: 250px;
+            gap: 15px;
+            padding: 0 10px;
+        }
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        .bar-container {
+            display: flex;
+            align-items: end;
+            height: 200px;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .bar {
+            width: 20px;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .bar:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+        .bar-vocab {
+            background: linear-gradient(180deg, #28a745 0%, #20c997 100%);
+        }
+        .bar-grammar {
+            background: linear-gradient(180deg, #007bff 0%, #0056b3 100%);
+        }
+        .bar-label {
+            font-size: 12px;
+            color: #495057;
+            text-align: center;
+            font-weight: 600;
+        }
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        .legend-vocab {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .legend-grammar {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+        
         /* 반응형 디자인 */
         @media (max-width: 768px) {
             .container {
@@ -508,6 +597,20 @@
                     <div class="number">${stats.excellentRate}%</div>
                     <div class="subtitle">80점 이상</div>
                 </div>`;
+                html += `<div class="stat-card">
+                    <span class="icon">📅</span>
+                    <h3>주간 평균</h3>
+                    <div class="number">${stats.weeklyAverage}</div>
+                    <div class="subtitle">세션/주</div>
+                </div>`;
+                html += '</div>';
+                
+                // 성적 추이 차트 추가
+                html += '<div class="performance-chart">';
+                html += '<h3>📈 성적 추이 분석</h3>';
+                html += '<div class="chart-container">';
+                html += generatePerformanceChart(data);
+                html += '</div>';
                 html += '</div>';
                 
                 html += '<div class="table-container">';
@@ -560,12 +663,71 @@
             const excellentRate = data.length > 0 ? 
                 Math.round((excellentScores / data.length) * 100) : 0;
             
+            // 주간 평균 계산
+            const weeklyAverage = data.length > 0 ? 
+                Math.round((data.length / 7) * 10) / 10 : 0;
+            
             return {
                 uniqueStudents,
                 avgVocabScore,
                 avgGrammarScore,
-                excellentRate
+                excellentRate,
+                weeklyAverage
             };
+        }
+        
+        // 성적 추이 차트 생성
+        function generatePerformanceChart(data) {
+            // 날짜별로 데이터 그룹화 (최근 7일)
+            const sortedData = data.sort((a, b) => new Date(a.date) - new Date(b.date));
+            const recentData = sortedData.slice(-7);
+            
+            if (recentData.length === 0) {
+                return '<div style="text-align: center; padding: 50px; color: #6c757d;">'
+                     + '표시할 데이터가 없습니다.</div>';
+            }
+            
+            // 날짜별 평균 점수 계산
+            const dailyStats = recentData.map(record => {
+                return {
+                    date: new Date(record.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+                    vocabScore: record.vocabScore || 0,
+                    grammarScore: record.grammarScore || 0
+                };
+            });
+            
+            let chartHtml = '<div class="performance-bars">';
+            
+            dailyStats.forEach(day => {
+                const vocabHeight = Math.max((day.vocabScore / 100) * 180, 5);
+                const grammarHeight = Math.max((day.grammarScore / 100) * 180, 5);
+                
+                chartHtml += `
+                    <div class="bar-group">
+                        <div class="bar-container">
+                            <div class="bar bar-vocab" style="height: ${vocabHeight}px;" 
+                                 title="단어: ${day.vocabScore}점"></div>
+                            <div class="bar bar-grammar" style="height: ${grammarHeight}px;" 
+                                 title="문법: ${day.grammarScore}점"></div>
+                        </div>
+                        <div class="bar-label">${day.date}</div>
+                    </div>`;
+            });
+            
+            chartHtml += '</div>';
+            chartHtml += `
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <div class="legend-color legend-vocab"></div>
+                        <span>단어 점수</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color legend-grammar"></div>
+                        <span>문법 점수</span>
+                    </div>
+                </div>`;
+            
+            return chartHtml;
         }
 
         // JWT 토큰 가져오기

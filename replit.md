@@ -75,10 +75,11 @@ Implements role-based access control with 7 distinct user accounts:
 
 ## Vercel Environment Variables
 Required for production deployment:
-- `JWT_SECRET`: Strong random string for token signing
+- `JWT_SECRET`: Strong random string for token signing (REQUIRED)
+- `NOTION_ACCESS_TOKEN`: Notion integration token from https://www.notion.so/my-integrations (REQUIRED)
 - `NODE_ENV`: Set to 'production' for deployment
-- `STUDENT_DATABASE_ID`: Notion student database ID (optional)
-- `PROGRESS_DATABASE_ID`: Notion progress database ID (optional)
+- `STUDENT_DATABASE_ID`: Notion student database ID (optional - uses sample data if missing)
+- `PROGRESS_DATABASE_ID`: Notion progress database ID (optional - uses sample data if missing)
 
 # User Accounts
 
@@ -94,13 +95,24 @@ Required for production deployment:
 # Deployment Guide
 
 ## Vercel Deployment Steps
-1. Connect GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard:
-   - `JWT_SECRET`: Generate strong random string
+1. **Create Notion Integration**:
+   - Go to https://www.notion.so/my-integrations
+   - Create new integration and copy the token
+   - Share your Notion databases with the integration
+
+2. **Connect GitHub repository to Vercel**
+
+3. **Set environment variables in Vercel dashboard**:
+   - `JWT_SECRET`: Generate strong random string (use openssl rand -base64 32)
+   - `NOTION_ACCESS_TOKEN`: Your Notion integration token
    - `NODE_ENV`: production
-   - Optional Notion database IDs
-3. Deploy with zero configuration (vercel.json handles routing)
-4. Access deployed application at Vercel provided URL
+   - Optional: `STUDENT_DATABASE_ID` and `PROGRESS_DATABASE_ID`
+
+4. **Deploy with zero configuration** (vercel.json handles routing)
+
+5. **Access deployed application** at Vercel provided URL
+
+**Note**: The app works with or without Notion databases - it uses sample data for testing when databases are not configured.
 
 ## Local Development
 - Runs on port 5000 in Replit environment
