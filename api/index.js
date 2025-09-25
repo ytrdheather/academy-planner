@@ -284,49 +284,14 @@ app.post('/login', async (req, res) => {
       }
     }
 
-    // 실제 Notion 데이터베이스 조회
-    const databaseId = process.env.STUDENT_DATABASE_ID;
+    // 실제 Notion 데이터베이스 조회 (다양한 환경변수 지원)
+    const databaseId = process.env.STUDENT_DATABASE_ID || process.env.NOTION_DATABASE;
     if (!databaseId) {
-      console.error('STUDENT_DATABASE_ID 환경변수가 설정되지 않았습니다 - 샘플 데이터 사용');
-      
-      // 샘플 학생 계정들
-      const sampleStudents = {
-        'readitude000': { password: '000', name: '김학생', realName: '김학생' },
-        'readitude001': { password: '001', name: '이학생', realName: '이학생' },
-        'readitude002': { password: '002', name: '박학생', realName: '박학생' },
-        'test': { password: 'test', name: 'Test 원장', realName: 'Test 원장' }
-      };
-      
-      const student = sampleStudents[studentId];
-      if (!student) {
-        return res.json({ success: false, message: '존재하지 않는 학생 ID입니다. (샘플: readitude000/000, test/test)' });
-      }
-      
-      if (student.password !== studentPassword) {
-        return res.json({ success: false, message: '비밀번호가 올바르지 않습니다.' });
-      }
-      
-      // 샘플 로그인 성공
-      const token = generateToken(studentId, {
-        role: 'student',
-        name: student.name,
-        realName: student.realName,
-        assignedStudents: []
-      });
-      
-      console.log(`샘플 학생 로그인 성공: ${student.name} (${studentId})`);
-      
-      return res.json({ 
-        success: true, 
-        message: '로그인 성공 (샘플 데이터)',
-        token: token,
-        studentInfo: {
-          studentId: studentId,
-          studentName: student.name,
-          studentRealName: student.realName
-        }
-      });
+      console.error('학생 데이터베이스 ID를 찾을 수 없습니다 (STUDENT_DATABASE_ID 또는 NOTION_DATABASE)');
+      return res.json({ success: false, message: '데이터베이스 설정 오류. 관리자에게 문의하세요.' });
     }
+    
+    console.log('학생 데이터베이스 ID:', databaseId);
 
     // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
     const queryMethod = notion.databases?.query || notion.dataSources?.query;
