@@ -199,6 +199,21 @@ app.post('/login', async (req, res) => {
     
     console.log('학생 DB ID:', STUDENT_DB_ID);
     
+    // 먼저 데이터베이스 스키마 확인
+    const schemaResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      }
+    });
+    
+    if (schemaResponse.ok) {
+      const schema = await schemaResponse.json();
+      console.log('데이터베이스 속성들:', Object.keys(schema.properties));
+    }
+    
     const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
       method: 'POST',
       headers: {
