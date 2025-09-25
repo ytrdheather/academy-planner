@@ -153,6 +153,12 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    // JWT 토큰 저장
+                    if (result.token) {
+                        localStorage.setItem('authToken', result.token);
+                        console.log('JWT 토큰 저장 완료');
+                    }
+                    
                     successDiv.textContent = result.message;
                     successDiv.style.display = 'block';
                     setTimeout(() => {
