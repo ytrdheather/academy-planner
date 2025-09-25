@@ -169,15 +169,25 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/views/login.html'));
 });
 
-// 기존에 잘 작동하던 학생 로그인 처리 방식
+// Vercel 호환 학생 로그인 처리
 app.post('/login', async (req, res) => {
   const { studentId, studentPassword } = req.body;
   
   console.log('학생 로그인 시도:', { studentId, password: '***' });
   
   try {
-    // 기존에 잘 작동하던 방식: REST API 직접 호출
-    const accessToken = await getAccessToken();
+    // Vercel 호환: 직접 NOTION_ACCESS_TOKEN 사용 또는 Replit 커넥터 폴백
+    let accessToken;
+    
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      // Vercel 배포용: 직접 토큰 사용
+      accessToken = process.env.NOTION_ACCESS_TOKEN;
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+    } else {
+      // Replit 개발용: 커넥터 사용
+      accessToken = await getAccessToken();
+      console.log('Replit 모드: 커넥터 사용');
+    }
     
     // 환경변수에서 데이터베이스 ID 가져오기
     const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || process.env.NOTION_DATABASE;
