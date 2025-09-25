@@ -404,8 +404,9 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('Replit 모드: 커넥터 사용');
     }
     
-    // 정확한 "New 학생 명부 관리" 데이터베이스 사용
-    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360';
+    // 데이터베이스 ID들
+    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360'; // "New 학생 명부 관리"
+    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada'; // "NEW 리디튜드 학생 진도 관리"
     
     // 오늘 날짜 (한국 시간 기준)
     const today = new Date().toLocaleDateString('ko-KR', {
@@ -416,8 +417,49 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }).replace(/\. /g, '-').replace('.', '');
     
     console.log(`오늘 날짜 필터: ${today}`);
+    console.log(`진도 관리 DB ID: ${PROGRESS_DB_ID}`);
 
-    // 오늘 날짜에 생성된 학생 데이터만 조회
+    // 1단계: "NEW 리디튜드 학생 진도 관리"에서 오늘 날짜 페이지가 있는 학생 ID 찾기
+    const progressResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: '날짜',
+          date: {
+            equals: today
+          }
+        }
+      })
+    });
+
+    if (!progressResponse.ok) {
+      throw new Error(`진도 관리 DB 조회 오류: ${progressResponse.status}`);
+    }
+
+    const progressData = await progressResponse.json();
+    console.log(`오늘(${today}) 진도 관리에서 조회된 학습일지: ${progressData.results.length}개`);
+    
+    // 오늘 학습일지가 있는 학생 ID들 추출
+    const studentIdsWithProgress = progressData.results.map(page => {
+      const studentId = page.properties['학생 ID']?.rich_text?.[0]?.plain_text;
+      console.log(`진도 관리 학생 ID: ${studentId}`);
+      return studentId;
+    }).filter(id => id); // null/undefined 제거
+
+    console.log(`오늘 학습일지 작성한 학생들: ${studentIdsWithProgress.join(', ')}`);
+
+    if (studentIdsWithProgress.length === 0) {
+      console.log('오늘 학습일지 작성한 학생이 없습니다.');
+      // 빈 배열 반환하여 "숙제 현황 데이터가 없습니다" 표시
+      return res.json([]);
+    }
+
+    // 2단계: 학생 명부에서 해당 학생들의 숙제 현황 조회
     const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
       method: 'POST',
       headers: {
@@ -427,10 +469,12 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          property: '현재날짜',
-          date: {
-            equals: today
-          }
+          or: studentIdsWithProgress.map(studentId => ({
+            property: '학생 ID',
+            rich_text: {
+              equals: studentId
+            }
+          }))
         },
         sorts: [
           {
