@@ -408,13 +408,11 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360'; // "New 학생 명부 관리"
     const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada'; // "NEW 리디튜드 학생 진도 관리"
     
-    // 오늘 날짜 (한국 시간 기준)
-    const today = new Date().toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit', 
-      day: '2-digit',
-      timeZone: 'Asia/Seoul'
-    }).replace(/\. /g, '-').replace('.', '');
+    // 오늘 날짜 (ISO 형식으로 변경)
+    const now = new Date();
+    const kstOffset = 9 * 60; // 한국 시간은 UTC+9
+    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
+    const today = kstTime.toISOString().split('T')[0]; // YYYY-MM-DD 형식
     
     console.log(`오늘 날짜 필터: ${today}`);
     console.log(`진도 관리 DB ID: ${PROGRESS_DB_ID}`);
@@ -549,43 +547,10 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
 
   } catch (error) {
     console.error('숙제 현황 조회 오류:', error);
+    console.error('오류 상세:', error.message);
     
-    // 오류 시 샘플 데이터 반환 (Manager 테스트용)
-    const sampleData = [
-      {
-        studentId: 'Test 원장',
-        grammarHomework: '숙제 함',
-        vocabCards: '숙제 함', 
-        readingCards: '안 해옴',
-        summary: '숙제 함',
-        readingHomework: '숙제 함',
-        diary: '안 해옴',
-        completionRate: 67
-      },
-      {
-        studentId: '김학생',
-        grammarHomework: '숙제 함',
-        vocabCards: '숙제 함',
-        readingCards: '숙제 함',
-        summary: '안 해옴',
-        readingHomework: '숙제 함',
-        diary: '숙제 함',
-        completionRate: 83
-      },
-      {
-        studentId: '이학생',
-        grammarHomework: '안 해옴',
-        vocabCards: '숙제 함',
-        readingCards: '숙제 함',
-        summary: '숙제 함',
-        readingHomework: '안 해옴',
-        diary: '숙제 함',
-        completionRate: 67
-      }
-    ];
-
-    console.log('샘플 데이터 반환:', sampleData.length + '명');
-    res.json(sampleData);
+    // 오류 시 빈 배열 반환 (샘플 데이터 제거)
+    res.json([]);
   }
 });
 
