@@ -450,7 +450,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     
     // 오늘 날짜에 해당하는 학습일지만 필터링
     const todayProgressData = progressData.results.filter(page => {
-      const pageDate = page.properties['날짜']?.date?.start;
+      const pageDate = page.properties['🕐 날짜']?.date?.start;
       console.log(`학습일지 날짜: ${pageDate}, 오늘: ${today}`);
       return pageDate === today;
     });
@@ -459,7 +459,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     
     // 오늘 학습일지가 있는 학생 ID들 추출
     const studentIdsWithProgress = todayProgressData.map(page => {
-      const studentId = page.properties['학생 ID']?.rich_text?.[0]?.plain_text;
+      const studentId = page.properties['이름']?.title?.[0]?.plain_text;
       console.log(`진도 관리 학생 ID: ${studentId}`);
       return studentId;
     }).filter(id => id); // null/undefined 제거
