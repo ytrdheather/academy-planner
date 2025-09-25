@@ -190,7 +190,7 @@ app.post('/login', async (req, res) => {
     }
     
     // 환경변수에서 데이터베이스 ID 가져오기
-    const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || process.env.NOTION_DATABASE;
+    const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || process.env.NOTION_DATABASE || '25409320bce280f8ace1ddcdd022b360';
     
     if (!STUDENT_DB_ID) {
       console.error('학생 데이터베이스 ID가 설정되지 않았습니다');
@@ -214,8 +214,8 @@ app.post('/login', async (req, res) => {
       console.log('데이터베이스 속성들:', Object.keys(schema.properties));
     }
     
-    // 먼저 모든 데이터를 가져와서 구조 확인 (첫 5개만)
-    const exploreResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+    // 정확한 데이터베이스와 속성명으로 로그인 처리
+    const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -223,30 +223,23 @@ app.post('/login', async (req, res) => {
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
-        page_size: 5
+        filter: {
+          and: [
+            {
+              property: '학생 ID',
+              rich_text: {
+                equals: studentId
+              }
+            },
+            {
+              property: '비밀번호',
+              rich_text: {
+                equals: studentPassword.toString()
+              }
+            }
+          ]
+        }
       })
-    });
-    
-    if (exploreResponse.ok) {
-      const exploreData = await exploreResponse.json();
-      console.log('첫 번째 학생 레코드 예시:');
-      if (exploreData.results.length > 0) {
-        const sampleRecord = exploreData.results[0];
-        Object.keys(sampleRecord.properties).forEach(key => {
-          const prop = sampleRecord.properties[key];
-          let value = '';
-          if (prop.rich_text?.[0]?.plain_text) value = prop.rich_text[0].plain_text;
-          if (prop.title?.[0]?.plain_text) value = prop.title[0].plain_text;
-          if (prop.number) value = prop.number;
-          console.log(`"${key}": "${value}"`);
-        });
-      }
-    }
-    
-    // 실제 로그인은 잠시 스킵하고 데이터 구조만 확인
-    return res.json({ 
-      success: false, 
-      message: '데이터베이스 구조 확인 중... 로그를 확인해주세요' 
     });
     
     if (!restResponse.ok) {
