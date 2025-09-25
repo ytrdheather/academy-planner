@@ -258,8 +258,8 @@ app.post('/login', async (req, res) => {
     const notion = await getVercelCompatibleNotionClient();
     console.log('Notion 클라이언트 타입:', typeof notion, notion && notion.constructor && notion.constructor.name);
     
-    // Notion 클라이언트가 제대로 생성되었는지 확인
-    if (!notion || typeof notion.databases?.query !== 'function') {
+    // Notion 클라이언트가 제대로 생성되었는지 확인 (dataSources.query 또는 databases.query)
+    if (!notion || (!notion.databases?.query && !notion.dataSources?.query)) {
       console.error('Notion 클라이언트가 올바르지 않음:', notion);
       // 임시 데이터로 테스트 가능하게 함
       if (studentId === 'test' && studentPassword === 'test') {
@@ -291,7 +291,9 @@ app.post('/login', async (req, res) => {
       return res.json({ success: false, message: '데이터베이스 설정 오류. 관리자에게 문의하세요.' });
     }
 
-    const response = await notion.databases.query({
+    // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
+    const queryMethod = notion.databases?.query || notion.dataSources?.query;
+    const response = await queryMethod({
       database_id: databaseId,
       filter: {
         property: "학생 ID",
@@ -437,8 +439,8 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
     const notion = await getVercelCompatibleNotionClient();
     console.log('Notion 클라이언트 타입:', typeof notion, notion && notion.constructor && notion.constructor.name);
     
-    // Notion 클라이언트가 제대로 생성되었는지 확인
-    if (!notion || typeof notion.databases?.query !== 'function') {
+    // Notion 클라이언트가 제대로 생성되었는지 확인 (dataSources.query 또는 databases.query)
+    if (!notion || (!notion.databases?.query && !notion.dataSources?.query)) {
       console.error('Notion 클라이언트가 올바르지 않음:', notion);
       
       // 권한별 임시 데이터 반환 (더 다양한 샘플 데이터)
@@ -520,7 +522,9 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
       return res.json({ error: '데이터베이스 설정 오류. 관리자에게 문의하세요.' });
     }
 
-    const response = await notion.databases.query({
+    // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
+    const queryMethod = notion.databases?.query || notion.dataSources?.query;
+    const response = await queryMethod({
       database_id: databaseId,
       sorts: [
         {
@@ -676,7 +680,9 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
 
     // 오늘 날짜 또는 최근 데이터 조회
-    const response = await notion.databases.query({
+    // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
+    const queryMethod = notion.databases?.query || notion.dataSources?.query;
+    const response = await queryMethod({
       database_id: databaseId,
       sorts: [
         {
@@ -829,7 +835,9 @@ app.get('/api/student-progress/:studentId', requireAuth, async (req, res) => {
     }
 
     // Notion에서 해당 학생 데이터 조회
-    const response = await notion.databases.query({
+    // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
+    const queryMethod = notion.databases?.query || notion.dataSources?.query;
+    const response = await queryMethod({
       database_id: databaseId,
       filter: {
         property: '학생 ID',
