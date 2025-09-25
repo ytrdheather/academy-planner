@@ -189,8 +189,8 @@ app.post('/login', async (req, res) => {
       console.log('Replit 모드: 커넥터 사용');
     }
     
-    // 환경변수에서 데이터베이스 ID 가져오기
-    const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID || process.env.NOTION_DATABASE || '25409320bce280f8ace1ddcdd022b360';
+    // 정확한 "New 학생 명부 관리" 데이터베이스 ID 사용
+    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360';
     
     if (!STUDENT_DB_ID) {
       console.error('학생 데이터베이스 ID가 설정되지 않았습니다');
