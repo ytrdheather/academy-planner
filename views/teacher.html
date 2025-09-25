@@ -118,9 +118,12 @@
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <a href="/" class="back-button">← 홈페이지로</a>
-            <button onclick="logout()" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">로그아웃</button>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div id="userInfo" style="background: #f8f9fa; padding: 8px 15px; border-radius: 6px; font-size: 14px; color: #495057;"></div>
+                <button onclick="logout()" style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">로그아웃</button>
+            </div>
         </div>
-        <h1>👩‍🏫 선생님 페이지 - 학생 진도 관리</h1>
+        <h1 id="pageTitle">👩‍🏫 선생님 페이지 - 학생 진도 관리</h1>
         
         <div class="search-section">
             <input type="text" id="studentIdSearch" placeholder="학생 ID 입력 (전체 조회시 공백)">
@@ -241,9 +244,46 @@
             }
         }
         
-        // 페이지 로드 시 전체 진도 조회
-        window.addEventListener('load', () => {
-            loadAllProgress();
+        // 사용자 정보 로드 및 페이지 초기화
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user-info', {
+                    credentials: 'include'
+                });
+                const userInfo = await response.json();
+                
+                // 사용자 정보 표시
+                const userInfoDiv = document.getElementById('userInfo');
+                const roleNames = {
+                    'manager': '매니저',
+                    'teacher': '선생님',
+                    'assistant': '아르바이트'
+                };
+                userInfoDiv.textContent = `${userInfo.userName} (${roleNames[userInfo.userRole]})`;
+                
+                // 권한별 페이지 제목 업데이트
+                const pageTitle = document.getElementById('pageTitle');
+                if (userInfo.userRole === 'manager') {
+                    pageTitle.textContent = '👩‍💼 매니저 대시보드 - 전체 학생 관리';
+                } else if (userInfo.userRole === 'teacher') {
+                    pageTitle.textContent = '👩‍🏫 선생님 대시보드 - 담당 학생 관리';
+                } else {
+                    pageTitle.textContent = '👥 아르바이트 대시보드 - 학생 진도 확인';
+                }
+                
+                return userInfo;
+            } catch (error) {
+                console.error('사용자 정보 로드 오류:', error);
+                return null;
+            }
+        }
+        
+        // 페이지 로드 시 사용자 정보 로드 후 진도 조회
+        window.addEventListener('load', async () => {
+            const userInfo = await loadUserInfo();
+            if (userInfo) {
+                loadAllProgress();
+            }
         });
     </script>
 </body>

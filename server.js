@@ -268,15 +268,30 @@ app.get('/teacher-login', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'teacher-login.html'));
 });
 
+// 다중 사용자 계정 설정
+const userAccounts = {
+  // 매니저 (전체 관리)
+  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저', assignedStudents: 'all' },
+  
+  // 선생님 4명 (담당 학생만)
+  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1', assignedStudents: [] },
+  'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '선생님2', assignedStudents: [] },
+  'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '선생님3', assignedStudents: [] },
+  'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '선생님4', assignedStudents: [] },
+  
+  // 아르바이트생 2명 (제한적 권한)
+  'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트1', assignedStudents: [] },
+  'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트2', assignedStudents: [] }
+};
+
 // 선생님 로그인 처리
 app.post('/teacher-login', async (req, res) => {
   const { teacherId, teacherPassword } = req.body;
   
-  // 선생님 계정 정보 (환경변수 또는 기본값)
-  const validTeacherId = process.env.TEACHER_ID || 'readitude';
-  const validTeacherPassword = process.env.TEACHER_PASSWORD || 'rdtd112!@';
+  // 사용자 계정 확인
+  const userAccount = userAccounts[teacherId];
   
-  if (teacherId === validTeacherId && teacherPassword === validTeacherPassword) {
+  if (userAccount && teacherPassword === userAccount.password) {
     // 보안: 세션 고정 공격 방지를 위한 세션 ID 재생성
     req.session.regenerate((err) => {
       if (err) {
@@ -284,9 +299,14 @@ app.post('/teacher-login', async (req, res) => {
         return res.json({ success: false, message: '로그인 처리 중 오류가 발생했습니다.' });
       }
       
-      // 세션에 선생님 로그인 정보 저장
+      // 세션에 사용자 정보 저장
       req.session.isTeacher = true;
-      req.session.teacherId = teacherId;
+      req.session.userId = teacherId;
+      req.session.userRole = userAccount.role;
+      req.session.userName = userAccount.name;
+      req.session.assignedStudents = userAccount.assignedStudents;
+      
+      console.log(`로그인 성공: ${userAccount.name} (${userAccount.role})`);
       
       // 세션 저장 후 응답
       req.session.save((err) => {
@@ -298,6 +318,7 @@ app.post('/teacher-login', async (req, res) => {
       });
     });
   } else {
+    console.log(`로그인 실패: ${teacherId}`);
     res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
   }
 });
@@ -767,23 +788,31 @@ app.get('/api/student-progress', requireTeacherAuth, async (req, res) => {
       };
     });
 
-    res.json(progressData);
+    // 권한별 데이터 필터링
+    const filteredData = filterStudentsByRole(userRole, assignedStudents, progressData);
+    
+    // 활동 로그 기록
+    console.log(`${userName}(${userRole})이 ${filteredData.length}건의 진도 데이터를 조회했습니다.`);
+    
+    res.json(filteredData);
   } catch (error) {
     console.error('전체 진도 조회 오류:', error);
-    // 에러 발생시에도 임시 데이터 반환
-    res.json([
+    // 에러 발생시에도 권한별 임시 데이터 반환
+    const errorSampleData = [
       {
         id: 'temp1',
         studentId: 'Test 원장',
-        date: '2025-09-24',
+        date: '2025-09-25',
         vocabScore: 85,
         grammarScore: 90,
         readingResult: 'pass',
         englishReading: '완료함',
         bookTitle: 'Harry Potter',
-        feeling: '오늘 영어 공부가 재미있었어요!'
+        feeling: '오늘 영어 공부가 재미있었어요!',
+        assignedTeacher: '선생님1'
       }
-    ]);
+    ];
+    res.json(filterStudentsByRole(userRole, assignedStudents, errorSampleData));
   }
 });
 
