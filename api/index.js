@@ -153,16 +153,61 @@ function hasPermission(userRole, requiredRole) {
 }
 
 // 담당 학생 필터링 함수
-function filterStudentsByRole(userRole, assignedStudents, allData) {
+function filterStudentsByRole(userRole, userName, assignedStudents, allData) {
   if (userRole === 'manager') {
     // 매니저는 모든 학생 접근 가능
     return allData;
   } else if (userRole === 'teacher') {
-    // 선생님은 담당 학생만 (일단 전체 반환 - Notion에서 담당강사 필드로 필터링 예정)
-    return allData;
+    // 선생님은 담당 학생만 접근 (실제 구현 시 assignedStudents 배열 사용)
+    // 현재는 선생님 이름으로 필터링 (예: teacher1 -> 선생님1)
+    const teacherName = userName.replace('teacher', '선생님');
+    return allData.filter(data => 
+      !data.assignedTeacher || data.assignedTeacher === teacherName
+    );
+  } else if (userRole === 'assistant') {
+    // 아르바이트생은 읽기 전용으로 제한된 데이터만
+    return allData.slice(0, 10); // 최근 10개만
   } else {
-    // 아르바이트생은 제한적 접근
-    return allData;
+    return [];
+  }
+}
+
+// 날짜 필터링 함수
+function filterDataByDate(data, period, startDate, endDate) {
+  if (period === 'all') return data;
+  
+  const now = new Date();
+  let filterDate;
+  
+  switch (period) {
+    case 'today':
+      filterDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return data.filter(item => {
+        const itemDate = new Date(item.date);
+        return itemDate >= filterDate;
+      });
+    
+    case 'week':
+      filterDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return data.filter(item => new Date(item.date) >= filterDate);
+    
+    case 'month':
+      filterDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return data.filter(item => new Date(item.date) >= filterDate);
+    
+    case 'custom':
+      if (startDate || endDate) {
+        return data.filter(item => {
+          const itemDate = new Date(item.date);
+          if (startDate && itemDate < new Date(startDate)) return false;
+          if (endDate && itemDate > new Date(endDate)) return false;
+          return true;
+        });
+      }
+      return data;
+    
+    default:
+      return data;
   }
 }
 
@@ -354,7 +399,10 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
     const userName = req.user.name;
     const assignedStudents = req.user.assignedStudents;
     
-    console.log(`${userName}(${userRole}) 진도 조회 시작...`);
+    // 쿼리 파라미터에서 필터 정보 가져오기
+    const { period, startDate, endDate } = req.query;
+    
+    console.log(`${userName}(${userRole}) 진도 조회 시작... 필터: ${period || 'all'}`);
     
     const notion = await getUncachableNotionClient();
     console.log('Notion 클라이언트 타입:', typeof notion, notion && notion.constructor && notion.constructor.name);
@@ -363,7 +411,7 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
     if (!notion || typeof notion.databases?.query !== 'function') {
       console.error('Notion 클라이언트가 올바르지 않음:', notion);
       
-      // 권한별 임시 데이터 반환
+      // 권한별 임시 데이터 반환 (더 다양한 샘플 데이터)
       const sampleData = [
         {
           id: 'temp1',
@@ -400,10 +448,40 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
           bookTitle: 'The Little Prince',
           feeling: '오늘도 열심히 공부했어요!',
           assignedTeacher: '선생님2'
+        },
+        {
+          id: 'temp4',
+          studentId: '박영희',
+          date: '2025-09-23',
+          vocabScore: 95,
+          grammarScore: 93,
+          readingResult: 'pass',
+          englishReading: '완료함',
+          bookTitle: 'Matilda',
+          feeling: '책이 정말 재미있었어요!',
+          assignedTeacher: '선생님3'
+        },
+        {
+          id: 'temp5',
+          studentId: '이수진',
+          date: '2025-09-22',
+          vocabScore: 73,
+          grammarScore: 79,
+          readingResult: 'fail',
+          englishReading: '미완료',
+          bookTitle: 'The Secret Garden',
+          feeling: '좀 더 열심히 해야겠어요.',
+          assignedTeacher: '선생님4'
         }
       ];
       
-      return res.json(filterStudentsByRole(userRole, assignedStudents, sampleData));
+      // 날짜 필터링 적용
+      let filteredData = filterDataByDate(sampleData, period, startDate, endDate);
+      
+      // 권한별 필터링 적용
+      filteredData = filterStudentsByRole(userRole, userName, assignedStudents, filteredData);
+      
+      return res.json(filteredData);
     }
 
     const databaseId = process.env.PROGRESS_DATABASE_ID;
@@ -442,11 +520,14 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
       };
     });
 
+    // 날짜 필터링 적용
+    let filteredData = filterDataByDate(progressData, period, startDate, endDate);
+    
     // 권한별 데이터 필터링
-    const filteredData = filterStudentsByRole(userRole, assignedStudents, progressData);
+    filteredData = filterStudentsByRole(userRole, userName, assignedStudents, filteredData);
     
     // 활동 로그 기록
-    console.log(`${userName}(${userRole})이 ${filteredData.length}건의 진도 데이터를 조회했습니다.`);
+    console.log(`${userName}(${userRole})이 ${filteredData.length}건의 진도 데이터를 조회했습니다. 필터: ${period || 'all'}`);
     
     res.json(filteredData);
   } catch (error) {
@@ -466,7 +547,127 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
         assignedTeacher: '선생님1'
       }
     ];
-    res.json(filterStudentsByRole(req.user.role, req.user.assignedStudents, errorSampleData));
+    res.json(filterStudentsByRole(req.user.role, req.user.name, req.user.assignedStudents, errorSampleData));
+  }
+});
+
+// 개별 학생 진도 조회 API
+app.get('/api/student-progress/:studentId', requireAuth, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const userRole = req.user.role;
+    const userName = req.user.name;
+    const assignedStudents = req.user.assignedStudents;
+    
+    console.log(`${userName}(${userRole}) 학생 ${studentId} 상세 진도 조회 시작...`);
+    
+    const notion = await getUncachableNotionClient();
+    
+    // Notion 클라이언트가 없는 경우 샘플 데이터 반환
+    if (!notion || typeof notion.databases?.query !== 'function') {
+      console.error('Notion 클라이언트가 올바르지 않음');
+      
+      // 해당 학생의 샘플 데이터
+      const sampleData = [
+        {
+          id: 'detail1',
+          studentId: studentId,
+          date: '2025-09-25',
+          vocabScore: 85,
+          grammarScore: 90,
+          readingResult: 'pass',
+          englishReading: '완료함',
+          bookTitle: 'Harry Potter',
+          feeling: '오늘 영어 공부가 재미있었어요!',
+          assignedTeacher: '선생님1'
+        },
+        {
+          id: 'detail2',
+          studentId: studentId,
+          date: '2025-09-24',
+          vocabScore: 78,
+          grammarScore: 82,
+          readingResult: 'pass',
+          englishReading: '완료함',
+          bookTitle: 'Charlotte\'s Web',
+          feeling: '단어가 조금 어려웠지만 열심히 했어요.',
+          assignedTeacher: '선생님1'
+        },
+        {
+          id: 'detail3',
+          studentId: studentId,
+          date: '2025-09-23',
+          vocabScore: 92,
+          grammarScore: 88,
+          readingResult: 'pass',
+          englishReading: '완료함',
+          bookTitle: 'The Little Prince',
+          feeling: '오늘도 열심히 공부했어요!',
+          assignedTeacher: '선생님1'
+        }
+      ];
+      
+      // 권한 검사 후 데이터 반환
+      const filteredData = filterStudentsByRole(userRole, userName, assignedStudents, sampleData);
+      return res.json(filteredData);
+    }
+    
+    const databaseId = process.env.PROGRESS_DATABASE_ID;
+    if (!databaseId) {
+      console.error('PROGRESS_DATABASE_ID 환경변수가 설정되지 않았습니다');
+      return res.json({ error: '데이터베이스 설정 오류. 관리자에게 문의하세요.' });
+    }
+
+    // Notion에서 해당 학생 데이터 조회
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      filter: {
+        property: '학생 ID',
+        title: {
+          equals: studentId
+        }
+      },
+      sorts: [
+        {
+          property: '날짜',
+          direction: 'descending'
+        }
+      ]
+    });
+
+    console.log(`학생 ${studentId}에 대해 ${response.results.length}개 레코드 조회됨`);
+
+    const progressData = response.results.map(page => {
+      const properties = page.properties;
+      
+      return {
+        id: page.id,
+        studentId: properties['학생 ID']?.title?.[0]?.text?.content || 
+                  properties['학생 ID']?.rich_text?.[0]?.plain_text || '',
+        date: properties['날짜']?.date?.start || '',
+        vocabScore: properties['📰 단어 테스트 점수']?.formula?.number || 
+                   properties['📰 단어 테스트 점수']?.number || 0,
+        grammarScore: properties['📑 문법 시험 점수']?.formula?.number || 
+                     properties['📑 문법 시험 점수']?.number || 0,
+        readingResult: properties['📚 독해 해석 시험 결과']?.formula?.string || 
+                      properties['📚 독해 해석 시험 결과']?.select?.name || '',
+        englishReading: properties['📖 영어독서']?.select?.name || '',
+        bookTitle: properties['오늘 읽은 영어 책']?.rich_text?.[0]?.plain_text || '',
+        feeling: properties['오늘의 학습 소감']?.rich_text?.[0]?.plain_text || '',
+        assignedTeacher: properties['담당강사']?.select?.name || ''
+      };
+    });
+
+    // 권한 검사
+    const filteredData = filterStudentsByRole(userRole, userName, assignedStudents, progressData);
+    
+    console.log(`${userName}(${userRole})이 학생 ${studentId}의 ${filteredData.length}건 데이터를 조회했습니다.`);
+    
+    res.json(filteredData);
+    
+  } catch (error) {
+    console.error('개별 학생 진도 조회 오류:', error);
+    res.status(500).json({ error: '데이터를 불러오는 중 오류가 발생했습니다.' });
   }
 });
 
