@@ -508,6 +508,15 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     // 숙제 현황 데이터 변환
     const homeworkData = data.results.map(student => {
       const props = student.properties;
+      const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
+      
+      console.log(`=== ${studentName} 학생의 실제 숙제 데이터 ===`);
+      console.log('1️⃣ 어휘 클카 원본:', JSON.stringify(props['1️⃣ 어휘 클카 암기 숙제']));
+      console.log('2️⃣ 독해 단어 클카 원본:', JSON.stringify(props['2️⃣ 독해 단어 클카 숙제']));
+      console.log('⭕ 지난 문법 숙제 검사 원본:', JSON.stringify(props['⭕ 지난 문법 숙제 검사']));
+      console.log('4️⃣ Summary 원본:', JSON.stringify(props['4️⃣ Summary 숙제']));
+      console.log('5️⃣ 매일 독해 원본:', JSON.stringify(props['5️⃣ 매일 독해 숙제']));
+      console.log('6️⃣ 영어 일기 원본:', JSON.stringify(props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']));
       
       // 6가지 숙제 카테고리 상태 확인
       const grammarHomework = props['1️⃣ 어휘 클카 암기 숙제']?.select?.name || '해당없음';
@@ -517,12 +526,23 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       const readingHomework = props['5️⃣ 매일 독해 숙제']?.select?.name || '해당없음';
       const diary = props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.select?.name || '해당없음';
       
+      console.log('추출된 값들:');
+      console.log('  1️⃣ 어휘 클카:', grammarHomework);
+      console.log('  2️⃣ 독해 단어 클카:', vocabCards);
+      console.log('  ⭕ 지난 문법 숙제 검사:', readingCards);
+      console.log('  4️⃣ Summary:', summary);
+      console.log('  5️⃣ 매일 독해:', readingHomework);
+      console.log('  6️⃣ 영어 일기:', diary);
+      
       // 완료율 계산 (OK 개수 / 6 * 100)
       const statuses = [grammarHomework, vocabCards, readingCards, summary, readingHomework, diary];
       const completedCount = statuses.filter(status => 
         status === '숙제 함' || status === '완료' || status === 'OK' || status === '✓'
       ).length;
       const completionRate = Math.round((completedCount / 6) * 100);
+      
+      console.log(`완료 체크: ${statuses} -> 완료개수: ${completedCount}/6 = ${completionRate}%`);
+      console.log('===============================');
       
       return {
         studentId: props['이름']?.title?.[0]?.plain_text || props['학생 ID']?.rich_text?.[0]?.plain_text || '이름없음',
