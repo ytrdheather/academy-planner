@@ -482,10 +482,10 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       },
       body: JSON.stringify({
         filter: {
-          or: studentIdsWithProgress.map(studentId => ({
-            property: '학생 ID',
-            rich_text: {
-              equals: studentId
+          or: studentIdsWithProgress.map(studentName => ({
+            property: '이름',
+            title: {
+              equals: studentName
             }
           }))
         },
