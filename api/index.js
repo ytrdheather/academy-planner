@@ -472,91 +472,63 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       return res.json([]);
     }
 
-    // 2단계: 학생 명부에서 해당 학생들의 숙제 현황 조회
-    const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Notion-Version': '2022-06-28'
-      },
-      body: JSON.stringify({
-        filter: {
-          or: studentIdsWithProgress.map(studentName => ({
-            property: '이름',
-            title: {
-              equals: studentName
-            }
-          }))
-        },
-        sorts: [
-          {
-            property: '이름',
-            direction: 'ascending'
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Notion API 오류: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log(`오늘(${today}) 날짜로 조회된 학생 수: ${data.results.length}`);
-
-    // 숙제 현황 데이터 변환
-    const homeworkData = data.results.map(student => {
-      const props = student.properties;
+    // 2단계: 진도 관리 DB에서 직접 숙제 현황 추출
+    console.log('진도 관리 DB에서 숙제 상태 직접 추출 시작...');
+    
+    const homeworkData = todayProgressData.map(progressPage => {
+      const props = progressPage.properties;
       const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
       
-      console.log(`=== ${studentName} 학생의 실제 숙제 데이터 ===`);
+      console.log(`=== ${studentName} 학생의 진도 관리 숙제 데이터 ===`);
+      console.log('⭕ 지난 문법 숙제 검사 원본:', JSON.stringify(props['⭕ 지난 문법 숙제 검사']));
       console.log('1️⃣ 어휘 클카 원본:', JSON.stringify(props['1️⃣ 어휘 클카 암기 숙제']));
       console.log('2️⃣ 독해 단어 클카 원본:', JSON.stringify(props['2️⃣ 독해 단어 클카 숙제']));
-      console.log('⭕ 지난 문법 숙제 검사 원본:', JSON.stringify(props['⭕ 지난 문법 숙제 검사']));
       console.log('4️⃣ Summary 원본:', JSON.stringify(props['4️⃣ Summary 숙제']));
       console.log('5️⃣ 매일 독해 원본:', JSON.stringify(props['5️⃣ 매일 독해 숙제']));
       console.log('6️⃣ 영어 일기 원본:', JSON.stringify(props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']));
+      console.log('수행율 원본:', JSON.stringify(props['수행율']));
       
-      // 6가지 숙제 카테고리 상태 확인
-      const grammarHomework = props['1️⃣ 어휘 클카 암기 숙제']?.select?.name || '해당없음';
-      const vocabCards = props['2️⃣ 독해 단어 클카 숙제']?.select?.name || '해당없음';
-      const readingCards = props['⭕ 지난 문법 숙제 검사']?.select?.name || '해당없음';
+      // 6가지 숙제 카테고리 상태 확인 (select 속성에서 name 추출)
+      const grammarHomework = props['⭕ 지난 문법 숙제 검사']?.select?.name || '해당없음';
+      const vocabCards = props['1️⃣ 어휘 클카 암기 숙제']?.select?.name || '해당없음';
+      const readingCards = props['2️⃣ 독해 단어 클카 숙제']?.select?.name || '해당없음';
       const summary = props['4️⃣ Summary 숙제']?.select?.name || '해당없음';
       const readingHomework = props['5️⃣ 매일 독해 숙제']?.select?.name || '해당없음';
       const diary = props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.select?.name || '해당없음';
       
+      // 수행율 정보 (formula 속성에서 추출)
+      const performanceRate = props['수행율']?.formula?.number || 0;
+      
       console.log('추출된 값들:');
-      console.log('  1️⃣ 어휘 클카:', grammarHomework);
-      console.log('  2️⃣ 독해 단어 클카:', vocabCards);
-      console.log('  ⭕ 지난 문법 숙제 검사:', readingCards);
+      console.log('  ⭕ 지난 문법 숙제 검사:', grammarHomework);
+      console.log('  1️⃣ 어휘 클카:', vocabCards);
+      console.log('  2️⃣ 독해 단어 클카:', readingCards);
       console.log('  4️⃣ Summary:', summary);
       console.log('  5️⃣ 매일 독해:', readingHomework);
       console.log('  6️⃣ 영어 일기:', diary);
+      console.log('  수행율:', performanceRate);
       
-      // 완료율 계산 (OK 개수 / 6 * 100)
+      // 완료율 계산 ("숙제 함"이면 완료로 간주)
       const statuses = [grammarHomework, vocabCards, readingCards, summary, readingHomework, diary];
-      const completedCount = statuses.filter(status => 
-        status === '숙제 함' || status === '완료' || status === 'OK' || status === '✓'
-      ).length;
+      const completedCount = statuses.filter(status => status === '숙제 함').length;
       const completionRate = Math.round((completedCount / 6) * 100);
       
       console.log(`완료 체크: ${statuses} -> 완료개수: ${completedCount}/6 = ${completionRate}%`);
       console.log('===============================');
       
       return {
-        studentId: props['이름']?.title?.[0]?.plain_text || props['학생 ID']?.rich_text?.[0]?.plain_text || '이름없음',
+        studentId: studentName,
         grammarHomework: grammarHomework,
         vocabCards: vocabCards,
         readingCards: readingCards,
         summary: summary,
         readingHomework: readingHomework,
         diary: diary,
-        completionRate: completionRate,
+        completionRate: performanceRate > 0 ? Math.round(performanceRate) : completionRate, // 노션 수행율이 있으면 사용, 없으면 계산값 사용
         rawData: {
-          name: props['이름']?.title?.[0]?.plain_text,
-          studentId: props['학생 ID']?.rich_text?.[0]?.plain_text,
-          teacher: props['담당강사']?.select?.name || '미배정'
+          name: studentName,
+          performanceRate: performanceRate,
+          teacher: '담당쌤'
         }
       };
     });
