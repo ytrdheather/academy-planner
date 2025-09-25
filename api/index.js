@@ -293,17 +293,33 @@ app.post('/login', async (req, res) => {
     
     console.log('학생 데이터베이스 ID:', databaseId);
 
-    // Notion API 버전에 따라 databases.query 또는 dataSources.query 사용
-    const queryMethod = notion.databases?.query || notion.dataSources?.query;
-    const response = await queryMethod({
-      database_id: databaseId,
-      filter: {
-        property: "학생 ID",
-        rich_text: {
-          equals: studentId
+    // Notion API 버전에 따라 적절한 쿼리 방법 사용
+    let response;
+    if (notion.databases && notion.databases.query) {
+      // 표준 databases.query 사용
+      response = await notion.databases.query({
+        database_id: databaseId,
+        filter: {
+          property: "학생 ID",
+          rich_text: {
+            equals: studentId
+          }
         }
-      }
-    });
+      });
+    } else if (notion.dataSources && notion.dataSources.query) {
+      // dataSources.query 사용 (다른 파라미터 형식)
+      response = await notion.dataSources.query({
+        data_source_id: databaseId,
+        filter: {
+          property: "학생 ID",
+          rich_text: {
+            equals: studentId
+          }
+        }
+      });
+    } else {
+      throw new Error('Notion 클라이언트에서 지원하는 쿼리 메소드를 찾을 수 없습니다');
+    }
 
     console.log('Notion 응답 길이:', response.results.length);
 
