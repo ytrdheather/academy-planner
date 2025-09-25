@@ -417,7 +417,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     console.log(`오늘 날짜 필터: ${today}`);
     console.log(`진도 관리 DB ID: ${PROGRESS_DB_ID}`);
 
-    // 1단계: "NEW 리디튜드 학생 진도 관리"에서 오늘 날짜 페이지가 있는 학생 ID 찾기
+    // 1단계: "NEW 리디튜드 학생 진도 관리"에서 전체 데이터 조회 후 필터링
     const progressResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
       method: 'POST',
       headers: {
@@ -426,12 +426,12 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
-        filter: {
-          property: '날짜',
-          date: {
-            equals: today
+        sorts: [
+          {
+            property: '날짜',
+            direction: 'descending'
           }
-        }
+        ]
       })
     });
 
@@ -440,10 +440,19 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
 
     const progressData = await progressResponse.json();
-    console.log(`오늘(${today}) 진도 관리에서 조회된 학습일지: ${progressData.results.length}개`);
+    console.log(`진도 관리에서 조회된 전체 학습일지: ${progressData.results.length}개`);
+    
+    // 오늘 날짜에 해당하는 학습일지만 필터링
+    const todayProgressData = progressData.results.filter(page => {
+      const pageDate = page.properties['날짜']?.date?.start;
+      console.log(`학습일지 날짜: ${pageDate}, 오늘: ${today}`);
+      return pageDate === today;
+    });
+    
+    console.log(`오늘(${today}) 학습일지: ${todayProgressData.length}개`);
     
     // 오늘 학습일지가 있는 학생 ID들 추출
-    const studentIdsWithProgress = progressData.results.map(page => {
+    const studentIdsWithProgress = todayProgressData.map(page => {
       const studentId = page.properties['학생 ID']?.rich_text?.[0]?.plain_text;
       console.log(`진도 관리 학생 ID: ${studentId}`);
       return studentId;
