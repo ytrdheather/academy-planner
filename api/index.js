@@ -581,6 +581,186 @@ app.get('/api/student-progress', requireAuth, async (req, res) => {
   }
 });
 
+// 숙제 수행 상황 조회 API (6가지 숙제 + 수행율)
+app.get('/api/homework-status', requireAuth, async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userName = req.user.name;
+    const assignedStudents = req.user.assignedStudents;
+    
+    console.log(`${userName}(${userRole}) 숙제 현황 조회 시작...`);
+    
+    const notion = await getVercelCompatibleNotionClient();
+    
+    // Notion 클라이언트가 없는 경우 샘플 데이터 반환
+    if (!notion || typeof notion.databases?.query !== 'function') {
+      console.error('Notion 클라이언트가 올바르지 않음 - 숙제 샘플 데이터 반환');
+      
+      const homeworkSampleData = [
+        {
+          id: 'hw1',
+          studentId: 'Test 원장',
+          date: '2025-09-25',
+          grammarHomework: '숙제 함',
+          vocabCards: '숙제 함', 
+          readingCards: '안 해옴',
+          summary: '숙제 함',
+          readingHomework: '숙제 함',
+          diary: '숙제 없음',
+          completionRate: 85,
+          assignedTeacher: '선생님1'
+        },
+        {
+          id: 'hw2',
+          studentId: '김민수',
+          date: '2025-09-25',
+          grammarHomework: '숙제 함',
+          vocabCards: '숙제 함',
+          readingCards: '숙제 함', 
+          summary: '안 해옴',
+          readingHomework: '숙제 함',
+          diary: '숙제 함',
+          completionRate: 92,
+          assignedTeacher: '선생님2'
+        },
+        {
+          id: 'hw3',
+          studentId: '박영희',
+          date: '2025-09-25',
+          grammarHomework: '안 해옴',
+          vocabCards: '숙제 함',
+          readingCards: '숙제 함',
+          summary: '숙제 함', 
+          readingHomework: '안 해옴',
+          diary: '숙제 함',
+          completionRate: 78,
+          assignedTeacher: '선생님3'
+        },
+        {
+          id: 'hw4',
+          studentId: '이수진',
+          date: '2025-09-25',
+          grammarHomework: '숙제 함',
+          vocabCards: '안 해옴',
+          readingCards: '숙제 없음',
+          summary: '숙제 함',
+          readingHomework: '숙제 함', 
+          diary: '안 해옴',
+          completionRate: 65,
+          assignedTeacher: '선생님4'
+        },
+        {
+          id: 'hw5',
+          studentId: '최준호',
+          date: '2025-09-25',
+          grammarHomework: '숙제 함',
+          vocabCards: '숙제 함',
+          readingCards: '숙제 함',
+          summary: '숙제 함',
+          readingHomework: '숙제 함',
+          diary: '숙제 함',
+          completionRate: 100,
+          assignedTeacher: '선생님1'
+        }
+      ];
+      
+      // 권한별 필터링 적용  
+      const filteredData = filterStudentsByRole(userRole, userName, assignedStudents, homeworkSampleData);
+      return res.json(filteredData);
+    }
+
+    const databaseId = process.env.PROGRESS_DATABASE_ID;
+    if (!databaseId) {
+      console.error('PROGRESS_DATABASE_ID 환경변수가 설정되지 않았습니다');
+      return res.json({ error: '데이터베이스 설정 오류. 관리자에게 문의하세요.' });
+    }
+
+    // 오늘 날짜 또는 최근 데이터 조회
+    const response = await notion.databases.query({
+      database_id: databaseId,
+      sorts: [
+        {
+          property: '날짜',
+          direction: 'descending'
+        }
+      ]
+    });
+
+    console.log(`숙제 현황: Notion에서 ${response.results.length}개 레코드 조회됨`);
+
+    const homeworkData = response.results.map(page => {
+      const properties = page.properties;
+      
+      // 6가지 숙제 상태 속성 매핑
+      return {
+        id: page.id,
+        studentId: properties['학생 ID']?.title?.[0]?.text?.content || 
+                  properties['학생 ID']?.rich_text?.[0]?.text?.content || '',
+        date: properties['날짜']?.date?.start || '',
+        
+        // 6가지 숙제 상태 (노션 속성명은 실제 DB에 맞게 조정 필요)
+        grammarHomework: properties['지난 문법 숙제 검사']?.select?.name || 
+                        properties['문법 숙제']?.select?.name || '숙제 없음',
+        vocabCards: properties['어휘 클카 암기 숙제']?.select?.name || 
+                   properties['어휘 클카']?.select?.name || '숙제 없음',
+        readingCards: properties['독해 단어 클카 숙제']?.select?.name || 
+                     properties['독해 클카']?.select?.name || '숙제 없음',
+        summary: properties['Summary 숙제']?.select?.name || 
+                properties['Summary']?.select?.name || '숙제 없음',
+        readingHomework: properties['매일 독해 숙제']?.select?.name || 
+                        properties['독해 숙제']?.select?.name || '숙제 없음',
+        diary: properties['영어 일기(초등) / 개인 독해서 (중고등)']?.select?.name || 
+               properties['일기/부교재']?.select?.name || '숙제 없음',
+        
+        // 수행율 (수식 속성)
+        completionRate: properties['수행율']?.formula?.number || 0,
+        
+        // 담당 선생님 정보
+        assignedTeacher: properties['담당강사']?.rich_text?.[0]?.text?.content || ''
+      };
+    });
+
+    // 날짜별로 그룹화하여 가장 최근 데이터만 반환 (학생별 최신 상태)
+    const latestHomeworkByStudent = {};
+    homeworkData.forEach(hw => {
+      if (!latestHomeworkByStudent[hw.studentId] || 
+          hw.date > latestHomeworkByStudent[hw.studentId].date) {
+        latestHomeworkByStudent[hw.studentId] = hw;
+      }
+    });
+    
+    const latestHomeworkData = Object.values(latestHomeworkByStudent);
+    
+    // 권한별 필터링 적용
+    const filteredData = filterStudentsByRole(userRole, userName, assignedStudents, latestHomeworkData);
+    
+    console.log(`${userName}(${userRole})이 ${filteredData.length}건의 숙제 현황을 조회했습니다.`);
+    
+    res.json(filteredData);
+  } catch (error) {
+    console.error('숙제 현황 조회 오류:', error);
+    
+    // 에러 시 샘플 데이터 반환
+    const errorSampleData = [
+      {
+        id: 'error1',
+        studentId: 'Error Test',
+        date: '2025-09-25',
+        grammarHomework: '숙제 함',
+        vocabCards: '숙제 함',
+        readingCards: '안 해옴',
+        summary: '숙제 함',
+        readingHomework: '숙제 함',
+        diary: '숙제 없음',
+        completionRate: 80,
+        assignedTeacher: '선생님1'
+      }
+    ];
+    
+    res.json(filterStudentsByRole(req.user.role, req.user.name, req.user.assignedStudents, errorSampleData));
+  }
+});
+
 // 개별 학생 진도 조회 API
 app.get('/api/student-progress/:studentId', requireAuth, async (req, res) => {
   try {
