@@ -407,7 +407,17 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     // 정확한 "New 학생 명부 관리" 데이터베이스 사용
     const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360';
     
-    // 모든 학생 데이터 조회
+    // 오늘 날짜 (한국 시간 기준)
+    const today = new Date().toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      timeZone: 'Asia/Seoul'
+    }).replace(/\. /g, '-').replace('.', '');
+    
+    console.log(`오늘 날짜 필터: ${today}`);
+
+    // 오늘 날짜에 생성된 학생 데이터만 조회
     const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
       method: 'POST',
       headers: {
@@ -416,6 +426,12 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
+        filter: {
+          property: '현재날짜',
+          date: {
+            equals: today
+          }
+        },
         sorts: [
           {
             property: '이름',
@@ -430,7 +446,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
 
     const data = await response.json();
-    console.log(`조회된 학생 수: ${data.results.length}`);
+    console.log(`오늘(${today}) 날짜로 조회된 학생 수: ${data.results.length}`);
 
     // 숙제 현황 데이터 변환
     const homeworkData = data.results.map(student => {

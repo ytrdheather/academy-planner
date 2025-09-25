@@ -361,6 +361,7 @@
             <p>학생들의 실시간 숙제 완료 상태를 확인하세요</p>
             <div class="user-info">
                 <div class="user-name" id="userName">로딩중...</div>
+                <div id="todayDate" class="today-date" style="font-size: 0.9em; color: #666; margin-top: 5px; text-align: right;"></div>
                 <button class="logout-btn" onclick="logout()">로그아웃</button>
             </div>
         </div>
@@ -427,6 +428,17 @@
                 if (data.userName) {
                     document.getElementById('userName').textContent = data.userName + ' (' + data.userRole + ')';
                 }
+                
+                // 오늘 날짜 표시 (한국 시간)
+                const today = new Date().toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long',
+                    timeZone: 'Asia/Seoul'
+                });
+                document.getElementById('todayDate').textContent = '조회 기준일: ' + today;
+                
             } catch (error) {
                 console.error('사용자 정보 로드 오류:', error);
             }
