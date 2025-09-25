@@ -152,9 +152,9 @@
             
             try {
                 const url = studentId ? `/api/student-progress/${studentId}` : '/api/student-progress';
-                // 세션 기반 인증 (토큰 헤더 불필요)
+                // JWT 기반 인증
                 const response = await fetch(url, {
-                    credentials: 'include' // 세션 쿠키 포함
+                    headers: getAuthHeaders()
                 });
                 const data = await response.json();
                 
@@ -224,32 +224,47 @@
             };
         }
 
-        // 로그아웃 함수
+        // JWT 토큰 가져오기
+        function getAuthToken() {
+            return localStorage.getItem('auth_token');
+        }
+        
+        // 인증 헤더 추가
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+        
+        // 로그아웃 함수 (JWT 토큰 삭제)
         async function logout() {
             if (confirm('로그아웃 하시겠습니까?')) {
-                try {
-                    const response = await fetch('/teacher-logout', {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        window.location.href = '/teacher-login';
-                    }
-                } catch (error) {
-                    console.error('로그아웃 오류:', error);
-                    // 오류가 발생해도 로그인 페이지로 이동
-                    window.location.href = '/teacher-login';
-                }
+                // JWT 토큰 삭제
+                localStorage.removeItem('auth_token');
+                
+                alert('로그아웃되었습니다.');
+                window.location.href = '/teacher-login';
             }
         }
         
         // 사용자 정보 로드 및 페이지 초기화
         async function loadUserInfo() {
             try {
+                const token = getAuthToken();
+                if (!token) {
+                    window.location.href = '/teacher-login';
+                    return;
+                }
+                
                 const response = await fetch('/api/user-info', {
-                    credentials: 'include'
+                    headers: getAuthHeaders()
                 });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('auth_token');
+                    window.location.href = '/teacher-login';
+                    return;
+                }
+                
                 const userInfo = await response.json();
                 
                 // 사용자 정보 표시

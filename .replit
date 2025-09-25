@@ -28,15 +28,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Study Planner Server"
+args = "Vercel Dev Server"
 
 [[workflows.workflow]]
-name = "Study Planner Server"
+name = "Vercel Dev Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm start"
+args = "node api/index.js"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -47,5 +47,5 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 43667
+localPort = 42041
 externalPort = 3000
