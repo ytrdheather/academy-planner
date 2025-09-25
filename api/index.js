@@ -418,6 +418,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     console.log(`진도 관리 DB ID: ${PROGRESS_DB_ID}`);
 
     // 1단계: "NEW 리디튜드 학생 진도 관리"에서 전체 데이터 조회 후 필터링
+    console.log('진도 관리 DB 조회 시작...');
     const progressResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
       method: 'POST',
       headers: {
@@ -426,21 +427,26 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
-        sorts: [
-          {
-            property: '날짜',
-            direction: 'descending'
-          }
-        ]
+        page_size: 100
       })
     });
 
+    console.log(`진도 관리 DB 응답 상태: ${progressResponse.status}`);
+    
     if (!progressResponse.ok) {
-      throw new Error(`진도 관리 DB 조회 오류: ${progressResponse.status}`);
+      const errorText = await progressResponse.text();
+      console.error('진도 관리 DB 오류 응답:', errorText);
+      throw new Error(`진도 관리 DB 조회 오류: ${progressResponse.status} - ${errorText}`);
     }
 
     const progressData = await progressResponse.json();
     console.log(`진도 관리에서 조회된 전체 학습일지: ${progressData.results.length}개`);
+    
+    // 데이터베이스 속성들 확인
+    if (progressData.results.length > 0) {
+      const firstPage = progressData.results[0];
+      console.log('진도 관리 DB 속성들:', Object.keys(firstPage.properties));
+    }
     
     // 오늘 날짜에 해당하는 학습일지만 필터링
     const todayProgressData = progressData.results.filter(page => {
