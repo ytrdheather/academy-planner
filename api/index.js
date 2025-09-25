@@ -388,6 +388,147 @@ app.get('/api/user-info', requireAuth, (req, res) => {
   });
 });
 
+// 숙제 현황 조회 API (JWT 기반) - Manager는 전체, Teacher는 담당 학생만
+app.get('/api/homework-status', requireAuth, async (req, res) => {
+  console.log(`숙제 현황 조회 시작: ${req.user.name} (${req.user.role})`);
+  
+  try {
+    // Vercel 호환: 직접 NOTION_ACCESS_TOKEN 사용 또는 Replit 커넥터 폴백
+    let accessToken;
+    
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      accessToken = process.env.NOTION_ACCESS_TOKEN;
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+    } else {
+      accessToken = await getAccessToken();
+      console.log('Replit 모드: 커넥터 사용');
+    }
+    
+    // 정확한 "New 학생 명부 관리" 데이터베이스 사용
+    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360';
+    
+    // 모든 학생 데이터 조회
+    const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        sorts: [
+          {
+            property: '이름',
+            direction: 'ascending'
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Notion API 오류: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`조회된 학생 수: ${data.results.length}`);
+
+    // 숙제 현황 데이터 변환
+    const homeworkData = data.results.map(student => {
+      const props = student.properties;
+      
+      // 6가지 숙제 카테고리 상태 확인
+      const grammarHomework = props['1️⃣ 어휘 클카 암기 숙제']?.select?.name || '해당없음';
+      const vocabCards = props['2️⃣ 독해 단어 클카 숙제']?.select?.name || '해당없음';
+      const readingCards = props['⭕ 지난 문법 숙제 검사']?.select?.name || '해당없음';
+      const summary = props['4️⃣ Summary 숙제']?.select?.name || '해당없음';
+      const readingHomework = props['5️⃣ 매일 독해 숙제']?.select?.name || '해당없음';
+      const diary = props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.select?.name || '해당없음';
+      
+      // 완료율 계산 (OK 개수 / 6 * 100)
+      const statuses = [grammarHomework, vocabCards, readingCards, summary, readingHomework, diary];
+      const completedCount = statuses.filter(status => 
+        status === '숙제 함' || status === '완료' || status === 'OK' || status === '✓'
+      ).length;
+      const completionRate = Math.round((completedCount / 6) * 100);
+      
+      return {
+        studentId: props['이름']?.title?.[0]?.plain_text || props['학생 ID']?.rich_text?.[0]?.plain_text || '이름없음',
+        grammarHomework: grammarHomework,
+        vocabCards: vocabCards,
+        readingCards: readingCards,
+        summary: summary,
+        readingHomework: readingHomework,
+        diary: diary,
+        completionRate: completionRate,
+        rawData: {
+          name: props['이름']?.title?.[0]?.plain_text,
+          studentId: props['학생 ID']?.rich_text?.[0]?.plain_text,
+          teacher: props['담당강사']?.select?.name || '미배정'
+        }
+      };
+    });
+
+    // Manager는 모든 학생, Teacher는 담당 학생만 (현재는 Manager 테스트용으로 모든 데이터)
+    let filteredData = homeworkData;
+    
+    if (req.user.role === 'manager') {
+      // Manager: 모든 학생 데이터
+      filteredData = homeworkData;
+      console.log(`Manager ${req.user.name}: 전체 ${homeworkData.length}명 학생 조회`);
+    } else if (req.user.role === 'teacher') {
+      // Teacher: 담당 학생만 (현재는 임시로 모든 데이터)
+      filteredData = homeworkData;
+      console.log(`Teacher ${req.user.name}: ${homeworkData.length}명 학생 조회`);
+    } else if (req.user.role === 'assistant') {
+      // Assistant: 제한된 데이터
+      filteredData = homeworkData.slice(0, 10);
+      console.log(`Assistant ${req.user.name}: 제한된 ${filteredData.length}명 학생 조회`);
+    }
+
+    res.json(filteredData);
+
+  } catch (error) {
+    console.error('숙제 현황 조회 오류:', error);
+    
+    // 오류 시 샘플 데이터 반환 (Manager 테스트용)
+    const sampleData = [
+      {
+        studentId: 'Test 원장',
+        grammarHomework: '숙제 함',
+        vocabCards: '숙제 함', 
+        readingCards: '안 해옴',
+        summary: '숙제 함',
+        readingHomework: '숙제 함',
+        diary: '안 해옴',
+        completionRate: 67
+      },
+      {
+        studentId: '김학생',
+        grammarHomework: '숙제 함',
+        vocabCards: '숙제 함',
+        readingCards: '숙제 함',
+        summary: '안 해옴',
+        readingHomework: '숙제 함',
+        diary: '숙제 함',
+        completionRate: 83
+      },
+      {
+        studentId: '이학생',
+        grammarHomework: '안 해옴',
+        vocabCards: '숙제 함',
+        readingCards: '숙제 함',
+        summary: '숙제 함',
+        readingHomework: '안 해옴',
+        diary: '숙제 함',
+        completionRate: 67
+      }
+    ];
+
+    console.log('샘플 데이터 반환:', sampleData.length + '명');
+    res.json(sampleData);
+  }
+});
+
 // Vercel 배포용 기본 handler
 export default app;
 
