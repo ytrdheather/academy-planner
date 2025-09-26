@@ -55,8 +55,21 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Notion 데이터베이스 ID 설정
-const TEACHER_DATABASE_ID = process.env.TEACHER_DATABASE_ID || '27a09320bce280059937c42d2fa699ed';
+// 다중 사용자 계정 설정 (환경변수로 관리 예정)
+const userAccounts = {
+  // 매니저 (전체 관리)
+  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저', assignedStudents: 'all' },
+  
+  // 선생님 4명 (담당 학생만)
+  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1', assignedStudents: [] },
+  'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '선생님2', assignedStudents: [] },
+  'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '선생님3', assignedStudents: [] },
+  'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '선생님4', assignedStudents: [] },
+  
+  // 아르바이트생 2명 (제한적 권한)
+  'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트1', assignedStudents: [] },
+  'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트2', assignedStudents: [] }
+};
 
 // JWT 토큰 생성 함수 (학생/선생님 공용)
 function generateToken(userData) {
@@ -183,7 +196,7 @@ app.post('/login', async (req, res) => {
     }
     
     // 정확한 "New 학생 명부 관리" 데이터베이스 ID 사용
-    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360';
+    const STUDENT_DB_ID = '25409320-bce2-80f8-ace1-ddcdd022b360';
     
     if (!STUDENT_DB_ID) {
       console.error('학생 데이터베이스 ID가 설정되지 않았습니다');
@@ -335,93 +348,18 @@ app.get('/teacher-login', (req, res) => {
 app.post('/teacher-login', async (req, res) => {
   const { teacherId, teacherPassword } = req.body;
   
-  console.log(`로그인 시도: ${teacherId}`);
+  // 사용자 계정 확인
+  const userAccount = userAccounts[teacherId];
   
-  try {
-    // Vercel 호환: 직접 NOTION_ACCESS_TOKEN 사용 또는 Replit 커넥터 폴백
-    let accessToken;
-    
-    if (process.env.NOTION_ACCESS_TOKEN) {
-      accessToken = process.env.NOTION_ACCESS_TOKEN;
-      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
-    } else {
-      accessToken = await getAccessToken();
-      console.log('Replit 모드: 커넥터 사용');
-    }
-    
-    console.log('선생님 명부 데이터베이스 조회 중...');
-    
-    // 선생님 명부 데이터베이스에서 로그인 ID로 검색
-    const response = await fetch(`https://api.notion.com/v1/databases/${TEACHER_DATABASE_ID}/query`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Notion-Version': '2022-06-28'
-      },
-      body: JSON.stringify({
-        filter: {
-          property: '로그인 ID',
-          rich_text: {
-            equals: teacherId
-          }
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('선생님 명부 조회 오류:', errorText);
-      throw new Error(`선생님 명부 조회 실패: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.results.length === 0) {
-      console.log(`로그인 실패: 존재하지 않는 ID - ${teacherId}`);
-      return res.status(401).json({ 
-        success: false, 
-        message: '아이디 또는 비밀번호가 올바르지 않습니다.' 
-      });
-    }
-    
-    const teacherRecord = data.results[0];
-    
-    // Notion 속성에서 값 추출
-    const teacherName = teacherRecord.properties['이름']?.title?.[0]?.text?.content || '';
-    const storedPassword = teacherRecord.properties['비밀번호']?.rich_text?.[0]?.text?.content || '';
-    const teacherRole = teacherRecord.properties['권한']?.rich_text?.[0]?.text?.content || '';
-    
-    console.log(`DB에서 조회된 선생님 정보: 이름=${teacherName}, 권한=${teacherRole}`);
-    
-    // 비밀번호 확인
-    if (teacherPassword !== storedPassword) {
-      console.log(`로그인 실패: 비밀번호 불일치 - ${teacherId}`);
-      return res.status(401).json({ 
-        success: false, 
-        message: '아이디 또는 비밀번호가 올바르지 않습니다.' 
-      });
-    }
-    
-    // 권한 검증 (manager 또는 teacher만 허용)
-    if (teacherRole !== 'manager' && teacherRole !== 'teacher') {
-      console.log(`로그인 실패: 잘못된 권한 - ${teacherId}, 권한: ${teacherRole}`);
-      return res.status(403).json({ 
-        success: false, 
-        message: '접근 권한이 없습니다.' 
-      });
-    }
-    
+  if (userAccount && teacherPassword === userAccount.password) {
     // JWT 토큰 생성
-    const teacherData = {
+    const token = generateToken({
       loginId: teacherId,
-      name: teacherName,
-      role: teacherRole
-    };
+      name: userAccount.name,
+      role: userAccount.role
+    });
     
-    const token = generateToken(teacherData);
-    
-    console.log(`로그인 성공: ${teacherName} (${teacherRole})`);
+    console.log(`로그인 성공: ${userAccount.name} (${userAccount.role})`);
     
     res.json({ 
       success: true, 
@@ -429,18 +367,15 @@ app.post('/teacher-login', async (req, res) => {
       token: token,
       userInfo: {
         userId: teacherId,
-        userName: teacherName,
-        userRole: teacherRole
+        userName: userAccount.name,
+        userRole: userAccount.role
       }
     });
-    
-  } catch (error) {
-    console.error('로그인 처리 오류:', error);
-    console.error('오류 상세:', error.message);
-    
-    res.status(500).json({ 
+  } else {
+    console.log(`로그인 실패: ${teacherId}`);
+    res.status(401).json({ 
       success: false, 
-      message: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+      message: '아이디 또는 비밀번호가 올바르지 않습니다.' 
     });
   }
 });
@@ -497,10 +432,11 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     
     // 쿼리 파라미터 처리
     const { period, startDate, endDate, teacher } = req.query;
+    console.log(`쿼리 파라미터 확인: period=${period}, teacher=${teacher}`);
     
     // 데이터베이스 ID들
-    const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360'; // "New 학생 명부 관리"
-    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada'; // "NEW 리디튜드 학생 진도 관리"
+    const STUDENT_DB_ID = '25409320-bce2-80f8-ace1-ddcdd022b360'; // "New 학생 명부 관리"
+    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320-bce2-8076-97ed-e3f1c1b62ada'; // "NEW 리디튜드 학생 진도 관리"
     
     // 날짜 범위 계산
     let dateFilter = null;
@@ -560,26 +496,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       });
     }
     
-    // 담당강사 필터 (매니저가 특정 강사로 필터링할 때)
-    if (teacher && teacher !== 'all') {
-      notionFilter.and.push({
-        property: '담당쌤',
-        multi_select: {
-          contains: teacher
-        }
-      });
-    }
-    
-    // Teacher 역할인 경우 자신의 담당 학생만 필터링
-    if (req.user.role === 'teacher') {
-      notionFilter.and.push({
-        property: '담당쌤',
-        multi_select: {
-          contains: req.user.name
-        }
-      });
-      console.log(`Teacher ${req.user.name}: 담당 학생만 필터링`);
-    }
+    // 담당강사 필터는 클라이언트측에서 처리 (롤업 필드는 Notion API 필터링이 불안정함)
     
     const progressResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
       method: 'POST',
@@ -638,8 +555,13 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       const performanceRateString = props['수행율']?.formula?.string || '0%';
       const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
       
-      // 담당강사 정보 추출 (multi_select)
-      const assignedTeachers = props['담당쌤']?.multi_select?.map(teacher => teacher.name) || [];
+      // 담당강사 정보 추출 (rollup)
+      const assignedTeachers = props['담당쌤']?.rollup?.array?.map(item => {
+        if (item.multi_select) {
+          return item.multi_select.map(tag => tag.name);
+        }
+        return [];
+      }).flat() || [];
       
       console.log('추출된 값들:');
       console.log('  ⭕ 지난 문법 숙제 검사:', grammarHomework);
@@ -679,16 +601,28 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       };
     });
 
-    // 권한 기반 데이터 필터링 (이미 Notion API 레벨에서 처리됨)
+    // 권한 기반 및 담당쌤 필터링
     let filteredData = homeworkData;
     
-    if (req.user.role === 'manager') {
-      console.log(`Manager ${req.user.name}: 전체 ${homeworkData.length}명 학생 조회`);
-    } else if (req.user.role === 'teacher') {
-      console.log(`Teacher ${req.user.name}: 담당 학생 ${homeworkData.length}명 조회`);
+    // 담당쌤 필터 적용 (매니저가 특정 강사로 필터링할 때)
+    if (teacher && teacher !== 'all') {
+      filteredData = filteredData.filter(student => {
+        return student.teachers && student.teachers.includes(teacher);
+      });
+      console.log(`담당쌤 필터 "${teacher}" 적용: ${filteredData.length}명 학생 조회`);
+    }
+    
+    // Teacher 역할인 경우 자신의 담당 학생만 필터링
+    if (req.user.role === 'teacher') {
+      filteredData = filteredData.filter(student => {
+        return student.teachers && student.teachers.includes(req.user.name);
+      });
+      console.log(`Teacher ${req.user.name}: 담당 학생 ${filteredData.length}명 조회`);
+    } else if (req.user.role === 'manager') {
+      console.log(`Manager ${req.user.name}: ${filteredData.length}명 학생 조회`);
     } else if (req.user.role === 'assistant') {
       // Assistant: 제한된 데이터
-      filteredData = homeworkData.slice(0, 15);
+      filteredData = filteredData.slice(0, 15);
       console.log(`Assistant ${req.user.name}: 제한된 ${filteredData.length}명 학생 조회`);
     }
 
@@ -703,7 +637,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
   }
 });
 
-// 강사 목록 API - 담당강사 속성의 모든 옵션 반환
+// 강사 목록 API - 학생명부 DB의 담당쌤 속성 옵션 반환
 app.get('/api/teachers', requireAuth, async (req, res) => {
   console.log(`강사 목록 조회 시작: ${req.user.name} (${req.user.role})`);
   
@@ -719,10 +653,10 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
       console.log('Replit 모드: 커넥터 사용');
     }
     
-    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
+    const STUDENT_DB_ID = '25409320-bce2-80f8-ace1-ddcdd022b360'; // "학생 명부 관리" DB
     
-    console.log('데이터베이스 스키마 조회 중...');
-    const schemaResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}`, {
+    console.log('학생 명부 관리 DB 스키마 조회 중...');
+    const schemaResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -733,17 +667,17 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
 
     if (!schemaResponse.ok) {
       const errorText = await schemaResponse.text();
-      console.error('데이터베이스 스키마 조회 오류:', errorText);
-      throw new Error(`데이터베이스 스키마 조회 실패: ${schemaResponse.status} - ${errorText}`);
+      console.error('학생 명부 관리 DB 스키마 조회 오류:', errorText);
+      throw new Error(`학생 명부 관리 DB 스키마 조회 실패: ${schemaResponse.status} - ${errorText}`);
     }
 
     const schemaData = await schemaResponse.json();
     
-    // 담당강사 속성의 multi_select 옵션들 추출
+    // 담당쌤 속성의 multi_select 옵션들 추출
     const teachersProperty = schemaData.properties['담당쌤'];
     
     if (!teachersProperty || teachersProperty.type !== 'multi_select') {
-      console.error('담당쌤 속성을 찾을 수 없거나 multi_select 타입이 아닙니다.');
+      console.error('학생 명부 관리 DB에서 담당쌤 속성을 찾을 수 없거나 multi_select 타입이 아닙니다.');
       return res.json([]);
     }
     
@@ -753,7 +687,7 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
       color: option.color
     }));
     
-    console.log(`담당쌤 옵션 ${teacherOptions.length}개 조회 완료:`, teacherOptions.map(t => t.name));
+    console.log(`학생 명부 관리 DB에서 담당쌤 옵션 ${teacherOptions.length}개 조회 완료:`, teacherOptions.map(t => t.name));
     
     res.json(teacherOptions);
     
