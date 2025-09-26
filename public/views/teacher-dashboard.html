@@ -699,7 +699,11 @@
 
         // 숙제 상태 드롭다운 생성
         function formatHomeworkDropdown(pageId, propertyName, currentStatus) {
-            if (!pageId) {
+            // 디버깅: pageId 상태 로그
+            console.log('formatHomeworkDropdown 호출:', { pageId, propertyName, currentStatus, pageIdType: typeof pageId });
+            
+            if (!pageId || pageId === 'undefined' || pageId === 'null') {
+                console.warn('pageId가 없어서 텍스트 형식으로 표시:', pageId);
                 // pageId가 없으면 기존 텍스트 형식으로 표시
                 return formatHomeworkStatus(currentStatus);
             }
