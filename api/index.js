@@ -378,6 +378,11 @@ app.get('/teacher', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/views/teacher.html'));
 });
 
+// 선생님 대시보드 페이지
+app.get('/teacher-dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/views/teacher-dashboard.html'));
+});
+
 // 사용자 정보 조회 API (JWT 기반)
 app.get('/api/user-info', requireAuth, (req, res) => {
   res.json({
@@ -389,6 +394,7 @@ app.get('/api/user-info', requireAuth, (req, res) => {
 });
 
 // 숙제 현황 조회 API (JWT 기반) - Manager는 전체, Teacher는 담당 학생만
+// 숙제 현황 조회 API (진도 관리 DB 직접 사용) - 대폭 개선
 app.get('/api/homework-status', requireAuth, async (req, res) => {
   console.log(`숙제 현황 조회 시작: ${req.user.name} (${req.user.role})`);
   
@@ -404,21 +410,92 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('Replit 모드: 커넥터 사용');
     }
     
+    // 쿼리 파라미터 처리
+    const { period, startDate, endDate, teacher } = req.query;
+    
     // 데이터베이스 ID들
     const STUDENT_DB_ID = '25409320bce280f8ace1ddcdd022b360'; // "New 학생 명부 관리"
     const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada'; // "NEW 리디튜드 학생 진도 관리"
     
-    // 오늘 날짜 (ISO 형식으로 변경)
+    // 날짜 범위 계산
+    let dateFilter = null;
     const now = new Date();
-    const kstOffset = 9 * 60; // 한국 시간은 UTC+9
-    const kstTime = new Date(now.getTime() + (kstOffset * 60 * 1000));
-    const today = kstTime.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    const kstTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
     
-    console.log(`오늘 날짜 필터: ${today}`);
+    if (period === 'today') {
+      const today = kstTime.toISOString().split('T')[0];
+      dateFilter = { date: { equals: today } };
+    } else if (period === 'week') {
+      const weekStart = new Date(kstTime);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // 이번 주 일요일
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6); // 이번 주 토요일
+      dateFilter = {
+        date: {
+          on_or_after: weekStart.toISOString().split('T')[0],
+          on_or_before: weekEnd.toISOString().split('T')[0]
+        }
+      };
+    } else if (period === 'month') {
+      const monthStart = new Date(kstTime.getFullYear(), kstTime.getMonth(), 1);
+      const monthEnd = new Date(kstTime.getFullYear(), kstTime.getMonth() + 1, 0);
+      dateFilter = {
+        date: {
+          on_or_after: monthStart.toISOString().split('T')[0],
+          on_or_before: monthEnd.toISOString().split('T')[0]
+        }
+      };
+    } else if (startDate && endDate) {
+      dateFilter = {
+        date: {
+          on_or_after: startDate,
+          on_or_before: endDate
+        }
+      };
+    } else {
+      // 기본값: 오늘
+      const today = kstTime.toISOString().split('T')[0];
+      dateFilter = { date: { equals: today } };
+    }
+    
+    console.log(`날짜 필터: ${JSON.stringify(dateFilter)}`);
     console.log(`진도 관리 DB ID: ${PROGRESS_DB_ID}`);
 
-    // 1단계: "NEW 리디튜드 학생 진도 관리"에서 전체 데이터 조회 후 필터링
-    console.log('진도 관리 DB 조회 시작...');
+    // Notion API filter 사용하여 최적화된 조회
+    console.log('진도 관리 DB 조회 시작... (Notion API 필터 사용)');
+    const notionFilter = {
+      and: []
+    };
+    
+    // 날짜 필터 추가
+    if (dateFilter) {
+      notionFilter.and.push({
+        property: '🕐 날짜',
+        ...dateFilter
+      });
+    }
+    
+    // 담당강사 필터 (매니저가 특정 강사로 필터링할 때)
+    if (teacher && teacher !== 'all') {
+      notionFilter.and.push({
+        property: '담당강사',
+        multi_select: {
+          contains: teacher
+        }
+      });
+    }
+    
+    // Teacher 역할인 경우 자신의 담당 학생만 필터링
+    if (req.user.role === 'teacher') {
+      notionFilter.and.push({
+        property: '담당강사',
+        multi_select: {
+          contains: req.user.name
+        }
+      });
+      console.log(`Teacher ${req.user.name}: 담당 학생만 필터링`);
+    }
+    
     const progressResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
       method: 'POST',
       headers: {
@@ -427,6 +504,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
         'Notion-Version': '2022-06-28'
       },
       body: JSON.stringify({
+        filter: notionFilter.and.length > 0 ? notionFilter : undefined,
         page_size: 100
       })
     });
@@ -440,7 +518,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
 
     const progressData = await progressResponse.json();
-    console.log(`진도 관리에서 조회된 전체 학습일지: ${progressData.results.length}개`);
+    console.log(`진도 관리에서 조회된 학습일지: ${progressData.results.length}개`);
     
     // 데이터베이스 속성들 확인
     if (progressData.results.length > 0) {
@@ -448,45 +526,20 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('진도 관리 DB 속성들:', Object.keys(firstPage.properties));
     }
     
-    // 오늘 날짜에 해당하는 학습일지만 필터링
-    const todayProgressData = progressData.results.filter(page => {
-      const pageDate = page.properties['🕐 날짜']?.date?.start;
-      console.log(`학습일지 날짜: ${pageDate}, 오늘: ${today}`);
-      return pageDate === today;
-    });
-    
-    console.log(`오늘(${today}) 학습일지: ${todayProgressData.length}개`);
-    
-    // 오늘 학습일지가 있는 학생 ID들 추출
-    const studentIdsWithProgress = todayProgressData.map(page => {
-      const studentId = page.properties['이름']?.title?.[0]?.plain_text;
-      console.log(`진도 관리 학생 ID: ${studentId}`);
-      return studentId;
-    }).filter(id => id); // null/undefined 제거
-
-    console.log(`오늘 학습일지 작성한 학생들: ${studentIdsWithProgress.join(', ')}`);
-
-    if (studentIdsWithProgress.length === 0) {
-      console.log('오늘 학습일지 작성한 학생이 없습니다.');
-      // 빈 배열 반환하여 "숙제 현황 데이터가 없습니다" 표시
+    if (progressData.results.length === 0) {
+      console.log('조건에 맞는 학습일지가 없습니다.');
       return res.json([]);
     }
 
-    // 2단계: 진도 관리 DB에서 직접 숙제 현황 추출
+    // 숙제 현황 데이터 추출
     console.log('진도 관리 DB에서 숙제 상태 직접 추출 시작...');
     
-    const homeworkData = todayProgressData.map(progressPage => {
+    const homeworkData = progressData.results.map(progressPage => {
       const props = progressPage.properties;
       const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
+      const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
       
-      console.log(`=== ${studentName} 학생의 진도 관리 숙제 데이터 ===`);
-      console.log('⭕ 지난 문법 숙제 검사 원본:', JSON.stringify(props['⭕ 지난 문법 숙제 검사']));
-      console.log('1️⃣ 어휘 클카 원본:', JSON.stringify(props['1️⃣ 어휘 클카 암기 숙제']));
-      console.log('2️⃣ 독해 단어 클카 원본:', JSON.stringify(props['2️⃣ 독해 단어 클카 숙제']));
-      console.log('4️⃣ Summary 원본:', JSON.stringify(props['4️⃣ Summary 숙제']));
-      console.log('5️⃣ 매일 독해 원본:', JSON.stringify(props['5️⃣ 매일 독해 숙제']));
-      console.log('6️⃣ 영어 일기 원본:', JSON.stringify(props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']));
-      console.log('수행율 원본:', JSON.stringify(props['수행율']));
+      console.log(`=== ${studentName} 학생의 진도 관리 숙제 데이터 (${pageDate}) ===`);
       
       // 6가지 숙제 카테고리 상태 확인 (status 속성에서 name 추출)
       const grammarHomework = props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당없음';
@@ -523,36 +576,34 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       
       return {
         studentId: studentName,
+        date: pageDate,
         grammarHomework: grammarHomework,
         vocabCards: vocabCards,
         readingCards: readingCards,
         summary: summary,
         readingHomework: readingHomework,
         diary: diary,
-        completionRate: performanceRate > 0 ? Math.round(performanceRate) : completionRate, // 노션 수행율이 있으면 사용, 없으면 계산값 사용
-        teachers: assignedTeachers, // 실제 담당강사 배열
+        completionRate: performanceRate > 0 ? Math.round(performanceRate) : completionRate,
+        teachers: assignedTeachers,
         rawData: {
           name: studentName,
+          date: pageDate,
           performanceRate: performanceRate,
           teachers: assignedTeachers
         }
       };
     });
 
-    // Manager는 모든 학생, Teacher는 담당 학생만 (현재는 Manager 테스트용으로 모든 데이터)
+    // 권한 기반 데이터 필터링 (이미 Notion API 레벨에서 처리됨)
     let filteredData = homeworkData;
     
     if (req.user.role === 'manager') {
-      // Manager: 모든 학생 데이터
-      filteredData = homeworkData;
       console.log(`Manager ${req.user.name}: 전체 ${homeworkData.length}명 학생 조회`);
     } else if (req.user.role === 'teacher') {
-      // Teacher: 담당 학생만 (현재는 임시로 모든 데이터)
-      filteredData = homeworkData;
-      console.log(`Teacher ${req.user.name}: ${homeworkData.length}명 학생 조회`);
+      console.log(`Teacher ${req.user.name}: 담당 학생 ${homeworkData.length}명 조회`);
     } else if (req.user.role === 'assistant') {
       // Assistant: 제한된 데이터
-      filteredData = homeworkData.slice(0, 10);
+      filteredData = homeworkData.slice(0, 15);
       console.log(`Assistant ${req.user.name}: 제한된 ${filteredData.length}명 학생 조회`);
     }
 
@@ -563,6 +614,68 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     console.error('오류 상세:', error.message);
     
     // 오류 시 빈 배열 반환 (샘플 데이터 제거)
+    res.json([]);
+  }
+});
+
+// 강사 목록 API - 담당강사 속성의 모든 옵션 반환
+app.get('/api/teachers', requireAuth, async (req, res) => {
+  console.log(`강사 목록 조회 시작: ${req.user.name} (${req.user.role})`);
+  
+  try {
+    // Vercel 호환: 직접 NOTION_ACCESS_TOKEN 사용 또는 Replit 커넥터 폴백
+    let accessToken;
+    
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      accessToken = process.env.NOTION_ACCESS_TOKEN;
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+    } else {
+      accessToken = await getAccessToken();
+      console.log('Replit 모드: 커넥터 사용');
+    }
+    
+    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID || '25409320bce2807697ede3f1c1b62ada';
+    
+    console.log('데이터베이스 스키마 조회 중...');
+    const schemaResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      }
+    });
+
+    if (!schemaResponse.ok) {
+      const errorText = await schemaResponse.text();
+      console.error('데이터베이스 스키마 조회 오류:', errorText);
+      throw new Error(`데이터베이스 스키마 조회 실패: ${schemaResponse.status} - ${errorText}`);
+    }
+
+    const schemaData = await schemaResponse.json();
+    
+    // 담당강사 속성의 multi_select 옵션들 추출
+    const teachersProperty = schemaData.properties['담당강사'];
+    
+    if (!teachersProperty || teachersProperty.type !== 'multi_select') {
+      console.error('담당강사 속성을 찾을 수 없거나 multi_select 타입이 아닙니다.');
+      return res.json([]);
+    }
+    
+    const teacherOptions = teachersProperty.multi_select.options.map(option => ({
+      id: option.id,
+      name: option.name,
+      color: option.color
+    }));
+    
+    console.log(`담당강사 옵션 ${teacherOptions.length}개 조회 완료:`, teacherOptions.map(t => t.name));
+    
+    res.json(teacherOptions);
+    
+  } catch (error) {
+    console.error('강사 목록 조회 오류:', error);
+    console.error('오류 상세:', error.message);
+    
     res.json([]);
   }
 });
