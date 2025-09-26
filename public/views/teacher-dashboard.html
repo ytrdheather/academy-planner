@@ -699,13 +699,10 @@
 
         // 숙제 상태 드롭다운 생성
         function formatHomeworkDropdown(pageId, propertyName, currentStatus) {
-            // 디버깅: pageId 상태 로그
-            console.log('formatHomeworkDropdown 호출:', { pageId, propertyName, currentStatus, pageIdType: typeof pageId });
-            
-            if (!pageId || pageId === 'undefined' || pageId === 'null') {
-                console.warn('pageId가 없어서 텍스트 형식으로 표시:', pageId);
-                // pageId가 없으면 기존 텍스트 형식으로 표시
-                return formatHomeworkStatus(currentStatus);
+            // 강제로 드롭다운 생성 (디버깅용)
+            if (!pageId || pageId === 'undefined' || pageId === 'null' || pageId === undefined || pageId === null) {
+                console.warn('⚠️ pageId가 없음:', pageId, '- 임시 pageId로 드롭다운 생성');
+                pageId = 'temp-' + Math.random().toString(36).substr(2, 9); // 임시 ID 생성
             }
 
             const options = ['숙제 함', '안 해옴', '숙제 없음'];
