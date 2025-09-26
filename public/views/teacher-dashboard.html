@@ -655,6 +655,7 @@
 
         // 학생 데이터 표시
         function displayStudentData(students) {
+            console.log('🎯 displayStudentData 호출됨:', students.length + '명');
             const tbody = document.getElementById('studentsTableBody');
             const studentCount = document.getElementById('studentCount');
             
@@ -664,7 +665,18 @@
                 return;
             }
             
-            tbody.innerHTML = students.map(student => `
+            console.log('🔍 첫 번째 학생 데이터:', students[0]);
+            
+            tbody.innerHTML = students.map((student, index) => {
+                if (index === 0) {
+                    console.log('🔍 첫 번째 학생 HTML 생성 중:', {
+                        pageId: student.pageId,
+                        studentId: student.studentId,
+                        grammarHomework: student.grammarHomework
+                    });
+                }
+                
+                return `
                 <tr>
                     <td class="student-name">${student.studentId || '이름 없음'}</td>
                     <td style="font-size: 12px; color: #6b7280;">${formatDate(student.date)}</td>
@@ -681,7 +693,8 @@
                     <td>${formatHomeworkDropdown(student.pageId, '5️⃣ 매일 독해 숙제', student.readingHomework)}</td>
                     <td>${formatHomeworkDropdown(student.pageId, '6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)', student.diary)}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             
             studentCount.textContent = `${students.length}명`;
         }
