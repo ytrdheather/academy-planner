@@ -730,8 +730,8 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     
     console.log(`Notion 페이지 업데이트 시작: ${pageId}, 속성: ${propertyName}, 값: ${newValue}`);
     
-    // Notion API로 페이지 속성 업데이트
-    const updateResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    // 먼저 select 타입으로 시도
+    let updateResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -748,6 +748,28 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         }
       })
     });
+    
+    // select가 실패하면 status 타입으로 재시도
+    if (!updateResponse.ok) {
+      console.log('select 타입 실패, status 타입으로 재시도...');
+      updateResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28'
+        },
+        body: JSON.stringify({
+          properties: {
+            [propertyName]: {
+              status: {
+                name: newValue
+              }
+            }
+          }
+        }
+      });
+    }
     
     if (!updateResponse.ok) {
       const errorData = await updateResponse.text();
