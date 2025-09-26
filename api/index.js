@@ -582,6 +582,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('===============================');
       
       return {
+        pageId: progressPage.id, // Notion 페이지 ID 추가
         studentId: studentName,
         date: pageDate,
         grammarHomework: grammarHomework,
@@ -696,6 +697,100 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
     console.error('오류 상세:', error.message);
     
     res.json([]);
+  }
+});
+
+// 숙제 상태 업데이트 API
+app.post('/api/update-homework', requireAuth, async (req, res) => {
+  console.log('숙제 업데이트 요청:', req.user.name, req.body);
+  
+  try {
+    const { pageId, propertyName, newValue } = req.body;
+    
+    // 입력값 검증
+    if (!pageId || !propertyName || newValue === undefined || newValue === null) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '필수 데이터가 누락되었습니다. (pageId, propertyName, newValue)' 
+      });
+    }
+    
+    // Notion 액세스 토큰 가져오기
+    let accessToken;
+    
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      // Vercel 배포용: 직접 토큰 사용
+      accessToken = process.env.NOTION_ACCESS_TOKEN;
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+    } else {
+      // Replit 개발용: 커넥터 사용
+      accessToken = await getAccessToken();
+      console.log('Replit 모드: 커넥터 사용');
+    }
+    
+    console.log(`Notion 페이지 업데이트 시작: ${pageId}, 속성: ${propertyName}, 값: ${newValue}`);
+    
+    // Notion API로 페이지 속성 업데이트
+    const updateResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        properties: {
+          [propertyName]: {
+            select: {
+              name: newValue
+            }
+          }
+        }
+      })
+    });
+    
+    if (!updateResponse.ok) {
+      const errorData = await updateResponse.text();
+      console.error('Notion API 업데이트 실패:', updateResponse.status, errorData);
+      
+      let errorMessage = '업데이트에 실패했습니다.';
+      try {
+        const errorJson = JSON.parse(errorData);
+        if (errorJson.message) {
+          errorMessage = errorJson.message;
+        }
+      } catch (e) {
+        // JSON 파싱 실패시 기본 메시지 사용
+      }
+      
+      return res.status(500).json({ 
+        success: false, 
+        message: errorMessage,
+        details: errorData
+      });
+    }
+    
+    const updateResult = await updateResponse.json();
+    console.log('Notion 페이지 업데이트 성공:', updateResult.id);
+    
+    res.json({ 
+      success: true, 
+      message: '성공적으로 업데이트되었습니다.',
+      pageId: updateResult.id,
+      property: propertyName,
+      newValue: newValue,
+      updatedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('숙제 업데이트 오류:', error);
+    console.error('오류 상세:', error.message);
+    
+    res.status(500).json({ 
+      success: false, 
+      message: '서버 오류가 발생했습니다.',
+      error: error.message 
+    });
   }
 });
 

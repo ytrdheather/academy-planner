@@ -266,6 +266,48 @@
         .status-incomplete { background: #fecaca; color: #991b1b; }
         .status-none { background: #f3f4f6; color: #6b7280; }
 
+        .homework-dropdown {
+            padding: 4px 6px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 50px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .homework-dropdown:hover {
+            border-color: #6b46c1;
+            box-shadow: 0 0 0 2px rgba(107, 70, 193, 0.1);
+        }
+
+        .homework-dropdown:focus {
+            outline: none;
+            border-color: #6b46c1;
+            box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+        }
+
+        .homework-dropdown.status-complete {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #bbf7d0;
+        }
+
+        .homework-dropdown.status-incomplete {
+            background: #fecaca;
+            color: #991b1b;
+            border-color: #fca5a5;
+        }
+
+        .homework-dropdown.status-none {
+            background: #f3f4f6;
+            color: #6b7280;
+            border-color: #d1d5db;
+        }
+
         .teachers-list {
             font-size: 12px;
             color: #6b46c1;
@@ -294,6 +336,46 @@
             border-radius: 8px;
             margin: 20px 0;
             display: none;
+        }
+
+        .success-message {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .toast-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .toast-message.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast-success {
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .toast-error {
+            background: #fecaca;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
         }
 
         @media (max-width: 768px) {
@@ -592,19 +674,19 @@
                             : '미배정'
                     }</td>
                     <td><span class="completion-rate ${getCompletionRateClass(student.completionRate)}">${student.completionRate || 0}%</span></td>
-                    <td>${formatHomeworkStatus(student.grammarHomework)}</td>
-                    <td>${formatHomeworkStatus(student.vocabCards)}</td>
-                    <td>${formatHomeworkStatus(student.readingCards)}</td>
-                    <td>${formatHomeworkStatus(student.summary)}</td>
-                    <td>${formatHomeworkStatus(student.readingHomework)}</td>
-                    <td>${formatHomeworkStatus(student.diary)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '⭕ 지난 문법 숙제 검사', student.grammarHomework)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '1️⃣ 어휘 클카 암기 숙제', student.vocabCards)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '2️⃣ 독해 단어 클카 숙제', student.readingCards)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '4️⃣ Summary 숙제', student.summary)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '5️⃣ 매일 독해 숙제', student.readingHomework)}</td>
+                    <td>${formatHomeworkDropdown(student.pageId, '6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)', student.diary)}</td>
                 </tr>
             `).join('');
             
             studentCount.textContent = `${students.length}명`;
         }
 
-        // 숙제 상태 포맷팅
+        // 숙제 상태 포맷팅 (기존 함수 유지)
         function formatHomeworkStatus(status) {
             if (status === '숙제 함') {
                 return '<span class="homework-status status-complete">OK</span>';
@@ -612,6 +694,41 @@
                 return '<span class="homework-status status-incomplete">NO</span>';
             } else {
                 return '<span class="homework-status status-none">-</span>';
+            }
+        }
+
+        // 숙제 상태 드롭다운 생성
+        function formatHomeworkDropdown(pageId, propertyName, currentStatus) {
+            if (!pageId) {
+                // pageId가 없으면 기존 텍스트 형식으로 표시
+                return formatHomeworkStatus(currentStatus);
+            }
+
+            const options = ['숙제 함', '안 해옴', '숙제 없음'];
+            const statusClass = getHomeworkStatusClass(currentStatus);
+            
+            const optionsHtml = options.map(option => 
+                `<option value="${option}" ${option === currentStatus ? 'selected' : ''}>${option}</option>`
+            ).join('');
+            
+            return `
+                <select class="homework-dropdown ${statusClass}" 
+                        data-page-id="${pageId}" 
+                        data-property-name="${propertyName}"
+                        onchange="updateHomework(this)">
+                    ${optionsHtml}
+                </select>
+            `;
+        }
+
+        // 숙제 상태에 따른 CSS 클래스 반환
+        function getHomeworkStatusClass(status) {
+            if (status === '숙제 함') {
+                return 'status-complete';
+            } else if (status === '안 해옴' || status === '안해옴') {
+                return 'status-incomplete';
+            } else {
+                return 'status-none';
             }
         }
 
@@ -658,6 +775,103 @@
             setTimeout(() => {
                 errorElement.style.display = 'none';
             }, 5000);
+        }
+
+        // 숙제 상태 업데이트 함수
+        async function updateHomework(selectElement) {
+            const pageId = selectElement.getAttribute('data-page-id');
+            const propertyName = selectElement.getAttribute('data-property-name');
+            const newValue = selectElement.value;
+            const originalValue = selectElement.defaultValue || selectElement.options[0].value;
+            
+            console.log('숙제 업데이트 요청:', { pageId, propertyName, newValue });
+            
+            // 로딩 상태 표시
+            const originalClass = selectElement.className;
+            selectElement.disabled = true;
+            selectElement.style.opacity = '0.6';
+            
+            try {
+                const response = await fetch('/api/update-homework', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({
+                        pageId: pageId,
+                        propertyName: propertyName,
+                        newValue: newValue
+                    })
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                        logout();
+                        return;
+                    }
+                    
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || '업데이트 실패');
+                }
+                
+                const result = await response.json();
+                
+                // 성공시 드롭다운 스타일 업데이트
+                selectElement.className = `homework-dropdown ${getHomeworkStatusClass(newValue)}`;
+                selectElement.defaultValue = newValue;
+                
+                // 성공 토스트 메시지 표시
+                showToast('저장되었습니다!', 'success');
+                
+                console.log('숙제 업데이트 성공:', result);
+                
+            } catch (error) {
+                console.error('숙제 업데이트 오류:', error);
+                
+                // 실패시 원래 값으로 되돌리기
+                selectElement.value = originalValue;
+                selectElement.className = originalClass;
+                
+                // 에러 토스트 메시지 표시
+                showToast(`업데이트 실패: ${error.message}`, 'error');
+                
+            } finally {
+                // 로딩 상태 해제
+                selectElement.disabled = false;
+                selectElement.style.opacity = '1';
+            }
+        }
+
+        // 토스트 메시지 표시
+        function showToast(message, type = 'success') {
+            // 기존 토스트 제거
+            const existingToast = document.querySelector('.toast-message');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `toast-message toast-${type}`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // 애니메이션 트리거
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            // 3초 후 자동 제거
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
         }
 
         // 필터 변경 시 자동 새로고침
