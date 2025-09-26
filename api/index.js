@@ -563,7 +563,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     // 담당강사 필터 (매니저가 특정 강사로 필터링할 때)
     if (teacher && teacher !== 'all') {
       notionFilter.and.push({
-        property: '담당강사',
+        property: '담당쌤',
         multi_select: {
           contains: teacher
         }
@@ -573,7 +573,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     // Teacher 역할인 경우 자신의 담당 학생만 필터링
     if (req.user.role === 'teacher') {
       notionFilter.and.push({
-        property: '담당강사',
+        property: '담당쌤',
         multi_select: {
           contains: req.user.name
         }
@@ -639,7 +639,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
       
       // 담당강사 정보 추출 (multi_select)
-      const assignedTeachers = props['담당강사']?.multi_select?.map(teacher => teacher.name) || [];
+      const assignedTeachers = props['담당쌤']?.multi_select?.map(teacher => teacher.name) || [];
       
       console.log('추출된 값들:');
       console.log('  ⭕ 지난 문법 숙제 검사:', grammarHomework);
@@ -740,10 +740,10 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
     const schemaData = await schemaResponse.json();
     
     // 담당강사 속성의 multi_select 옵션들 추출
-    const teachersProperty = schemaData.properties['담당강사'];
+    const teachersProperty = schemaData.properties['담당쌤'];
     
     if (!teachersProperty || teachersProperty.type !== 'multi_select') {
-      console.error('담당강사 속성을 찾을 수 없거나 multi_select 타입이 아닙니다.');
+      console.error('담당쌤 속성을 찾을 수 없거나 multi_select 타입이 아닙니다.');
       return res.json([]);
     }
     
@@ -753,7 +753,7 @@ app.get('/api/teachers', requireAuth, async (req, res) => {
       color: option.color
     }));
     
-    console.log(`담당강사 옵션 ${teacherOptions.length}개 조회 완료:`, teacherOptions.map(t => t.name));
+    console.log(`담당쌤 옵션 ${teacherOptions.length}개 조회 완료:`, teacherOptions.map(t => t.name));
     
     res.json(teacherOptions);
     
