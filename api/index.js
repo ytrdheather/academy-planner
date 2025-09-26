@@ -58,14 +58,21 @@ const PORT = process.env.PORT || 5000;
 // Notion 데이터베이스 ID 설정
 const TEACHER_DATABASE_ID = process.env.TEACHER_DATABASE_ID || '27a09320bce280059937c42d2fa699ed';
 
-// JWT 토큰 생성 함수 (Notion 데이터베이스 기반)
-function generateToken(teacherData) {
+// JWT 토큰 생성 함수 (학생/선생님 공용)
+function generateToken(userData) {
   const secret = JWT_SECRET || DEV_SECRET;
-  return jwt.sign({
-    userId: teacherData.loginId,
-    role: teacherData.role,
-    name: teacherData.name
-  }, secret, { expiresIn: '24h' });
+  const tokenPayload = {
+    userId: userData.loginId,
+    role: userData.role,
+    name: userData.name
+  };
+  
+  // 학생의 경우 realName 포함
+  if (userData.realName) {
+    tokenPayload.realName = userData.realName;
+  }
+  
+  return jwt.sign(tokenPayload, secret, { expiresIn: '24h' });
 }
 
 // JWT 토큰 검증 함수
@@ -264,11 +271,11 @@ app.post('/login', async (req, res) => {
       const studentRealName = realName || studentId;
       
       // JWT 토큰 생성
-      const token = generateToken(studentId, {
+      const token = generateToken({
+        loginId: studentId,
         role: 'student',
         name: studentName,
-        realName: studentRealName,
-        assignedStudents: []
+        realName: studentRealName
       });
 
       console.log('로그인 성공:', studentId);
