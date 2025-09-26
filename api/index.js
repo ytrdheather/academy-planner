@@ -458,8 +458,16 @@ app.get('/api/user-info', requireAuth, (req, res) => {
   res.json({
     userId: req.user.userId,
     userName: req.user.name,
-    userRole: req.user.role,
-    assignedStudents: req.user.assignedStudents
+    userRole: req.user.role
+  });
+});
+
+// 선생님 대시보드용 사용자 정보 API (별칭)
+app.get('/api/teacher/user-info', requireAuth, (req, res) => {
+  res.json({
+    userId: req.user.userId,
+    userName: req.user.name,
+    userRole: req.user.role
   });
 });
 
