@@ -500,6 +500,9 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       const performanceRateString = props['수행율']?.formula?.string || '0%';
       const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
       
+      // 담당쌤 정보 추출
+      const assignedTeacher = props['담당쌤']?.select?.name || '미배정';
+      
       console.log('추출된 값들:');
       console.log('  ⭕ 지난 문법 숙제 검사:', grammarHomework);
       console.log('  1️⃣ 어휘 클카:', vocabCards);
@@ -508,6 +511,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
       console.log('  5️⃣ 매일 독해:', readingHomework);
       console.log('  6️⃣ 영어 일기:', diary);
       console.log('  수행율:', performanceRate);
+      console.log('  담당쌤:', assignedTeacher);
       
       // 완료율 계산 ("숙제 함"이면 완료로 간주)
       const statuses = [grammarHomework, vocabCards, readingCards, summary, readingHomework, diary];
@@ -526,10 +530,11 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
         readingHomework: readingHomework,
         diary: diary,
         completionRate: performanceRate > 0 ? Math.round(performanceRate) : completionRate, // 노션 수행율이 있으면 사용, 없으면 계산값 사용
+        teacher: assignedTeacher, // 실제 담당쌤 정보
         rawData: {
           name: studentName,
           performanceRate: performanceRate,
-          teacher: '담당쌤'
+          teacher: assignedTeacher
         }
       };
     });
