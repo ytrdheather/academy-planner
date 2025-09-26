@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>선생님 대시보드 - 숙제 수행 현황</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: "NanumSquareRound", "나눔스퀘어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
         }
         
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333; 
+            background: #ffffff;
+            color: #2d3748; 
             min-height: 100vh;
             padding: 20px;
         }
@@ -29,23 +30,24 @@
         }
         
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
+            background: #ffffff;
+            color: #6b46c1;
+            padding: 25px 30px;
             text-align: center;
             position: relative;
+            border-bottom: 2px solid #e2e8f0;
         }
         
         .header h1 { 
-            font-size: 2.5em;
+            font-size: 2.2em;
             font-weight: 700;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            color: #6b46c1;
         }
         
         .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
+            font-size: 1.1em;
+            color: #718096;
         }
         
         .user-info {
@@ -59,22 +61,25 @@
             font-size: 1.1em;
             font-weight: 600;
             margin-bottom: 5px;
+            color: #6b46c1;
         }
         
         .logout-btn {
-            background: rgba(255,255,255,0.2);
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
-            border: 2px solid rgba(255,255,255,0.3);
+            border: none;
             padding: 8px 16px;
-            border-radius: 25px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
         }
         
         .logout-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
         }
         
         .main-content {
@@ -86,9 +91,9 @@
         }
         
         .section-title {
-            font-size: 1.8em;
+            font-size: 1.6em;
             font-weight: 700;
-            color: #333;
+            color: #6b46c1;
             margin-bottom: 20px;
             display: flex;
             align-items: center;
@@ -115,12 +120,12 @@
         }
         
         .homework-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
             color: white;
-            padding: 18px 12px;
+            padding: 10px 8px;
             text-align: center;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 12px;
             border-right: 1px solid rgba(255,255,255,0.2);
         }
         
@@ -129,11 +134,12 @@
         }
         
         .homework-table td {
-            padding: 16px 12px;
+            padding: 8px 6px;
             text-align: center;
             border-bottom: 1px solid #f1f3f4;
             border-right: 1px solid #f1f3f4;
             vertical-align: middle;
+            font-size: 13px;
         }
         
         .homework-table td:last-child {
@@ -146,25 +152,25 @@
         
         .student-name {
             font-weight: 600;
-            color: #333;
+            color: #2d3748;
             text-align: left !important;
-            font-size: 15px;
-            background: linear-gradient(90deg, #f8f9ff, #ffffff);
-            padding: 16px 20px !important;
+            font-size: 14px;
+            background: linear-gradient(90deg, #f8fafc, #ffffff);
+            padding: 8px 12px !important;
         }
         
         .homework-status {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 4px 8px;
+            border-radius: 12px;
             font-weight: 600;
-            font-size: 12px;
-            min-width: 50px;
+            font-size: 11px;
+            min-width: 35px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            letter-spacing: 0.3px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
         }
         
         .status-complete {
@@ -184,20 +190,20 @@
         
         .completion-rate {
             font-weight: 700;
-            font-size: 16px;
-            color: #333;
+            font-size: 14px;
+            color: #2d3748;
         }
         
         .rate-excellent {
-            color: #48bb78;
+            color: #10b981;
         }
         
         .rate-good {
-            color: #4299e1;
+            color: #8b5cf6;
         }
         
         .rate-poor {
-            color: #f56565;
+            color: #ef4444;
         }
         
         .loading {
@@ -223,22 +229,22 @@
         }
         
         .refresh-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
+            padding: 10px 20px;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
             transition: all 0.3s ease;
         }
         
         .refresh-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
         }
         
         .stats-summary {
@@ -250,11 +256,12 @@
         
         .stat-card {
             background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            border-left: 5px solid #667eea;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-left: 4px solid #8b5cf6;
             transition: transform 0.3s ease;
+            border: 1px solid rgba(139, 92, 246, 0.1);
         }
         
         .stat-card:hover {
@@ -262,9 +269,9 @@
         }
         
         .stat-value {
-            font-size: 2.2em;
+            font-size: 2.0em;
             font-weight: 700;
-            color: #667eea;
+            color: #6b46c1;
             margin-bottom: 5px;
         }
         
