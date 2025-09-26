@@ -58,14 +58,13 @@ const PORT = process.env.PORT || 5000;
 // Notion 데이터베이스 ID 설정
 const TEACHER_DATABASE_ID = process.env.TEACHER_DATABASE_ID || '27a09320bce280059937c42d2fa699ed';
 
-// JWT 토큰 생성 함수
-function generateToken(userId, userInfo) {
+// JWT 토큰 생성 함수 (Notion 데이터베이스 기반)
+function generateToken(teacherData) {
   const secret = JWT_SECRET || DEV_SECRET;
   return jwt.sign({
-    userId: userId,
-    role: userInfo.role,
-    name: userInfo.name,
-    assignedStudents: userInfo.assignedStudents
+    userId: teacherData.loginId,
+    role: teacherData.role,
+    name: teacherData.name
   }, secret, { expiresIn: '24h' });
 }
 
@@ -329,14 +328,93 @@ app.get('/teacher-login', (req, res) => {
 app.post('/teacher-login', async (req, res) => {
   const { teacherId, teacherPassword } = req.body;
   
-  // 사용자 계정 확인
-  const userAccount = userAccounts[teacherId];
+  console.log(`로그인 시도: ${teacherId}`);
   
-  if (userAccount && teacherPassword === userAccount.password) {
-    // JWT 토큰 생성
-    const token = generateToken(teacherId, userAccount);
+  try {
+    // Vercel 호환: 직접 NOTION_ACCESS_TOKEN 사용 또는 Replit 커넥터 폴백
+    let accessToken;
     
-    console.log(`로그인 성공: ${userAccount.name} (${userAccount.role})`);
+    if (process.env.NOTION_ACCESS_TOKEN) {
+      accessToken = process.env.NOTION_ACCESS_TOKEN;
+      console.log('Vercel 모드: NOTION_ACCESS_TOKEN 사용');
+    } else {
+      accessToken = await getAccessToken();
+      console.log('Replit 모드: 커넥터 사용');
+    }
+    
+    console.log('선생님 명부 데이터베이스 조회 중...');
+    
+    // 선생님 명부 데이터베이스에서 로그인 ID로 검색
+    const response = await fetch(`https://api.notion.com/v1/databases/${TEACHER_DATABASE_ID}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({
+        filter: {
+          property: '로그인 ID',
+          rich_text: {
+            equals: teacherId
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('선생님 명부 조회 오류:', errorText);
+      throw new Error(`선생님 명부 조회 실패: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.results.length === 0) {
+      console.log(`로그인 실패: 존재하지 않는 ID - ${teacherId}`);
+      return res.status(401).json({ 
+        success: false, 
+        message: '아이디 또는 비밀번호가 올바르지 않습니다.' 
+      });
+    }
+    
+    const teacherRecord = data.results[0];
+    
+    // Notion 속성에서 값 추출
+    const teacherName = teacherRecord.properties['이름']?.title?.[0]?.text?.content || '';
+    const storedPassword = teacherRecord.properties['비밀번호']?.rich_text?.[0]?.text?.content || '';
+    const teacherRole = teacherRecord.properties['권한']?.rich_text?.[0]?.text?.content || '';
+    
+    console.log(`DB에서 조회된 선생님 정보: 이름=${teacherName}, 권한=${teacherRole}`);
+    
+    // 비밀번호 확인
+    if (teacherPassword !== storedPassword) {
+      console.log(`로그인 실패: 비밀번호 불일치 - ${teacherId}`);
+      return res.status(401).json({ 
+        success: false, 
+        message: '아이디 또는 비밀번호가 올바르지 않습니다.' 
+      });
+    }
+    
+    // 권한 검증 (manager 또는 teacher만 허용)
+    if (teacherRole !== 'manager' && teacherRole !== 'teacher') {
+      console.log(`로그인 실패: 잘못된 권한 - ${teacherId}, 권한: ${teacherRole}`);
+      return res.status(403).json({ 
+        success: false, 
+        message: '접근 권한이 없습니다.' 
+      });
+    }
+    
+    // JWT 토큰 생성
+    const teacherData = {
+      loginId: teacherId,
+      name: teacherName,
+      role: teacherRole
+    };
+    
+    const token = generateToken(teacherData);
+    
+    console.log(`로그인 성공: ${teacherName} (${teacherRole})`);
     
     res.json({ 
       success: true, 
@@ -344,14 +422,19 @@ app.post('/teacher-login', async (req, res) => {
       token: token,
       userInfo: {
         userId: teacherId,
-        userName: userAccount.name,
-        userRole: userAccount.role,
-        assignedStudents: userAccount.assignedStudents
+        userName: teacherName,
+        userRole: teacherRole
       }
     });
-  } else {
-    console.log(`로그인 실패: ${teacherId}`);
-    res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+    
+  } catch (error) {
+    console.error('로그인 처리 오류:', error);
+    console.error('오류 상세:', error.message);
+    
+    res.status(500).json({ 
+      success: false, 
+      message: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+    });
   }
 });
 
