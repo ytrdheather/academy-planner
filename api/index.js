@@ -55,21 +55,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 다중 사용자 계정 설정 (환경변수로 관리 예정)
-const userAccounts = {
-  // 매니저 (전체 관리)
-  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저', assignedStudents: 'all' },
-  
-  // 선생님 4명 (담당 학생만)
-  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1', assignedStudents: [] },
-  'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '선생님2', assignedStudents: [] },
-  'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '선생님3', assignedStudents: [] },
-  'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '선생님4', assignedStudents: [] },
-  
-  // 아르바이트생 2명 (제한적 권한)
-  'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트1', assignedStudents: [] },
-  'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '아르바이트2', assignedStudents: [] }
-};
+// Notion 데이터베이스 ID 설정
+const TEACHER_DATABASE_ID = process.env.TEACHER_DATABASE_ID || '27a09320bce280059937c42d2fa699ed';
 
 // JWT 토큰 생성 함수
 function generateToken(userId, userInfo) {
