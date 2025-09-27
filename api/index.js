@@ -22,9 +22,9 @@ const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
 
 // 사용자 계정 (코드 내에서 간단히 관리)
 const userAccounts = {
-  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저' },
-  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1' },
-  // ... 다른 선생님 계정들
+  'manager': { password: 'rdtd123!@', role: 'manager', name: '매니저' },
+  'teacher1': { password: 'rdtd123!@', role: 'teacher', name: '선생님1' },
+  // ... 다른 선생님 계정들 ...
 };
 
 // 미들웨어 설정
@@ -33,7 +33,6 @@ app.use(bodyParser.json());
 
 // ===== 정적 파일 및 페이지 라우팅 =====
 const publicPath = path.join(process.cwd(), 'public');
-app.use(express.static(publicPath));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicPath, 'views', 'login.html'));
@@ -44,29 +43,4 @@ app.get('/planner', (req, res) => {
 });
 
 app.get('/teacher-login', (req, res) => {
-  res.sendFile(path.join(publicPath, 'views', 'teacher-login.html'));
-});
-
-app.get('/teacher-dashboard', (req, res) => {
-  res.sendFile(path.join(publicPath, 'views', 'teacher-dashboard.html'));
-});
-
-// ===== JWT 함수 =====
-function generateToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-}
-
-function verifyToken(token) {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
-}
-
-// ===== API 엔드포인트들 =====
-
-// 1. 학생 로그인 API
-app.post('/api/login', async (req, res) => {
-  const { studentId, studentPassword } = req.body;
-  if (!STUDENT_DB_
+  res.sendFile(path.join(publicPath, 'views', 'teacher-
