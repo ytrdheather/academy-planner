@@ -6,36 +6,54 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client } from '@notionhq/client';
 
+// ES Modules에서 __dirname를 사용하기 위한 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Vercel 환경에서는 /tmp 디렉토리에 public 폴더를 복사해야 할 수 있습니다.
-// 이 코드는 Vercel이 정적 파일을 찾는 경로를 설정합니다.
-const publicPath = path.join(process.cwd(), 'public');
+// Express 앱 초기화
+const app = express();
 
-// Notion 클라이언트 초기화
+// Notion 클라이언트 및 JWT 시크릿 키 초기화
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
-
-// JWT 시크릿 키
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-readitude-2025';
 
-const app = express();
+// 데이터베이스 ID (환경 변수에서 관리)
+const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
+
+// 사용자 계정 (코드 내에서 간단히 관리)
+const userAccounts = {
+  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저' },
+  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1' },
+  // ... 다른 선생님 계정들
+};
 
 // 미들웨어 설정
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(publicPath)); // 정적 파일 경로 설정
 
-// ===== 데이터베이스 ID (환경 변수에서 관리) =====
-const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
-const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
+// ===== 정적 파일 및 페이지 라우팅 (중요!) =====
+// 'public' 폴더의 파일들을 웹에서 접근 가능하게 합니다.
+const publicPath = path.join(__dirname, '../../public');
+app.use(express.static(publicPath));
 
-// ===== 사용자 계정 (코드 내에서 간단히 관리) =====
-const userAccounts = {
-  'manager': { password: 'rdtd112!@', role: 'manager', name: '매니저' },
-  'teacher1': { password: 'rdtd112!@', role: 'teacher', name: '선생님1' },
-  // ... 다른 선생님 및 보조 선생님 계정
-};
+// 기본 주소('/')로 접속하면 로그인 페이지를 보여줍니다.
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'views', 'login.html'));
+});
+
+// 각 HTML 페이지 경로를 직접 지정해줍니다.
+app.get('/planner', (req, res) => {
+  res.sendFile(path.join(publicPath, 'views', 'planner.html'));
+});
+
+app.get('/teacher-login', (req, res) => {
+  res.sendFile(path.join(publicPath, 'views', 'teacher-login.html'));
+});
+
+app.get('/teacher-dashboard', (req, res) => {
+  res.sendFile(path.join(publicPath, 'views', 'teacher-dashboard.html'));
+});
+
 
 // ===== JWT 함수 =====
 function generateToken(payload) {
