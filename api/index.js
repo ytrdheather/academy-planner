@@ -20,7 +20,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ===== 페이지 보여주기 =====
-// public 폴더의 경로를 Vercel 환경에 맞게 정확하게 지정
 const publicPath = path.join(process.cwd(), 'public');
 
 // 기본 주소('/')로 접속하면 로그인 페이지를 보여줌
@@ -28,8 +27,17 @@ app.get('/', (req, res) => {
   try {
     res.sendFile(path.join(publicPath, 'views', 'login.html'));
   } catch (error) {
+    console.error("login.html 파일 서빙 오류:", error);
     res.status(500).send("로그인 페이지를 불러오는 중 오류가 발생했습니다.");
   }
+});
+
+app.get('/planner', (req, res) => {
+    try {
+      res.sendFile(path.join(publicPath, 'views', 'planner.html'));
+    } catch (error) {
+      res.status(500).send("플래너 페이지를 불러오는 중 오류가 발생했습니다.");
+    }
 });
 
 // ===== 학생 로그인 API 기능 =====
@@ -48,6 +56,7 @@ app.post('/api/login', async (req, res) => {
     });
 
     if (response.results.length > 0) {
+      // 실제 JWT 토큰 생성 로직은 나중에 다시 추가하겠습니다.
       res.json({ success: true, message: '로그인 성공!' });
     } else {
       res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
