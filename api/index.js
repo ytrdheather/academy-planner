@@ -31,17 +31,14 @@ const userAccounts = {
 app.use(cors());
 app.use(bodyParser.json());
 
-// ===== 정적 파일 및 페이지 라우팅 (경로 수정!) =====
-// 'public' 폴더의 경로를 정확하게 지정합니다.
+// ===== 정적 파일 및 페이지 라우팅 =====
 const publicPath = path.join(process.cwd(), 'public');
 app.use(express.static(publicPath));
 
-// 기본 주소('/')로 접속하면 로그인 페이지를 보여줍니다.
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicPath, 'views', 'login.html'));
 });
 
-// 각 HTML 페이지 경로를 직접 지정해줍니다.
 app.get('/planner', (req, res) => {
   res.sendFile(path.join(publicPath, 'views', 'planner.html'));
 });
@@ -53,7 +50,6 @@ app.get('/teacher-login', (req, res) => {
 app.get('/teacher-dashboard', (req, res) => {
   res.sendFile(path.join(publicPath, 'views', 'teacher-dashboard.html'));
 });
-
 
 // ===== JWT 함수 =====
 function generateToken(payload) {
@@ -70,51 +66,5 @@ function verifyToken(token) {
 
 // ===== API 엔드포인트들 =====
 
-// 1. 학생 로그인 API
-app.post('/api/login', async (req, res) => {
-  const { studentId, studentPassword } = req.body;
-  if (!STUDENT_DB_ID) {
-      return res.status(500).json({ success: false, message: '학생 DB ID가 설정되지 않았습니다.' });
-  }
-  try {
-    const response = await notion.databases.query({
-      database_id: STUDENT_DB_ID,
-      filter: {
-        and: [
-          { property: '학생 ID', rich_text: { equals: studentId } },
-          { property: '비밀번호', number: { equals: Number(studentPassword) } }
-        ]
-      }
-    });
-
-    if (response.results.length > 0) {
-      const studentData = response.results[0].properties;
-      const studentName = studentData['이름']?.title[0]?.plain_text || studentId;
-      const token = generateToken({ userId: studentId, name: studentName, role: 'student' });
-      res.json({ success: true, message: '로그인 성공!', token });
-    } else {
-      res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
-    }
-  } catch (error) {
-    console.error('학생 로그인 오류:', error);
-    res.status(500).json({ success: false, message: '로그인 중 서버 오류가 발생했습니다.' });
-  }
-});
-
-// 2. 선생님 로그인 API
-app.post('/api/teacher-login', (req, res) => {
-    const { teacherId, teacherPassword } = req.body;
-    const account = userAccounts[teacherId];
-    if (account && account.password === teacherPassword) {
-        const token = generateToken({ userId: teacherId, name: account.name, role: account.role });
-        res.json({ success: true, message: '로그인 성공!', token });
-    } else {
-        res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.'});
-    }
-});
-
-// ... (향후 다른 API들) ...
-
-
-// ===== Vercel 호환을 위한 최종 핸들러 =====
-export default app;
+// 1. 학생 로그인 API (수정됨)
+app.post('/api/login', async (req, res
