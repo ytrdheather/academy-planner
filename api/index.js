@@ -31,9 +31,9 @@ const userAccounts = {
 app.use(cors());
 app.use(bodyParser.json());
 
-// ===== 정적 파일 및 페이지 라우팅 (중요!) =====
-// 'public' 폴더의 파일들을 웹에서 접근 가능하게 합니다.
-const publicPath = path.join(__dirname, '../../public');
+// ===== 정적 파일 및 페이지 라우팅 (경로 수정!) =====
+// 'public' 폴더의 경로를 정확하게 지정합니다.
+const publicPath = path.join(process.cwd(), 'public');
 app.use(express.static(publicPath));
 
 // 기본 주소('/')로 접속하면 로그인 페이지를 보여줍니다.
@@ -68,7 +68,7 @@ function verifyToken(token) {
   }
 }
 
-// ===== 라우트(API 엔드포인트) 정의 =====
+// ===== API 엔드포인트들 =====
 
 // 1. 학생 로그인 API
 app.post('/api/login', async (req, res) => {
@@ -113,10 +113,8 @@ app.post('/api/teacher-login', (req, res) => {
     }
 });
 
-
-// ... (향후 다른 API들, 예를 들어 /api/homework-status 등을 여기에 추가) ...
+// ... (향후 다른 API들) ...
 
 
 // ===== Vercel 호환을 위한 최종 핸들러 =====
-// 모든 Express 라우트를 Vercel의 서버리스 함수로 내보냅니다.
 export default app;
