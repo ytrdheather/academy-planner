@@ -11,8 +11,6 @@ const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
   console.error(`❌ 필수 환경 변수가 설정되지 않았습니다: ${missingEnvVars.join(', ')}`);
-  // 실제 운영 환경에서는 서버를 종료시키는 것이 안전합니다.
-  // process.exit(1); 
 }
 
 // ES Modules에서 __dirname, __filename을 사용하기 위한 설정
@@ -67,8 +65,8 @@ function generateToken(payload) {
 
 // ===== API 엔드포인트들 =====
 
-// 1. 학생 로그인 API
-app.post('/api/login', async (req, res) => {
+// 1. 학생 로그인 API (주소 변경!)
+app.post('/login', async (req, res) => { // '/api/login'에서 '/login'으로 변경
   const { studentId, studentPassword } = req.body;
   
   try {
@@ -86,27 +84,4 @@ app.post('/api/login', async (req, res) => {
       const studentData = response.results[0].properties;
       const studentName = studentData['이름']?.title[0]?.plain_text || studentId;
       const token = generateToken({ userId: studentId, name: studentName, role: 'student' });
-      res.json({ success: true, message: '로그인 성공!', token });
-    } else {
-      res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
-    }
-  } catch (error) {
-    console.error('학생 로그인 오류:', error);
-    res.status(500).json({ success: false, message: '로그인 중 서버 오류가 발생했습니다.' });
-  }
-});
-
-// 2. 선생님 로그인 API
-app.post('/api/teacher-login', (req, res) => {
-    const { teacherId, teacherPassword } = req.body;
-    const account = userAccounts[teacherId];
-    if (account && account.password === teacherPassword) {
-        const token = generateToken({ userId: teacherId, name: account.name, role: account.role });
-        res.json({ success: true, message: '로그인 성공!', token });
-    } else {
-        res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.'});
-    }
-});
-
-// ===== Vercel 호환을 위한 최종 핸들러 =====
-export default app;
+      res.json({ success: true, message: '로그인 성공!', token
