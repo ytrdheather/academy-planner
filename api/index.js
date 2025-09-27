@@ -66,5 +66,7 @@ function verifyToken(token) {
 
 // ===== API 엔드포인트들 =====
 
-// 1. 학생 로그인 API (수정됨)
-app.post('/api/login', async (req, res
+// 1. 학생 로그인 API
+app.post('/api/login', async (req, res) => {
+  const { studentId, studentPassword } = req.body;
+  if (!STUDENT_DB_
