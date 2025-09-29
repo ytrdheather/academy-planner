@@ -6,100 +6,18 @@
     <title>리디튜드 학습 플래너 - 로그인</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        * {
-            font-family: "NanumSquareRound", "나눔스퀴어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
-        }
-        body { 
-            background: #ffffff;
-            color: #2d3748; 
-            margin: 0; 
-            padding: 20px; 
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .login-container { 
-            max-width: 400px; 
-            width: 100%;
-            background: white; 
-            padding: 40px; 
-            border-radius: 20px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
-        }
-        h1 { 
-            text-align: center; 
-            color: #6b46c1; 
-            margin-bottom: 30px; 
-            font-size: 28px;
-            font-weight: 700;
-        }
-        .input-group { 
-            margin-bottom: 20px; 
-        }
-        .input-group label { 
-            display: block; 
-            font-weight: 600; 
-            margin-bottom: 8px; 
-            color: #495057; 
-        }
-        .input-group input { 
-            width: 100%; 
-            padding: 12px 16px; 
-            border-radius: 12px; 
-            border: 2px solid #e2e8f0; 
-            box-sizing: border-box; 
-            font-size: 16px; 
-            transition: all 0.3s ease;
-            background: #f8fafc;
-        }
-        .input-group input:focus {
-            outline: none;
-            border-color: #8b5cf6;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-        }
-        .login-button { 
-            width: 100%; 
-            padding: 14px; 
-            border: none; 
-            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-            color: white; 
-            border-radius: 12px; 
-            cursor: pointer; 
-            font-size: 18px; 
-            font-weight: 600; 
-            margin-top: 10px; 
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
-        }
-        .login-button:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
-        }
-        .error-message {
-            color: #dc3545;
-            text-align: center;
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #f8d7da;
-            border-radius: 6px;
-            display: none;
-        }
-        .success-message {
-            color: #155724;
-            text-align: center;
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #d4edda;
-            border-radius: 6px;
-            display: none;
-        }
-        .logo {
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 48px;
-        }
+        * { font-family: "NanumSquareRound", sans-serif !important; }
+        body { background: #f7fafc; color: #2d3748; margin: 0; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-container { max-width: 400px; width: 100%; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+        h1 { text-align: center; color: #6b46c1; margin-bottom: 30px; font-size: 28px; font-weight: 700; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #495057; }
+        .input-group input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; box-sizing: border-box; font-size: 16px; transition: all 0.3s ease; background: #f8fafc; }
+        .input-group input:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); }
+        .login-button { width: 100%; padding: 14px; border: none; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: 600; margin-top: 10px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
+        .login-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4); }
+        .error-message { color: #dc3545; text-align: center; margin-top: 15px; padding: 10px; background-color: #f8d7da; border-radius: 6px; display: none; }
+        .logo { text-align: center; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -108,7 +26,6 @@
             <img src="/assets/logo.png" alt="리디튜드 로고" style="width: 150px; height: auto; display: block; margin: 0 auto;">
         </div>
         <h1>리디튜드 학습 플래너</h1>
-        
         <form id="loginForm">
             <div class="input-group">
                 <label for="studentId">학생 ID</label>
@@ -120,57 +37,56 @@
             </div>
             <button type="submit" class="login-button">로그인</button>
         </form>
-        
         <div id="errorMessage" class="error-message"></div>
-        <div id="successMessage" class="success-message"></div>
-        
         <div style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 14px;">
-            <a href="/teacher" style="color: #0056b3; text-decoration: none;">선생님 페이지</a>
+            <a href="/teacher-login" style="color: #0056b3; text-decoration: none;">선생님 로그인</a>
         </div>
     </div>
 
     <script>
+        console.log("로그인 페이지 스크립트가 로드되었습니다.");
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            console.log("로그인 폼 제출 이벤트가 감지되었습니다!");
             e.preventDefault();
             
             const studentId = document.getElementById('studentId').value;
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('errorMessage');
-            const successDiv = document.getElementById('successMessage');
-            
+            const loginButton = e.target.querySelector('.login-button');
+
             errorDiv.style.display = 'none';
-            successDiv.style.display = 'none';
+            loginButton.textContent = '로그인 중...';
+            loginButton.disabled = true;
             
             try {
+                console.log("서버로 로그인 요청을 보내기 직전입니다...");
                 const response = await fetch('/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, studentPassword: password })
                 });
                 
+                console.log("서버로부터 응답을 받았습니다. 상태 코드:", response.status);
                 const result = await response.json();
                 
                 if (result.success) {
-                    // JWT 토큰 저장
-                    if (result.token) {
-                        localStorage.setItem('authToken', result.token);
-                        console.log('JWT 토큰 저장 완료');
-                    }
-                    
-                    successDiv.textContent = result.message;
-                    successDiv.style.display = 'block';
-                    setTimeout(() => {
-                        window.location.href = '/planner';
-                    }, 1000);
+                    console.log("로그인 성공! 플래너 페이지로 이동합니다.");
+                    localStorage.setItem('authToken', result.token);
+                    window.location.href = '/planner';
                 } else {
+                    console.log("로그인 실패. 서버가 보낸 메시지:", result.message);
                     errorDiv.textContent = result.message;
                     errorDiv.style.display = 'block';
                 }
             } catch (error) {
-                errorDiv.textContent = '로그인 중 오류가 발생했습니다.';
+                console.error("Fetch 요청 중 심각한 에러 발생:", error);
+                errorDiv.textContent = '로그인 중 오류가 발생했습니다. 서버가 켜져있는지, Console 창에 다른 에러가 없는지 확인하세요.';
                 errorDiv.style.display = 'block';
+            } finally {
+                console.log("로그인 절차(try 또는 catch)가 모두 끝났습니다.");
+                loginButton.textContent = '로그인';
+                loginButton.disabled = false;
             }
         });
     </script>
