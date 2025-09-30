@@ -68,8 +68,133 @@ app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'p
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
+// 1. 로그인한 선생님의 정보를 알려주는 API
+app.get('/api/teachers', requireAuth, async (req, res) => {
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        const TEACHER_DB_ID = process.env.TEACHER_DB_ID;
+        if (!accessToken || !TEACHER_DB_ID) {
+            throw new Error('서버에 선생님 DB ID가 설정되지 않았습니다.');
+        }
 
+        const response = await fetch(`https://api.notion.com/v1/databases/${TEACHER_DB_ID}/query`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Notion-Version': '2022-06-28'
+            },
+            body: JSON.stringify({
+                filter: {
+                    or: [
+                        {
+                            property: '권한',
+                            rich_text: {
+                                equals: 'teacher'
+                            }
+                        },
+                        {
+                            property: '권한',
+                            rich_text: {
+                                equals: 'manager'
+                            }
+                        }
+                    ]
+                }
+            })
+        });
 
+        if (!response.ok) {
+            console.error('Notion API 응답 오류:', await response.json());
+            throw new Error('Notion에서 강사 목록을 가져오는 데 실패했습니다.');
+        }
+
+        const data = await response.json();
+        
+        const teachers = data.results.map(page => {
+            const props = page.properties;
+            return {
+                id: page.id,
+                name: props['이름']?.title[0]?.plain_text || '이름 없음'
+            };
+        });
+
+        res.json(teachers);
+
+    } catch (error) {
+        console.error('강사 목록 로드 오류:', error);
+        res.status(500).json({ message: '서버에서 강사 목록을 처리하는 중 오류가 발생했습니다.' });
+    }
+});
+
+// 3. 학생들의 숙제 현황 데이터를 Notion에서 가져오는 API
+app.get('/api/homework-status', requireAuth, async (req, res) => {
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
+        if (!accessToken || !PROGRESS_DB_ID) {
+            throw new Error('서버 환경 변수가 설정되지 않았습니다.');
+        }
+
+        const { period, startDate, endDate, teacher } = req.query;
+        const filterConditions = [];
+
+        if (period === 'today') {
+            const today = new Date().toISOString().split('T')[0];
+            filterConditions.push({ property: '🕐 날짜', date: { equals: today } });
+        } else if (startDate && endDate) {
+            filterConditions.push({
+                and: [
+                    { property: '🕐 날짜', date: { on_or_after: startDate } },
+                    { property: '🕐 날짜', date: { on_or_before: endDate } }
+                ]
+            });
+        }
+
+        if (teacher && teacher !== 'all') {
+            filterConditions.push({ property: '담당쌤', relation: { contains: teacher } });
+        }
+
+        const response = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+            body: JSON.stringify({
+                filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
+                sorts: [{ property: '🕐 날짜', direction: 'descending' }]
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Notion API Error: ${errorData.message}`);
+        }
+
+        const data = await response.json();
+
+        const homeworkStatus = data.results.map(page => {
+            const props = page.properties;
+            const teacherNames = props['담당쌤']?.relation?.map(rel => rel.title).flat() || [];
+
+            return {
+                pageId: page.id,
+                studentId: props['이름']?.title[0]?.plain_text || '이름 없음',
+                date: props['🕐 날짜']?.date?.start || '날짜없음',
+                teachers: teacherNames,
+                completionRate: props['수행율']?.formula?.number || 0,
+                grammarHomework: props['⭕ 지난 문법 숙제 검사']?.status?.name || '숙제 없음',
+                vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '숙제 없음',
+                readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '숙제 없음',
+                summary: props['4️⃣ Summary 숙제']?.status?.name || '숙제 없음',
+                readingHomework: props['5️⃣ 매일 독해 숙제']?.status?.name || '숙제 없음',
+                diary: props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.status?.name || '숙제 없음'
+            };
+        });
+        res.json(homeworkStatus);
+    } catch (error) {
+        console.error('숙제 현황 로드 오류:', error);
+        res.status(500).json({ message: '서버에서 숙제 현황 데이터를 처리하는 중 오류가 발생했습니다.' });
+    }
+});
 // --- API 라우트 ---
 app.post('/login', async (req, res) => {
   const { studentId, studentPassword } = req.body;
@@ -248,12 +373,96 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             console.warn(`[주의] ${today} 날짜의 ${studentName} 학생 기록이 없어서 저장을 거부했습니다.`);
             res.status(404).json({ success: false, message: "선생님에게 스터디 플래너 에러라고 알려주세요!" });
         }
-
+        
     } catch (error) {
         console.error('학습일지 저장 오류:', error);
         res.status(500).json({ success: false, message: '저장 중 서버에 문제가 발생했습니다.' });
     }
 });
+app.get('/api/homework-status', requireAuth, async (req, res) => {
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
+        if (!accessToken || !PROGRESS_DB_ID) {
+            throw new Error('서버 환경 변수가 설정되지 않았습니다.');
+        }
+
+        // --- 필터 조건 구성 ---
+        const { period, startDate, endDate, teacher } = req.query;
+        const filterConditions = [];
+
+        // 1. 기간 필터
+        if (period === 'today') {
+            const today = new Date().toISOString().split('T')[0];
+            filterConditions.push({ property: '🕐 날짜', date: { equals: today } });
+        }
+        // (week, month 등 다른 기간 필터는 필요시 추가)
+        else if (startDate && endDate) {
+            filterConditions.push({
+                and: [
+                    { property: '🕐 날짜', date: { on_or_after: startDate } },
+                    { property: '🕐 날짜', date: { on_or_before: endDate } }
+                ]
+            });
+        }
+
+        // 2. 담당쌤 필터 (관계형 속성 필터링)
+        if (teacher && teacher !== 'all') {
+            filterConditions.push({ property: '담당쌤', relation: { contains: teacher } });
+        }
+
+        // --- Notion API 호출 ---
+        const response = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Notion-Version': '2022-06-28'
+            },
+            body: JSON.stringify({
+                filter: { and: filterConditions },
+                sorts: [{ property: '🕐 날짜', direction: 'descending' }]
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Notion API 오류:', errorData);
+            throw new Error('Notion에서 데이터를 가져오는 데 실패했습니다.');
+        }
+
+        const data = await response.json();
+
+        // --- 프론트엔드로 보낼 데이터 가공 ---
+        const homeworkStatus = data.results.map(page => {
+            const props = page.properties;
+            
+            // 관계형 데이터에서 담당쌤 이름 추출
+            const teacherNames = props['담당쌤']?.relation?.map(rel => rel.title) || [];
+
+            return {
+                pageId: page.id,
+                studentId: props['이름']?.title[0]?.plain_text || '이름 없음',
+                date: props['🕐 날짜']?.date?.start || '날짜없음',
+                teachers: teacherNames, // 가공된 담당쌤 이름 배열
+                completionRate: props['수행율']?.formula?.number || 0,
+                grammarHomework: props['⭕ 지난 문법 숙제 검사']?.status?.name || '숙제 없음',
+                vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '숙제 없음',
+                readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '숙제 없음',
+                summary: props['4️⃣ Summary 숙제']?.status?.name || '숙제 없음',
+                readingHomework: props['5️⃣ 매일 독해 숙제']?.status?.name || '숙제 없음',
+                diary: props['6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)']?.status?.name || '숙제 없음'
+            };
+        });
+
+        res.json(homeworkStatus);
+
+    } catch (error) {
+        console.error('숙제 현황 로드 오류:', error);
+        res.status(500).json({ message: '서버에서 숙제 현황 데이터를 처리하는 중 오류가 발생했습니다.' });
+    }
+});
+
 
 // --- 서버 실행 ---
 app.listen(PORT, '127.0.0.1', () => { 
