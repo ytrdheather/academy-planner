@@ -163,52 +163,96 @@ app.get('/api/search-sayu-books', async (req, res) => {
   }
 });
 app.post('/save-progress', requireAuth, async (req, res) => {
-  const formData = req.body;
-  const studentName = req.user.name;
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
-    if (!accessToken || !PROGRESS_DB_ID) { throw new Error('서버 설정 오류'); }
-    const properties = {
-      '이름': { title: [{ text: { content: studentName } }] },
-      '🕐 날짜': { date: { start: new Date().toISOString().split('T')[0] } },
-    };
-    const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
-    const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
-    const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"];
-    const textProps = ["어휘유닛", "오늘의 학습 소감"];
-    for (let key in formData) {
-      const value = formData[key];
-      const notionPropName = propertyNameMap[key] || key;
-      if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
-      if (numberProps.includes(notionPropName)) { properties[notionPropName] = { number: Number(value) }; } 
-      else if (selectProps.includes(notionPropName)) { properties[notionPropName] = { select: { name: value } }; } 
-      else if (textProps.includes(notionPropName)) { properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; } 
-      else if (key === '오늘 읽은 영어 책') {
-        const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
-      } 
-      else if (key === '3독 독서 제목') {
-        const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
-      } 
-      else { properties[notionPropName] = { status: { name: value } }; }
+    const formData = req.body;
+    const studentName = req.user.name;
+    const today = new Date().toISOString().split('T')[0]; // 오늘 날짜 ('YYYY-MM-DD' 형식)
+
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
+        if (!accessToken || !PROGRESS_DB_ID) { throw new Error('서버 설정 오류'); }
+
+        // --- 1. 오늘 날짜와 학생 이름으로 기존 기록이 있는지 먼저 검색 ---
+        const searchResponse = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '이름', title: { equals: studentName } },
+                        { property: '🕐 날짜', date: { equals: today } }
+                    ]
+                }
+            })
+        });
+
+        if (!searchResponse.ok) {
+            console.error('Notion 검색 API 오류:', await searchResponse.json());
+            throw new Error('기존 데이터 검색에 실패했습니다.');
+        }
+        
+        const searchData = await searchResponse.json();
+        const existingPageId = searchData.results[0]?.id || null;
+
+        // --- 2. 기존 기록의 유무에 따라 로직 분기 ---
+        if (existingPageId) {
+            // [업데이트] 기존 기록이 있으면 내용을 업데이트합니다.
+            
+            // 업데이트할 properties 객체를 새로 만듭니다.
+            const properties = {}; 
+
+            // Heather님의 기존 데이터 처리 로직을 그대로 사용합니다.
+            const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
+            const numberProps = ["단어 (맞은 개수)", "단어 (전체 개수)", "문법 (전체 개수)", "문법 (틀린 개수)", "독해 (틀린 개수)"]; 
+            const selectProps = ["독해 하브루타", "📖 영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"];
+            const textProps = ["어휘유닛", "오늘의 학습 소감"];
+            
+            for (let key in formData) {
+                const value = formData[key];
+                const notionPropName = propertyNameMap[key] || key;
+                if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP', ''].includes(value)) { continue; }
+
+                if (key === '오늘 읽은 영어 책 ID') {
+                    properties['오늘 읽은 영어 책'] = { relation: [{ id: value }] };
+                } else if (key === '국어 독서 제목') { 
+                    const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
+                    if (bookPageId) { properties['국어 독서 제목'] = { relation: [{ id: bookPageId }] }; }
+                } else if (numberProps.includes(notionPropName)) {
+                    properties[notionPropName] = { number: Number(value) };
+                } else if (selectProps.includes(notionPropName)) {
+                    properties[notionPropName] = { select: { name: value } };
+                } else if (textProps.includes(notionPropName)) {
+                    properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
+                } else if (key !== '오늘 읽은 영어 책') {
+                    properties[notionPropName] = { status: { name: value } };
+                }
+            }
+
+            // PATCH 요청으로 기존 페이지를 업데이트합니다.
+            const updateResponse = await fetch(`https://api.notion.com/v1/pages/${existingPageId}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+                body: JSON.stringify({ properties: properties })
+            });
+            
+            if (!updateResponse.ok) {
+                const errorData = await updateResponse.json();
+                console.error('Notion 업데이트 API 오류:', errorData);
+                throw new Error(`Notion API Error: ${errorData.message}`);
+            }
+
+            res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 업데이트되었습니다!' });
+
+        } else {
+            // [에러 처리] 기존 기록이 없으면, 요청하신 메시지를 출력합니다.
+            console.warn(`[주의] ${today} 날짜의 ${studentName} 학생 기록이 없어서 저장을 거부했습니다.`);
+            res.status(404).json({ success: false, message: "선생님에게 스터디 플래너 에러라고 알려주세요!" });
+        }
+
+    } catch (error) {
+        console.error('학습일지 저장 오류:', error);
+        res.status(500).json({ success: false, message: '저장 중 서버에 문제가 발생했습니다.' });
     }
-    const response = await fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ parent: { database_id: PROGRESS_DB_ID }, properties: properties })
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Notion 저장 API 오류:', errorData);
-      throw new Error(`Notion API Error: ${errorData.message}`);
-    }
-    res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
-  } catch (error) {
-    console.error('학습일지 저장 오류:', error);
-    res.status(500).json({ success: false, message: '저장 중 서버에 문제가 발생했습니다.' });
-  }
 });
 
 // --- 서버 실행 ---

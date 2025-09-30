@@ -307,7 +307,7 @@
                 </div>
                 <div>
                     <label for="diaryOrReadingHomework">6️⃣ 영어일기 or 개인 독해서</label>
-                    <select id="diaryOrReadingHomework" name="6️⃣ 영어일기 or 개인 독해서">
+                    <select id="diaryOrReadingHomework" name="6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)">
                         <option value="해당없음">해당없음</option>
                         <option value="안 해옴">안 해옴</option>
                         <option value="숙제 함">숙제 함</option>
@@ -321,11 +321,11 @@
             <div class="input-group input-row">
                 <div>
                     <label for="vocabCorrect">단어 (맞은 개수)</label>
-                    <input type="number" id="vocabCorrect" name="단어 (맞은 개수)" min="0">
+                    <input type="number" id="vocabCorrect" name="어휘정답" min="0">
                 </div>
                 <div>
                     <label for="vocabTotal">단어 (전체 개수)</label>
-                    <input type="number" id="vocabTotal" name="단어 (전체 개수)" min="0">
+                    <input type="number" id="vocabTotal" name="어휘총문제" min="0">
                 </div>
             </div>
             <div class="input-group">
@@ -335,21 +335,21 @@
             <div class="input-group input-row">
                 <div>
                     <label for="grammarTotal">문법 (전체 개수)</label>
-                    <input type="number" id="grammarTotal" name="문법 (전체 개수)" min="0">
+                    <input type="number" id="grammarTotal" name="문법 전체 개수" min="0">
                 </div>
                 <div>
                     <label for="grammarWrong">문법 (틀린 개수)</label>
-                    <input type="number" id="grammarWrong" name="문법 (틀린 개수)" min="0">
+                    <input type="number" id="grammarWrong" name="문법숙제오답" min="0">
                 </div>
             </div>
              <div class="input-group input-row">
                 <div>
                     <label for="readingWrong">독해 (틀린 개수)</label>
-                    <input type="number" id="readingWrong" name="독해 (틀린 개수)" min="0">
+                    <input type="number" id="readingWrong" name="독해오답갯수" min="0">
                 </div>
                 <div>
                     <label for="readingHavruta">독해 하브루타</label>
-                    <select id="readingHavruta" name="독해 하브루타">
+                    <select id="readingHavruta" name="독해하브루타">
                         <option value="숙제없음">숙제없음</option>
                         <option value="완료함">완료함</option>
                         <option value="못하고감">못하고감</option>
@@ -380,48 +380,47 @@
             </div>
             </div>
             
- <div class="section-card">
-    <h2>📚 원서 독서</h2>
-    <div class="input-group">
-        <label for="englishBookTitle">오늘 읽은 영어 책</label>
-        <div class="autocomplete-container">
-            <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
-            <input type="hidden" id="englishBookId" name="오늘 읽은 영어 책 ID">
-            <div id="bookSuggestions" class="autocomplete-suggestions"></div>
-        </div>
-    </div>
-    <div class="input-group input-row">
-        <div>
-            <label for="englishReading">영어독서</label>
-            <select id="englishReading" name="📖 영어독서">
-                <option value="못함">못함</option>
-                <option value="완료함">완료함</option>
-            </select>
-        </div>
-        <div>
-            <label for="readingVocab">어휘학습</label>
-            <select id="readingVocab" name="어휘학습">
-                <option value="못함">못함</option>
-                <option value="완료함">완료함</option>
-            </select>
-        </div>
-        <div>
-            <label for="writing">Writing</label>
-            <select id="writing" name="Writing">
-                <option value="SKIP">SKIP</option>
-                <option value="3 SENTENCE">3 SENTENCE</option>
-                <option value="북 리포트">북 리포트</option>
-            </select>
-        </div>
-    </div>
-</div>
+            <div class="section-card">
+                <h2>📚 원서 독서</h2>
+            <div class="input-group">
+                <label for="englishBookTitle">오늘 읽은 영어 책</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
+                    <div id="bookSuggestions" class="autocomplete-suggestions"></div>
+                </div>
+            </div>
+             <div class="input-group input-row">
+                <div>
+                    <label for="englishReading">영어독서</label>
+                    <select id="englishReading" name="📖 영어독서">
+                        <option value="못함">못함</option>
+                        <option value="완료함">완료함</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="readingVocab">어휘학습</label>
+                    <select id="readingVocab" name="어휘학습">
+                        <option value="못함">못함</option>
+                        <option value="완료함">완료함</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="writing">Writing</label>
+                    <select id="writing" name="Writing">
+                        <option value="SKIP">SKIP</option>
+                        <option value="3 SENTENCE">3 SENTENCE</option>
+                        <option value="북 리포트">북 리포트</option>
+                    </select>
+                </div>
+            </div>
+            </div>
             
             <div class="section-card">
                 <h2>📕 책 읽는 거인</h2>
             <div class="input-group">
-                <label for="giantBookTitle">국어 독서 제목</label>
+                <label for="giantBookTitle">3독 독서 제목</label>
                 <div class="autocomplete-container">
-                    <input type="text" id="giantBookTitle" name="국어 독서 제목" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
+                    <input type="text" id="giantBookTitle" name="3독 독서 제목" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
                     <div id="sayuBookSuggestions" class="autocomplete-suggestions"></div>
                 </div>
             </div>
@@ -551,45 +550,34 @@
 
         // 폼 제출
         document.getElementById('plannerForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData);
-
-    // ⚠️ 1. 로컬 스토리지에서 인증 토큰(신분증)을 가져옵니다.
-    const token = localStorage.getItem('authToken');
-
-    // 토큰이 없으면 로그인 페이지로 보내버립니다.
-    if (!token) {
-        alert('인증 정보가 만료되었습니다. 다시 로그인해주세요.');
-        window.location.href = '/';
-        return;
-    }
-
-    try {
-        const response = await fetch('/save-progress', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // ⚠️ 2. 요청서에 인증 토큰을 붙여서 보냅니다.
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/save-progress', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus(result.message, true);
+                    // 성공 시 임시 저장 데이터 삭제
+                    localStorage.removeItem('plannerData');
+                    document.getElementById('autoSaveStatus').textContent = '정식 저장 완료';
+                } else {
+                    showStatus(result.message, false);
+                }
+            } catch (error) {
+                showStatus('저장 중 오류가 발생했습니다.', false);
+            }
         });
-
-        const result = await response.json();
-
-        if (response.ok) { // result.success 대신 response.ok로 확인
-            showStatus(result.message, true);
-            localStorage.removeItem('plannerData');
-            document.getElementById('autoSaveStatus').textContent = '정식 저장 완료';
-        } else {
-            showStatus(result.message || '저장에 실패했습니다.', false);
-        }
-    } catch (error) {
-        showStatus('저장 중 오류가 발생했습니다.', false);
-    }
-});
 
         function logout() {
             if (confirm('로그아웃 하시겠습니까?')) {
@@ -728,20 +716,17 @@
             suggestionsList.style.display = 'none';
         }
         
-       function selectBook(index) {
+        function selectBook(index) {
             const book = currentBooks[index];
-            const bookTitleInput = document.getElementById('englishBookTitle');
-            const bookIdInput = document.getElementById('englishBookId');
-    
-            // 제목과 ID를 각각의 input에 저장
-            bookTitleInput.value = book.title;
-            bookIdInput.value = book.id; 
-    
+            const bookInput = document.getElementById('englishBookTitle');
+            
+            bookInput.value = book.title;
             hideSuggestions();
-    
-            // 자동 저장을 위해 input 이벤트 발생
-            bookTitleInput.dispatchEvent(new Event('input', { bubbles: true }));
-}
+            
+            // input 이벤트 발생시켜서 자동 저장 트리거
+            bookInput.dispatchEvent(new Event('input', { bubbles: true }));
+            saveFormData();
+        }
         
         // saveFormData 함수 정의 (자동저장용)
         function saveFormData() {
