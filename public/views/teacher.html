@@ -1,697 +1,231 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>선생님 대시보드 - 숙제 수행 현황</title>
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: "NanumSquareRound", "나눔스퀘어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
-        }
-        
-        body { 
-            background: #ffffff;
-            color: #2d3748; 
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container { 
-            max-width: 1400px; 
-            margin: 0 auto; 
-            background: white; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: #ffffff;
-            color: #6b46c1;
-            padding: 25px 30px;
-            text-align: center;
-            position: relative;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        
-        .header h1 { 
-            font-size: 2.2em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            color: #6b46c1;
-        }
-        
-        .header p {
-            font-size: 1.1em;
-            color: #718096;
-        }
-        
-        .user-info {
-            position: absolute;
-            top: 30px;
-            right: 30px;
-            text-align: right;
-        }
-        
-        .user-name {
-            font-size: 1.1em;
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #6b46c1;
-        }
-        
-        .logout-btn {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
-        }
-        
-        .logout-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-        }
-        
-        .main-content {
-            padding: 40px;
-        }
-        
-        .homework-section {
-            margin-bottom: 40px;
-        }
-        
-        .section-title {
-            font-size: 1.6em;
-            font-weight: 700;
-            color: #6b46c1;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .section-title::before {
-            content: "📋";
-            font-size: 1.2em;
-        }
-        
-        .homework-table-container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            overflow: hidden;
-            border: 1px solid #e9ecef;
-        }
-        
-        .homework-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-        
-        .homework-table th {
-            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-            color: white;
-            padding: 10px 8px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 12px;
-            border-right: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .homework-table th:last-child {
-            border-right: none;
-        }
-        
-        .homework-table td {
-            padding: 8px 6px;
-            text-align: center;
-            border-bottom: 1px solid #f1f3f4;
-            border-right: 1px solid #f1f3f4;
-            vertical-align: middle;
-            font-size: 13px;
-        }
-        
-        .homework-table td:last-child {
-            border-right: none;
-        }
-        
-        .homework-table tr:hover {
-            background-color: #f8f9ff;
-        }
-        
-        .student-name {
-            font-weight: 600;
-            color: #2d3748;
-            text-align: center !important;
-            font-size: 14px;
-            background: linear-gradient(90deg, #f8fafc, #ffffff);
-            padding: 8px 12px !important;
-        }
-        
-        .homework-status {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 11px;
-            min-width: 35px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-        
-        .status-complete {
-            background: linear-gradient(135deg, #48bb78, #38a169);
-            color: white;
-        }
-        
-        .status-incomplete {
-            background: linear-gradient(135deg, #f56565, #e53e3e);
-            color: white;
-        }
-        
-        .status-none {
-            background: linear-gradient(135deg, #a0aec0, #718096);
-            color: white;
-        }
-        
-        .completion-rate {
-            font-weight: 700;
-            font-size: 14px;
-            color: #2d3748;
-        }
-        
-        .rate-excellent {
-            color: #10b981;
-        }
-        
-        .rate-good {
-            color: #8b5cf6;
-        }
-        
-        .rate-poor {
-            color: #ef4444;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 60px;
-            color: #718096;
-            font-size: 18px;
-        }
-        
-        .loading::before {
-            content: "⏳ ";
-        }
-        
-        .no-data {
-            text-align: center;
-            padding: 60px;
-            color: #718096;
-            font-size: 18px;
-        }
-        
-        .no-data::before {
-            content: "📝 ";
-        }
-        
-        .refresh-btn {
-            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .refresh-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
-        }
-        
-        .stats-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border-left: 4px solid #8b5cf6;
-            transition: transform 0.3s ease;
-            border: 1px solid rgba(139, 92, 246, 0.1);
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .stat-value {
-            font-size: 2.0em;
-            font-weight: 700;
-            color: #6b46c1;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #718096;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        /* 반응형 디자인 */
-        @media (max-width: 1200px) {
-            .homework-table {
-                font-size: 12px;
-            }
-            
-            .homework-table th,
-            .homework-table td {
-                padding: 12px 8px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            
-            .header {
-                padding: 20px;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .user-info {
-                position: static;
-                text-align: center;
-                margin-top: 20px;
-            }
-            
-            .main-content {
-                padding: 20px;
-            }
-            
-            .homework-table-container {
-                overflow-x: auto;
-            }
-            
-            .homework-table {
-                min-width: 800px;
-                font-size: 11px;
-            }
-            
-            .homework-table th,
-            .homework-table td {
-                padding: 10px 6px;
-            }
-            
-            .homework-status {
-                padding: 6px 12px;
-                font-size: 10px;
-                min-width: 40px;
-            }
-            
-            .stats-summary {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-            }
-            
-            .stat-card {
-                padding: 20px;
-            }
-            
-            .stat-value {
-                font-size: 1.8em;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .stats-summary {
-                grid-template-columns: 1fr;
-            }
-            
-            .section-title {
-                font-size: 1.5em;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>선생님 대시보드 - 숙제 수행 현황</title>
+  <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
+    body { background: #ffffff; color: #2d3748; min-height: 100vh; padding: 20px; }
+    .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: #ffffff; color: #6b46c1; padding: 25px 30px; text-align: center;
+      position: relative; border-bottom: 2px solid #e2e8f0; }
+    .header h1 { font-size: 2.2em; font-weight: 700; margin-bottom: 10px; color: #6b46c1; }
+    .header p { font-size: 1.1em; color: #718096; }
+    .user-info { position: absolute; top: 30px; right: 30px; text-align: right; }
+    .user-name { font-size: 1.1em; font-weight: 600; margin-bottom: 5px; color: #6b46c1; }
+    .logout-btn { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none;
+      padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500;
+      transition: all 0.3s ease; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3); }
+    .logout-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+    .main-content { padding: 40px; }
+    .section-title { font-size: 1.6em; font-weight: 700; color: #6b46c1; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px; }
+    .section-title::before { content: "📋"; font-size: 1.2em; }
+    .homework-table-container { background: white; border-radius: 15px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e9ecef; }
+    .homework-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .homework-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white;
+      padding: 10px 8px; text-align: center; font-weight: 600; font-size: 12px;
+      border-right: 1px solid rgba(255,255,255,0.2); }
+    .homework-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #f1f3f4;
+      border-right: 1px solid #f1f3f4; vertical-align: middle; font-size: 13px; }
+    .homework-table tr:hover { background-color: #f8f9ff; }
+    .student-name { font-weight: 600; color: #2d3748; font-size: 14px; background: #f9fafc; }
+    .homework-status { display: inline-flex; align-items: center; justify-content: center;
+      padding: 4px 8px; border-radius: 12px; font-weight: 600; font-size: 11px; }
+    .status-complete { background: linear-gradient(135deg, #48bb78, #38a169); color: white; }
+    .status-incomplete { background: linear-gradient(135deg, #f56565, #e53e3e); color: white; }
+    .status-none { background: linear-gradient(135deg, #a0aec0, #718096); color: white; }
+    .completion-rate { font-weight: 700; font-size: 14px; }
+    .rate-excellent { color: #10b981; } .rate-good { color: #8b5cf6; } .rate-poor { color: #ef4444; }
+    .loading, .no-data { text-align: center; padding: 60px; color: #718096; font-size: 18px; }
+    .loading::before { content: "⏳ "; } .no-data::before { content: "📝 "; }
+    .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white;
+      border: none; padding: 10px 20px; border-radius: 12px; cursor: pointer;
+      font-size: 14px; font-weight: 600; margin-bottom: 20px; }
+    .stats-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .stat-value { font-size: 2.0em; font-weight: 700; color: #6b46c1; margin-bottom: 5px; }
+    .stat-label { color: #718096; font-size: 14px; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div id="todayDate" class="today-date" style="position: absolute; top: 20px; left: 20px; color: white; font-size: 0.9em; z-index: 10;"></div>
-            <h1>📚 숙제 수행 현황 대시보드</h1>
-            <p>학생들의 실시간 숙제 완료 상태를 확인하세요</p>
-            <div class="user-info">
-                <div class="user-name" id="userName">로딩중...</div>
-                <button class="logout-btn" onclick="logout()">로그아웃</button>
-            </div>
-        </div>
-        
-        <div class="main-content">
-            <div class="stats-summary" id="statsContainer">
-                <!-- 통계 카드들이 여기에 동적으로 생성됩니다 -->
-            </div>
-            
-            <div class="homework-section">
-                <div class="section-title">담당 학생 숙제 현황</div>
-                <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: center;">
-                    <button class="refresh-btn" onclick="loadHomeworkStatus()">🔄 새로고침</button>
-                    <div id="teacherFilterContainer" style="display: none;">
-                        <label for="teacherFilter" style="font-weight: 600; color: #6b46c1; margin-right: 8px;">담당강사 필터:</label>
-                        <select id="teacherFilter" onchange="filterByTeacher()" style="
-                            padding: 8px 12px; 
-                            border-radius: 8px; 
-                            border: 2px solid #e2e8f0; 
-                            background: white; 
-                            font-size: 14px; 
-                            color: #2d3748;
-                            min-width: 150px;
-                        ">
-                            <option value="">전체 보기</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="homework-table-container">
-                    <table class="homework-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 100px;">학생 이름</th>
-                                <th style="width: 80px;">담당강사</th>
-                                <th style="width: 80px;">⭕ 문법숙제</th>
-                                <th style="width: 80px;">1️⃣ 어휘클카</th>
-                                <th style="width: 80px;">2️⃣ 독해클카</th>
-                                <th style="width: 80px;">4️⃣ Summary</th>
-                                <th style="width: 80px;">5️⃣ 독해서</th>
-                                <th style="width: 100px;">6️⃣ 일기/부교재</th>
-                                <th style="width: 70px;">수행율</th>
-                            </tr>
-                        </thead>
-                        <tbody id="homeworkTableBody">
-                            <tr>
-                                <td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>📚 숙제 수행 현황 대시보드</h1>
+      <p>학생들의 실시간 숙제 완료 상태를 확인하세요</p>
+      <div class="user-info">
+        <div class="user-name" id="userName">로딩중...</div>
+        <button class="logout-btn" onclick="logout()">로그아웃</button>
+      </div>
     </div>
 
-    <script>
-        let authToken = localStorage.getItem('teacher_auth_token');
-        let allHomeworkData = []; // 전체 데이터 저장용
-        let currentUserRole = '';
-        
-        // 페이지 로드 시 실행
-      document.addEventListener('DOMContentLoaded', function() {
-    if (!authToken) {
-        alert('로그인이 필요합니다.');
-        window.location.href = '/teacher-login';
-        return;
-    }
-    
-    // 페이지에 필요한 모든 초기 데이터를 순서대로 불러오는 함수
-    async function initializePage() {
-        try {
-            // 1. 사용자 정보와 강사 목록을 먼저 불러옵니다. (이 함수가 끝날 때까지 기다립니다)
-            await loadUserInfo(); 
-            
-            // 2. 위 함수가 성공적으로 끝나면, 학생 숙제 데이터를 불러옵니다.
-            await loadHomeworkStatus();
-        } catch (error) {
-            console.error("페이지 초기화 중 오류 발생:", error);
-            // 필요하다면 여기에 사용자에게 보여줄 에러 메시지를 추가할 수 있습니다.
-        }
-    }
-    
-    initializePage();
-});
-    
-// 사용자 정보 및 강사 목록 로드
-async function loadUserInfo() {
-    try {
-        // 1. 강사 목록을 먼저 불러옵니다.
-        const teachersResponse = await fetch('/api/teachers', {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-        });
-        if (!teachersResponse.ok) throw new Error('강사 목록 로드 실패');
-        const teachers = await teachersResponse.json();
+    <div class="main-content">
+      <div class="stats-summary" id="statsContainer"></div>
 
-        // 2. 사용자 정보를 불러옵니다.
-        const userInfoResponse = await fetch('/api/teacher/user-info', {
-            headers: { 'Authorization': 'Bearer ' + authToken }
-        });
-        if (!userInfoResponse.ok) throw new Error('사용자 정보 로드 실패');
-        const data = await userInfoResponse.json();
-        
-        // 3. 정보를 화면에 표시합니다.
-        if (data.userName) {
-            document.getElementById('userName').textContent = data.userName + ' (' + data.userRole + ')';
-            currentUserRole = data.userRole;
-            
-            // Manager일 경우에만 필터를 표시하고, 받아온 강사 목록으로 업데이트합니다.
-            if (data.userRole === 'manager') {
-                document.getElementById('teacherFilterContainer').style.display = 'block';
-                updateTeacherFilter(teachers); 
-            }
-        }
-        
-        // 오늘 날짜를 표시합니다.
-        const today = new Date().toLocaleDateString('ko-KR', {
-            year: 'numeric', month: 'long', day: 'numeric',
-            weekday: 'long', timeZone: 'Asia/Seoul'
-        });
-        document.getElementById('todayDate').textContent = '조회 기준일: ' + today;
-        
-    } catch (error) {
-        console.error('사용자/강사 정보 로드 오류:', error);
-        // 여기서 발생한 오류를 상위로 전달하여 initializePage에서 잡도록 합니다.
-        throw error; 
-    }
-}
-function updateTeacherFilter(teachers) {
-    // manager 역할이 아니거나 teachers 데이터가 없으면 함수를 종료합니다.
-    if (currentUserRole !== 'manager' || !teachers) {
-        return;
-    }
-    
-    const teacherFilter = document.getElementById('teacherFilter');
-    
-    // 기존 옵션들을 모두 제거합니다 ('전체 보기' 옵션은 남겨둡니다).
-    while (teacherFilter.children.length > 1) {
-        teacherFilter.removeChild(teacherFilter.lastChild);
-    }
-    
-    // 서버에서 받아온 강사 목록으로 새로운 옵션을 추가합니다.
-    teachers.forEach(teacher => {
-        const option = document.createElement('option');
-        option.value = teacher.name;
-        option.textContent = teacher.name;
-        teacherFilter.appendChild(option);
+      <div class="homework-section">
+        <div class="section-title">담당 학생 숙제 현황</div>
+        <div style="display:flex; gap:15px; margin-bottom:20px; align-items:center;">
+          <button class="refresh-btn" onclick="loadHomeworkStatus()">🔄 새로고침</button>
+
+          <!-- 기간 필터 -->
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label for="periodFilter" style="font-weight:600; color:#6b46c1;">기간 필터:</label>
+            <select id="periodFilter" onchange="toggleCustomDateInputs(); loadHomeworkStatus()" 
+              style="padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; background:white;">
+              <option value="today">오늘</option>
+              <option value="week">이번 주</option>
+              <option value="month">이번 달</option>
+              <option value="custom">사용자 지정</option>
+            </select>
+          </div>
+          <div id="customDateContainer" style="display:none; align-items:center; gap:8px;">
+            <input type="date" id="startDate" onchange="loadHomeworkStatus()">
+            <span>~</span>
+            <input type="date" id="endDate" onchange="loadHomeworkStatus()">
+          </div>
+
+          <!-- 강사 필터 -->
+          <div id="teacherFilterContainer" style="display:none;">
+            <label for="teacherFilter" style="font-weight:600; color:#6b46c1; margin-right:8px;">담당강사:</label>
+            <select id="teacherFilter" onchange="filterByTeacher()" 
+              style="padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; background:white; min-width:150px;">
+              <option value="">전체 보기</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="homework-table-container">
+          <table class="homework-table">
+            <thead>
+              <tr>
+                <th>학생 이름</th>
+                <th>담당강사</th>
+                <th>⭕ 문법숙제</th>
+                <th>1️⃣ 어휘클카</th>
+                <th>2️⃣ 독해클카</th>
+                <th>4️⃣ Summary</th>
+                <th>5️⃣ 독해서</th>
+                <th>6️⃣ 일기/부교재</th>
+                <th>수행율</th>
+              </tr>
+            </thead>
+            <tbody id="homeworkTableBody">
+              <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = localStorage.getItem('teacher_auth_token');
+    let allHomeworkData = [];
+    let currentUserRole = '';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!authToken) { alert('로그인이 필요합니다.'); window.location.href='/teacher-login'; return; }
+      initializePage();
     });
-}
 
+    async function initializePage() {
+      try {
+        await loadUserInfo();
+        await loadHomeworkStatus();
+      } catch (e) { console.error("초기화 오류:", e); }
+    }
 
-// 숙제 현황 로드
-async function loadHomeworkStatus() {
-    try {
-        // '오늘' 데이터만 요청하도록 URL 수정
-        const response = await fetch('/api/homework-status?period=today', {
-            headers: {
-                'Authorization': 'Bearer ' + authToken
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('네트워크 응답 오류');
+    async function loadUserInfo() {
+      const teachersResponse = await fetch('/api/teachers', { headers:{Authorization:'Bearer '+authToken} });
+      const teachers = teachersResponse.ok ? await teachersResponse.json() : [];
+      const userInfoResponse = await fetch('/api/teacher/user-info', { headers:{Authorization:'Bearer '+authToken} });
+      const data = await userInfoResponse.json();
+      if (data.userName) {
+        document.getElementById('userName').textContent = data.userName + ' ('+data.userRole+')';
+        currentUserRole = data.userRole;
+        if (data.userRole === 'manager') {
+          document.getElementById('teacherFilterContainer').style.display='block';
+          updateTeacherFilterFromData(teachers);
         }
-        
+      }
+    }
+
+    async function loadHomeworkStatus() {
+      try {
+        const period = document.getElementById('periodFilter').value;
+        let url = `/api/homework-status?period=${period}`;
+        if (period==='custom') {
+          const s=document.getElementById('startDate').value, e=document.getElementById('endDate').value;
+          if (s&&e) url += `&startDate=${s}&endDate=${e}`;
+        }
+        const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
+        if (!response.ok) throw new Error("네트워크 오류");
         const homeworkData = await response.json();
-        allHomeworkData = homeworkData; // 전체 데이터 저장
+        allHomeworkData = homeworkData;
         displayHomeworkData(homeworkData);
         updateStats(homeworkData);
-        // 이전에 추가했던 updateTeacherFilter는 여기서 호출할 필요가 없습니다.
-        
-    } catch (error) {
-        console.error('숙제 현황 로드 오류:', error);
-        document.getElementById('homeworkTableBody').innerHTML = 
-            '<tr><td colspan="9" class="no-data">숙제 현황을 불러올 수 없습니다. 다시 시도해주세요.</td></tr>';
+      } catch(e) {
+        console.error("숙제 로드 오류:", e);
+        document.getElementById('homeworkTableBody').innerHTML='<tr><td colspan="9" class="no-data">불러오기 실패</td></tr>';
+      }
     }
-}
-        
-        // 숙제 데이터 표시
-        function displayHomeworkData(data) {
-            const tbody = document.getElementById('homeworkTableBody');
-            
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">숙제 현황 데이터가 없습니다.</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = data.map(student => `
-                <tr>
-                    <td class="student-name" style="text-align: center;">${student.studentId || '이름 없음'}</td>
-                    <td style="font-size: 12px; color: #6b46c1; font-weight: 600; text-align: center;">${
-                        student.teachers && student.teachers.length > 0 
-                            ? student.teachers.join(', ') 
-                            : '미배정'
-                    }</td>
-                    <td>${formatHomeworkStatus(student.grammarHomework)}</td>
-                    <td>${formatHomeworkStatus(student.vocabCards)}</td>
-                    <td>${formatHomeworkStatus(student.readingCards)}</td>
-                    <td>${formatHomeworkStatus(student.summary)}</td>
-                    <td>${formatHomeworkStatus(student.readingHomework)}</td>
-                    <td>${formatHomeworkStatus(student.diary)}</td>
-                    <td><span class="completion-rate ${getCompletionRateClass(student.completionRate)}">${student.completionRate || 0}%</span></td>
-                </tr>
-            `).join('');
-        }
-        
-        // 숙제 상태 포맷팅
-        function formatHomeworkStatus(status) {
-            if (status === '숙제 함') {
-                return '<span class="homework-status status-complete">OK</span>';
-            } else if (status === '안 해옴') {
-                return '<span class="homework-status status-incomplete">NO</span>';
-            } else {
-                return '<span class="homework-status status-none">-</span>';
-            }
-        }
-        
-        // 수행율 클래스 결정
-        function getCompletionRateClass(rate) {
-            if (rate >= 90) return 'rate-excellent';
-            if (rate >= 70) return 'rate-good';
-            return 'rate-poor';
-        }
-        
-        // 통계 업데이트
-        function updateStats(data) {
-            if (!data || data.length === 0) return;
-            
-            const totalStudents = data.length;
-            const avgCompletionRate = Math.round(data.reduce((sum, student) => sum + (student.completionRate || 0), 0) / totalStudents);
-            const excellentStudents = data.filter(student => (student.completionRate || 0) >= 90).length;
-            
-            // 오늘 완료된 숙제 카운트
-            const homeworkTypes = ['grammarHomework', 'vocabCards', 'readingCards', 'summary', 'readingHomework', 'diary'];
-            let totalCompleted = 0;
-            let totalAssigned = 0;
-            
-            data.forEach(student => {
-                homeworkTypes.forEach(type => {
-                    if (student[type] === '숙제 함') totalCompleted++;
-                    if (student[type] !== '숙제 없음') totalAssigned++;
-                });
-            });
-            
-            document.getElementById('statsContainer').innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-value">${totalStudents}</div>
-                    <div class="stat-label">총 학생 수</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${avgCompletionRate}%</div>
-                    <div class="stat-label">평균 수행율</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${excellentStudents}</div>
-                    <div class="stat-label">우수 학생 (90%+)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${totalCompleted}/${totalAssigned}</div>
-                    <div class="stat-label">완료된 숙제</div>
-                </div>
-            `;
-        }
-        
-        // 로그아웃
-        function logout() {
-            localStorage.removeItem('teacher_auth_token');
-            alert('로그아웃 되었습니다.');
-            window.location.href = '/teacher-login';
-        }
-        
-        // 토큰 만료 체크
-        function checkTokenExpiry() {
-            if (!authToken) {
-                window.location.href = '/teacher-login';
-            }
-        }
-        
-        // 정기적으로 토큰 체크 (5분마다)
-        setInterval(checkTokenExpiry, 5 * 60 * 1000);
-        
-        // 담당강사 필터 업데이트
-        function updateTeacherFilter(data) {
-            if (currentUserRole !== 'manager') return;
-            
-            const teacherFilter = document.getElementById('teacherFilter');
-            // 모든 학생의 담당강사 배열을 평탄화하여 고유한 강사 목록 생성
-            const allTeachers = data
-                .flatMap(student => student.teachers || [])
-                .filter(teacher => teacher && teacher.trim() !== '');
-            const uniqueTeachers = [...new Set(allTeachers)];
-            
-            // 기존 옵션 제거 (전체 보기 제외)
-            while (teacherFilter.children.length > 1) {
-                teacherFilter.removeChild(teacherFilter.lastChild);
-            }
-            
-            // 담당강사 옵션 추가
-            uniqueTeachers.sort().forEach(teacher => {
-                const option = document.createElement('option');
-                option.value = teacher;
-                option.textContent = teacher;
-                teacherFilter.appendChild(option);
-            });
-        }
-        
-        // 담당강사별 필터링 (교집합 방식)
-        function filterByTeacher() {
-            const selectedTeacher = document.getElementById('teacherFilter').value;
-            let filteredData;
-            
-            if (!selectedTeacher) {
-                // 전체 보기
-                filteredData = allHomeworkData;
-            } else {
-                // 선택된 담당강사가 포함된 학생들 필터링 (배열에서 교집합 확인)
-                filteredData = allHomeworkData.filter(student => 
-                    student.teachers && student.teachers.includes(selectedTeacher)
-                );
-            }
-            
-            displayHomeworkData(filteredData);
-            updateStats(filteredData);
-        }
-    </script>
+
+    function toggleCustomDateInputs() {
+      document.getElementById('customDateContainer').style.display = 
+        (document.getElementById('periodFilter').value==='custom')?'flex':'none';
+    }
+
+    function displayHomeworkData(data) {
+      const tbody=document.getElementById('homeworkTableBody');
+      if(!data||!data.length){ tbody.innerHTML='<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return;}
+      tbody.innerHTML=data.map(st=>`
+        <tr>
+          <td class="student-name">${st.studentId||'이름 없음'}</td>
+          <td>${(st.teachers||[]).join(', ')||'미배정'}</td>
+          <td>${formatStatus(st.grammarHomework)}</td>
+          <td>${formatStatus(st.vocabCards)}</td>
+          <td>${formatStatus(st.readingCards)}</td>
+          <td>${formatStatus(st.summary)}</td>
+          <td>${formatStatus(st.readingHomework)}</td>
+          <td>${formatStatus(st.diary)}</td>
+          <td><span class="completion-rate ${rateClass(st.completionRate)}">${st.completionRate||0}%</span></td>
+        </tr>`).join('');
+    }
+
+    function formatStatus(s){ if(s==='숙제 함')return'<span class="homework-status status-complete">OK</span>';
+      if(s==='안 해옴')return'<span class="homework-status status-incomplete">NO</span>';
+      return'<span class="homework-status status-none">-</span>'; }
+    function rateClass(r){ if(r>=90)return'rate-excellent'; if(r>=70)return'rate-good'; return'rate-poor'; }
+
+    function updateStats(data){
+      if(!data.length)return;
+      const total=data.length;
+      const avg=Math.round(data.reduce((s,x)=>s+(x.completionRate||0),0)/total);
+      const excellent=data.filter(x=>(x.completionRate||0)>=90).length;
+      document.getElementById('statsContainer').innerHTML=`
+        <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">총 학생 수</div></div>
+        <div class="stat-card"><div class="stat-value">${avg}%</div><div class="stat-label">평균 수행율</div></div>
+        <div class="stat-card"><div class="stat-value">${excellent}</div><div class="stat-label">우수 학생</div></div>`;
+    }
+
+    function updateTeacherFilterFromData(teachers){
+      const sel=document.getElementById('teacherFilter');
+      while(sel.children.length>1)sel.removeChild(sel.lastChild);
+      teachers.forEach(t=>{ const o=document.createElement('option'); o.value=t.name; o.textContent=t.name; sel.appendChild(o); });
+    }
+
+    function filterByTeacher(){
+      const t=document.getElementById('teacherFilter').value;
+      const data=t?allHomeworkData.filter(s=>s.teachers&&s.teachers.includes(t)):allHomeworkData;
+      displayHomeworkData(data); updateStats(data);
+    }
+
+    function logout(){ localStorage.removeItem('teacher_auth_token'); alert("로그아웃"); window.location.href='/teacher-login'; }
+  </script>
 </body>
 </html>
