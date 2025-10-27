@@ -70,6 +70,52 @@ app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 // --- API 라우트 ---
 
+app.post('/api/update-homework', requireAuth, async (req, res) => {
+  const { pageId, propertyName, newValue } = req.body;
+  console.log(`숙제 업데이트 요청: ${req.user.name} (${req.user.role}) - PageID: ${pageId}, 속성: ${propertyName}, 새 값: ${newValue}`);
+
+  if (!pageId || !propertyName || newValue === undefined) {
+    return res.status(400).json({ success: false, message: '필수 정보(pageId, propertyName, newValue)가 누락되었습니다.' });
+  }
+
+  try {
+    const accessToken = process.env.NOTION_ACCESS_TOKEN;
+    if (!accessToken) { throw new Error('서버에 Notion 토큰이 설정되지 않았습니다.'); }
+
+    const propertiesToUpdate = {
+      [propertyName]: {
+        status: {
+          name: newValue // '숙제 없음'도 이름으로 그대로 전송
+        }
+      }
+    };
+
+    const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+      },
+      body: JSON.stringify({ properties: propertiesToUpdate })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error(`Notion 업데이트 API 오류 (PageID: ${pageId}):`, errorData);
+        throw new Error(errorData.message || `Notion API 업데이트 실패 (${response.status})`);
+    }
+
+    console.log(`Notion 페이지 업데이트 성공 (PageID: ${pageId})`);
+    res.json({ success: true, message: '숙제 상태가 성공적으로 업데이트되었습니다.' });
+
+  } catch (error) {
+    console.error(`숙제 업데이트 처리 중 오류 (PageID: ${pageId}):`, error);
+    res.status(500).json({ success: false, message: error.message || '서버 내부 오류로 업데이트에 실패했습니다.' });
+  }
+});
+
+
 app.get('/api/teachers', requireAuth, async (req, res) => {
   console.log(`강사 목록 조회 시작: ${req.user.name} (${req.user.role})`);
   try {
@@ -171,14 +217,6 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
     console.log(`Notion에서 총 ${pages.length}개 데이터 조회 완료`);
 
-    console.log("\n--- 첫 3개 데이터의 '이름' 속성 확인 ---");
-    pages.slice(0, 3).forEach((page, index) => {
-        console.log(`[데이터 ${index + 1}] props['이름'] 객체 전체:`, JSON.stringify(page.properties['이름'], null, 2));
-        const nameValue = page.properties['이름']?.title?.[0]?.plain_text;
-        console.log(`[데이터 ${index + 1}] 추출된 이름 값:`, nameValue);
-    });
-    console.log("---------------------------------------\n");
-
     const homeworkData = pages.map(page => {
         const props = page.properties;
         const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
@@ -201,7 +239,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
             readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '-',
             summary: props['4️⃣ Summary 숙제']?.status?.name || '-',
             readingHomework: props['5️⃣ 매일 독해 숙제']?.status?.name || '-',
-            diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '-'
+            diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '-' // Notion 속성 이름 확인!
         };
         return { pageId: page.id, studentName: studentName, date: pageDate, teachers: assignedTeachers, completionRate: Math.round(performanceRate), ...homeworkStatuses };
     });
@@ -217,8 +255,8 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
     }
     res.json(filteredData);
   } catch (error) {
-    console.error('숙제 현황 로드 오류:', error);
-    res.status(500).json({ message: '서버 오류' });
+     console.error('숙제 현황 로드 오류:', error);
+    res.status(500).json({ message: '서버 오류' });
   }
 });
 
@@ -226,7 +264,6 @@ app.post('/login', async (req, res) => { /* ... 이전 최종본과 동일 ... *
 app.get('/api/search-books', requireAuth, async (req, res) => { /* ... 이전 최종본과 동일 ... */ });
 app.get('/api/search-sayu-books', requireAuth, async (req, res) => { /* ... 이전 최종본과 동일 ... */ });
 app.post('/save-progress', requireAuth, async (req, res) => { /* ... 이전 최종본과 동일 ... */ });
-app.post('/api/update-homework', requireAuth, async (req, res) => { res.json({ success: true, message: '임시 응답' }); });
 
 
 // --- 서버 실행 ---
