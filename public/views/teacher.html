@@ -6,6 +6,7 @@
     <title>선생님 대시보드 - 리디튜드</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
+        /* --- 기본 스타일 --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
         .container { max-width: 1400px; margin: 0 auto; background: none; box-shadow: none; overflow: visible; padding: 0 20px; }
@@ -15,94 +16,147 @@
         .user-name { font-size: 1em; margin-bottom: 0; display: inline-block; font-weight: 600; }
         .logout-btn { background: #6b46c1; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s ease; box-shadow: none; }
         .logout-btn:hover { background: #5a3eaa; }
+        
+        /* --- 탭 메뉴 --- */
         .tab-menu { display: flex; background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 0 40px; margin-top: 20px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s ease; }
         .tab-button::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; transform: scaleX(0); transition: transform 0.3s ease; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { transform: scaleX(1); }
+        
+        /* --- 컨텐츠 공통 --- */
         .main-content { padding: 30px 0; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .content-section { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.05); border: 1px solid #e9ecef; padding: 30px; margin: 0 20px 30px; }
+        .section-title { font-size: 1.6em; font-weight: 700; color: #6b46c1; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
+        .section-title::before { content: var(--icon, "📋"); font-size: 1.2em; }
+        .loading, .no-data { text-align: center; padding: 60px; color: #718096; font-size: 16px; }
+        .loading::before { content: "⏳ "; } .no-data::before { content: "📝 "; }
+
+        /* --- 통계 카드 --- */
         .stats-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; padding: 0 20px; }
         .stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         .stat-value { font-size: 2.0em; font-weight: 700; color: #6b46c1; margin-bottom: 5px; }
         .stat-label { color: #718096; font-size: 14px; }
-        .homework-section { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.05); border: 1px solid #e9ecef; padding: 30px; margin: 0 20px 30px; }
-        .section-title { font-size: 1.6em; font-weight: 700; color: #6b46c1; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
-        .section-title::before { content: "📋"; font-size: 1.2em; }
+        
+        /* --- 필터 --- */
         .filters-container { display:flex; gap:15px; margin-bottom:25px; align-items:center; flex-wrap: wrap; }
         .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; }
         .filter-group { display:flex; align-items:center; gap:8px; }
         .filter-label { font-weight:600; color:#6b46c1; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; background:white; font-size: 14px; }
-        #customDateContainer_hw, #customDateContainer_test { display:none; align-items:center; gap:8px; }
-        #teacherFilterContainer_hw, #teacherFilterContainer_test { display:none; }
-        .homework-table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
-        .homework-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .homework-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); white-space: nowrap; }
-        .homework-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; border-right: 1px solid #f1f3f4; vertical-align: middle; font-size: 13px; }
-        .homework-table tr:hover { background-color: #f8f9ff; }
+        #customDateContainer_hw, #customDateContainer_test, #customDateContainer_reading { display:none; align-items:center; gap:8px; }
+        #teacherFilterContainer_hw, #teacherFilterContainer_test, #teacherFilterContainer_reading { display:none; }
+        
+        /* --- 테이블 --- */
+        .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
+        .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); white-space: nowrap; }
+        .styled-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; border-right: 1px solid #f1f3f4; vertical-align: middle; font-size: 13px; }
+        .styled-table tr:hover { background-color: #f8f9ff; }
         .student-name { font-weight: 600; color: #2d3748; font-size: 14px; background: #f9fafc; text-align: left; padding-left: 15px; }
-        .homework-dropdown { padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; min-width: 50px; background: white; cursor: pointer; transition: all 0.2s ease; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em 1em; padding-right: 1.8em; }
-        .homework-dropdown:hover { border-color: #6b46c1; box-shadow: 0 0 0 2px rgba(107, 70, 193, 0.1); }
-        .homework-dropdown:focus { outline: none; border-color: #6b46c1; box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1); }
-        .homework-dropdown.status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
-        .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
-        .homework-dropdown.status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+        
+        /* --- 테이블 내 요소 --- */
+        .editable-input { padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; text-align: center; max-width: 60px; background-color: #f9fafb; transition: all 0.2s ease; }
+        .editable-input:focus { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); background-color: white; }
+        .editable-text-input { max-width: 100px; text-align: left; }
+        
+        .reading-result-badge { padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
+        .result-pass { background-color: #dcfce7; color: #166534; }
+        .result-fail { background-color: #fecaca; color: #991b1b; }
+        .result-none { background-color: #f3f4f6; color: #6b7280; }
+        
+        /* --- 수행율 버튼 --- */
         .completion-rate { font-weight: 700; font-size: 14px; }
         .rate-excellent { color: #10b981; } .rate-good { color: #8b5cf6; } .rate-poor { color: #ef4444; }
         .refresh-rate-btn { background: none; border: none; cursor: pointer; font-size: 1.1em; vertical-align: middle; margin-left: 5px; opacity: 0.6; transition: opacity 0.2s ease, transform 0.2s ease; }
         .refresh-rate-btn:hover { opacity: 1; transform: rotate(90deg); }
         .refresh-rate-btn.loading { opacity: 0.5; cursor: default; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .loading, .no-data { text-align: center; padding: 60px; color: #718096; font-size: 16px; }
-        .loading::before { content: "⏳ "; } .no-data::before { content: "📝 "; }
-        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 1000; opacity: 0; transform: translateX(100%); transition: all 0.3s ease; }
+        
+        /* --- 드롭다운 공통 --- */
+        .homework-dropdown { padding: 4px 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; min-width: 50px; background: white; cursor: pointer; transition: all 0.2s ease; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em 1em; padding-right: 1.8em; }
+        .homework-dropdown:hover { border-color: #6b46c1; box-shadow: 0 0 0 2px rgba(107, 70, 193, 0.1); }
+        .homework-dropdown:focus { outline: none; border-color: #6b46c1; box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1); }
+
+        /* [신규] 드롭다운 색상 스타일 */
+        .homework-dropdown.status-default,
+        .homework-dropdown.status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+        
+        /* (Green) 숙제 함, 완료, 북리포트 */
+        .homework-dropdown.status-complete, 
+        .homework-dropdown.status-reading-complete,
+        .homework-dropdown.status-vocab-complete,
+        .homework-dropdown.status-writing-bookreport { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        
+        /* (Red) 안 해옴, 못함 */
+        .homework-dropdown.status-incomplete,
+        .homework-dropdown.status-reading-incomplete,
+        .homework-dropdown.status-vocab-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
+        
+        /* (Orange) SKIP */
+        .homework-dropdown.status-vocab-skip,
+        .homework-dropdown.status-writing-skip { background-color: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+
+        /* (Blue) 3 SENTENCE */
+        .homework-dropdown.status-writing-3sentence { background-color: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+        
+        /* --- 원형 점수 그래프 --- */
+        .score-circle { position: relative; width: 45px; height: 45px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+        .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
+        .score-text { position: relative; font-size: 13px; font-weight: 700; color: var(--score-color, #6b7280); }
+        .score-none { font-size: 14px; font-weight: 600; color: #9ca3af; }
+        
+        /* --- 책 제목 버튼 (원서 독서) --- */
+        .book-title-cell { padding: 5px !important; }
+        .book-title-button {
+            width: 100%; min-height: 30px;
+            padding: 6px 8px;
+            border: 1px solid transparent; /* 기본 테두리 숨김 */
+            border-radius: 4px;
+            background-color: transparent; /* 기본 배경 투명 */
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            color: #111827;
+            transition: all 0.2s ease;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+        .book-title-button:hover { 
+            border-color: #d1d5db; /* 호버 시 테두리 */
+            background-color: #f9fafb; 
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+        }
+        .book-title-button.empty { 
+            color: #6b7280; 
+            font-style: italic; 
+            text-align: center;
+        }
+
+        /* --- 책 검색 모달 --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+        .modal-title { font-size: 1.4em; font-weight: 700; color: #6b46c1; margin-bottom: 20px; }
+        .modal-search-input { width: 100%; padding: 12px 15px; font-size: 16px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; }
+        .modal-search-results { max-height: 300px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 8px; }
+        .result-item { padding: 12px 15px; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+        .result-item:hover { background-color: #f8f9ff; }
+        .result-item:last-child { border-bottom: none; }
+        .result-title { font-weight: 600; color: #2d3748; }
+        .result-meta { font-size: 13px; color: #718096; margin-top: 4px; }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: space-between; }
+        .modal-btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-cancel { background: #f3f4f6; color: #4b5563; }
+        .btn-clear { background: #fee2e2; color: #991b1b; }
+
+        /* --- 토스트 메시지 --- */
+        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 3000; opacity: 0; transform: translateX(100%); transition: all 0.3s ease; }
         .toast-message.show { opacity: 1; transform: translateX(0); }
         .toast-success { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; }
         .toast-error { background: #fecaca; border: 1px solid #fca5a5; color: #991b1b; }
-        .editable-input { padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; text-align: center; max-width: 60px; background-color: #f9fafb; transition: all 0.2s ease; }
-        .editable-input:focus { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); background-color: white; }
-        .editable-text-input { max-width: 100px; text-align: left; }
-        .reading-result-badge { padding: 4px 10px; border-radius: 12px; font-weight: 600; font-size: 11px; display: inline-block; }
-        .result-pass { background-color: #dcfce7; color: #166534; }
-        .result-fail { background-color: #fecaca; color: #991b1b; }
-        .result-none { background-color: #f3f4f6; color: #6b7280; }
-        
-        /* --- [추가됨] 원형 점수 그래프 스타일 --- */
-        .score-circle {
-            position: relative;
-            width: 45px; /* 크기 조정 */
-            height: 45px;
-            border-radius: 50%;
-            /* conic-gradient 배경은 JS에서 --score-color와 --score-value 변수를 통해 동적으로 설정됨 */
-            background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto;
-        }
-        .score-circle::before { /* 도넛 구멍 */
-            content: '';
-            position: absolute;
-            width: 75%; /* 구멍 크기 */
-            height: 75%;
-            background: white;
-            border-radius: 50%;
-        }
-        .score-text {
-            position: relative;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--score-color, #6b7280);
-        }
-        .score-none { /* 점수 없을 때 스타일 */
-            font-size: 14px;
-            font-weight: 600;
-            color: #9ca3af;
-        }
-        /* --- 그래프 스타일 끝 --- */
-
     </style>
 </head>
 <body>
@@ -124,64 +178,66 @@
         </div>
 
         <div class="main-content">
+            <!-- ========== 숙제 현황 탭 ========== -->
             <div id="homework-view" class="tab-content active">
-                 <div class="stats-summary" id="statsContainer_hw"></div>
-                 <div class="homework-section">
-                     <div class="section-title">담당 학생 숙제 현황</div>
-                     <div class="filters-container" id="commonFilters_hw">
-                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                         <div class="filter-group">
-                             <label for="periodFilter_hw" class="filter-label">기간:</label>
-                             <select id="periodFilter_hw" class="filter-select" onchange="toggleCustomDateInputs('hw'); loadDataForCurrentTab()">
-                                 <option value="today">오늘</option> <option value="week">이번 주</option> <option value="month">이번 달</option> <option value="custom">사용자 지정</option>
-                             </select>
-                         </div>
-                         <div id="customDateContainer_hw" style="display:none;" class="filter-group">
-                             <input type="date" id="startDate_hw" class="filter-input" onchange="loadDataForCurrentTab()"> <span>~</span> <input type="date" id="endDate_hw" class="filter-input" onchange="loadDataForCurrentTab()">
-                         </div>
-                         <div id="teacherFilterContainer_hw" style="display:none;" class="filter-group">
-                             <label for="teacherFilter_hw" class="filter-label">담당강사:</label>
-                             <select id="teacherFilter_hw" class="filter-select" onchange="loadDataForCurrentTab()">
-                                 <option value="">전체 보기</option>
-                             </select>
-                         </div>
-                     </div>
-                     <div class="homework-table-container">
-                         <table class="homework-table">
-                             <thead>
-                                 <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
-                             </thead>
-                             <tbody id="homeworkTableBody">
-                                 <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
-                             </tbody>
-                         </table>
-                     </div>
-                 </div>
+                <div class="stats-summary" id="statsContainer_hw"></div>
+                <div class="content-section">
+                    <div class="section-title" style="--icon:'📋'">담당 학생 숙제 현황</div>
+                    <div class="filters-container" id="commonFilters_hw">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <div class="filter-group">
+                            <label for="periodFilter_hw" class="filter-label">기간:</label>
+                            <select id="periodFilter_hw" class="filter-select">
+                                <option value="today">오늘</option> <option value="week">이번 주</option> <option value="month">이번 달</option> <option value="custom">사용자 지정</option>
+                            </select>
+                        </div>
+                        <div id="customDateContainer_hw" style="display:none;" class="filter-group">
+                            <input type="date" id="startDate_hw" class="filter-input"> <span>~</span> <input type="date" id="endDate_hw" class="filter-input">
+                        </div>
+                        <div id="teacherFilterContainer_hw" style="display:none;" class="filter-group">
+                            <label for="teacherFilter_hw" class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_hw" class="filter-select">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
+                            </thead>
+                            <tbody id="homeworkTableBody">
+                                <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
+            <!-- ========== 테스트 결과 탭 ========== -->
             <div id="tests-view" class="tab-content">
-                <div class="homework-section">
-                    <div class="section-title" style="--icon:'📝'">📝 담당 학생 테스트 결과</div>
+                <div class="content-section">
+                    <div class="section-title" style="--icon:'📝'">담당 학생 테스트 결과</div>
                     <div class="filters-container" id="commonFilters_test">
-                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                         <div class="filter-group">
-                             <label for="periodFilter_test" class="filter-label">기간:</label>
-                             <select id="periodFilter_test" class="filter-select" onchange="toggleCustomDateInputs('test'); loadDataForCurrentTab()">
-                                 <option value="today">오늘</option> <option value="week">이번 주</option> <option value="month">이번 달</option> <option value="custom">사용자 지정</option>
-                             </select>
-                         </div>
-                         <div id="customDateContainer_test" style="display:none;" class="filter-group">
-                             <input type="date" id="startDate_test" class="filter-input" onchange="loadDataForCurrentTab()"> <span>~</span> <input type="date" id="endDate_test" class="filter-input" onchange="loadDataForCurrentTab()">
-                         </div>
-                         <div id="teacherFilterContainer_test" style="display:none;" class="filter-group">
-                             <label for="teacherFilter_test" class="filter-label">담당강사:</label>
-                             <select id="teacherFilter_test" class="filter-select" onchange="loadDataForCurrentTab()">
-                                 <option value="">전체 보기</option>
-                             </select>
-                         </div>
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <div class="filter-group">
+                            <label for="periodFilter_test" class="filter-label">기간:</label>
+                            <select id="periodFilter_test" class="filter-select">
+                                <option value="today">오늘</option> <option value="week">이번 주</option> <option value="month">이번 달</option> <option value="custom">사용자 지정</option>
+                            </select>
+                        </div>
+                        <div id="customDateContainer_test" style="display:none;" class="filter-group">
+                            <input type="date" id="startDate_test" class="filter-input"> <span>~</span> <input type="date" id="endDate_test" class="filter-input">
+                        </div>
+                        <div id="teacherFilterContainer_test" style="display:none;" class="filter-group">
+                            <label for="teacherFilter_test" class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_test" class="filter-select">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="homework-table-container">
-                        <table class="homework-table">
+                    <div class="table-container">
+                        <table class="styled-table">
                             <thead>
                                 <tr>
                                     <th>학생 이름</th>
@@ -192,79 +248,199 @@
                                     <th>독해오답</th>
                                     <th>독해결과</th>
                                     <th>하브루타</th>
-                                    <th>문법문항</th> <th>문법오답</th> <th>문법점수</th> </tr>
+                                    <th>문법문항</th> <th>문법오답</th> <th>문법점수</th> 
+                                </tr>
                             </thead>
                             <tbody id="testsTableBody">
-                                <tr><td colspan="11" class="loading">테스트 결과를 불러오는 중입니다...</td></tr> </tbody>
+                                <tr><td colspan="11" class="loading">테스트 결과를 불러오는 중입니다...</td></tr> 
+                            </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <div id="reading-view" class="tab-content"><div class="homework-section"><div class="section-title" style="--icon:'📚'">📚 원서 독서 현황</div><p class="no-data">구현 예정</p></div></div>
-            <div id="listening-view" class="tab-content"><div class="homework-section"><div class="section-title" style="--icon:'🎧'">🎧 리스닝 현황</div><p class="no-data">구현 예정</p></div></div>
-            <div id="comments-view" class="tab-content"><div class="homework-section"><div class="section-title" style="--icon:'💬'">💬 오늘의 코멘트</div><p class="no-data">구현 예정</p></div></div>
+            <!-- ========== [신규] 원서 독서 현황 탭 ========== -->
+            <div id="reading-view" class="tab-content">
+                <div class="content-section">
+                    <div class="section-title" style="--icon:'📚'">원서 독서 현황</div>
+                    <div class="filters-container" id="commonFilters_reading">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <div class="filter-group">
+                            <label for="periodFilter_reading" class="filter-label">기간:</label>
+                            <select id="periodFilter_reading" class="filter-select">
+                                <option value="today">오늘</option> <option value="week">이번 주</option> <option value="month">이번 달</option> <option value="custom">사용자 지정</option>
+                            </select>
+                        </div>
+                        <div id="customDateContainer_reading" style="display:none;" class="filter-group">
+                            <input type="date" id="startDate_reading" class="filter-input"> <span>~</span> <input type="date" id="endDate_reading" class="filter-input">
+                        </div>
+                        <div id="teacherFilterContainer_reading" style="display:none;" class="filter-group">
+                            <label for="teacherFilter_reading" class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_reading" class="filter-select">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>학생 이름</th>
+                                    <th>담당강사</th>
+                                    <th>📖 영어독서</th>
+                                    <th>어휘학습</th>
+                                    <th>📚 책 제목</th>
+                                    <th>시리즈</th>
+                                    <th>AR</th>
+                                    <th>Lexile</th>
+                                    <th>Writing 학습</th>
+                                </tr>
+                            </thead>
+                            <tbody id="readingTableBody">
+                                <tr><td colspan="9" class="loading">원서 독서 현황을 불러오는 중입니다...</td></tr> 
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="listening-view" class="tab-content"><div class="content-section"><div class="section-title" style="--icon:'🎧'">🎧 리스닝 현황</div><p class="no-data">구현 예정</p></div></div>
+            <div id="comments-view" class="tab-content"><div class="content-section"><div class="section-title" style="--icon:'💬'">💬 오늘의 코멘트</div><p class="no-data">구현 예정</p></div></div>
+        </div>
+    </div>
+
+    <!-- ========== [신규] 책 검색 모달 ========== -->
+    <div id="bookSearchModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="modal-title">📚 책 제목 검색</h2>
+            <input type="text" id="modalSearchInput" class="modal-search-input" placeholder="검색어를 입력하세요...">
+            <div id="modalSearchResults" class="modal-search-results">
+                <div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn btn-clear" onclick="selectBook(null, '책 검색...')">🚫 관계 연결 해제</button>
+                <button class="modal-btn btn-cancel" onclick="closeBookSearchModal()">닫기</button>
+            </div>
         </div>
     </div>
 
     <script>
         // --- 전역 변수 및 초기화 ---
+        const API_BASE_URL = 'http://localhost:5001'; // [수정] API 서버 주소 명시
         let authToken = localStorage.getItem('teacher_auth_token');
-        let allCombinedData = [];
+        let allCombinedData = []; // 숙제+테스트 탭 데이터 캐시
+        let allReadingData = []; // 원서 독서 탭 데이터 캐시
         let currentUserRole = '';
         let currentUserName = '';
-        let currentActiveTab = 'homework';
+        let currentActiveTab = 'homework'; // 현재 활성화된 탭
+        let currentModalContext = {}; // 모달에 전달할 pageId 등
+        let bookSearchTimer = null; // 책 검색 디바운스 타이머
 
         document.addEventListener('DOMContentLoaded', () => {
-            if (!authToken) { alert('로그인이 필요합니다.'); window.location.href='/teacher-login'; return; }
+            if (!authToken) { console.error('인증 토큰 없음'); window.location.href='/teacher-login'; return; }
             initializePage();
-            showTab('homework'); // 초기 탭 설정
         });
 
         async function initializePage() {
             try {
                 await loadUserInfo(); // 사용자 정보 및 강사 필터 옵션 로드
-                await loadDataForCurrentTab(); // 현재 활성화된 탭 데이터 로드
+                setupEventListeners(); // 모든 탭의 이벤트 리스너 설정
+                showTab('homework'); // 초기 탭 설정 및 데이터 로드
             } catch (e) { console.error("초기화 오류:", e); }
+        }
+
+        function setupEventListeners() {
+            // 모든 탭의 필터 변경 시 자동 새로고침
+            ['hw', 'test', 'reading'].forEach(suffix => {
+                const s = `_${suffix}`; // _hw, _test, _reading
+                document.getElementById(`periodFilter${s}`)?.addEventListener('change', () => {
+                    toggleCustomDateInputs(s); // [수정] 올바른 접미사 전달
+                    loadDataForCurrentTab();
+                });
+                document.getElementById(`startDate${s}`)?.addEventListener('change', loadDataForCurrentTab);
+                document.getElementById(`endDate${s}`)?.addEventListener('change', loadDataForCurrentTab);
+                document.getElementById(`teacherFilter${s}`)?.addEventListener('change', loadDataForCurrentTab);
+            });
+
+            // 책 검색 모달 디바운스 입력
+            document.getElementById('modalSearchInput')?.addEventListener('input', (e) => {
+                clearTimeout(bookSearchTimer);
+                const query = e.target.value;
+                bookSearchTimer = setTimeout(() => {
+                    searchBooks(query);
+                }, 300); // 300ms 디바운스
+            });
+            
+            // 모달 닫기 버튼
+            document.querySelector('.btn-cancel').addEventListener('click', closeBookSearchModal);
         }
 
         // --- 데이터 로드 함수 ---
         async function loadUserInfo() {
              try {
-                const userInfoResponse = await fetch('/api/teacher/user-info', { headers:{Authorization:'Bearer '+authToken} });
+                const userInfoResponse = await fetch(`${API_BASE_URL}/api/teacher/user-info`, { headers:{Authorization:'Bearer '+authToken} });
                 if (!userInfoResponse.ok) throw new Error('사용자 정보 로드 실패');
                 const data = await userInfoResponse.json();
                 if (data.userName) {
                     document.getElementById('userName').textContent = data.userName + ' ('+data.userRole+')';
                     currentUserRole = data.userRole;
                     currentUserName = data.userName;
+                    
+                    const filterContainers = document.querySelectorAll('#teacherFilterContainer_hw, #teacherFilterContainer_test, #teacherFilterContainer_reading');
+                    
                     if (data.userRole === 'manager') {
-                        // 두 탭의 필터 컨테이너 모두 표시
-                        document.getElementById('teacherFilterContainer_hw').style.display='flex';
-                        document.getElementById('teacherFilterContainer_test').style.display='flex';
-                        const teachersResponse = await fetch('/api/teachers', { headers:{Authorization:'Bearer '+authToken} });
+                        const teachersResponse = await fetch(`${API_BASE_URL}/api/teachers`, { headers:{Authorization:'Bearer '+authToken} });
                         if (!teachersResponse.ok) throw new Error('강사 목록 로드 실패');
                         const teachers = await teachersResponse.json();
                         updateTeacherFilterOptions(teachers); // 두 필터 모두 업데이트
+                        filterContainers.forEach(el => el.style.display='flex');
                     } else {
-                         // 매니저가 아닐 때, 필터 숨김
-                         document.getElementById('teacherFilterContainer_hw').style.display='none';
-                         document.getElementById('teacherFilterContainer_test').style.display='none';
+                        // 매니저가 아닐 때, 필터 숨김
+                        updateTeacherFilterOptions([]); // [신규] 강사 목록 비우고 본인 이름으로 설정
+                        filterContainers.forEach(el => el.style.display='none');
                     }
                 } else { throw new Error('사용자 정보 형식이 잘못됨'); }
-            } catch (error) {
+             } catch (error) {
                  console.error("사용자 정보 로드 오류:", error);
                  alert('사용자 정보를 불러오는데 실패했습니다. 다시 로그인해주세요.');
                  logout();
-            }
+             }
         }
 
         async function loadDataForCurrentTab() {
-            // 현재 활성화된 탭에 따라 데이터 로드
+            console.log(`데이터 로드 시작: ${currentActiveTab}`);
+            // 현재 활성화된 탭에 따라 다른 데이터 로드 함수 호출
             if (currentActiveTab === 'homework' || currentActiveTab === 'tests') {
                 await loadHomeworkAndTestData();
+            } else if (currentActiveTab === 'reading') {
+                await loadReadingStatusData();
             }
             // ... 다른 탭 데이터 로드 ...
+        }
+
+        function getFilterParams(suffix) { // suffix e.g., _hw, _test, _reading
+            const period = document.getElementById(`periodFilter${suffix}`)?.value || 'today';
+            const teacherSelect = document.getElementById(`teacherFilter${suffix}`);
+            const teacher = (currentUserRole === 'manager' && teacherSelect) ? teacherSelect.value : (currentUserRole === 'teacher' ? currentUserName : '');
+
+            let url = `period=${period}`;
+            if (period === 'custom') {
+                const s = document.getElementById(`startDate${suffix}`)?.value;
+                const e = document.getElementById(`endDate${suffix}`)?.value;
+                if (s && e) {
+                    url += `&startDate=${s}&endDate=${e}`;
+                } else { 
+                    // [수정] 커스텀 선택 시 날짜 없으면 오류 대신 오늘 날짜로 대체 (혹은 경고)
+                    console.warn('사용자 지정 기간이 선택되었으나 날짜가 없습니다.');
+                    showToast('사용자 지정 기간을 모두 입력해주세요.', 'error');
+                    // 오늘 날짜로 강제하지 않고, 빈 테이블이 로드되도록 둠 (혹은 period=today로 강제)
+                    // 여기서는 일단 진행
+                }
+            }
+            if (currentUserRole === 'manager' && teacher && teacher !== "") {
+                url += `&teacher=${encodeURIComponent(teacher)}`;
+            }
+            return url;
         }
 
         async function loadHomeworkAndTestData() {
@@ -273,51 +449,62 @@
             hwTbody.innerHTML = '<tr><td colspan="9" class="loading">로딩중...</td></tr>';
             testTbody.innerHTML = '<tr><td colspan="11" class="loading">로딩중...</td></tr>';
 
-            // 활성화된 탭의 필터 값 사용
-            const filterSuffix = (currentActiveTab === 'tests') ? '_test' : '_hw';
-            const period = document.getElementById(`periodFilter${filterSuffix}`).value;
-            const teacherSelect = document.getElementById(`teacherFilter${filterSuffix}`);
-            // 선생님 역할일 경우, 필터 값을 자신의 이름으로, 매니저면 선택된 값으로
-            const teacher = (currentUserRole === 'manager' && teacherSelect) ? teacherSelect.value : (currentUserRole === 'teacher' ? currentUserName : '');
-
             try {
-                let url = `/api/homework-status?period=${period}`;
-                if (period === 'custom') {
-                    const s = document.getElementById(`startDate${filterSuffix}`).value, e = document.getElementById(`endDate${filterSuffix}`).value;
-                    if (s && e) url += `&startDate=${s}&endDate=${e}`;
-                    else { throw new Error('사용자 지정 기간을 모두 입력해주세요.'); }
-                }
-                 // 매니저이고 '전체 보기'가 아닐 때만 teacher 파라미터 추가
-                 if (currentUserRole === 'manager' && teacher && teacher !== "") {
-                     url += `&teacher=${encodeURIComponent(teacher)}`;
-                 }
-                 // 선생님 역할일 경우, 서버에서 req.user.name으로 자동 필터링 (index.js 로직)
+                // 활성화된 탭의 필터 값 사용 (숙제/테스트는 필터 ID가 다름)
+                const filterSuffix = (currentActiveTab === 'tests') ? '_test' : '_hw';
+                const params = getFilterParams(filterSuffix);
+                const url = `${API_BASE_URL}/api/homework-status?${params}`;
 
                 const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
-                if (!response.ok) { 
-                    const errorText = await response.text(); 
-                    console.error("서버 응답 오류:", errorText); 
-                    throw new Error("네트워크 오류 또는 서버 응답 실패"); 
-                }
+                if (!response.ok) { const errorText = await response.text(); console.error("서버 응답 오류:", errorText); throw new Error("네트워크 오류 또는 서버 응답 실패"); }
+                
                 const combinedData = await response.json();
-                allCombinedData = combinedData;
+                allCombinedData = combinedData; // 캐시 저장
 
                 displayHomeworkData(combinedData);
                 displayTestData(combinedData);
-                updateStats(combinedData, period === 'today'); // '오늘'인 경우만 오늘 통계
+                updateStats(combinedData); // 통계 업데이트
             } catch(e) {
-                console.error("데이터 로드 오류:", e);
-                const errorMsg = `<tr><td colspan="${(currentActiveTab === 'tests') ? 11 : 9}" class="no-data">${e.message || '로드 실패'}</td></tr>`;
-                hwTbody.innerHTML = errorMsg;
+                console.error("숙제/테스트 데이터 로드 오류:", e);
+                const errorMsg = `<tr><td colspan="11" class="no-data">${e.message || '로드 실패'}</td></tr>`;
+                hwTbody.innerHTML = errorMsg.replace('colspan="11"', 'colspan="9"');
                 testTbody.innerHTML = errorMsg;
                 updateStats([]);
             }
         }
 
+        async function loadReadingStatusData() {
+            const tbody = document.getElementById('readingTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">로딩중...</td></tr>';
+
+            try {
+                const params = getFilterParams('_reading'); // '_reading' 접미사 사용
+                const url = `${API_BASE_URL}/api/reading-status?${params}`;
+
+                const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
+                if (!response.ok) { const errorText = await response.text(); console.error("서버 응답 오류:", errorText); throw new Error("네트워크 오류 또는 서버 응답 실패"); }
+
+                const readingData = await response.json();
+                allReadingData = readingData; // 캐시 저장
+
+                displayReadingData(readingData);
+
+            } catch(e) {
+                console.error("원서 독서 데이터 로드 오류:", e);
+                const errorMsg = `<tr><td colspan="9" class="no-data">${e.message || '로드 실패'}</td></tr>`;
+                tbody.innerHTML = errorMsg;
+            }
+        }
+
+
         // --- UI 업데이트 함수 ---
-        function toggleCustomDateInputs(suffix) {
-             const period = document.getElementById(`periodFilter_${suffix}`).value;
-             document.getElementById(`customDateContainer_${suffix}`).style.display = (period === 'custom') ? 'flex' : 'none';
+        function toggleCustomDateInputs(suffixWithUnderscore) { // e.g., _hw, _test, _reading
+             const periodEl = document.getElementById(`periodFilter${suffixWithUnderscore}`);
+             const customDateEl = document.getElementById(`customDateContainer${suffixWithUnderscore}`);
+             
+             if (periodEl && customDateEl) { 
+                 customDateEl.style.display = (periodEl.value === 'custom') ? 'flex' : 'none';
+             }
         }
 
         function displayHomeworkData(data) {
@@ -340,43 +527,74 @@
                 </tr>`).join('');
         }
 
-        // [수정됨] 테스트 결과 데이터 표시 (클라이언트 사이드 점수 계산)
         function displayTestData(data) {
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => {
-                // 어휘 점수 계산
+                // 클라이언트 사이드 점수 계산
                 const vScore = (st.vocabTotal > 0) ? Math.round((st.vocabCorrect / st.vocabTotal) * 100) : 0;
-                // 문법 점수 계산
                 const gScore = (st.grammarTotal > 0) ? Math.round(((st.grammarTotal - (st.grammarWrong || 0)) / st.grammarTotal) * 100) : 0;
                 
                 return `
                 <tr id="row-test-${st.pageId || Math.random()}">
                     <td class="student-name">${st.studentName || '이름 없음'}</td>
-                    <td><input type="text" class="editable-input editable-text-input" value="${st.vocabUnit || ''}" defaultValue="${st.vocabUnit || ''}" data-page-id="${st.pageId || ''}" data-property-name="어휘유닛" data-property-type="rich_text" onblur="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
-                    <td><input type="number" class="editable-input" value="${st.vocabCorrect ?? ''}" defaultValue="${st.vocabCorrect ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="단어 (맞은 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
-                    <td><input type="number" class="editable-input" value="${st.vocabTotal ?? ''}" defaultValue="${st.vocabTotal ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="단어 (전체 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
-                    <td>${formatScoreCircle(vScore)}</td> <td><input type="number" class="editable-input" value="${st.readingWrong ?? ''}" defaultValue="${st.readingWrong ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="독해 (틀린 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
+                    <td><input type="text" class="editable-input editable-text-input" value="${st.vocabUnit || ''}" defaultValue="${st.vocabUnit || ''}" data-page-id="${st.pageId || ''}" data-property-name="어휘유닛" data-property-type="rich_text" onblur="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                    <td><input type="number" class="editable-input" value="${st.vocabCorrect ?? ''}" defaultValue="${st.vocabCorrect ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="단어 (맞은 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                    <td><input type="number" class="editable-input" value="${st.vocabTotal ?? ''}" defaultValue="${st.vocabTotal ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="단어 (전체 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                    <td class="vocab-score">${formatScoreCircle(vScore)}</td> 
+                    <td><input type="number" class="editable-input" value="${st.readingWrong ?? ''}" defaultValue="${st.readingWrong ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="독해 (틀린 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                     <td><span class="reading-result-badge ${getReadingResultClass(st.readingResult)}">${st.readingResult || '-'}</span></td>
-                    <td>${formatSelectDropdown(st.pageId, '독해 하브루타', st.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                    <td><input type="number" class="editable-input" value="${st.grammarTotal ?? ''}" defaultValue="${st.grammarTotal ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="문법 (전체 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
-                    <td><input type="number" class="editable-input" value="${st.grammarWrong ?? ''}" defaultValue="${st.grammarWrong ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="문법 (틀린 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event)"></td>
-                    <td>${formatScoreCircle(gScore)}</td> </tr>`
+                    <td>${formatSelectDropdown(st.pageId, '독해 하브루타', st.havruta, ['완료함', '못하고감', '숙제없음'], '숙제없음')}</td>
+                    <td><input type="number" class="editable-input" value="${st.grammarTotal ?? ''}" defaultValue="${st.grammarTotal ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="문법 (전체 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                    <td><input type="number" class="editable-input" value="${st.grammarWrong ?? ''}" defaultValue="${st.grammarWrong ?? ''}" data-page-id="${st.pageId || ''}" data-property-name="문법 (틀린 개수)" data-property-type="number" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                    <td class="grammar-score">${formatScoreCircle(gScore)}</td> 
+                </tr>`
             }).join('');
         }
+
+        // [신규] 원서 독서 데이터 표시
+        function displayReadingData(data) {
+            const tbody = document.getElementById('readingTableBody');
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-reading-${st.pageId || Math.random()}">
+                    <td class="student-name">${st.studentName || '이름 없음'}</td>
+                    <td>${(st.teachers || []).join(', ') || '미배정'}</td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, '📖 영어독서', st.readingStatus, ['완료함', '못함'], '---')}
+                    </td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, '어휘학습', st.vocabStatus, ['완료함', '못함', 'SKIP', '완료'], '---')}
+                    </td>
+                    <td class="book-title-cell">
+                        <button 
+                            class="book-title-button ${st.bookTitle ? '' : 'empty'}" 
+                            data-page-id="${st.pageId}" 
+                            data-relation-id="${st.bookRelationId || ''}"
+                            onclick="openBookSearchModal(this)">
+                            ${st.bookTitle || '책 검색...'}
+                        </button>
+                    </td>
+                    <td>${st.bookSeries || '-'}</td>
+                    <td>${st.bookAR ?? '-'}</td>
+                    <td>${st.bookLexile ?? '-'}</td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, 'Writing', st.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'], '---')}
+                    </td>
+                </tr>`).join('');
+        }
         
-        // [새 함수] Enter 키를 Tab처럼 사용
-        function handleEnterAsTab(event) {
+        function handleEnterAsTab(event, tableBodyId) {
             if (event.key === 'Enter') {
-                event.preventDefault(); // 기본 Enter 동작 방지
-                const formElements = Array.from(document.querySelectorAll('#testsTableBody input, #testsTableBody select'));
+                event.preventDefault(); 
+                const formElements = Array.from(document.querySelectorAll(`#${tableBodyId} input, #${tableBodyId} select`));
                 const currentIndex = formElements.indexOf(event.target);
                 const nextElement = formElements[currentIndex + 1];
                 if (nextElement) {
                     nextElement.focus();
-                    if (nextElement.select) nextElement.select(); // input text/number의 경우 텍스트 전체 선택
+                    if (nextElement.select) nextElement.select(); 
                 } else {
-                    event.target.blur(); // 다음 요소가 없으면 포커스 해제
+                    event.target.blur(); 
                 }
             }
         }
@@ -384,28 +602,65 @@
         // --- Helper Functions (Styling & Formatting) ---
         function getReadingResultClass(result) { if (result === 'PASS') return 'result-pass'; if (result === 'FAIL') return 'result-fail'; return 'result-none'; }
         
-        function formatSelectDropdown(pageId, propertyName, currentValue, options) {
-            const defaultOption = '숙제없음';
-            const displayValue = options.includes(currentValue) ? currentValue : defaultOption;
-            return `<select class="homework-dropdown" data-page-id="${pageId || ''}" data-property-name="${propertyName}" data-property-type="select" onchange="updateField(this)">
+        // [수정] 범용 Select 드롭다운 (옵션, 기본값, 색상 매핑 포함)
+        function formatSelectDropdown(pageId, propertyName, currentValue, options, defaultValue = '---') { // 기본값을 '---'로 변경
+            const displayValue = (currentValue && options.includes(currentValue)) ? currentValue : ""; // null이나 기본값은 "" (빈 값)으로 처리
+            const statusClass = getSelectStatusClass(propertyName, currentValue); // [수정] currentValue로 클래스 계산
+            
+            // [수정] defaultValue가 '---'일 때 <option value="">---</option>를 생성
+            const defaultOptionHtml = (defaultValue === '---') 
+                ? `<option value="" ${displayValue === "" ? 'selected' : ''}>---</option>`
+                : `<option value="${defaultValue}" ${displayValue === defaultValue ? 'selected' : ''}>${defaultValue}</option>`;
+
+            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId || ''}" data-property-name="${propertyName}" data-property-type="select" onchange="updateField(this)">
+                        ${defaultOptionHtml}
                         ${options.map(option => `<option value="${option}" ${option === displayValue ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
         }
         
         function formatHomeworkDropdown(pageId, propertyName, currentStatus) {
             const options = ['숙제 함', '안 해옴', '숙제 없음'];
-            const statusClass = getHomeworkStatusClass(currentStatus);
             const displayStatus = options.includes(currentStatus) ? currentStatus : '숙제 없음';
+            const statusClass = getSelectStatusClass(propertyName, displayStatus); // 공통 함수 사용
+            
             return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId || ''}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
                         ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
         }
         
-        function getHomeworkStatusClass(status) { if (status === '숙제 함') return 'status-complete'; if (status === '안 해옴') return 'status-incomplete'; return 'status-none'; }
+        // [신규] 드롭다운 값에 따른 색상 클래스 반환 (공통)
+        function getSelectStatusClass(propertyName, value) {
+            // 1. 숙제 현황 (Status)
+            if (['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'].includes(propertyName)) {
+                if (value === '숙제 함') return 'status-complete';
+                if (value === '안 해옴') return 'status-incomplete';
+                return 'status-none'; // 숙제 없음
+            }
+            // 2. 원서 독서 (Select)
+            if (propertyName === '📖 영어독서') {
+                if (value === '완료함') return 'status-reading-complete';
+                if (value === '못함') return 'status-reading-incomplete';
+            }
+            if (propertyName === '어휘학습') {
+                if (value === '완료함' || value === '완료') return 'status-vocab-complete';
+                if (value === '못함') return 'status-vocab-incomplete';
+                if (value === 'SKIP') return 'status-vocab-skip';
+            }
+            if (propertyName === 'Writing') {
+                if (value === '북리포트') return 'status-writing-bookreport';
+                if (value === '3 SENTENCE') return 'status-writing-3sentence';
+                if (value === 'SKIP') return 'status-writing-skip';
+            }
+            // 3. 테스트 (Select)
+            if (propertyName === '독해 하브루타') {
+                if (value === '완료함') return 'status-complete';
+                if (value === '못하고감') return 'status-incomplete';
+            }
+            return 'status-default'; // 기본
+        }
         
         function rateClass(r){ if(r>=90)return'rate-excellent'; if(r>=70)return'rate-good'; return'rate-poor'; }
 
-        // [수정됨] 점수(숫자)를 받아 스타일 반환
         function getScoreStyle(score) {
             let color = '#ef4444'; // 40점 미만 (빨강)
             if (score >= 80) color = '#10b981'; // 80점 이상 (초록)
@@ -414,7 +669,6 @@
             return `style="--score-color: ${color}; --score-value: ${score}%"`;
         }
 
-        // [수정됨] 점수(숫자)를 받아 그래프 HTML 반환
         function formatScoreCircle(score) {
             if (score === null || isNaN(score) || score === 0) return '<span class="score-none">-</span>'; // 0점이나 null이면 - 표시
             const style = getScoreStyle(score);
@@ -430,74 +684,90 @@
              console.log(`개별 새로고침 요청: ${pageId}`);
              buttonElement.classList.add('loading'); buttonElement.disabled = true;
              try {
-                 const response = await fetch(`/api/student-homework/${pageId}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                 if (!response.ok) { throw new Error('데이터 조회 실패'); }
-                 const result = await response.json();
-                 if (result.success) {
-                     const row = buttonElement.closest('tr');
-                     if (row) {
+                const response = await fetch(`${API_BASE_URL}/api/student-homework/${pageId}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                if (!response.ok) { throw new Error('데이터 조회 실패'); }
+                const result = await response.json();
+                if (result.success) {
+                    const row = buttonElement.closest('tr');
+                    if (row) {
                         const rateSpan = row.querySelector('.completion-rate');
                         if (rateSpan) {
-                             rateSpan.textContent = `${result.completionRate || 0}%`;
-                             rateSpan.className = `completion-rate ${rateClass(result.completionRate)}`;
-                             showToast(`${result.studentName} 학생 정보 업데이트 완료`, 'success');
+                            rateSpan.textContent = `${result.completionRate || 0}%`;
+                            rateSpan.className = `completion-rate ${rateClass(result.completionRate)}`;
+                            showToast(`${result.studentName} 학생 정보 업데이트 완료`, 'success');
                         }
-                     }
-                 } else { throw new Error(result.message || '데이터 업데이트 실패'); }
+                    }
+                } else { throw new Error(result.message || '데이터 업데이트 실패'); }
              } catch (error) {
-                 console.error('개별 학생 새로고침 오류:', error);
-                 showToast(`새로고침 실패: ${error.message}`, 'error');
+                console.error('개별 학생 새로고침 오류:', error);
+                showToast(`새로고침 실패: ${error.message}`, 'error');
              } finally {
-                 buttonElement.classList.remove('loading'); buttonElement.disabled = false;
+                buttonElement.classList.remove('loading'); buttonElement.disabled = false;
              }
         }
 
         function updateStats(data){
-             const container = document.getElementById('statsContainer_hw');
-             if (!container) return;
-             if(!data || !data.length){ container.innerHTML = `<div class="stat-card"><div class="stat-value">0</div><div class="stat-label">총 학생 수</div></div><div class="stat-card"><div class="stat-value">0%</div><div class="stat-label">평균 수행율</div></div><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">우수 학생</div></div>`; return; }
-             
-             // '오늘' 데이터만 필터링 (통계용)
-             const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-             const todayData = data.filter(item => item.date === today);
+            const container = document.getElementById('statsContainer_hw');
+            if (!container) return;
+            if(!data || !data.length){ container.innerHTML = `<div class="stat-card"><div class="stat-value">0</div><div class="stat-label">총 학생 수</div></div><div class="stat-card"><div class="stat-value">0%</div><div class="stat-label">평균 수행율</div></div><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">우수 학생</div></div>`; return; }
+            
+            // '오늘' 데이터만 필터링 (통계용) - '오늘' 필터가 활성화되었는지 확인
+            const isTodayFilter = document.getElementById('periodFilter_hw').value === 'today';
+            const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            const statsData = isTodayFilter ? data.filter(item => item.date === today) : data; // 오늘 필터일 때만 오늘 날짜로, 아니면 전체 데이터로
+            const labelSuffix = isTodayFilter ? " (오늘)" : "";
 
-             const uniqueStudents = new Set(todayData.map(item => item.studentName));
-             const totalStudents = uniqueStudents.size;
-             const avg = todayData.length > 0 ? Math.round(todayData.reduce((s,x)=>s+(x.completionRate||0),0)/todayData.length) : 0;
-             const excellentStudents = new Set(todayData.filter(x => (x.completionRate || 0) === 100).map(item => item.studentName)).size;
+            const uniqueStudents = new Set(statsData.map(item => item.studentName));
+            const totalStudents = uniqueStudents.size;
+            const avg = statsData.length > 0 ? Math.round(statsData.reduce((s,x)=>s+(x.completionRate||0),0)/statsData.length) : 0;
+            const excellentStudents = new Set(statsData.filter(x => (x.completionRate || 0) === 100).map(item => item.studentName)).size;
 
-             container.innerHTML=`<div class="stat-card"><div class="stat-value">${totalStudents}</div><div class="stat-label">총 학생 수 (오늘)</div></div><div class="stat-card"><div class="stat-value">${avg}%</div><div class="stat-label">평균 수행율 (오늘)</div></div><div class="stat-card"><div class="stat-value">${excellentStudents}</div><div class="stat-label">우수 학생 (100%)</div></div>`;
+            container.innerHTML=`<div class="stat-card"><div class="stat-value">${totalStudents}</div><div class="stat-label">총 학생 수${labelSuffix}</div></div><div class="stat-card"><div class="stat-value">${avg}%</div><div class="stat-label">평균 수행율${labelSuffix}</div></div><div class="stat-card"><div class="stat-value">${excellentStudents}</div><div class="stat-label">우수 학생 (100%)${labelSuffix}</div></div>`;
         }
 
         function updateTeacherFilterOptions(teachers){
-             const selHw = document.getElementById('teacherFilter_hw');
-             const selTest = document.getElementById('teacherFilter_test');
-             if (!selHw || !selTest) return;
-             while(selHw.children.length > 1) selHw.removeChild(selHw.lastChild);
-             while(selTest.children.length > 1) selTest.removeChild(selTest.lastChild);
-             teachers.forEach(t=>{
-                 const o = document.createElement('option'); o.value=t.name; o.textContent=t.name;
-                 selHw.appendChild(o.cloneNode(true));
-                 selTest.appendChild(o);
-             });
-             if (currentUserRole !== 'manager') {
-                 selHw.value = currentUserName; selHw.disabled = true;
-                 selTest.value = currentUserName; selTest.disabled = true;
-             } else {
-                 selHw.disabled = false; selTest.disabled = false;
-             }
+            const selectors = [
+                document.getElementById('teacherFilter_hw'),
+                document.getElementById('teacherFilter_test'),
+                document.getElementById('teacherFilter_reading')
+            ];
+            
+            selectors.forEach(sel => {
+                 if (!sel) return;
+                 while(sel.children.length > 1) sel.removeChild(sel.lastChild); // '전체 보기' 옵션 남기기
+                 
+                 teachers.forEach(t=>{
+                     const o = document.createElement('option'); o.value=t.name; o.textContent=t.name;
+                     sel.appendChild(o.cloneNode(true));
+                 });
+
+                 if (currentUserRole !== 'manager') {
+                    // [수정] 선생님일 경우, '전체 보기' 옵션을 숨기고 본인 이름으로 강제 선택
+                    sel.querySelector('option[value=""]').style.display = 'none'; // '전체 보기' 숨기기
+                    
+                    // 본인 이름 옵션 추가 (만약 목록에 없다면)
+                    if (!teachers.find(t => t.name === currentUserName)) {
+                         const o = document.createElement('option'); o.value=currentUserName; o.textContent=currentUserName;
+                         sel.appendChild(o);
+                    }
+                    sel.value = currentUserName; 
+                    sel.disabled = true;
+                 } else {
+                     sel.querySelector('option[value=""]').style.display = 'block'; // '전체 보기' 보이기
+                     sel.disabled = false;
+                 }
+            });
         }
 
-        // [수정됨] 범용 필드 업데이트 함수
+        // [수정됨] 범용 필드 업데이트 함수 (submitUpdate 호출)
         async function updateField(element) {
             const pageId = element.getAttribute('data-page-id');
             const propertyName = element.getAttribute('data-property-name');
             const propertyType = element.getAttribute('data-property-type');
             let newValue = element.value;
-            const tagName = element.tagName.toUpperCase();
             let originalValue;
 
-            if (tagName === 'INPUT') { // input (text, number)
+            if (element.tagName.toUpperCase() === 'INPUT') {
                 originalValue = element.defaultValue;
                 if (propertyType === 'number') {
                     newValue = (newValue === '') ? null : Number(newValue);
@@ -509,11 +779,17 @@
 
             if (!pageId || !propertyName) { showToast('업데이트 정보 부족', 'error'); return; }
 
+            // [신규] 공통 업데이트 로직 호출
+            await submitUpdate(pageId, propertyName, newValue, propertyType, element, originalValue);
+        }
+
+        // [신규] 공통 업데이트 제출 함수 (관계형/일반 필드 모두 사용)
+        async function submitUpdate(pageId, propertyName, newValue, propertyType, element = null, originalValue = null) {
             console.log('필드 업데이트 요청:', { pageId, propertyName, newValue, propertyType });
-            element.disabled = true; element.style.opacity = '0.6';
+            if (element) { element.disabled = true; element.style.opacity = '0.6'; }
 
             try {
-                const response = await fetch('/api/update-homework', {
+                const response = await fetch(`${API_BASE_URL}/api/update-homework`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ pageId, propertyName, newValue, propertyType })
@@ -526,49 +802,130 @@
                 showToast('저장되었습니다!', 'success');
                 console.log('필드 업데이트 성공:', result);
 
-                 if (tagName === 'INPUT') {
-                     element.defaultValue = element.value; // input의 기본값 업데이트
-                 }
-                 if (tagName === 'SELECT') {
-                    // select의 기본 selected 속성 업데이트
-                    Array.from(element.options).forEach(opt => opt.defaultSelected = false);
-                    const newSelectedOption = element.querySelector(`option[value="${newValue}"]`);
-                    if(newSelectedOption) newSelectedOption.defaultSelected = true;
-                    if (propertyType === 'status') {
-                         element.className = `homework-dropdown ${getHomeworkStatusClass(newValue)}`;
+                // --- UI 즉시 업데이트 ---
+                if (element) {
+                    const tagName = element.tagName.toUpperCase();
+                    if (tagName === 'INPUT') {
+                        element.defaultValue = element.value; // input의 기본값 업데이트
                     }
-                 }
-                 
-                 // [수정] 점수 변경 시, 해당 행의 점수 그래프 즉시 업데이트
-                 const row = element.closest('tr');
-                 if (row && (propertyName === '단어 (맞은 개수)' || propertyName === '단어 (전체 개수)')) {
-                     const correct = Number(row.querySelector('[data-property-name="단어 (맞은 개수)"]').value);
-                     const total = Number(row.querySelector('[data-property-name="단어 (전체 개수)"]').value);
-                     const newScore = (total > 0) ? Math.round((correct / total) * 100) : 0;
-                     row.querySelector('.vocab-score').innerHTML = formatScoreCircle(newScore);
-                 }
-                 if (row && (propertyName === '문법 (전체 개수)' || propertyName === '문법 (틀린 개수)')) {
-                     const total = Number(row.querySelector('[data-property-name="문법 (전체 개수)"]').value);
-                     const wrong = Number(row.querySelector('[data-property-name="문법 (틀린 개수)"]').value);
-                     const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0;
-                     row.querySelector('td:last-child').innerHTML = formatScoreCircle(newScore); // 문법 점수는 마지막 셀
-                 }
+                    if (tagName === 'SELECT') {
+                        // select의 기본 selected 속성 업데이트
+                        Array.from(element.options).forEach(opt => opt.defaultSelected = false);
+                        const newSelectedOption = Array.from(element.options).find(opt => opt.value == newValue); // newValue가 null/""일 수 있으므로 == 사용
+                        if(newSelectedOption) {
+                            newSelectedOption.defaultSelected = true;
+                        } else {
+                            // 값에 해당하는 옵션이 없으면 (e.g., '---' 선택)
+                            element.options[0].defaultSelected = true;
+                        }
+                        
+                        // 공통 스타일 함수로 클래스 업데이트
+                        element.className = `homework-dropdown ${getSelectStatusClass(propertyName, newValue)}`;
+                    }
+                }
+                
+                const row = element?.closest('tr');
+                if (row && (propertyName === '단어 (맞은 개수)' || propertyName === '단어 (전체 개수)')) {
+                    const correct = Number(row.querySelector('[data-property-name="단어 (맞은 개수)"]').value);
+                    const total = Number(row.querySelector('[data-property-name="단어 (전체 개수)"]').value);
+                    const newScore = (total > 0) ? Math.round((correct / total) * 100) : 0;
+                    row.querySelector('.vocab-score').innerHTML = formatScoreCircle(newScore);
+                }
+                if (row && (propertyName === '문법 (전체 개수)' || propertyName === '문법 (틀린 개수)')) {
+                    const total = Number(row.querySelector('[data-property-name="문법 (전체 개수)"]').value);
+                    const wrong = Number(row.querySelector('[data-property-name="문법 (틀린 개수)"]').value);
+                    const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0;
+                    row.querySelector('.grammar-score').innerHTML = formatScoreCircle(newScore);
+                }
 
-                 // 수행율 새로고침 버튼이 있다면 즉시 호출
-                 const refreshButton = row?.querySelector('.refresh-rate-btn');
-                 if (refreshButton) {
-                     refreshStudentRate(refreshButton, pageId);
-                 }
+                // [수정] 관계형(책 제목) 업데이트 시, 전체 새로고침 대신 '개별 행' 새로고침
+                if (propertyType === 'relation') {
+                    showToast('책 정보를 업데이트합니다. 롤업 계산 후 새로고침됩니다...', 'success');
+                    refreshReadingRow(pageId); // 1초 대기는 이 함수 안에서 처리
+                } else {
+                    // 수행율 새로고침 버튼이 있다면 즉시 호출 (숙제 탭)
+                    const refreshButton = row?.querySelector('.refresh-rate-btn');
+                    if (refreshButton) {
+                        refreshStudentRate(refreshButton, pageId);
+                    }
+                }
 
             } catch (error) {
                 console.error('필드 업데이트 오류:', error);
-                element.value = originalValue || ''; // 실패 시 원래 값으로 복구
-                if (tagName === 'SELECT' && propertyType === 'status') element.className = `homework-dropdown ${getHomeworkStatusClass(originalValue)}`;
+                if (element) {
+                    element.value = originalValue || ''; // 실패 시 원래 값으로 복구
+                    if (element.tagName.toUpperCase() === 'SELECT') {
+                        element.className = `homework-dropdown ${getSelectStatusClass(propertyName, originalValue)}`;
+                    }
+                }
                 showToast(`업데이트 실패: ${error.message}`, 'error');
             } finally {
-                element.disabled = false; element.style.opacity = '1';
+                if (element) { element.disabled = false; element.style.opacity = '1'; }
             }
         }
+
+        // [신규] 원서 독서 현황 한 줄(row) 새로고침
+        async function refreshReadingRow(pageId) {
+            if (!pageId) return;
+
+            const row = document.getElementById(`row-reading-${pageId}`);
+            if (!row) return;
+
+            // 로딩 스피너 표시 (임시)
+            row.style.opacity = '0.5';
+            
+            try {
+                // 1초 대기 (노션 롤업 계산 시간)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const response = await fetch(`${API_BASE_URL}/api/reading-status/${pageId}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+
+                if (!response.ok) {
+                    throw new Error('학생 정보를 새로고침하지 못했습니다.');
+                }
+                const st = await response.json(); // 한 명의 학생 데이터 (st)
+
+                // 새 row HTML 생성
+                const newRowContent = `
+                    <td class="student-name">${st.studentName || '이름 없음'}</td>
+                    <td>${(st.teachers || []).join(', ') || '미배정'}</td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, '📖 영어독서', st.readingStatus, ['완료함', '못함'], '---')}
+                    </td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, '어휘학습', st.vocabStatus, ['완료함', '못함', 'SKIP', '완료'], '---')}
+                    </td>
+                    <td class="book-title-cell">
+                        <button 
+                            class="book-title-button ${st.bookTitle ? '' : 'empty'}" 
+                            data-page-id="${st.pageId}" 
+                            data-relation-id="${st.bookRelationId || ''}"
+                            onclick="openBookSearchModal(this)">
+                            ${st.bookTitle || '책 검색...'}
+                        </button>
+                    </td>
+                    <td>${st.bookSeries || '-'}</td>
+                    <td>${st.bookAR ?? '-'}</td>
+                    <td>${st.bookLexile ?? '-'}</td>
+                    <td>
+                        ${formatSelectDropdown(st.pageId, 'Writing', st.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'], '---')}
+                    </td>
+                `;
+                
+                // row의 내용만 교체
+                row.innerHTML = newRowContent;
+                row.style.opacity = '1';
+                showToast(`${st.studentName} 학생 롤업 정보 업데이트 완료!`, 'success');
+
+            } catch (error) {
+                console.error('개별 행 새로고침 오류:', error);
+                showToast(error.message, 'error');
+                if (row) row.style.opacity = '1';
+            }
+        }
+
 
         function showToast(message, type = 'success') {
              const existingToast = document.querySelector('.toast-message');
@@ -583,21 +940,6 @@
                  setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
              }, 3000);
         }
-
-        // 필터 변경 이벤트 리스너 (각 탭 필터에 맞게 수정)
-        ['hw', 'test'].forEach(suffix => {
-            const teacherFilter = document.getElementById(`teacherFilter_${suffix}`);
-            if(teacherFilter) teacherFilter.addEventListener('change', loadDataForCurrentTab);
-            
-            const periodFilter = document.getElementById(`periodFilter_${suffix}`);
-            if(periodFilter) periodFilter.addEventListener('change', loadDataForCurrentTab);
-            
-            const startDate = document.getElementById(`startDate_${suffix}`);
-            if(startDate) startDate.addEventListener('change', loadDataForCurrentTab);
-            
-            const endDate = document.getElementById(`endDate_${suffix}`);
-            if(endDate) endDate.addEventListener('change', loadDataForCurrentTab);
-        });
 
         function logout(){ localStorage.removeItem('teacher_auth_token'); alert("로그아웃 되었습니다."); window.location.href='/teacher-login'; }
         
@@ -626,21 +968,134 @@
             loadDataForCurrentTab();
         }
 
+        // [수정] 탭 전환 시 필터 값 동기화 (모든 탭 기준)
         function syncFilters(targetTabName) {
-            const targetSuffix = (targetTabName === 'tests') ? '_test' : '_hw';
-            const sourceSuffix = (targetTabName === 'tests') ? '_hw' : '_test';
+            // [수정] 소스 탭을 'homework'로 고정 (homework가 기준)
+            const sourceTabName = 'homework';
+            if (targetTabName === sourceTabName) { // '숙제 현황' 탭이 로드될 때
+                 toggleCustomDateInputs('_hw'); // [신규] 본인 탭의 커스텀 날짜 인풋 확인
+                 return; // 같은 탭이면 동기화 불필요
+            }
 
-            const period = document.getElementById(`periodFilter${sourceSuffix}`)?.value;
-            if(period) document.getElementById(`periodFilter${targetSuffix}`).value = period;
-            const start = document.getElementById(`startDate${sourceSuffix}`)?.value;
-            if(start) document.getElementById(`startDate${targetSuffix}`).value = start;
-            const end = document.getElementById(`endDate${sourceSuffix}`)?.value;
-            if(end) document.getElementById(`endDate${targetSuffix}`).value = end;
-            const teacher = document.getElementById(`teacherFilter${sourceSuffix}`)?.value;
-            if(teacher) document.getElementById(`teacherFilter${targetSuffix}`).value = teacher;
+            function getSuffixForTab(tabName) {
+                if (tabName === 'homework') return '_hw';
+                if (tabName === 'tests') return '_test'; 
+                if (tabName === 'reading') return '_reading';
+                return ''; 
+            }
+
+            const sourceSuffix = getSuffixForTab(sourceTabName); // _hw
+            const targetSuffix = getSuffixForTab(targetTabName); // _test 또는 _reading
             
-            toggleCustomDateInputs(targetSuffix);
+            if (!sourceSuffix || !targetSuffix) return; // [신규] 유효하지 않은 탭이면 중단
+
+            const periodEl = document.getElementById(`periodFilter${sourceSuffix}`);
+            const periodTargetEl = document.getElementById(`periodFilter${targetSuffix}`);
+            if(periodEl && periodTargetEl) periodTargetEl.value = periodEl.value;
+            
+            const startEl = document.getElementById(`startDate${sourceSuffix}`);
+            const startTargetEl = document.getElementById(`startDate${targetSuffix}`);
+            if(startEl && startTargetEl) startTargetEl.value = startEl.value;
+            
+            const endEl = document.getElementById(`endDate${sourceSuffix}`);
+            const endTargetEl = document.getElementById(`endDate${targetSuffix}`);
+            if(endEl && endTargetEl) endTargetEl.value = endEl.value;
+            
+            const teacherEl = document.getElementById(`teacherFilter${sourceSuffix}`);
+            const teacherTargetEl = document.getElementById(`teacherFilter${targetSuffix}`);
+            if(teacherEl && teacherTargetEl) teacherTargetEl.value = teacherEl.value;
+            
+            toggleCustomDateInputs(targetSuffix); // _hw, _test, _reading 중 하나를 전달
         }
+
+        // --- [신규] 책 검색 모달 관련 함수 ---
+        function openBookSearchModal(buttonElement) {
+            currentModalContext.pageId = buttonElement.getAttribute('data-page-id');
+            const currentTitle = buttonElement.textContent.trim();
+            
+            const modal = document.getElementById('bookSearchModal');
+            const input = document.getElementById('modalSearchInput');
+            
+            if (currentTitle !== '책 검색...') {
+                input.value = currentTitle;
+            } else {
+                input.value = '';
+            }
+            
+            modal.classList.add('show');
+            input.focus();
+            searchBooks(input.value); // 현재 값으로 즉시 검색
+        }
+        
+        function closeBookSearchModal() {
+             document.getElementById('bookSearchModal').classList.remove('show');
+             currentModalContext = {}; // 컨텍스트 초기화
+        }
+
+        async function searchBooks(query) {
+            const resultsList = document.getElementById('modalSearchResults');
+            if (!query || query.trim().length < 2) {
+                resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 2자 이상 입력해주세요.</div>';
+                return;
+            }
+            resultsList.innerHTML = '<div class="loading" style="padding: 30px;">검색 중...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (!response.ok) throw new Error('검색 API 오류');
+                const books = await response.json();
+                
+                if (books.length === 0) {
+                    resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색 결과가 없습니다.</div>';
+                    return;
+                }
+                
+                resultsList.innerHTML = books.map(book => `
+                    <div class="result-item" onclick="selectBook('${book.id}', '${book.title.replace(/'/g, "\\'")}')">
+                        <div class="result-title">${book.title}</div>
+                        <div class="result-meta">저자: ${book.author || 'N/A'} | 레벨: ${book.level || 'N/A'}</div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error("책 검색 오류:", error);
+                resultsList.innerHTML = '<div class="no-data" style="color: red; padding: 30px;">검색 중 오류 발생</div>';
+            }
+        }
+
+        async function selectBook(bookPageId, bookTitle) { // bookTitle은 '책 검색...'이 될 수도 있음
+            if (!currentModalContext.pageId) return;
+
+            const pageId = currentModalContext.pageId;
+
+            // 1. 모달 닫기
+            closeBookSearchModal();
+            
+            // 2. UI 즉시 업데이트 (버튼 텍스트 변경)
+            const buttonElement = document.querySelector(`.book-title-button[data-page-id="${pageId}"]`);
+            if (buttonElement) {
+                buttonElement.textContent = bookTitle;
+                if (bookPageId) {
+                    buttonElement.classList.remove('empty');
+                    buttonElement.setAttribute('data-relation-id', bookPageId);
+                } else {
+                    buttonElement.classList.add('empty');
+                    buttonElement.setAttribute('data-relation-id', '');
+                }
+            }
+            
+            // 3. 서버에 업데이트 요청 (공통 함수 사용)
+            await submitUpdate(
+                pageId, 
+                '오늘 읽은 영어 책', // 노션의 '관계형' 속성 이름
+                bookPageId, // null 또는 pageId
+                'relation' // 타입
+            );
+        }
+
     </script>
 </body>
 </html>
+
