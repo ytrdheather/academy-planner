@@ -65,6 +65,7 @@ app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.ht
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
+app.get('/management', (req, res) => res.sendFile(path.join(publicPath, 'views', 'management.html'))); // [신규] 학생 명부 관리 페이지
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
@@ -78,20 +79,20 @@ const getRollupValue = (prop, isNumber = false) => {
         if (firstItem.type === 'title' && firstItem.title.length > 0) return firstItem.title[0].plain_text;
         if (firstItem.type === 'rich_text' && firstItem.rich_text.length > 0) return firstItem.rich_text[0].plain_text;
         if (firstItem.type === 'number') return firstItem.number;
-        if (firstItem.type === 'relation') return ''; // 관계형 자체는 빈값 처리 (relation 배열 확인 불필요)
+        if (firstItem.type === 'relation') return ''; // 관계형 자체는 빈값 처리
         if (firstItem.type === 'formula') {
             if (firstItem.formula.type === 'string') return firstItem.formula.string;
             if (firstItem.formula.type === 'number') return firstItem.formula.number;
         }
     }
-    if (prop.rollup.type === 'formula') { // 롤업 속성 자체가 수식인 경우
+    if (prop.rollup.type === 'formula') {
         if (prop.rollup.formula.type === 'number') return prop.rollup.formula.number;
         if (prop.rollup.formula.type === 'string') return prop.rollup.formula.string;
     }
     return isNumber ? null : '';
 };
 
-// --- 헬퍼 함수: 리스닝 현황 파싱 ---
+// --- 헬퍼 함수: 리스닝 현황 파싱 (교재 컬럼 제거) ---
 function parseListeningPageData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
@@ -101,12 +102,16 @@ function parseListeningPageData(page) {
         assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean);
     }
     return {
-        pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers,
-        listeningTextbook: getRollupValue(props['🎧 리스닝 교재 (롤업)']), // 롤업 속성 사용
+        pageId: page.id,
+        studentName,
+        date: pageDate,
+        teachers: assignedTeachers,
+        // listeningTextbook: ... (제거됨)
         listeningStudy: props['영어 더빙 학습 완료']?.status?.name || '진행하지 않음',
         listeningWorkbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음'
     };
 }
+
 
 // --- 헬퍼 함수: 원서 독서 현황 파싱 ---
 function parseReadingPageData(page) {
@@ -129,6 +134,42 @@ function parseReadingPageData(page) {
         writingStatus: props['Writing']?.select?.name || '',
     };
 }
+
+// --- 헬퍼 함수: 오늘의 코멘트 파싱 ---
+function parseCommentPageData(page) {
+    const props = page.properties;
+    const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
+    const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
+    let assignedTeachers = [];
+    if (props['담당쌤']?.rollup?.array) {
+        assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean);
+    }
+    return {
+        pageId: page.id,
+        studentName,
+        date: pageDate,
+        teachers: assignedTeachers,
+        grammarClass: getRollupValue(props['문법클래스']),
+        comment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || ''
+    };
+}
+
+// --- [신규] 헬퍼 함수: 학생 명부 파싱 ---
+function parseStudentRosterData(page) {
+    const props = page.properties;
+    return {
+        pageId: page.id,
+        studentName: props['이름']?.title?.[0]?.plain_text || '이름없음',
+        grade: getRollupValue(props['1. 학년']) || getRollupValue(props['학년']), // '1. 학년' 또는 '학년' 롤업
+        school: getRollupValue(props['2. 학교']) || getRollupValue(props['학교']), // '2. 학교' 또는 '학교' 롤업
+        // '영어 더빙 OR 듣기 교재' (관계형) ID 배열
+        listeningBookRelationIds: props['영어 더빙 OR 듣기 교재']?.relation?.map(r => r.id) || [],
+        // '영어 더빙 OR 듣기 교재'의 텍스트 (롤업 또는 수식)
+        // (이전 스크린샷에서 확인한 롤업 이름 사용)
+        listeningBookTitle: getRollupValue(props['🎧 리스닝 교재 (롤업)']) || '' 
+    };
+}
+
 
 // --- [공통] 데이터 조회 함수 ---
 async function fetchProgressData(req, parseFunction) {
@@ -179,7 +220,7 @@ async function fetchProgressData(req, parseFunction) {
 // 숙제 현황 조회 API
 app.get('/api/homework-status', requireAuth, async (req, res) => {
     try {
-        const parseHomeworkTestData = (page) => { // 파싱 함수 내부 정의
+        const parseHomeworkTestData = (page) => {
             const props = page.properties;
             const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
             const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
@@ -209,7 +250,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
             };
             return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: Math.round(performanceRate), ...homeworkStatuses, ...testResults };
         };
-        const data = await fetchProgressData(req, parseHomeworkTestData); // 공통 함수 호출
+        const data = await fetchProgressData(req, parseHomeworkTestData);
         res.json(data);
     } catch (error) { console.error('숙제 및 테스트 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
 });
@@ -217,7 +258,7 @@ app.get('/api/homework-status', requireAuth, async (req, res) => {
 // 리스닝 현황 조회 API
 app.get('/api/listening-status', requireAuth, async (req, res) => {
     try {
-        const data = await fetchProgressData(req, parseListeningPageData); // 공통 함수 호출
+        const data = await fetchProgressData(req, parseListeningPageData);
         res.json(data);
     } catch (error) { console.error('리스닝 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
 });
@@ -225,9 +266,50 @@ app.get('/api/listening-status', requireAuth, async (req, res) => {
 // 원서 독서 현황 조회 API
 app.get('/api/reading-status', requireAuth, async (req, res) => {
     try {
-        const data = await fetchProgressData(req, parseReadingPageData); // 공통 함수 호출
+        const data = await fetchProgressData(req, parseReadingPageData);
         res.json(data);
     } catch (error) { console.error('원서 독서 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
+});
+
+// 오늘의 코멘트 조회 API
+app.get('/api/comment-status', requireAuth, async (req, res) => {
+    try {
+        const data = await fetchProgressData(req, parseCommentPageData);
+        res.json(data);
+    } catch (error) { console.error('오늘의 코멘트 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
+});
+
+// [신규] 학생 명부 조회 API
+app.get('/api/student-roster', requireAuth, async (req, res) => {
+    if (req.user.role !== 'manager') {
+        return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    }
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
+        if (!accessToken || !STUDENT_DB_ID) { throw new Error('서버 환경 변수가 설정되지 않았습니다.'); }
+        
+        const pages = [];
+        let hasMore = true;
+        let startCursor = undefined;
+        while (hasMore) {
+            const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+                body: JSON.stringify({
+                    sorts: [{ property: '이름', direction: 'ascending' }],
+                    page_size: 100, start_cursor: startCursor
+                })
+            });
+            if (!response.ok) { const errorText = await response.text(); throw new Error(`DB 조회 오류: ${response.status} - ${errorText}`); }
+            const data = await response.json(); pages.push(...data.results);
+            hasMore = data.has_more; startCursor = data.next_cursor;
+        }
+
+        const rosterData = pages.map(parseStudentRosterData);
+        res.json(rosterData);
+
+    } catch (error) { console.error('학생 명부 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
 });
 
 
@@ -262,8 +344,23 @@ app.get('/api/reading-status/:pageId', requireAuth, async (req, res) => {
     } catch (error) { console.error(`개별 학생 독서 조회 오류 (PageID: ${pageId}):`, error); res.status(500).json({ message: error.message || '서버 내부 오류' }); }
 });
 
+// 개별 학생 코멘트 조회 API
+app.get('/api/comment-status/:pageId', requireAuth, async (req, res) => {
+    const { pageId } = req.params;
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        if (!accessToken) { throw new Error('서버 토큰 오류'); }
+        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Notion-Version': '2022-06-28' }
+        });
+        if (!response.ok) { throw new Error(await response.text()); }
+        const pageData = await response.json();
+        res.json(parseCommentPageData(pageData));
+    } catch (error) { console.error(`개별 학생 코멘트 조회 오류 (PageID: ${pageId}):`, error); res.status(500).json({ message: error.message || '서버 내부 오류' }); }
+});
 
-// 업데이트 API
+
+// 업데이트 API (진도 관리 DB)
 app.post('/api/update-homework', requireAuth, async (req, res) => {
   const { pageId, propertyName, newValue, propertyType } = req.body;
   if (!pageId || !propertyName || newValue === undefined) { return res.status(400).json({ success: false, message: '필수 정보 누락' }); }
@@ -304,6 +401,42 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     res.json({ success: true, message: '업데이트 성공' });
   } catch (error) { console.error(`숙제 업데이트 처리 중 오류 (PageID: ${pageId}):`, error); res.status(500).json({ success: false, message: error.message || '서버 내부 오류' }); }
 });
+
+// [신규] 업데이트 API (학생 명부 DB)
+app.post('/api/update-student-roster', requireAuth, async (req, res) => {
+    if (req.user.role !== 'manager') {
+        return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    }
+    const { pageId, propertyName, newValue, propertyType } = req.body;
+    if (!pageId || !propertyName || newValue === undefined) { return res.status(400).json({ success: false, message: '필수 정보 누락' }); }
+    
+    // 이 API는 '학생 명부' DB를 업데이트하므로, pageId가 STUDENT_DATABASE_ID 소속인지
+    // 검증하는 로직이 추가되면 더 좋지만, 일단은 update-homework와 동일하게 구현합니다.
+    try {
+        const accessToken = process.env.NOTION_ACCESS_TOKEN;
+        if (!accessToken) { throw new Error('서버 토큰 오류'); }
+        let notionUpdatePayload;
+        switch (propertyType) {
+            case 'relation':
+                if (newValue === null || newValue === '') { notionUpdatePayload = { relation: [] }; }
+                else { notionUpdatePayload = { relation: [{ id: newValue }] }; } // 단일 관계형 연결
+                break;
+            // (추후 다른 속성 타입 추가 가능)
+            default:
+                return res.status(400).json({ success: false, message: '지원되지 않는 속성 타입입니다.' });
+        }
+        
+        const propertiesToUpdate = { [propertyName]: notionUpdatePayload };
+        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
+            body: JSON.stringify({ properties: propertiesToUpdate })
+        });
+        if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || `Notion API 업데이트 실패 (${response.status})`); }
+        res.json({ success: true, message: '학생 명부 업데이트 성공' });
+    } catch (error) { console.error(`학생 명부 업데이트 처리 중 오류 (PageID: ${pageId}):`, error); res.status(500).json({ success: false, message: error.message || '서버 내부 오류' }); }
+});
+
 
 // 개별 학생 수행율 새로고침 API
 app.get('/api/student-homework/:pageId', requireAuth, async (req, res) => {

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 명부 관리 - 리디튜드</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <style>
+        /* --- 기본 스타일 (teacher.html과 동일) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
+        body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
+        .container { max-width: 1400px; margin: 20px auto; background: none; box-shadow: none; overflow: visible; padding: 0 20px; }
+        
+        /* --- 헤더 (이 페이지 전용) --- */
+        .header { background: #ffffff; color: #6b46c1; padding: 20px 30px; text-align: left; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.8em; margin: 0; }
+        .close-btn { background: #6b46c1; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s ease; }
+        .close-btn:hover { background: #5a3eaa; }
+
+        /* --- 컨텐츠 공통 --- */
+        .content-section { background: white; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.05); border: 1px solid #e9ecef; padding: 30px; margin: 0 20px 30px; }
+        .section-title { font-size: 1.6em; font-weight: 700; color: #6b46c1; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
+        .section-title::before { content: "🧑‍🎓"; font-size: 1.2em; }
+        .loading, .no-data { text-align: center; padding: 60px; color: #718096; font-size: 16px; }
+        .loading::before { content: "⏳ "; } .no-data::before { content: "📝 "; }
+
+        /* --- 필터 --- */
+        .filters-container { display:flex; gap:15px; margin-bottom:25px; align-items:center; flex-wrap: wrap; }
+        .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .filter-group { display:flex; align-items:center; gap:8px; }
+        .filter-label { font-weight:600; color:#6b46c1; }
+        .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; background:white; font-size: 14px; }
+
+        /* --- 테이블 --- */
+        .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
+        .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); white-space: nowrap; }
+        .styled-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; border-right: 1px solid #f1f3f4; vertical-align: middle; font-size: 13px; }
+        .styled-table tr:hover { background-color: #f8f9ff; }
+        .student-name { font-weight: 600; color: #2d3748; font-size: 14px; background: #f9fafc; text-align: left; padding-left: 15px; }
+        .book-title-cell { padding: 5px !important; }
+        .book-title-button { width: 100%; min-height: 30px; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; background-color: transparent; cursor: pointer; text-align: left; font-size: 13px; color: #111827; transition: all 0.2s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+        .book-title-button:hover { border-color: #d1d5db; background-color: #f9fafb; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1); }
+        .book-title-button.empty { color: #6b7280; font-style: italic; text-align: center; }
+
+        /* --- 책 검색 모달 --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+        .modal-title { font-size: 1.4em; font-weight: 700; color: #6b46c1; margin-bottom: 20px; }
+        .modal-search-input { width: 100%; padding: 12px 15px; font-size: 16px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; }
+        .modal-search-results { max-height: 300px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 8px; }
+        .result-item { padding: 12px 15px; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+        .result-item:hover { background-color: #f8f9ff; }
+        .result-item:last-child { border-bottom: none; }
+        .result-title { font-weight: 600; color: #2d3748; }
+        .result-meta { font-size: 13px; color: #718096; margin-top: 4px; }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: space-between; }
+        .modal-btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-cancel { background: #f3f4f6; color: #4b5563; }
+        .btn-clear { background: #fee2e2; color: #991b1b; }
+
+        /* --- 토스트 메시지 --- */
+        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 3000; opacity: 0; transform: translateX(100%); transition: all 0.3s ease; }
+        .toast-message.show { opacity: 1; transform: translateX(0); }
+        .toast-success { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; }
+        .toast-error { background: #fecaca; border: 1px solid #fca5a5; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧑‍🎓 학생 명부 관리</h1>
+        <div class="user-info">
+            <button class="close-btn" onclick="window.close()">창 닫기</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="content-section">
+            <div class="filters-container">
+                <button class="refresh-btn" onclick="loadStudentRosterData()">🔄 새로고침</button>
+                <div class="filter-group">
+                    <label for="studentSearch_management" class="filter-label">학생 검색:</label>
+                    <input type="text" id="studentSearch_management" class="filter-input" placeholder="이름으로 검색...">
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>학생 이름</th>
+                            <th>학년</th>
+                            <th>학교</th>
+                            <th>영어 더빙 OR 듣기 교재 (수정)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="managementTableBody">
+                        <tr><td colspan="4" class="loading">학생 명부 데이터를 불러오는 중입니다...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 책 검색 모달 (공통 사용) ========== -->
+    <div id="bookSearchModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modalTitle">🎧 리스닝 교재 검색</h2>
+            <input type="text" id="modalSearchInput" class="modal-search-input" placeholder="검색어를 입력하세요...">
+            <div id="modalSearchResults" class="modal-search-results">
+                <div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn btn-clear" onclick="selectBook(null, '교재 없음')">🚫 관계 연결 해제</button>
+                <button class="modal-btn btn-cancel" onclick="closeBookSearchModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 전역 변수 및 초기화 ---
+        const API_BASE_URL = 'http://localhost:5001';
+        let authToken = localStorage.getItem('teacher_auth_token');
+        let allRosterData = []; // 학생 명부 데이터 캐시
+        let currentModalContext = {}; // { pageId, propertyName, type }
+        let bookSearchTimer = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) {
+                console.error('인증 토큰 없음');
+                alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+                window.location.href = '/teacher-login';
+                return;
+            }
+            initializePage();
+        });
+
+        async function initializePage() {
+            try {
+                await loadStudentRosterData();
+                setupEventListeners();
+            } catch (e) {
+                console.error("초기화 오류:", e);
+                const tbody = document.getElementById('managementTableBody');
+                tbody.innerHTML = `<tr><td colspan="4" class="no-data">${e.message || '페이지 로드 실패'}</td></tr>`;
+            }
+        }
+
+        function setupEventListeners() {
+            // 학생 명부 검색
+            document.getElementById('studentSearch_management')?.addEventListener('input', (e) => {
+                filterStudentRoster(e.target.value);
+            });
+
+            // 책 검색 모달 디바운스 입력
+            document.getElementById('modalSearchInput')?.addEventListener('input', (e) => {
+                clearTimeout(bookSearchTimer);
+                const query = e.target.value;
+                bookSearchTimer = setTimeout(() => {
+                    searchListeningBooks(query); // 이 페이지는 리스닝 교재만 검색
+                }, 300);
+            });
+            document.querySelector('.btn-cancel').addEventListener('click', closeBookSearchModal);
+        }
+
+        // --- 데이터 로드 함수 ---
+        async function loadStudentRosterData() {
+            const tbody = document.getElementById('managementTableBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="loading">로딩중...</td></tr>';
+            try {
+                const url = `${API_BASE_URL}/api/student-roster`;
+                const response = await fetch(url, { headers: { Authorization: 'Bearer ' + authToken } });
+                
+                if (response.status === 401) {
+                    alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                    window.location.href = '/teacher-login';
+                    return;
+                }
+                if (response.status === 403) {
+                     throw new Error('접근 권한이 없습니다. (매니저 계정 전용)');
+                }
+                if (!response.ok) { 
+                    const errorText = await response.text(); 
+                    throw new Error(errorText || "학생 명부 로드 실패"); 
+                }
+                
+                const rosterData = await response.json();
+                allRosterData = rosterData; // 캐시
+                displayStudentRosterData(rosterData);
+            } catch (e) {
+                console.error("학생 명부 로드 오류:", e);
+                tbody.innerHTML = `<tr><td colspan="4" class="no-data">${e.message || '로드 실패'}</td></tr>`;
+                throw e; // initializePage로 오류 전파
+            }
+        }
+
+        // --- UI 업데이트 함수 ---
+        function displayStudentRosterData(data) {
+            const tbody = document.getElementById('managementTableBody');
+            if (!data || !data.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">학생 데이터가 없습니다.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-management-${st.pageId}">
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${st.grade || '-'}</td>
+                    <td>${st.school || '-'}</td>
+                    <td class="book-title-cell">
+                        <button 
+                            class="book-title-button ${st.listeningBookTitle ? '' : 'empty'}" 
+                            data-page-id="${st.pageId}" 
+                            data-relation-ids="${(st.listeningBookRelationIds || []).join(',')}"
+                            onclick="openListeningBookModal(this)">
+                            ${st.listeningBookTitle || '교재 없음'}
+                        </button>
+                    </td>
+                </tr>`).join('');
+        }
+        
+        // 학생 명부 이름으로 필터링
+        function filterStudentRoster(query) {
+            const normalizedQuery = query.toLowerCase().trim();
+            if (!normalizedQuery) {
+                displayStudentRosterData(allRosterData); // 검색어 없으면 전체 표시
+                return;
+            }
+            const filteredData = allRosterData.filter(st => 
+                st.studentName.toLowerCase().includes(normalizedQuery)
+            );
+            displayStudentRosterData(filteredData);
+        }
+
+        // --- 책 검색 모달 관련 함수 ---
+        function openListeningBookModal(buttonElement) {
+            const pageId = buttonElement.getAttribute('data-page-id');
+            const currentTitle = buttonElement.textContent.trim();
+            currentModalContext = {
+                pageId: pageId, // 학생 명부 DB의 pageId
+                propertyName: '영어 더빙 OR 듣기 교재',
+                type: 'listeningBook'
+            };
+            
+            document.getElementById('modalTitle').textContent = '🎧 리스닝 교재 검색';
+            const input = document.getElementById('modalSearchInput');
+            if (currentTitle !== '교재 없음') { input.value = currentTitle; } else { input.value = ''; }
+            document.getElementById('bookSearchModal').classList.add('show');
+            input.focus();
+            searchListeningBooks(input.value); 
+        }
+
+        function closeBookSearchModal() { 
+            document.getElementById('bookSearchModal').classList.remove('show'); 
+            currentModalContext = {}; 
+        }
+
+        // 리스닝 교재 검색 (임시로 영어 원서 DB 사용)
+        async function searchListeningBooks(query) {
+             const resultsList = document.getElementById('modalSearchResults');
+            if (!query || query.trim().length < 2) { 
+                resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 2자 이상 입력해주세요.</div>'; 
+                return; 
+            }
+            resultsList.innerHTML = '<div class="loading" style="padding: 30px;">검색 중...</div>';
+            try {
+                // index.js의 /api/search-books 엔드포인트 사용
+                const response = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                if (!response.ok) throw new Error('검색 API 오류'); 
+                const books = await response.json();
+                if (books.length === 0) { 
+                    resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색 결과가 없습니다.</div>'; 
+                    return; 
+                }
+                resultsList.innerHTML = books.map(book => `
+                    <div class="result-item" onclick="selectBook('${book.id}', '${book.title.replace(/'/g, "\\'")}')">
+                        <div class="result-title">${book.title}</div>
+                        <div class="result-meta">저자: ${book.author || 'N/A'} | 레벨: ${book.level || 'N/A'}</div>
+                    </div>`).join('');
+            } catch (error) { 
+                console.error("리스닝 교재 검색 오류:", error); 
+                resultsList.innerHTML = '<div class="no-data" style="color: red; padding: 30px;">검색 중 오류 발생</div>'; 
+            }
+        }
+
+        // 선택한 책/교재를 업데이트
+        async function selectBook(bookPageId, bookTitle) {
+            if (!currentModalContext.pageId) return;
+            
+            const { pageId, propertyName } = currentModalContext;
+            const emptyTitle = '교재 없음';
+            
+            closeBookSearchModal();
+            
+            // 1. UI 즉시 업데이트
+            const buttonElement = document.querySelector(`#managementTableBody button[data-page-id="${pageId}"]`);
+            if (buttonElement) {
+                buttonElement.textContent = bookTitle || emptyTitle;
+                if (bookPageId) {
+                    buttonElement.classList.remove('empty');
+                    buttonElement.setAttribute('data-relation-id', bookPageId);
+                } else {
+                    buttonElement.classList.add('empty');
+                    buttonElement.setAttribute('data-relation-id', '');
+                }
+            }
+
+            // 2. 서버에 업데이트 요청
+            await submitUpdate(pageId, propertyName, bookPageId, 'relation', buttonElement);
+        }
+
+        // --- 서버 업데이트 함수 ---
+        async function submitUpdate(pageId, propertyName, newValue, propertyType, element = null) {
+            console.log('필드 업데이트 요청:', { pageId, propertyName, newValue, propertyType });
+            if (element) { 
+                element.disabled = true; 
+                element.style.opacity = '0.6'; 
+            }
+
+            try {
+                // 이 페이지는 항상 '학생 명부' API를 사용
+                const updateUrl = `${API_BASE_URL}/api/update-student-roster`;
+                
+                const response = await fetch(updateUrl, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
+                    body: JSON.stringify({ pageId, propertyName, newValue, propertyType }) 
+                });
+                
+                if (!response.ok) { 
+                    if (response.status === 401) { alert('로그인이 만료되었습니다.'); window.location.href = '/teacher-login'; return; } 
+                    const errorData = await response.json(); 
+                    throw new Error(errorData.message || '업데이트 실패'); 
+                }
+                
+                const result = await response.json(); 
+                showToast('저장되었습니다!', 'success');
+                console.log('필드 업데이트 성공:', result);
+                
+                // 롤업 값(교재명)이 변경되었을 수 있으므로 행을 새로고침
+                refreshStudentRosterRow(pageId); 
+
+            } catch (error) { 
+                console.error('필드 업데이트 오류:', error); 
+                showToast(`업데이트 실패: ${error.message}`, 'error'); 
+                // (오류 시 UI 롤백이 필요하면 여기 구현)
+            }
+            finally { 
+                if (element) { 
+                    element.disabled = false; 
+                    element.style.opacity = '1'; 
+                }
+            }
+        }
+        
+        // 행 새로고침 (간단하게 전체 데이터를 다시 로드)
+        async function refreshStudentRosterRow(pageId) {
+            if (!pageId) return; 
+            const row = document.getElementById(`row-management-${pageId}`); 
+            if (row) row.style.opacity = '0.5';
+            
+            try {
+                // (더 나은 방법: /api/student-roster/:pageId API를 index.js에 추가)
+                // (일단은, 간단하게 전체 다시 로드하여 갱신)
+                await loadStudentRosterData();
+                showToast(`학생 정보 업데이트 완료!`, 'success');
+            } catch (error) { 
+                console.error('학생 명부 행 새로고침 오류:', error); 
+                showToast(error.message, 'error'); 
+                if (row) row.style.opacity = '1'; 
+            }
+        }
+
+        // --- 유틸리티 함수 ---
+        function showToast(message, type = 'success') {
+             const existingToast = document.querySelector('.toast-message'); 
+             if (existingToast) existingToast.remove(); 
+             const toast = document.createElement('div'); 
+             toast.className = `toast-message toast-${type}`; 
+             toast.textContent = message; 
+             document.body.appendChild(toast); 
+             setTimeout(() => { toast.classList.add('show'); }, 100); 
+             setTimeout(() => { 
+                toast.classList.remove('show'); 
+                setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); 
+             }, 3000);
+        }
+    </script>
+</body>
+</html>
