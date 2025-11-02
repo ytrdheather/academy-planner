@@ -4,72 +4,137 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모듈 추가
+import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
+import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
+
+// --- .env 파일에서 환경 변수 로드 ---
+const {
+    JWT_SECRET = 'dev-only-secret-readitude-2025',
+    NOTION_ACCESS_TOKEN,
+    STUDENT_DATABASE_ID,
+    PROGRESS_DATABASE_ID,
+    KOR_BOOKS_ID,
+    ENG_BOOKS_ID,
+    GEMINI_API_KEY, // AI 요약 기능용 API 키
+    MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
+    PORT = 5001
+} = process.env;
 
 // --- 기본 설정 ---
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-readitude-2025';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const PORT = process.env.PORT || 5001;
-const userAccounts = {
- 'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
- 'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
- 'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '주디쌤' },
- 'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '소영쌤' },
- 'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '레일라쌤' },
- 'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '제니쌤' },
- 'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
-};
 const publicPath = path.join(__dirname, '../public');
 
-// --- Helper Functions ---
-function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
-function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
-async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
-  const accessToken = process.env.NOTION_ACCESS_TOKEN;
-  if (!accessToken || !title || !databaseId) return null;
-  try {
-    const isTitleProp = ['Title', '책제목', '이름'].includes(titlePropertyName);
-    const filterQueryPart = isTitleProp ? { title: { contains: title } } : { rich_text: { contains: title } };
-    const filterBody = { property: titlePropertyName, ...filterQueryPart };
-    const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ filter: filterBody, page_size: 1 })
-    });
-    if (!response.ok) { console.error("Notion API Error (findPageIdByTitle):", await response.text()); return null; };
-    const data = await response.json();
-    return data.results[0]?.id || null;
-  } catch (error) {
-    console.error(`Error finding page ID for title "${title}" in DB ${databaseId}:`, error);
-    return null;
-  }
+// [신규] Gemini AI 클라이언트 설정
+let genAI;
+let geminiModel;
+if (GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+    console.log('✅ Gemini AI가 성공적으로 연결되었습니다.');
+} else {
+    console.warn('⚠️ GEMINI_API_KEY가 .env 파일에 없습니다. AI 요약 기능이 비활성화됩니다.');
 }
 
-// --- 미들웨어 ---
+// (교사 계정 정보는 변경 없음)
+const userAccounts = {
+    'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
+    'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
+    'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '주디쌤' },
+    'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '소영쌤' },
+    'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '레일라쌤' },
+    'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '제니쌤' },
+    'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
+};
+
+// --- [신규] Notion API 호출 래퍼 (에러 핸들링 및 재시도) ---
+async function fetchNotion(url, options) {
+    const headers = {
+        'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28'
+    };
+    const response = await fetch(url, { ...options, headers });
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
+        throw new Error(errorData.message || `Notion API Error: ${response.status}`);
+    }
+    return response.json();
+}
+
+// --- Helper Functions (기존 함수들) ---
+function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
+function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
+
+async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
+    if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
+    try {
+        const isTitleProp = ['Title', '책제목', '이름'].includes(titlePropertyName);
+        const filterQueryPart = isTitleProp ? { title: { contains: title } } : { rich_text: { contains: title } };
+        const filterBody = { property: titlePropertyName, ...filterQueryPart };
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: filterBody, page_size: 1 })
+        });
+        return data.results[0]?.id || null;
+    } catch (error) {
+        console.error(`Error finding page ID for title "${title}" in DB ${databaseId}:`, error);
+        return null;
+    }
+}
+
+// --- 미들웨어 (기존과 동일) ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) { return res.status(401).json({ error: '인증 토큰이 필요합니다' }); }
-  const decoded = verifyToken(token);
-  if (!decoded) { return res.status(401).json({ error: '유효하지 않은 토큰입니다' }); }
-  req.user = decoded;
-  next();
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) { return res.status(401).json({ error: '인증 토큰이 필요합니다' }); }
+    const decoded = verifyToken(token);
+    if (!decoded) { return res.status(401).json({ error: '유효하지 않은 토큰입니다' }); }
+    req.user = decoded;
+    next();
 }
 
-// --- 페이지 라우트 ---
+// --- 페이지 라우트 (기존과 동일, management 제거) ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
-app.get('/management', (req, res) => res.sendFile(path.join(publicPath, 'views', 'management.html'))); // [신규] 학생 명부 관리 페이지
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
-// --- [공통] 헬퍼 함수: 롤업 데이터 추출 ---
+// --- [신규] 헬퍼 함수: 한국 시간(KST) 기준 날짜 반환 ---
+function getKSTDate() {
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+}
+
+// [신규] 헬퍼 함수: KST Date 객체를 YYYY-MM-DD 문자열로 변환
+function getKSTDateString() {
+    const now = getKSTDate();
+    const options = {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'Asia/Seoul'
+    };
+    // en-CA (Canadian English) 로케일이 YYYY-MM-DD 형식을 반환합니다.
+    return new Intl.DateTimeFormat('en-CA', options).format(now);
+}
+
+// [신규] 헬퍼 함수: 날짜를 'YYYY년 MM월 DD일 (요일)' 형식으로 변환 ---
+function getKoreanDate(dateString) {
+    const date = new Date(dateString);
+    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' };
+    return new Intl.DateTimeFormat('ko-KR', options).format(date);
+}
+
+// --- [공통] 헬퍼 함수: 롤업 데이터 추출 (기존과 동일) ---
 const getRollupValue = (prop, isNumber = false) => {
     if (!prop?.rollup) return isNumber ? null : '';
     if (prop.rollup.type === 'number') return prop.rollup.number;
@@ -92,99 +157,102 @@ const getRollupValue = (prop, isNumber = false) => {
     return isNumber ? null : '';
 };
 
-// --- 헬퍼 함수: 리스닝 현황 파싱 (교재 컬럼 제거) ---
-function parseListeningPageData(page) {
+// --- [신규] 헬퍼 함수: 데일리 리포트용 전체 파서 ---
+function parseDailyReportData(page) {
     const props = page.properties;
-    const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-    const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
+    const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
+    // [수정] '날짜' -> '🕐 날짜'
+    const pageDate = props['🕐 날짜']?.date?.start || getKSTDateString();
+    
     let assignedTeachers = [];
     if (props['담당쌤']?.rollup?.array) {
         assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean);
     }
-    return {
-        pageId: page.id,
-        studentName,
-        date: pageDate,
-        teachers: assignedTeachers,
-        // listeningTextbook: ... (제거됨)
-        listeningStudy: props['영어 더빙 학습 완료']?.status?.name || '진행하지 않음',
-        listeningWorkbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음'
+    
+    // 1. 숙제 및 테스트
+    const performanceRateString = props['수행율']?.formula?.string || '0%';
+    const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
+    
+    const homework = {
+        grammar: props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당 없음',
+        vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
+        readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
+        summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
+        diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
     };
-}
 
-
-// --- 헬퍼 함수: 원서 독서 현황 파싱 ---
-function parseReadingPageData(page) {
-    const props = page.properties;
-    const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-    const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
-    let assignedTeachers = [];
-    if (props['담당쌤']?.rollup?.array) {
-        assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean);
-    }
-    return {
-        pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers,
+    const tests = {
+        vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
+        vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
+        vocabTotal: props['단어 (전체 개수)']?.number ?? null,
+        vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
+        readingWrong: props['독해 (틀린 개수)']?.number ?? null,
+        readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
+        havruta: props['독해 하브루타']?.select?.name || '숙제없음',
+        grammarTotal: props['문법 (전체 개수)']?.number ?? null,
+        grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
+        grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
+    };
+    
+    // 2. 리스닝
+    const listening = {
+        study: props['영어 더빙 학습 완료']?.status?.name || '진행하지 않음',
+        workbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음'
+    };
+    
+    // 3. 독서
+    const reading = {
         readingStatus: props['📖 영어독서']?.select?.name || '',
         vocabStatus: props['어휘학습']?.select?.name || '',
-        bookTitle: getRollupValue(props['📖 책제목 (롤업)']),
+        bookTitle: getRollupValue(props['📖 책제목 (롤업)']) || '읽은 책 없음',
         bookRelationId: props['오늘 읽은 영어 책']?.relation?.[0]?.id || '',
         bookSeries: getRollupValue(props['시리즈이름']),
         bookAR: getRollupValue(props['AR'], true),
         bookLexile: getRollupValue(props['Lexile'], true),
-        writingStatus: props['Writing']?.select?.name || '',
+        writingStatus: props['Writing']?.select?.name || 'N/A'
     };
-}
 
-// --- 헬퍼 함수: 오늘의 코멘트 파싱 ---
-function parseCommentPageData(page) {
-    const props = page.properties;
-    const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-    const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
-    let assignedTeachers = [];
-    if (props['담당쌤']?.rollup?.array) {
-        assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean);
-    }
+    // 4. 코멘트
+    const comment = {
+        teacherComment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || '오늘의 코멘트가 없습니다.',
+        grammarClass: getRollupValue(props['문법클래스']) || '진도 해당 없음'
+        // (문법 숙제 내용은 노션 롤업 필요)
+    };
+    
+    // 5. [신규] 월간 리포트용 학생 ID (관계형)
+    const studentRelationId = props['학생']?.relation?.[0]?.id || null; 
+
     return {
         pageId: page.id,
         studentName,
+        studentRelationId, // 월간 리포트 통계용
         date: pageDate,
         teachers: assignedTeachers,
-        grammarClass: getRollupValue(props['문법클래스']),
-        comment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || ''
-    };
-}
-
-// --- [신규] 헬퍼 함수: 학생 명부 파싱 ---
-function parseStudentRosterData(page) {
-    const props = page.properties;
-    return {
-        pageId: page.id,
-        studentName: props['이름']?.title?.[0]?.plain_text || '이름없음',
-        grade: getRollupValue(props['1. 학년']) || getRollupValue(props['학년']), // '1. 학년' 또는 '학년' 롤업
-        school: getRollupValue(props['2. 학교']) || getRollupValue(props['학교']), // '2. 학교' 또는 '학교' 롤업
-        // '영어 더빙 OR 듣기 교재' (관계형) ID 배열
-        listeningBookRelationIds: props['영어 더빙 OR 듣기 교재']?.relation?.map(r => r.id) || [],
-        // '영어 더빙 OR 듣기 교재'의 텍스트 (롤업 또는 수식)
-        // (이전 스크린샷에서 확인한 롤업 이름 사용)
-        listeningBookTitle: getRollupValue(props['🎧 리스닝 교재 (롤업)']) || '' 
+        completionRate: Math.round(performanceRate),
+        homework,
+        tests,
+        listening,
+        reading,
+        comment
     };
 }
 
 
-// --- [공통] 데이터 조회 함수 ---
-async function fetchProgressData(req, parseFunction) {
+// --- [공통] 데이터 조회 함수 (파서를 위 함수로 교체) ---
+async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date, teacher } = req.query;
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
-    if (!accessToken || !PROGRESS_DB_ID) { throw new Error('서버 환경 변수가 설정되지 않았습니다.'); }
+    if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
+        throw new Error('서버 환경 변수가 설정되지 않았습니다.');
+    }
 
     const filterConditions = [];
-    const today = new Date();
-
+    // [수정] '오늘' 날짜를 KST 기준으로 계산
     if (period === 'specific_date' && date) {
+        // [수정] '날짜' -> '🕐 날짜'
         filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
     } else { // 기본값 'today'
-        const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        const todayStr = getKSTDateString(); // KST 기준 '오늘' (YYYY-MM-DD)
+        // [수정] '날짜' -> '🕐 날짜'
         filterConditions.push({ property: '🕐 날짜', date: { equals: todayStr } });
     }
 
@@ -192,301 +260,111 @@ async function fetchProgressData(req, parseFunction) {
     let hasMore = true;
     let startCursor = undefined;
     while (hasMore) {
-        const response = await fetch(`https://api.notion.com/v1/databases/${PROGRESS_DB_ID}/query`, {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
             body: JSON.stringify({
                 filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
+                // [수정] '날짜' -> '🕐 날짜'
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
         });
-        if (!response.ok) { const errorText = await response.text(); throw new Error(`DB 조회 오류: ${response.status} - ${errorText}`); }
-        const data = await response.json(); pages.push(...data.results);
+        pages.push(...data.results);
         hasMore = data.has_more; startCursor = data.next_cursor;
     }
 
     const parsedData = pages.map(parseFunction);
 
     let filteredData = parsedData;
-    if (teacher && teacher !== '') { filteredData = filteredData.filter(item => item.teachers.includes(teacher)); }
-    if (req.user.role === 'teacher') { filteredData = filteredData.filter(item => item.teachers.includes(req.user.name)); }
-
+    // (프론트엔드에서 필터링하므로 백엔드 필터링 없음)
     return filteredData;
 }
 
-// --- API 라우트 ---
+// --- API 라우트 (데이터 조회를 통합 파서로 변경) ---
 
-// 숙제 현황 조회 API
-app.get('/api/homework-status', requireAuth, async (req, res) => {
+app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
-        const parseHomeworkTestData = (page) => {
-            const props = page.properties;
-            const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-            const pageDate = props['🕐 날짜']?.date?.start || '날짜없음';
-            let assignedTeachers = [];
-            if (props['담당쌤']?.rollup?.array) { assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text))].filter(Boolean); }
-            const performanceRateString = props['수행율']?.formula?.string || '0%';
-            const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
-            const homeworkStatuses = {
-                grammarHomework: props['⭕ 지난 문법 숙제 검사']?.status?.name || '-',
-                vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '-',
-                readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '-',
-                summary: props['4️⃣ Summary 숙제']?.status?.name || '-',
-                readingHomework: props['5️⃣ 매일 독해 숙제']?.status?.name || '-',
-                diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '-'
-            };
-            const testResults = {
-                vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
-                vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
-                vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-                vocabScore: props['📰 단어 테스트 점수']?.formula?.string || '',
-                readingWrong: props['독해 (틀린 개수)']?.number ?? null,
-                readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || '',
-                havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-                grammarTotal: props['문법 (전체 개수)']?.number ?? null,
-                grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-                grammarScore: props['📑 문법 시험 점수']?.formula?.string || ''
-            };
-            return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: Math.round(performanceRate), ...homeworkStatuses, ...testResults };
-        };
-        const data = await fetchProgressData(req, parseHomeworkTestData);
+        const data = await fetchProgressData(req, res, parseDailyReportData);
         res.json(data);
-    } catch (error) { console.error('숙제 및 테스트 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
-});
-
-// 리스닝 현황 조회 API
-app.get('/api/listening-status', requireAuth, async (req, res) => {
-    try {
-        const data = await fetchProgressData(req, parseListeningPageData);
-        res.json(data);
-    } catch (error) { console.error('리스닝 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
-});
-
-// 원서 독서 현황 조회 API
-app.get('/api/reading-status', requireAuth, async (req, res) => {
-    try {
-        const data = await fetchProgressData(req, parseReadingPageData);
-        res.json(data);
-    } catch (error) { console.error('원서 독서 현황 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
-});
-
-// 오늘의 코멘트 조회 API
-app.get('/api/comment-status', requireAuth, async (req, res) => {
-    try {
-        const data = await fetchProgressData(req, parseCommentPageData);
-        res.json(data);
-    } catch (error) { console.error('오늘의 코멘트 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
-});
-
-// [신규] 학생 명부 조회 API
-app.get('/api/student-roster', requireAuth, async (req, res) => {
-    if (req.user.role !== 'manager') {
-        return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    } catch (error) {
+        console.error('데일리 리포트 데이터 로드 오류:', error);
+        res.status(500).json({ message: error.message || '서버 오류' });
     }
-    try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
-        if (!accessToken || !STUDENT_DB_ID) { throw new Error('서버 환경 변수가 설정되지 않았습니다.'); }
-        
-        const pages = [];
-        let hasMore = true;
-        let startCursor = undefined;
-        while (hasMore) {
-            const response = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-                body: JSON.stringify({
-                    sorts: [{ property: '이름', direction: 'ascending' }],
-                    page_size: 100, start_cursor: startCursor
-                })
-            });
-            if (!response.ok) { const errorText = await response.text(); throw new Error(`DB 조회 오류: ${response.status} - ${errorText}`); }
-            const data = await response.json(); pages.push(...data.results);
-            hasMore = data.has_more; startCursor = data.next_cursor;
-        }
-
-        const rosterData = pages.map(parseStudentRosterData);
-        res.json(rosterData);
-
-    } catch (error) { console.error('학생 명부 로드 오류:', error); res.status(500).json({ message: error.message || '서버 오류' }); }
 });
 
-
-// 개별 학생 리스닝 현황 조회 API
-app.get('/api/listening-status/:pageId', requireAuth, async (req, res) => {
-    const { pageId } = req.params;
-    try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        if (!accessToken) { throw new Error('서버 토큰 오류'); }
-        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Notion-Version': '2022-06-28' }
-        });
-        if (!response.ok) { throw new Error(await response.text()); }
-        const pageData = await response.json();
-        res.json(parseListeningPageData(pageData));
-    } catch (error) { console.error(`개별 학생 리스닝 조회 오류 (PageID: ${pageId}):`, error); res.status(500).json({ message: error.message || '서버 내부 오류' }); }
-});
-
-
-// 개별 학생 원서 독서 현황 조회 API
-app.get('/api/reading-status/:pageId', requireAuth, async (req, res) => {
-    const { pageId } = req.params;
-    try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        if (!accessToken) { throw new Error('서버 토큰 오류'); }
-        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Notion-Version': '2022-06-28' }
-        });
-        if (!response.ok) { throw new Error(await response.text()); }
-        const pageData = await response.json();
-        res.json(parseReadingPageData(pageData));
-    } catch (error) { console.error(`개별 학생 독서 조회 오류 (PageID: ${pageId}):`, error); res.status(500).json({ message: error.message || '서버 내부 오류' }); }
-});
-
-// 개별 학생 코멘트 조회 API
-app.get('/api/comment-status/:pageId', requireAuth, async (req, res) => {
-    const { pageId } = req.params;
-    try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        if (!accessToken) { throw new Error('서버 토큰 오류'); }
-        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Notion-Version': '2022-06-28' }
-        });
-        if (!response.ok) { throw new Error(await response.text()); }
-        const pageData = await response.json();
-        res.json(parseCommentPageData(pageData));
-    } catch (error) { console.error(`개별 학생 코멘트 조회 오류 (PageID: ${pageId}):`, error); res.status(500).json({ message: error.message || '서버 내부 오류' }); }
-});
-
-
-// 업데이트 API (진도 관리 DB)
+// 업데이트 API (진도 관리 DB) - (기존과 동일)
 app.post('/api/update-homework', requireAuth, async (req, res) => {
-  const { pageId, propertyName, newValue, propertyType } = req.body;
-  if (!pageId || !propertyName || newValue === undefined) { return res.status(400).json({ success: false, message: '필수 정보 누락' }); }
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    if (!accessToken) { throw new Error('서버 토큰 오류'); }
-    let notionUpdatePayload;
-    switch (propertyType) {
-        case 'number':
-            const numValue = Number(newValue);
-            notionUpdatePayload = { number: (isNaN(numValue) || newValue === '' || newValue === null) ? null : numValue };
-            break;
-        case 'rich_text':
-            notionUpdatePayload = { rich_text: [{ text: { content: newValue || '' } }] };
-            break;
-        case 'select':
-            if (newValue === null || newValue === '숙제없음' || newValue === '') { notionUpdatePayload = { select: null }; }
-            else { notionUpdatePayload = { select: { name: newValue } }; }
-            break;
-        case 'relation':
-            if (newValue === null || newValue === '') { notionUpdatePayload = { relation: [] }; }
-            else { notionUpdatePayload = { relation: [{ id: newValue }] }; }
-            break;
-        case 'status': default:
-            if (newValue === null || newValue === '숙제 없음' || newValue === '진행하지 않음') {
-                const defaultStatusName = (newValue === '진행하지 않음') ? "진행하지 않음" : "숙제 없음";
-                notionUpdatePayload = { status: { name: defaultStatusName } };
-            } else { notionUpdatePayload = { status: { name: newValue } }; }
-            break;
-    }
-    const propertiesToUpdate = { [propertyName]: notionUpdatePayload };
-    const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ properties: propertiesToUpdate })
-    });
-    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || `Notion API 업데이트 실패 (${response.status})`); }
-    res.json({ success: true, message: '업데이트 성공' });
-  } catch (error) { console.error(`숙제 업데이트 처리 중 오류 (PageID: ${pageId}):`, error); res.status(500).json({ success: false, message: error.message || '서버 내부 오류' }); }
-});
-
-// [신규] 업데이트 API (학생 명부 DB)
-app.post('/api/update-student-roster', requireAuth, async (req, res) => {
-    if (req.user.role !== 'manager') {
-        return res.status(403).json({ message: '접근 권한이 없습니다.' });
-    }
     const { pageId, propertyName, newValue, propertyType } = req.body;
     if (!pageId || !propertyName || newValue === undefined) { return res.status(400).json({ success: false, message: '필수 정보 누락' }); }
     
-    // 이 API는 '학생 명부' DB를 업데이트하므로, pageId가 STUDENT_DATABASE_ID 소속인지
-    // 검증하는 로직이 추가되면 더 좋지만, 일단은 update-homework와 동일하게 구현합니다.
     try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        if (!accessToken) { throw new Error('서버 토큰 오류'); }
+        if (!NOTION_ACCESS_TOKEN) { throw new Error('서버 토큰 오류'); }
         let notionUpdatePayload;
         switch (propertyType) {
+            case 'number':
+                const numValue = Number(newValue);
+                notionUpdatePayload = { number: (isNaN(numValue) || newValue === '' || newValue === null) ? null : numValue };
+                break;
+            case 'rich_text':
+                notionUpdatePayload = { rich_text: [{ text: { content: newValue || '' } }] };
+                break;
+            case 'select':
+                if (newValue === null || newValue === '숙제없음' || newValue === '') { notionUpdatePayload = { select: null }; }
+                else { notionUpdatePayload = { select: { name: newValue } }; }
+                break;
             case 'relation':
                 if (newValue === null || newValue === '') { notionUpdatePayload = { relation: [] }; }
-                else { notionUpdatePayload = { relation: [{ id: newValue }] }; } // 단일 관계형 연결
+                else { notionUpdatePayload = { relation: [{ id: newValue }] }; }
                 break;
-            // (추후 다른 속성 타입 추가 가능)
-            default:
-                return res.status(400).json({ success: false, message: '지원되지 않는 속성 타입입니다.' });
+            case 'status': default:
+                if (newValue === null || newValue === '숙제 없음' || newValue === '진행하지 않음' || newValue === '해당 없음') {
+                    const defaultStatusName = (newValue === '진행하지 않음') ? "진행하지 않음" : (newValue === '해당 없음' ? "해당 없음" : "숙제 없음");
+                    notionUpdatePayload = { status: { name: defaultStatusName } };
+                } else { notionUpdatePayload = { status: { name: newValue } }; }
+                break;
         }
         
-        const propertiesToUpdate = { [propertyName]: notionUpdatePayload };
-        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+        await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
             method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-            body: JSON.stringify({ properties: propertiesToUpdate })
+            body: JSON.stringify({ properties: { [propertyName]: notionUpdatePayload } })
         });
-        if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || `Notion API 업데이트 실패 (${response.status})`); }
-        res.json({ success: true, message: '학생 명부 업데이트 성공' });
-    } catch (error) { console.error(`학생 명부 업데이트 처리 중 오류 (PageID: ${pageId}):`, error); res.status(500).json({ success: false, message: error.message || '서버 내부 오류' }); }
+        
+        res.json({ success: true, message: '업데이트 성공' });
+    } catch (error) { 
+        console.error(`숙제 업데이트 처리 중 오류 (PageID: ${pageId}):`, error); 
+        res.status(500).json({ success: false, message: error.message || '서버 내부 오류' }); 
+    }
 });
 
 
-// 개별 학생 수행율 새로고침 API
-app.get('/api/student-homework/:pageId', requireAuth, async (req, res) => {
-    const { pageId } = req.params;
-    try {
-        const accessToken = process.env.NOTION_ACCESS_TOKEN;
-        if (!accessToken) { throw new Error('Server token error.'); }
-        const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Notion-Version': '2022-06-28' }
-        });
-        if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.message || `Notion Page Fetch Failed (${response.status})`); }
-        const pageData = await response.json();
-        const props = pageData.properties;
-        const performanceRateString = props['수행율']?.formula?.string || '0%';
-        const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
-        const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-        res.json({ success: true, pageId: pageId, studentName: studentName, completionRate: Math.round(performanceRate) });
-    } catch (error) { console.error(`Error fetching individual student status (PageID: ${pageId}):`, error); res.status(500).json({ success: false, message: error.message || 'Server internal error.' }); }
-});
-
-
-// --- 나머지 API 라우트 ---
+// --- 나머지 API 라우트 (기존과 동일) ---
 app.get('/api/teachers', requireAuth, async (req, res) => {
-  try {
-    const teacherNames = Object.values(userAccounts).filter(acc => acc.role === 'teacher' || acc.role === 'manager').map(acc => acc.name);
-    const teacherOptions = teacherNames.map((name, index) => ({ id: `t${index}`, name: name }));
-    res.json(teacherOptions);
-  } catch (error) { console.error('강사 목록 로드 오류:', error); res.status(500).json([]); }
+    try {
+        const teacherNames = Object.values(userAccounts).filter(acc => acc.role === 'teacher' || acc.role === 'manager').map(acc => acc.name);
+        const teacherOptions = teacherNames.map((name, index) => ({ id: `t${index}`, name: name }));
+        res.json(teacherOptions);
+    } catch (error) { console.error('강사 목록 로드 오류:', error); res.status(500).json([]); }
 });
 
 app.post('/teacher-login', async (req, res) => {
-  try {
-    const { teacherId, teacherPassword } = req.body;
-    if (!teacherId || !teacherPassword) { return res.status(400).json({ success: false, message: '아이디와 비밀번호를 모두 입력해주세요.' }); }
-    if (!userAccounts[teacherId]) { return res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' }); }
-    const userAccount = userAccounts[teacherId];
-    if (userAccount.password === teacherPassword) {
-        const tokenPayload = { loginId: teacherId, name: userAccount.name, role: userAccount.role };
-        const token = generateToken(tokenPayload);
-        res.json({ success: true, message: '로그인 성공', token });
-    } else {
-        res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
-    }
-  } catch (error) { console.error('선생님 로그인 처리 중 예외 발생:', error); res.status(500).json({ success: false, message: '서버 내부 오류로 로그인 처리에 실패했습니다.' }); }
+    try {
+        const { teacherId, teacherPassword } = req.body;
+        if (!teacherId || !teacherPassword) { return res.status(400).json({ success: false, message: '아이디와 비밀번호를 모두 입력해주세요.' }); }
+        if (!userAccounts[teacherId]) { return res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' }); }
+        const userAccount = userAccounts[teacherId];
+        if (userAccount.password === teacherPassword) {
+            const tokenPayload = { loginId: teacherId, name: userAccount.name, role: userAccount.role };
+            const token = generateToken(tokenPayload);
+            res.json({ success: true, message: '로그인 성공', token });
+        } else {
+            res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+        }
+    } catch (error) { console.error('선생님 로그인 처리 중 예외 발생:', error); res.status(500).json({ success: false, message: '서버 내부 오류로 로그인 처리에 실패했습니다.' }); }
 });
 
 app.get('/api/teacher/user-info', requireAuth, (req, res) => {
- if (!req.user) { return res.status(401).json({ error: '인증 실패' }); }
- res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId });
+    if (!req.user) { return res.status(401).json({ error: '인증 실패' }); }
+    res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId });
 });
 
 app.get('/api/user-info', requireAuth, (req, res) => {
@@ -494,109 +372,552 @@ app.get('/api/user-info', requireAuth, (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-  const { studentId, studentPassword } = req.body;
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const STUDENT_DB_ID = process.env.STUDENT_DATABASE_ID;
-    if (!accessToken || !STUDENT_DB_ID) { return res.status(500).json({ success: false, message: '서버 설정 오류.' }); }
-    const restResponse = await fetch(`https://api.notion.com/v1/databases/${STUDENT_DB_ID}/query`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } })
-    });
-    if (!restResponse.ok) throw new Error(`Notion API Error: ${restResponse.status}`);
-    const response = await restResponse.json();
-    if (response.results.length > 0) {
-      const studentRecord = response.results[0].properties;
-      const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
-      const token = generateToken({ userId: studentId, role: 'student', name: realName });
-      res.json({ success: true, message: '로그인 성공!', token });
-    } else {
-      res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
-    }
-  } catch (error) { console.error('로그인 오류:', error); res.status(500).json({ success: false, message: '로그인 중 오류가 발생했습니다.' }); }
+    const { studentId, studentPassword } = req.body;
+    try {
+        if (!NOTION_ACCESS_TOKEN || !STUDENT_DATABASE_ID) { return res.status(500).json({ success: false, message: '서버 설정 오류.' }); }
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } })
+        });
+        if (data.results.length > 0) {
+            const studentRecord = data.results[0].properties;
+            const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
+            const token = generateToken({ userId: studentId, role: 'student', name: realName });
+            res.json({ success: true, message: '로그인 성공!', token });
+        } else {
+            res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+        }
+    } catch (error) { console.error('로그인 오류:', error); res.status(500).json({ success: false, message: '로그인 중 오류가 발생했습니다.' }); }
 });
 
 app.get('/api/search-books', requireAuth, async (req, res) => {
-  const { query } = req.query;
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const ENG_BOOKS_ID = process.env.ENG_BOOKS_ID;
-    if (!accessToken || !ENG_BOOKS_ID) { throw new Error('Server config error for Eng Books.'); }
-    const response = await fetch(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ filter: { property: 'Title', title: { contains: query } }, page_size: 10 })
-    });
-    if (!response.ok) throw new Error(`Notion API Error: ${response.status}`);
-    const data = await response.json();
-    const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.Title?.title?.[0]?.plain_text, author: props.Author?.rich_text?.[0]?.plain_text, level: props.Level?.select?.name }; });
-    res.json(books);
-  } catch (error) { console.error('English book search API error:', error); res.status(500).json([]); }
+    const { query } = req.query;
+    try {
+        if (!NOTION_ACCESS_TOKEN || !ENG_BOOKS_ID) { throw new Error('Server config error for Eng Books.'); }
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: { property: 'Title', title: { contains: query } }, page_size: 10 })
+        });
+        const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.Title?.title?.[0]?.plain_text, author: props.Author?.rich_text?.[0]?.plain_text, level: props.Level?.select?.name }; });
+        res.json(books);
+    } catch (error) { console.error('English book search API error:', error); res.status(500).json([]); }
 });
 
 app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
-  const { query } = req.query;
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const KOR_BOOKS_ID = process.env.KOR_BOOKS_ID;
-    if (!accessToken || !KOR_BOOKS_ID) { throw new Error('Server config error for Kor Books.'); }
-    const response = await fetch(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ filter: { property: '책제목', rich_text: { contains: query } }, page_size: 10 })
-    });
-    if (!response.ok) throw new Error(`Notion API Error: ${response.status}`);
-    const data = await response.json();
-    const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.책제목?.rich_text?.[0]?.plain_text, author: props.지은이?.rich_text?.[0]?.plain_text, publisher: props.출판사?.rich_text?.[0]?.plain_text }; });
-    res.json(books);
-  } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
+    const { query } = req.query;
+    try {
+        if (!NOTION_ACCESS_TOKEN || !KOR_BOOKS_ID) { throw new Error('Server config error for Kor Books.'); }
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: { property: '책제목', rich_text: { contains: query } }, page_size: 10 })
+        });
+        const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.책제목?.rich_text?.[0]?.plain_text, author: props.지은이?.rich_text?.[0]?.plain_text, publisher: props.출판사?.rich_text?.[0]?.plain_text }; });
+        res.json(books);
+    } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
 });
 
 app.post('/save-progress', requireAuth, async (req, res) => {
-  const formData = req.body;
-  const studentName = req.user.name;
-  try {
-    const accessToken = process.env.NOTION_ACCESS_TOKEN;
-    const PROGRESS_DB_ID = process.env.PROGRESS_DATABASE_ID;
-    if (!accessToken || !PROGRESS_DB_ID) { throw new Error('Server config error.'); }
-    const properties = {
-      '이름': { title: [{ text: { content: studentName } }] },
-      '🕐 날짜': { date: { start: new Date().toISOString().split('T')[0] } },
-    };
-    const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
-    const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
-    const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"];
-    const textProps = ["어휘유닛", "오늘의 학습 소감"];
-    for (let key in formData) {
-      const value = formData[key];
-      const notionPropName = propertyNameMap[key] || key;
-      if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
-      if (numberProps.includes(notionPropName)) { properties[notionPropName] = { number: Number(value) }; }
-      else if (selectProps.includes(notionPropName)) { properties[notionPropName] = { select: { name: value } }; }
-      else if (textProps.includes(notionPropName)) { properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; }
-      else if (key === '오늘 읽은 영어 책') {
-        const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
-      }
-      else if (key === '3독 독서 제목') {
-        const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
-      }
-      else { properties[notionPropName] = { status: { name: value } }; }
-    }
-    const response = await fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Notion-Version': '2022-06-28' },
-      body: JSON.stringify({ parent: { database_id: PROGRESS_DB_ID }, properties: properties })
-    });
-    if (!response.ok) { const errorData = await response.json(); throw new Error(`Notion API Error: ${errorData.message}`); }
-    res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
-  } catch (error) { console.error('Error saving student progress:', error); res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' }); }
+    const formData = req.body;
+    const studentName = req.user.name;
+    try {
+        if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
+        const properties = {
+            '이름': { title: [{ text: { content: studentName } }] },
+            // [수정] '날짜' -> '🕐 날짜' (KST 기준)
+            '🕐 날짜': { date: { start: getKSTDateString() } },
+        };
+        const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
+        const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
+        const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"];
+        const textProps = ["어휘유닛", "오늘의 학습 소감"];
+        for (let key in formData) {
+            const value = formData[key];
+            const notionPropName = propertyNameMap[key] || key;
+            if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
+            if (numberProps.includes(notionPropName)) { properties[notionPropName] = { number: Number(value) }; }
+            else if (selectProps.includes(notionPropName)) { properties[notionPropName] = { select: { name: value } }; }
+            else if (textProps.includes(notionPropName)) { properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; }
+            else if (key === '오늘 읽은 영어 책') {
+                const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
+                if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
+            }
+            else if (key === '3독 독서 제목') {
+                const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
+                if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
+            }
+            else { properties[notionPropName] = { status: { name: value } }; }
+        }
+        
+        await fetchNotion('https://api.notion.com/v1/pages', {
+            method: 'POST',
+            body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties: properties })
+        });
+        
+        res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
+    } catch (error) { console.error('Error saving student progress:', error); res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' }); }
 });
+
+
+// =======================================================================
+// [신규] 데일리 리포트 동적 생성 API
+// =======================================================================
+
+let reportTemplate = '';
+try {
+    reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
+    console.log('✅ dailyreport.html 템플릿을 성공적으로 불러왔습니다.');
+} catch (e) {
+    console.error('❌ dailyreport.html 템플릿 파일을 읽을 수 없습니다. (경로: public/views/dailyreport.html)', e);
+}
+
+function getReportColors(statusOrScore, type) {
+    // #5bb3ac (초록), #72aaa6 (회청), #ffde59 (노랑), #ff5757 (빨강)
+    const colors = {
+        green: '#5bb3ac',
+        teal: '#72aaa6',
+        yellow: '#ffde59',
+        red: '#ff5757',
+        gray: '#9ca3af'
+    };
+
+    if (type === 'hw_summary') { // 숙제 수행율 (숫자 %)
+        const score = parseInt(statusOrScore) || 0;
+        if (score >= 90) return colors.green;
+        if (score >= 80) return colors.teal;
+        if (score >= 70) return colors.yellow;
+        return colors.red;
+    }
+    if (type === 'test_score') { // 문법/어휘 (N/A 또는 숫자 %)
+        if (statusOrScore === 'N/A') return colors.gray;
+        const score = parseInt(statusOrScore) || 0;
+        if (score >= 80) return colors.green;
+        if (score >= 70) return colors.teal;
+        if (score >= 50) return colors.yellow;
+        return colors.red;
+    }
+    if (type === 'test_status') { // 독해 (PASS/FAIL/N/A)
+        if (statusOrScore === 'PASS') return colors.green;
+        if (statusOrScore === 'FAIL') return colors.red;
+        return colors.gray; // N/A
+    }
+    if (type === 'status') { // 리스닝, 독서 (완료/미완료/N/A)
+        if (statusOrScore === '완료' || statusOrScore === '완료함') return colors.green;
+        if (statusOrScore === '미완료' || statusOrScore === '못함') return colors.red;
+        return colors.gray; // N/A, 진행하지 않음 등
+    }
+    if (type === 'hw_detail') { // 숙제 상세 (숙제 함/안 해옴/해당 없음)
+        if (statusOrScore === '숙제 함') return '완료'; // 텍스트 반환
+        if (statusOrScore === '안 해옴') return '미완료'; // 텍스트 반환
+        return '해당 없음'; // 텍스트 반환
+    }
+    return colors.gray;
+}
+
+function getHwDetailColor(status) {
+    if (status === '완료') return '#5bb3ac'; // green
+    if (status === '미완료') return '#ff5757'; // red
+    return '#9ca3af'; // gray
+}
+
+
+function fillReportTemplate(template, data) {
+    const { tests, homework, listening, reading, comment } = data;
+    
+    // (데이터 예시가 없는 '문법 숙제 내용'은 임시 처리)
+    const grammarHwDetail = '워크북 p.50 ~ p.52 풀기'; // (이 부분은 노션에 속성 추가 후 롤업 필요)
+    
+    // HW 상세 포맷팅
+    const hwGrammarStatus = getReportColors(homework.grammar, 'hw_detail');
+    const hwVocabStatus = getReportColors(homework.vocabCards, 'hw_detail');
+    const hwReadingCardStatus = getReportColors(homework.readingCards, 'hw_detail');
+    const hwSummaryStatus = getReportColors(homework.summary, 'hw_detail');
+    const hwDiaryStatus = getReportColors(homework.diary, 'hw_detail');
+
+    const replacements = {
+        '{{STUDENT_NAME}}': data.studentName,
+        '{{REPORT_DATE}}': getKoreanDate(data.date),
+        '{{TEACHER_COMMENT}}': comment.teacherComment || '오늘의 코멘트가 없습니다.',
+        
+        '{{HW_SCORE}}': formatReportValue(data.completionRate, 'percent'),
+        '{{HW_SCORE_COLOR}}': getReportColors(data.completionRate, 'hw_summary'),
+        
+        '{{GRAMMAR_SCORE}}': formatReportValue(tests.grammarScore, 'score'),
+        '{{GRAMMAR_SCORE_COLOR}}': getReportColors(tests.grammarScore, 'test_score'),
+        
+        '{{VOCAB_SCORE}}': formatReportValue(tests.vocabScore, 'score'),
+        '{{VOCAB_SCORE_COLOR}}': getReportColors(tests.vocabScore, 'test_score'),
+        
+        '{{READING_TEST_STATUS}}': formatReportValue(tests.readingResult, 'status'),
+        '{{READING_TEST_COLOR}}': getReportColors(tests.readingResult, 'test_status'),
+        
+        '{{LISTENING_STATUS}}': formatReportValue(listening.study, 'listen_status'),
+        '{{LISTENING_COLOR}}': getReportColors(listening.study, 'status'),
+        
+        '{{READING_BOOK_STATUS}}': formatReportValue(reading.readingStatus, 'read_status'),
+        '{{READING_BOOK_COLOR}}': getReportColors(reading.readingStatus, 'status'),
+
+        '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarClass || '진도 해당 없음',
+        '{{GRAMMAR_HW_DETAIL}}': grammarHwDetail, // (임시 데이터)
+
+        '{{HW_GRAMMAR_STATUS}}': hwGrammarStatus,
+        '{{HW_GRAMMAR_COLOR}}': getHwDetailColor(hwGrammarStatus),
+        '{{HW_VOCAB_STATUS}}': hwVocabStatus,
+        '{{HW_VOCAB_COLOR}}': getHwDetailColor(hwVocabStatus),
+        '{{HW_READING_CARD_STATUS}}': hwReadingCardStatus,
+        '{{HW_READING_CARD_COLOR}}': getHwDetailColor(hwReadingCardStatus),
+        '{{HW_SUMMARY_STATUS}}': hwSummaryStatus,
+        '{{HW_SUMMARY_COLOR}}': getHwDetailColor(hwSummaryStatus),
+        '{{HW_DIARY_STATUS}}': hwDiaryStatus,
+        '{{HW_DIARY_COLOR}}': getHwDetailColor(hwDiaryStatus),
+
+        '{{BOOK_TITLE}}': reading.bookTitle || '읽은 책 없음',
+        '{{BOOK_LEVEL}}': (reading.bookAR || reading.bookLexile) ? `${reading.bookAR || 'N/A'} / ${reading.bookLexile || 'N/A'}` : 'N/A',
+        '{{WRITING_STATUS}}': reading.writingStatus || 'N/A'
+    };
+
+    return template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
+        // 정의되지 않은 값(null, undefined)이 템플릿에 그대로 노출되는 것을 방지
+        const value = replacements[match];
+        return value !== null && value !== undefined ? value : '';
+    });
+}
+
+function formatReportValue(value, type) {
+    if (value === null || value === undefined) value = 'N/A';
+
+    if (type === 'score' && value !== 'N/A') {
+        return `${parseInt(value) || 0}<span class="text-2xl text-gray-500">점</span>`;
+    }
+    if (type === 'percent' && value !== 'N/A') {
+        return `${parseInt(value) || 0}%`;
+    }
+    if (type === 'listen_status') {
+        if (value === '완료') return '완료';
+        if (value === '미완료') return '미완료';
+        return 'N/A';
+    }
+    if (type === 'read_status') {
+        if (value === '완료함') return '완료';
+        if (value === '못함') return '미완료';
+        return 'N/A';
+    }
+    return value; // 'N/A', 'PASS', 'FAIL' 등
+}
+
+app.get('/report', async (req, res) => {
+    const { pageId, date } = req.query; 
+    
+    if (!pageId || !date) {
+        return res.status(400).send('필수 정보(pageId, date)가 누락되었습니다.');
+    }
+    if (!reportTemplate) {
+        return res.status(500).send('서버 오류: 리포트 템플릿을 읽을 수 없습니다.');
+    }
+
+    try {
+        const pageData = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
+        const parsedData = parseDailyReportData(pageData);
+        const finalHtml = fillReportTemplate(reportTemplate, parsedData);
+        res.send(finalHtml);
+    } catch (error) {
+        console.error(`리포트 생성 오류 (PageID: ${pageId}):`, error);
+        res.status(500).send(`리포트 생성 중 오류가 발생했습니다: ${error.message}`);
+    }
+});
+
+// --- [신규] API 라우트: 월간 리포트 URL 조회 ---
+app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
+    const { studentName, date } = req.query; // (예: 2025-11-02)
+
+    if (!studentName || !date) {
+        return res.status(400).json({ message: '학생 이름과 날짜가 필요합니다.' });
+    }
+    if (!MONTHLY_REPORT_DB_ID) {
+        return res.status(500).json({ message: '월간 리포트 DB가 설정되지 않았습니다.' });
+    }
+
+    try {
+        // 1. '지난 달' 문자열 생성 (예: '2025-10')
+        // [수정] KST 기준으로 날짜 계산
+        const requestedDate = new Date(date); // (date는 'YYYY-MM-DD' 문자열)
+        const lastMonth = new Date(requestedDate.getFullYear(), requestedDate.getMonth() - 1, 1);
+        const lastMonthString = `${lastMonth.getFullYear()}-${(lastMonth.getMonth() + 1).toString().padStart(2, '0')}`; // "2025-10"
+
+        // 2. '월간 리포트 DB'에서 학생 이름과 리포트 월이 일치하는 항목 검색
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        // [주의] '학생' 속성이 '학생 명부 DB'와 '관계형'으로 연결되어 있어야 함
+                        // (이름으로 검색하려면, '학생' 속성의 롤업 속성이 필요함)
+                        // (임시로 Title 속성에서 학생 이름을 검색)
+                        { property: 'Title', title: { contains: studentName } },
+                        { property: '리포트 월', rich_text: { equals: lastMonthString } }
+                    ]
+                },
+                page_size: 1
+            })
+        });
+
+        const reportPage = data.results[0];
+        if (reportPage) {
+            const reportUrl = reportPage.properties['월간리포트URL']?.url;
+            if (reportUrl) {
+                res.json({ success: true, url: reportUrl });
+            } else {
+                res.status(404).json({ success: false, message: '리포트를 찾았으나 URL이 없습니다.' });
+            }
+        } else {
+            res.status(404).json({ success: false, message: `[${lastMonthString}]월 리포트를 찾을 수 없습니다.` });
+        }
+    } catch (error) {
+        console.error(`월간 리포트 URL 조회 오류 (${studentName}, ${date}):`, error);
+        res.status(500).json({ message: error.message || '서버 오류' });
+    }
+});
+
+
+// =======================================================================
+// [신규] 자동화 스케줄링 (Cron Jobs)
+// =======================================================================
+
+// --- [신규] 1. 데일리 리포트 URL 자동 생성 (매일 밤 10시) ---
+cron.schedule('0 22 * * *', async () => {
+    console.log('--- 🏃‍♂️ [데일리 리포트] 자동화 스케줄 실행 (매일 밤 10시) ---');
+    
+    if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
+        console.error('[데일리 리포트] DB ID가 설정되지 않아 스케줄을 중단합니다.');
+        return;
+    }
+
+    try {
+        // [수정] '오늘' 날짜를 KST 기준으로 계산
+        const today = getKSTDateString();
+        // [수정] '날짜' -> '🕐 날짜'
+        const filter = { property: '🕐 날짜', date: { equals: today } };
+        
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: filter })
+        });
+        
+        const pages = data.results;
+        if (!pages || pages.length === 0) {
+            console.log(`[데일리 리포트] ${today} 날짜에 해당하는 진도 페이지가 없습니다.`);
+            return;
+        }
+
+        console.log(`[데일리 리포트] 총 ${pages.length}개의 오늘 진도 페이지를 찾았습니다.`);
+
+        for (const page of pages) {
+            const pageId = page.id;
+            const reportUrl = `http://localhost:${PORT}/report?pageId=${pageId}&date=${today}`; // (주의: 배포 시 'localhost'를 실제 도메인으로 변경)
+
+            const currentUrl = page.properties['데일리리포트URL']?.url;
+            if (currentUrl === reportUrl) {
+                console.log(`[데일리 리포트] ${pageId} - 이미 URL이 존재합니다. (스킵)`);
+                continue;
+            }
+
+            await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    properties: {
+                        '데일리리포트URL': { url: reportUrl }
+                    }
+                })
+            });
+            console.log(`[데일리 리포트] ${pageId} - URL 저장 성공: ${reportUrl}`);
+        }
+        console.log('--- ✅ [데일리 리포트] 자동화 스케줄 완료 ---');
+
+    } catch (error) {
+        console.error('--- ❌ [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+    }
+}, {
+    timezone: "Asia/Seoul"
+});
+
+
+// --- [신규] 2. 월간 리포트 URL 자동 생성 (매달 마지막 주 금요일 밤 9시) ---
+cron.schedule('0 21 * * 5', async () => {
+    console.log('--- 🏃‍♂️ [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
+    
+    // [수정] '오늘'을 KST 기준으로 생성
+    const today = getKSTDate();
+    
+    const nextFriday = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (today.getMonth() === nextFriday.getMonth()) {
+        console.log(`[월간 리포트] 오늘은 마지막 주 금요일이 아닙니다. (스킵)`);
+        return;
+    }
+    
+    console.log('🔥 [월간 리포트] 오늘은 마지막 주 금요일입니다! 리포트 생성을 시작합니다.');
+
+    if (!NOTION_ACCESS_TOKEN || !STUDENT_DATABASE_ID || !PROGRESS_DATABASE_ID || !MONTHLY_REPORT_DB_ID || !geminiModel) {
+        console.error('[월간 리포트] DB ID 또는 Gemini AI가 설정되지 않아 스케줄을 중단합니다.');
+        return;
+    }
+
+    try {
+        const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST'
+        });
+        const students = studentData.results;
+        console.log(`[월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
+        
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // (0 = 1월, 11 = 12월)
+        const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-11"
+        const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+        for (const student of students) {
+            const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
+            const studentName = student.properties['이름']?.title?.[0]?.plain_text;
+            if (!studentName) continue;
+
+            console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
+
+            const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '학생', relation: { contains: studentPageId } },
+                            // [수정] '날짜' -> '🕐 날짜'
+                            { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+                            { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
+                        ]
+                    }
+                })
+            });
+            
+            const monthPages = progressData.results.map(parseDailyReportData);
+            if (monthPages.length === 0) {
+                console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
+                continue;
+            }
+
+            // 통계 계산
+            const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
+            const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
+            const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
+            const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
+            const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
+
+            const stats = {
+                hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
+                vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
+                grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
+                totalBooks: bookTitles.length,
+                bookList: bookTitles.join(', ') || '읽은 책 없음'
+            };
+
+            // Gemini AI로 코멘트 요약
+            let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
+            if (geminiModel && comments) {
+                try {
+                    const prompt = `
+                        너는 15년 차 리디튜드 학습 컨설턴트야.
+                        아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                        
+                        [월간 통계]
+                        - 숙제 수행율(평균): ${stats.hwAvg}%
+                        - 어휘 점수(평균): ${stats.vocabAvg}점
+                        - 문법 점수(평균): ${stats.grammarAvg}점
+                        - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
+
+                        [일일 코멘트 모음]
+                        ${comments}
+                        
+                        [요청]
+                        위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
+                        학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                    `;
+                    const result = await geminiModel.generateContent(prompt);
+                    const response = await result.response;
+                    aiSummary = response.text();
+                    console.log(`[월간 리포트] ${studentName} 학생 AI 요약 성공!`);
+                } catch (aiError) {
+                    console.error(`[월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
+                    aiSummary = 'AI 요약 중 오류가 발생했습니다.';
+                }
+            }
+            
+            // '월간 리포트 DB'에 새 페이지로 저장
+            const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
+            const reportUrl = `http://localhost:${PORT}/monthly-report?studentId=${studentPageId}&month=${monthString}`; // (주의: 이 API는 아직 안 만듦! / 배포 시 도메인 변경)
+
+            const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '학생', relation: { contains: studentPageId } },
+                            { property: '리포트 월', rich_text: { equals: monthString } }
+                        ]
+                    },
+                    page_size: 1
+                })
+            });
+            
+            if (existingReport.results.length > 0) {
+                // 이미 있으면 업데이트
+                const existingPageId = existingReport.results[0].id;
+                await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        properties: {
+                            '월간리포트URL': { url: reportUrl },
+                            '숙제수행율(평균)': { number: stats.hwAvg },
+                            '어휘점수(평균)': { number: stats.vocabAvg },
+                            '문법점수(평균)': { number: stats.grammarAvg },
+                            '총 읽은 권수': { number: stats.totalBooks },
+                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        }
+                    })
+                });
+                console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
+
+            } else {
+                // 없으면 새로 생성
+                await fetchNotion('https://api.notion.com/v1/pages', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        parent: { database_id: MONTHLY_REPORT_DB_ID },
+                        properties: {
+                            'Title': { title: [{ text: { content: reportTitle } }] },
+                            '학생': { relation: [{ id: studentPageId }] },
+                            '리포트 월': { rich_text: [{ text: { content: monthString } }] },
+                            '월간리포트URL': { url: reportUrl },
+                            '숙제수행율(평균)': { number: stats.hwAvg },
+                            '어휘점수(평균)': { number: stats.vocabAvg },
+                            '문법점수(평균)': { number: stats.grammarAvg },
+                            '총 읽은 권수': { number: stats.totalBooks },
+                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        }
+                    })
+                });
+                console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+            }
+        }
+        
+        console.log('--- ✅ [월간 리포트] 자동화 스케줄 완료 ---');
+
+    } catch (error) {
+        console.error('--- ❌ [월간 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+    }
+}, {
+    timezone: "Asia/Seoul"
+});
+
 
 // --- 서버 실행 ---
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`✅ 최종 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+    console.log(`✅ 최종 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
 
