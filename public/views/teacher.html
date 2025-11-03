@@ -146,11 +146,14 @@
         .report-btn-group {
             display: flex;
             flex-direction: row; /* [수정] column -> row (가로 정렬) */
+            flex-wrap: wrap; /* [추가] 5개 버튼이 넘칠 경우 줄바꿈 */
             gap: 4px;
             align-items: center; /* [수정] stretch -> center (세로 중앙 정렬) */
-            justify-content: center; /* [추가] 버튼들을 셀 가운데로 정렬 */
+            justify-content: flex-start; /* [수정] center -> flex-start (왼쪽 정렬) */
         }
-        .report-btn-daily, .report-btn-monthly {
+        
+        /* [수정] 공통 버튼 스타일 */
+        .report-btn-copy-daily, .report-btn-copy-monthly, .report-btn-view {
             border: none;
             padding: 6px 8px;
             border-radius: 6px;
@@ -160,29 +163,45 @@
             transition: all 0.2s ease;
             text-align: center;
         }
-        .report-btn-daily { /* 데일리 버튼 */
+
+        .report-btn-copy-daily { /* 데일리 복사 버튼 (기존 daily) */
             background-color: #eef2ff;
             color: #4f46e5;
             border: 1px solid #c7d2fe;
         }
-        .report-btn-daily:hover {
+        .report-btn-copy-daily:hover {
             background-color: #e0e7ff;
         }
-        .report-btn-monthly { /* 월간 버튼 */
+        .report-btn-copy-monthly { /* 월간 복사 버튼 (기존 monthly) */
             background-color: #fdf4ff;
             color: #a855f7;
             border: 1px solid #f0abfc;
         }
-        .report-btn-monthly:hover {
+        .report-btn-copy-monthly:hover {
             background-color: #fae8ff;
         }
-        .report-btn-monthly:disabled {
+        .report-btn-copy-monthly:disabled {
             background-color: #f3f4f6;
             color: #9ca3af;
             border-color: #e5e7eb;
             cursor: not-allowed;
         }
 
+        /* [신규] '보기' 버튼 스타일 */
+        .report-btn-view {
+            background-color: #e0f2fe; /* Light blue */
+            color: #0284c7; /* Dark blue */
+            border: 1px solid #bae6fd;
+        }
+        .report-btn-view:hover {
+            background-color: #bae6fd;
+        }
+        .report-btn-view:disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+        }
 
         /* --- 코멘트 탭 스타일 --- */
         .comment-textarea {
@@ -213,6 +232,7 @@
             font-weight: 600;
             transition: background 0.2s ease;
             width: auto; /* [수정] 100% -> auto (가로 정렬을 위해) */
+            margin-right: 4px; /* [추가] 저장 버튼과 보기 버튼 사이 간격 */
         }
         .comment-save-btn:hover { background: #059669; }
         .comment-save-btn:disabled { background: #d1d5db; cursor: not-allowed; }
@@ -518,12 +538,12 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <colgroup>
-                                <!-- [수정] 컬럼 너비 재조정 -->
-                                <col style="width: 15%;"> <!-- 학생 이름 -->
-                                <col style="width: 10%;"> <!-- 담당강사 -->
-                                <col style="width: 10%;"> <!-- 문법 클래스 -->
-                                <col style="width: 50%;"> <!-- 코멘트 -->
-                                <col style="width: 15%;"> <!-- 관리 (저장+리포트 버튼) -->
+                                <!-- [수정] 컬럼 너비 재조정 (헤더님 요청 반영) -->
+                                <col style="width: 7%;"> <!-- 학생 이름 -->
+                                <col style="width: 7%;"> <!-- 담당강사 -->
+                                <col style="width: 8%;"> <!-- 문법 클래스 -->
+                                <col style="width: 45%;"> <!-- 코멘트 -->
+                                <col style="width: 33%;"> <!-- 관리 (저장+리포트 버튼) -->
                             </colgroup>
                             <thead>
                                 <tr>
@@ -926,11 +946,13 @@
                         <textarea class="comment-textarea" rows="1" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}" oninput="markCommentAsChanged(this); autoResizeTextarea(this);">${st.comment.teacherComment || ''}</textarea>
                     </td>
                     <td style="vertical-align: middle;">
-                        <!-- [수정] 버튼 그룹 HTML 구조는 동일 (CSS로 정렬) -->
+                        <!-- [수정] 버튼 그룹 5개로 변경 -->
                         <div class="report-btn-group">
                             <button class="comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
-                            <button class="report-btn-daily" onclick="openReportModal('${st.pageId}', '${st.date}')">데일리 🔗</button>
-                            <button class="report-btn-monthly" onclick="openMonthlyReportModal(this, '${st.studentName}', '${st.date}')">지난 달 📖</button>
+                            <button class="report-btn-view" onclick="viewDailyReport('${st.pageId}', '${st.date}')">데일리 보기</button>
+                            <button class="report-btn-copy-daily" onclick="openReportModal('${st.pageId}', '${st.date}')">데일리 복사</button>
+                            <button class="report-btn-view" onclick="viewMonthlyReport(this, '${st.studentName}', '${st.date}')">월간 보기</button>
+                            <button class="report-btn-copy-monthly" onclick="openMonthlyReportModal(this, '${st.studentName}', '${st.date}')">월간 복사</button>
                         </div>
                     </td>
                 </tr>`).join('');
@@ -1286,7 +1308,48 @@
             window.open(url, '_blank', windowOptions);
         }
 
-        // --- [신규] 리포트 링크 모달 함수 ---
+        // --- [신규] 리포트 "보기" 함수 ---
+        function viewDailyReport(pageId, date) {
+            if (!pageId || !date) {
+                showToast('리포트 정보를 찾을 수 없습니다.', 'error');
+                return;
+            }
+            const reportUrl = `${API_BASE_URL}/report?pageId=${pageId}&date=${date}`;
+            window.open(reportUrl, '_blank'); // 새 탭에서 열기
+        }
+
+        async function viewMonthlyReport(button, studentName, date) {
+            if (!studentName || !date) {
+                showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error');
+                return;
+            }
+            
+            button.disabled = true; // 버튼 비활성화
+            button.textContent = '조회 중...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(studentName)}&date=${date}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    window.open(data.url, '_blank'); // 모달 대신 새 탭에서 열기
+                } else {
+                    throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.');
+                }
+            } catch (error) {
+                console.error('월간 리포트 \'보기\' 조회 오류:', error);
+                showToast(error.message, 'error'); // 에러를 토스트 메시지로
+            } finally {
+                button.disabled = false; // 버튼 다시 활성화
+                button.textContent = '월간 보기';
+            }
+        }
+
+
+        // --- [수정] 리포트 "복사" 모달 함수 ---
         function openReportModal(pageId, date) {
             if (!pageId || !date) {
                 showToast('리포트 정보를 찾을 수 없습니다.', 'error');
@@ -1302,7 +1365,7 @@
             const copyBtn = document.getElementById('copyReportLinkBtn');
 
             // 데일리 모달로 초기화
-            title.textContent = '🔗 데일리 리포트 링크';
+            title.textContent = '🔗 데일리 리포트 복사';
             desc.style.display = 'block';
             msg.style.display = 'none';
             input.style.display = 'block';
@@ -1315,7 +1378,6 @@
             modal.classList.add('show');
         }
 
-        // [신규] 월간 리포트 모달 열기
         async function openMonthlyReportModal(button, studentName, date) {
             if (!studentName || !date) {
                 showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error');
@@ -1333,7 +1395,7 @@
             const copyBtn = document.getElementById('copyReportLinkBtn');
 
             // 월간 모달로 초기화
-            title.textContent = '📖 지난 달 리포트';
+            title.textContent = '📖 지난 달 리포트 복사';
             desc.style.display = 'none';
             msg.style.display = 'block'; // 메시지 창 보이기
             msg.textContent = '지난 달 리포트를 조회 중입니다...';
@@ -1360,11 +1422,11 @@
                     throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.');
                 }
             } catch (error) {
-                console.error('월간 리포트 조회 오류:', error);
+                console.error('월간 리포트 \'복사\' 조회 오류:', error);
                 msg.innerHTML = `<span style="color: #ef4444;">${error.message}</span>`;
             } finally {
                 button.disabled = false; // 버튼 다시 활성화
-                button.textContent = '지난 달 📖';
+                button.textContent = '월간 복사';
             }
         }
 
@@ -1399,3 +1461,4 @@
     </script>
 </body>
 </html>
+

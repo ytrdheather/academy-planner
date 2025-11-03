@@ -18,6 +18,7 @@ const {
     ENG_BOOKS_ID,
     GEMINI_API_KEY, // AI 요약 기능용 API 키
     MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
+    GRAMMAR_DB_ID, // [신규] 문법 숙제 관리 DB ID
     PORT = 5001
 } = process.env;
 
@@ -70,12 +71,29 @@ async function fetchNotion(url, options) {
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
+// [신규] 헬퍼 함수: 롤업 또는 속성에서 간단한 텍스트 추출
+const getSimpleText = (prop) => {
+    if (!prop) return '';
+    if (prop.type === 'rich_text' && prop.rich_text.length > 0) return prop.rich_text[0].plain_text;
+    if (prop.type === 'title' && prop.title.length > 0) return prop.title[0].plain_text;
+    if (prop.type === 'select' && prop.select) return prop.select.name;
+    return '';
+};
+
 async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
         const isTitleProp = ['Title', '책제목', '이름'].includes(titlePropertyName);
-        const filterQueryPart = isTitleProp ? { title: { contains: title } } : { rich_text: { contains: title } };
-        const filterBody = { property: titlePropertyName, ...filterQueryPart };
+        // [수정] '반이름' 속성도 Title이 아닌 타입일 수 있으므로 분기 처리
+        let filterBody;
+        if (titlePropertyName === '반이름') {
+            filterBody = { property: titlePropertyName, select: { equals: title } };
+        } else if (isTitleProp) {
+            filterBody = { property: titlePropertyName, title: { contains: title } };
+        } else {
+            filterBody = { property: titlePropertyName, rich_text: { contains: title } };
+        }
+
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${databaseId}/query`, {
             method: 'POST',
             body: JSON.stringify({ filter: filterBody, page_size: 1 })
@@ -134,7 +152,7 @@ function getKoreanDate(dateString) {
     return new Intl.DateTimeFormat('ko-KR', options).format(date);
 }
 
-// --- [공통] 헬퍼 함수: 롤업 데이터 추출 (기존과 동일) ---
+// --- [공통] 헬퍼 함수: 롤업 데이터 추출 (수정됨) ---
 const getRollupValue = (prop, isNumber = false) => {
     if (!prop?.rollup) return isNumber ? null : '';
     if (prop.rollup.type === 'number') return prop.rollup.number;
@@ -145,6 +163,7 @@ const getRollupValue = (prop, isNumber = false) => {
         if (firstItem.type === 'rich_text' && firstItem.rich_text.length > 0) return firstItem.rich_text[0].plain_text;
         if (firstItem.type === 'number') return firstItem.number;
         if (firstItem.type === 'relation') return ''; // 관계형 자체는 빈값 처리
+        if (firstItem.type === 'select' && firstItem.select) return firstItem.select.name; // [수정] '선택' 속성 롤업 추가
         if (firstItem.type === 'formula') {
             if (firstItem.formula.type === 'string') return firstItem.formula.string;
             if (firstItem.formula.type === 'number') return firstItem.formula.number;
@@ -157,8 +176,9 @@ const getRollupValue = (prop, isNumber = false) => {
     return isNumber ? null : '';
 };
 
-// --- [신규] 헬퍼 함수: 데일리 리포트용 전체 파서 ---
-function parseDailyReportData(page) {
+// --- [신규] 헬퍼 함수: 데일리 리포트용 전체 파서 (async로 변경) ---
+// [수정] 함수를 async로 변경 (문법 DB를 별도 조회해야 하므로)
+async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
     // [수정] '날짜' -> '🕐 날짜'
@@ -212,11 +232,54 @@ function parseDailyReportData(page) {
         writingStatus: props['Writing']?.select?.name || 'N/A'
     };
 
+    // --- [신규] 4. 문법 DB에서 진도/숙제 내용 가져오기 ---
+    
+    // A. 학생 진도 DB의 '문법클래스' (롤업) 값을 가져옴 (예: "NN")
+    const grammarClassName = getRollupValue(props['문법클래스']) || null;
+
+    // [DEBUG] 1. '문법클래스' (예: "NN")가 제대로 넘어오는지 확인
+    // console.log(`[문법클래스 이름]: ${grammarClassName}`);
+
+    let grammarTopic = '진도 해당 없음';
+    let grammarHomework = '숙제 내용 없음';
+
+    if (grammarClassName && GRAMMAR_DB_ID) {
+        try {
+            const grammarDbData = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        // B. 문법 숙제 DB의 '반이름' (Select 속성)을 기준으로 필터링
+                        property: '반이름', 
+                        select: { equals: grammarClassName } // [수정] 'title' -> 'select'
+                    },
+                    page_size: 1
+                })
+            });
+
+            if (grammarDbData.results.length > 0) {
+                const grammarProps = grammarDbData.results[0].properties;
+
+                // [DEBUG] 2. '문법 진도 내용'과 '문법 과제 내용'의 실제 데이터를 확인합니다.
+                // console.log("[Notion '문법 진도 내용' Property]:", JSON.stringify(grammarProps['문법 진도 내용'], null, 2));
+                // console.log("[Notion '문법 과제 내용' Property]:", JSON.stringify(grammarProps['문법 과제 내용'], null, 2));
+
+                // C. '문법 진도 내용' (rich_text 속성이라고 가정)
+                grammarTopic = getSimpleText(grammarProps['문법 진도 내용']) || '진도 해당 없음'; 
+                // D. '문법 과제 내용' (rich_text 속성이라고 가정)
+                grammarHomework = getSimpleText(grammarProps['문법 과제 내용']) || '숙제 내용 없음';
+            }
+        } catch (e) {
+            console.error(`[문법 DB 조회 오류] (반이름: ${grammarClassName}):`, e.message);
+        }
+    }
+    
     // 4. 코멘트
     const comment = {
         teacherComment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || '오늘의 코멘트가 없습니다.',
-        grammarClass: getRollupValue(props['문법클래스']) || '진도 해당 없음'
-        // (문법 숙제 내용은 노션 롤업 필요)
+        grammarClass: grammarClassName || '진도 해당 없음', // [수정] teacher.html 대시보드용 '문법반' 롤업
+        grammarTopic: grammarTopic, // [신규] dailyreport.html 리포트용 '오늘의 진도'
+        grammarHomework: grammarHomework // [신규] dailyreport.html 리포트용 '오늘의 숙제'
     };
     
     // 5. [신규] 월간 리포트용 학생 ID (관계형)
@@ -239,6 +302,7 @@ function parseDailyReportData(page) {
 
 
 // --- [공통] 데이터 조회 함수 (파서를 위 함수로 교체) ---
+// [수정] parseFunction이 async이므로 Promise.all()로 병렬 처리
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date, teacher } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
@@ -273,7 +337,9 @@ async function fetchProgressData(req, res, parseFunction) {
         hasMore = data.has_more; startCursor = data.next_cursor;
     }
 
-    const parsedData = pages.map(parseFunction);
+    // [수정] pages.map(parseFunction)은 이제 [Promise, Promise, ...] 배열을 반환
+    // Promise.all()을 사용해 모든 비동기 파싱이 완료될 때까지 기다림
+    const parsedData = await Promise.all(pages.map(parseFunction));
 
     let filteredData = parsedData;
     // (프론트엔드에서 필터링하므로 백엔드 필터링 없음)
@@ -524,7 +590,7 @@ function fillReportTemplate(template, data) {
     const { tests, homework, listening, reading, comment } = data;
     
     // (데이터 예시가 없는 '문법 숙제 내용'은 임시 처리)
-    const grammarHwDetail = '워크북 p.50 ~ p.52 풀기'; // (이 부분은 노션에 속성 추가 후 롤업 필요)
+    // const grammarHwDetail = '워크북 p.50 ~ p.52 풀기'; // (이 부분은 노션에 속성 추가 후 롤업 필요)
     
     // HW 상세 포맷팅
     const hwGrammarStatus = getReportColors(homework.grammar, 'hw_detail');
@@ -556,8 +622,8 @@ function fillReportTemplate(template, data) {
         '{{READING_BOOK_STATUS}}': formatReportValue(reading.readingStatus, 'read_status'),
         '{{READING_BOOK_COLOR}}': getReportColors(reading.readingStatus, 'status'),
 
-        '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarClass || '진도 해당 없음',
-        '{{GRAMMAR_HW_DETAIL}}': grammarHwDetail, // (임시 데이터)
+        '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarTopic || '진도 해당 없음', // [수정] 'comment.grammarClass' -> 'comment.grammarTopic'
+        '{{GRAMMAR_HW_DETAIL}}': comment.grammarHomework || '숙제 내용 없음', // [수정]
 
         '{{HW_GRAMMAR_STATUS}}': hwGrammarStatus,
         '{{HW_GRAMMAR_COLOR}}': getHwDetailColor(hwGrammarStatus),
@@ -616,7 +682,8 @@ app.get('/report', async (req, res) => {
 
     try {
         const pageData = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-        const parsedData = parseDailyReportData(pageData);
+        // [수정] parseDailyReportData가 비동기(async)가 되었으므로 await 추가
+        const parsedData = await parseDailyReportData(pageData);
         const finalHtml = fillReportTemplate(reportTemplate, parsedData);
         res.send(finalHtml);
     } catch (error) {
@@ -741,6 +808,7 @@ cron.schedule('0 22 * * *', async () => {
 
 
 // --- [신규] 2. 월간 리포트 URL 자동 생성 (매달 마지막 주 금요일 밤 9시) ---
+// [수정] 월간 리포트 생성 로직이 비동기 parseDailyReportData를 사용하므로 수정
 cron.schedule('0 21 * * 5', async () => {
     console.log('--- 🏃‍♂️ [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
     
@@ -794,7 +862,8 @@ cron.schedule('0 21 * * 5', async () => {
                 })
             });
             
-            const monthPages = progressData.results.map(parseDailyReportData);
+            // [수정] parseDailyReportData가 비동기이므로 Promise.all() 사용
+            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
             if (monthPages.length === 0) {
                 console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
                 continue;
