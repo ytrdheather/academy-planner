@@ -933,7 +933,9 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
                         // [주의] '학생' 속성이 '학생 명부 DB'와 '관계형'으로 연결되어 있어야 함
                         // (이름으로 검색하려면, '학생' 속성의 롤업 속성이 필요함)
                         // (임시로 Title 속성에서 학생 이름을 검색)
-                        { property: 'Title', title: { contains: studentName } },
+                        // ▼ [수정] 'Title' -> '이름'
+                        { property: '이름', title: { contains: studentName } },
+                        // ▲ [수정]
                         { property: '리포트 월', rich_text: { equals: lastMonthString } }
                     ]
                 },
@@ -964,6 +966,7 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 // =======================================================================
 
 // --- [신규] 1. 데일리 리포트 URL 자동 생성 (매일 밤 10시) ---
+// [수정] 헤더님 요청: 개별 페이지 오류가 전체를 중단시키지 않도록 try...catch 추가
 cron.schedule('0 22 * * *', async () => {
     console.log('--- 🏃‍♂️ [데일리 리포트] 자동화 스케줄 실행 (매일 밤 10시) ---');
     
@@ -972,9 +975,13 @@ cron.schedule('0 22 * * *', async () => {
         return;
     }
 
+    let pages = [];
+    let dateString = '';
+
     try {
         // [수정] '오늘' 날짜를 KST 기준으로 계산 (범위 필터로 변경)
-        const { start, end, dateString } = getKSTTodayRange();
+        const { start, end, dateString: kstDateString } = getKSTTodayRange();
+        dateString = kstDateString; // 상위 스코프 변수에 할당
         
         const filter = { 
             and: [
@@ -988,7 +995,7 @@ cron.schedule('0 22 * * *', async () => {
             body: JSON.stringify({ filter: filter })
         });
         
-        const pages = data.results;
+        pages = data.results;
         if (!pages || pages.length === 0) {
             console.log(`[데일리 리포트] ${dateString} 날짜에 해당하는 진도 페이지가 없습니다.`);
             return;
@@ -996,14 +1003,25 @@ cron.schedule('0 22 * * *', async () => {
 
         console.log(`[데일리 리포트] 총 ${pages.length}개의 오늘 진도 페이지를 찾았습니다.`);
 
-        for (const page of pages) {
-            const pageId = page.id;
+    } catch (error) {
+        console.error('--- ❌ [데일리 리포트] 자동화 스케줄 중 (페이지 조회 단계) 오류 발생 ---', error);
+        return; // 페이지 조회부터 실패하면 중단
+    }
+
+    // --- [신규] 개별 페이지 업데이트 로직 (오류 분리) ---
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const page of pages) {
+        const pageId = page.id;
+        try {
             // [수정] localhost -> DOMAIN_URL (배포용)
             const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${dateString}`;
 
             const currentUrl = page.properties['데일리리포트URL']?.url;
             if (currentUrl === reportUrl) {
                 console.log(`[데일리 리포트] ${pageId} - 이미 URL이 존재합니다. (스킵)`);
+                successCount++; // 이미 있으므로 성공으로 간주
                 continue;
             }
 
@@ -1011,17 +1029,23 @@ cron.schedule('0 22 * * *', async () => {
                 method: 'PATCH',
                 body: JSON.stringify({
                     properties: {
+                        // [중요] '진도 관리 DB'에 '데일리리포트URL' (URL 타입) 속성이 있는지 확인!
                         '데일리리포트URL': { url: reportUrl }
                     }
                 })
             });
             console.log(`[데일리 리포트] ${pageId} - URL 저장 성공: ${reportUrl}`);
-        }
-        console.log('--- ✅ [데일리 리포트] 자동화 스케줄 완료 ---');
+            successCount++;
 
-    } catch (error) {
-        console.error('--- ❌ [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+        } catch (pageError) {
+            // [신규] 개별 페이지 오류 기록
+            console.error(`--- ❌ [데일리 리포트] ${pageId} 업데이트 실패 ---`, pageError.message);
+            failCount++;
+        }
     }
+    
+    console.log(`--- ✅ [데일리 리포트] 자동화 스케줄 완료 (성공: ${successCount} / 실패: ${failCount}) ---`);
+    
 }, {
     timezone: "Asia/Seoul"
 });
@@ -1180,7 +1204,9 @@ cron.schedule('0 21 * * 5', async () => {
                     body: JSON.stringify({
                         parent: { database_id: MONTHLY_REPORT_DB_ID },
                         properties: {
-                            'Title': { title: [{ text: { content: reportTitle } }] },
+                            // ▼ [수정] 'Title' -> '이름'
+                            '이름': { title: [{ text: { content: reportTitle } }] },
+                            // ▲ [수정]
                             '학생': { relation: [{ id: studentPageId }] },
                             '리포트 월': { rich_text: [{ text: { content: monthString } }] },
                             '월간리포트URL': { url: reportUrl },
