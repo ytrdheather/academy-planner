@@ -30,7 +30,7 @@ const PORT = process.env.PORT || 5001; // Render의 PORT 또는 로컬 5001
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-// [수정] 'src' 폴더로 이동함에 따라 public 폴더의 상대 경로가 변경됩니다.
+// [유지] public 폴더의 상대 경로는 'api/index.js' 기준 '../public'이 맞습니다.
 const publicPath = path.join(__dirname, '../public');
 
 // [신규] Gemini AI 클라이언트 설정
@@ -312,9 +312,17 @@ async function fetchProgressData(req, res, parseFunction) {
         // [수정] '날짜' -> '🕐 날짜'
         filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
     } else { // 기본값 'today'
-        const todayStr = getKSTDateString(); // KST 기준 '오늘' (YYYY-MM-DD)
-        // [수정] '날짜' -> '🕐 날짜'
-        filterConditions.push({ property: '🕐 날짜', date: { equals: todayStr } });
+        // [수정] KST '오늘' 날짜를 '문자열'이 아닌 '범위(range)'로 필터링 (시간대 문제 해결)
+        const nowKST = getKSTDate(); // (예: 11월 8일 09:30 KST)
+        nowKST.setHours(0, 0, 0, 0); // (11월 8일 00:00 KST)
+        const todayStartStr = nowKST.toISOString(); // (예: "2025-11-07T15:00:00.000Z")
+        
+        nowKST.setHours(23, 59, 59, 999); // (11월 8일 23:59 KST)
+        const todayEndStr = nowKST.toISOString(); // (예: "2025-11-08T14:59:59.999Z")
+        
+        // [수정] 'equals' 대신 'on_or_after'와 'on_or_before'를 사용
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: todayStartStr } });
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: todayEndStr } });
     }
 
     const pages = [];
@@ -774,8 +782,7 @@ cron.schedule('0 22 * * *', async () => {
 
         for (const page of pages) {
             const pageId = page.id;
-            // [수정] localhost -> DOMAIN_URL (배포용)
-            const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${today}`;
+            const reportUrl = `http://localhost:${PORT}/report?pageId=${pageId}&date=${today}`; // (주의: 배포 시 'localhost'를 실제 도메인으로 변경)
 
             const currentUrl = page.properties['데일리리포트URL']?.url;
             if (currentUrl === reportUrl) {
@@ -857,9 +864,7 @@ cron.schedule('0 21 * * 5', async () => {
                 })
             });
             
-            // [수정] parseDailyReportData가 async가 되었으므로 Promise.all() 사용
-            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
-            
+            const monthPages = progressData.results.map(parseDailyReportData);
             if (monthPages.length === 0) {
                 console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
                 continue;
@@ -913,8 +918,7 @@ cron.schedule('0 21 * * 5', async () => {
             
             // '월간 리포트 DB'에 새 페이지로 저장
             const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
-            // [수정] localhost -> DOMAIN_URL (배포용)
-            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
+            const reportUrl = `http://localhost:${PORT}/monthly-report?studentId=${studentPageId}&month=${monthString}`; // (주의: 이 API는 아직 안 만듦! / 배포 시 도메인 변경)
 
             const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
@@ -983,8 +987,6 @@ cron.schedule('0 21 * * 5', async () => {
 
 
 // --- 서버 실행 ---
-// [수정] '127.0.0.1'을 제거하고, '0.0.0.0'을 추가해야 Render의 외부 접속(0.0.0.0)이 가능해집니다.
-app.listen(PORT, '0.0.0.0', () => {
-    // [수정] localhost -> 0.0.0.0 (또는 그냥 포트만)
-    console.log(`✅ 최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
+app.listen(PORT, '127.0.0.1', () => {
+    console.log(`✅ 최종 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
