@@ -30,7 +30,7 @@ const PORT = process.env.PORT || 5001; // Render의 PORT 또는 로컬 5001
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-// [유지] public 폴더의 상대 경로는 'api/index.js' 기준 '../public'이 맞습니다.
+// [유지] public 폴더의 상대 경로는 'api/index.js' 기준 '../public'이 맞습니다. (src 폴더 구조 기준)
 const publicPath = path.join(__dirname, '../public');
 
 // [신규] Gemini AI 클라이언트 설정
@@ -132,25 +132,28 @@ app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 't
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
-// --- [신규] 헬퍼 함수: 한국 시간(KST) 기준 날짜 반환 ---
-function getKSTDate() {
-    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-}
-
-// [신규] 헬퍼 함수: KST Date 객체를 YYYY-MM-DD 문자열로 변환
-function getKSTDateString() {
-    const now = getKSTDate();
-    const options = {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        timeZone: 'Asia/Seoul'
+// --- [신규] 헬퍼 함수: KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환 ---
+function getKSTTodayRange() {
+    const now = new Date(); // 현재 UTC 시간
+    const kstOffset = 9 * 60 * 60 * 1000; // KST는 UTC+9
+    const kstNow = new Date(now.getTime() + kstOffset); // 현재 KST 시간 (값)
+    
+    // KST 날짜 문자열 (YYYY-MM-DD)
+    const kstDateString = kstNow.toISOString().split('T')[0]; // "2025-11-08" (KST 기준)
+    
+    // KST 00:00:00
+    const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
+    // KST 23:59:59
+    const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
+    
+    return {
+        start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
+        end: end.toISOString(),     // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
+        dateString: kstDateString    // URL용 (예: "2025-11-08")
     };
-    // en-CA (Canadian English) 로케일이 YYYY-MM-DD 형식을 반환합니다.
-    return new Intl.DateTimeFormat('en-CA', options).format(now);
 }
 
-// [신규] 헬퍼 함수: 날짜를 'YYYY년 MM월 DD일 (요일)' 형식으로 변환 ---
+// [유지] 헬퍼 함수: 날짜를 'YYYY년 MM월 DD일 (요일)' 형식으로 변환 ---
 function getKoreanDate(dateString) {
     const date = new Date(dateString);
     const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' };
@@ -187,7 +190,7 @@ async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
     // [수정] '날짜' -> '🕐 날짜'
-    const pageDate = props['🕐 날짜']?.date?.start || getKSTDateString();
+    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; // [수정] KST 날짜 사용
     
     let assignedTeachers = [];
     if (props['담당쌤']?.rollup?.array) {
@@ -313,16 +316,11 @@ async function fetchProgressData(req, res, parseFunction) {
         filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
     } else { // 기본값 'today'
         // [수정] KST '오늘' 날짜를 '문자열'이 아닌 '범위(range)'로 필터링 (시간대 문제 해결)
-        const nowKST = getKSTDate(); // (예: 11월 8일 09:30 KST)
-        nowKST.setHours(0, 0, 0, 0); // (11월 8일 00:00 KST)
-        const todayStartStr = nowKST.toISOString(); // (예: "2025-11-07T15:00:00.000Z")
-        
-        nowKST.setHours(23, 59, 59, 999); // (11월 8일 23:59 KST)
-        const todayEndStr = nowKST.toISOString(); // (예: "2025-11-08T14:59:59.999Z")
+        const { start, end } = getKSTTodayRange();
         
         // [수정] 'equals' 대신 'on_or_after'와 'on_or_before'를 사용
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: todayStartStr } });
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: todayEndStr } });
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
     }
 
     const pages = [];
@@ -495,7 +493,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         const properties = {
             '이름': { title: [{ text: { content: studentName } }] },
             // [수정] '날짜' -> '🕐 날짜' (KST 기준)
-            '🕐 날짜': { date: { start: getKSTDateString() } },
+            '🕐 날짜': { date: { start: getKSTTodayRange().dateString } }, // [수정] KST 날짜 사용
         };
         const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
         const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
@@ -762,10 +760,15 @@ cron.schedule('0 22 * * *', async () => {
     }
 
     try {
-        // [수정] '오늘' 날짜를 KST 기준으로 계산
-        const today = getKSTDateString();
-        // [수정] '날짜' -> '🕐 날짜'
-        const filter = { property: '🕐 날짜', date: { equals: today } };
+        // [수정] '오늘' 날짜를 KST 기준으로 계산 (범위 필터로 변경)
+        const { start, end, dateString } = getKSTTodayRange();
+        
+        const filter = { 
+            and: [
+                { property: '🕐 날짜', date: { on_or_after: start } },
+                { property: '🕐 날짜', date: { on_or_before: end } }
+            ]
+        };
         
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
@@ -774,7 +777,7 @@ cron.schedule('0 22 * * *', async () => {
         
         const pages = data.results;
         if (!pages || pages.length === 0) {
-            console.log(`[데일리 리포트] ${today} 날짜에 해당하는 진도 페이지가 없습니다.`);
+            console.log(`[데일리 리포트] ${dateString} 날짜에 해당하는 진도 페이지가 없습니다.`);
             return;
         }
 
@@ -782,7 +785,8 @@ cron.schedule('0 22 * * *', async () => {
 
         for (const page of pages) {
             const pageId = page.id;
-            const reportUrl = `http://localhost:${PORT}/report?pageId=${pageId}&date=${today}`; // (주의: 배포 시 'localhost'를 실제 도메인으로 변경)
+            // [수정] localhost -> DOMAIN_URL (배포용)
+            const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${dateString}`;
 
             const currentUrl = page.properties['데일리리포트URL']?.url;
             if (currentUrl === reportUrl) {
@@ -815,7 +819,8 @@ cron.schedule('0 21 * * 5', async () => {
     console.log('--- 🏃‍♂️ [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
     
     // [수정] '오늘'을 KST 기준으로 생성
-    const today = getKSTDate();
+    const { dateString } = getKSTTodayRange();
+    const today = new Date(dateString); // KST 기준 '오늘' Date 객체
     
     const nextFriday = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
     if (today.getMonth() === nextFriday.getMonth()) {
@@ -864,7 +869,9 @@ cron.schedule('0 21 * * 5', async () => {
                 })
             });
             
-            const monthPages = progressData.results.map(parseDailyReportData);
+            // [수정] parseDailyReportData가 async가 되었으므로 Promise.all() 사용
+            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
+            
             if (monthPages.length === 0) {
                 console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
                 continue;
@@ -918,7 +925,8 @@ cron.schedule('0 21 * * 5', async () => {
             
             // '월간 리포트 DB'에 새 페이지로 저장
             const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
-            const reportUrl = `http://localhost:${PORT}/monthly-report?studentId=${studentPageId}&month=${monthString}`; // (주의: 이 API는 아직 안 만듦! / 배포 시 도메인 변경)
+            // [수정] localhost -> DOMAIN_URL (배포용)
+            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
 
             const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
@@ -987,6 +995,8 @@ cron.schedule('0 21 * * 5', async () => {
 
 
 // --- 서버 실행 ---
-app.listen(PORT, '127.0.0.1', () => {
-    console.log(`✅ 최종 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+// [수정] '127.0.0.1'을 제거하고, '0.0.0.0'을 추가해야 Render의 외부 접속(0.0.0.0)이 가능해집니다.
+app.listen(PORT, '0.0.0.0', () => {
+    // [수정] localhost -> 0.0.0.0 (또는 그냥 포트만)
+    console.log(`✅ 최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
 });
