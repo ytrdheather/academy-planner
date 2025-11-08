@@ -695,7 +695,6 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] '학생' (Relation)
                         { property: '학생', relation: { contains: studentId } },
                         { property: '리포트 월', rich_text: { equals: month } }
                     ]
@@ -729,7 +728,6 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] '학생' (Relation) -> '이름' (Title)
                         { property: '이름', title: { equals: studentName } },
                         { property: '🕐 날짜', date: { on_or_after: firstDay } },
                         { property: '🕐 날짜', date: { on_or_before: lastDay } }
@@ -858,7 +856,6 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] 'Title' -> '이름'
                         { property: '이름', title: { contains: studentName } },
                         { property: '리포트 월', rich_text: { equals: lastMonthString } }
                     ]
@@ -886,9 +883,13 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 
 // --- [신규] 10월 리포트 수동 생성용 임시 API ---
 // (이전 Cron Job 로직을 기반으로 '지난 달' 리포트를 강제로 생성합니다)
-// ▼ [수정] requireAuth 미들웨어 제거
 app.get('/api/manual-monthly-report-gen', async (req, res) => {
     console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
+    
+    // ▼ [수정] URL 쿼리 대신 "Test 원장" 학생으로 이름 고정
+    const targetStudentName = "Test 원장";
+    console.log(`[수동 월간 리포트] 타겟 학생 고정: ${targetStudentName}`);
+    // ▲ [수정]
     
     // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
     const { dateString } = getKSTTodayRange();
@@ -907,9 +908,18 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
     }
 
     try {
+        // ▼ [수정] "Test 원장" 학생만 조회하도록 필터 고정
+        const studentQueryFilter = {
+            property: '이름',
+            title: { equals: targetStudentName }
+        };
+
         const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({ filter: studentQueryFilter }) // 필터 적용
         });
+        // ▲ [수정]
+
         const students = studentData.results;
         console.log(`[수동 월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
         
@@ -932,7 +942,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation) -> '이름' (Title)
                                 { property: '이름', title: { equals: studentName } },
                                 { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
                                 { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
@@ -1001,7 +1010,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation)
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1033,9 +1041,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                         body: JSON.stringify({
                             parent: { database_id: MONTHLY_REPORT_DB_ID },
                             properties: {
-                                // ▼ [수정] 'Title' -> '이름'
                                 '이름': { title: [{ text: { content: reportTitle } }] },
-                                // ▼ [수정] '학생' (Relation)
                                 '학생': { relation: [{ id: studentPageId }] },
                                 '리포트 월': { rich_text: [{ text: { content: monthString } }] },
                                 '월간리포트URL': { url: reportUrl },
@@ -1188,7 +1194,6 @@ cron.schedule('0 21 * * 5', async () => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation) -> '이름' (Title)
                                 { property: '이름', title: { equals: studentName } },
                                 { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
                                 { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
@@ -1259,7 +1264,6 @@ cron.schedule('0 21 * * 5', async () => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation)
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1294,9 +1298,7 @@ cron.schedule('0 21 * * 5', async () => {
                         body: JSON.stringify({
                             parent: { database_id: MONTHLY_REPORT_DB_ID },
                             properties: {
-                                // ▼ [수정] 'Title' -> '이름'
                                 '이름': { title: [{ text: { content: reportTitle } }] },
-                                // ▼ [수정] '학생' (Relation)
                                 '학생': { relation: [{ id: studentPageId }] },
                                 '리포트 월': { rich_text: [{ text: { content: monthString } }] },
                                 '월간리포트URL': { url: reportUrl },
