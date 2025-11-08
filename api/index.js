@@ -149,7 +149,7 @@ function getKSTTodayRange() {
     return {
         start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
         end: end.toISOString(),     // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
-        dateString: kstDateString    // URL용 (예: "2025-11-08")
+        dateString: kstDateString   // URL용 (예: "2025-11-08")
     };
 }
 
@@ -540,6 +540,16 @@ try {
     console.error('❌ dailyreport.html 템플릿 파일을 읽을 수 없습니다. (경로: public/views/dailyreport.html)', e);
 }
 
+// --- [신규] 월간 리포트 템플릿 로드 ---
+let monthlyReportTemplate = '';
+try {
+    monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
+    console.log('✅ monthlyreport.html 템플릿을 성공적으로 불러왔습니다.');
+} catch (e) {
+    console.error('❌ monthlyreport.html 템플릿 파일을 읽을 수 없습니다. (경로: public/views/monthlyreport.html)', e);
+}
+// --- [신규] ---
+
 function getReportColors(statusOrScore, type) {
     // #5bb3ac (초록), #72aaa6 (회청), #ffde59 (노랑), #ff5757 (빨강)
     const colors = {
@@ -692,6 +702,209 @@ app.get('/report', async (req, res) => {
         res.status(500).send(`리포트 생성 중 오류가 발생했습니다: ${error.message}`);
     }
 });
+
+// =======================================================================
+// [신규] 월간 리포트 동적 생성 API (View)
+// =======================================================================
+app.get('/monthly-report', async (req, res) => {
+    const { studentId, month } = req.query; // (예: studentId=page-id, month=2025-11)
+    
+    if (!studentId || !month) {
+        return res.status(400).send('필수 정보(studentId, month)가 누락되었습니다.');
+    }
+    if (!monthlyReportTemplate) {
+        return res.status(500).send('서버 오류: 월간 리포트 템플릿을 읽을 수 없습니다.');
+    }
+    if (!MONTHLY_REPORT_DB_ID || !PROGRESS_DATABASE_ID || !STUDENT_DATABASE_ID) {
+        return res.status(500).send('서버 오류: DB ID가 설정되지 않았습니다.');
+    }
+
+    try {
+        // --- 1. '월간 리포트 DB'에서 통계 및 AI 요약 조회 ---
+        const reportQuery = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '학생', relation: { contains: studentId } },
+                        { property: '리포트 월', rich_text: { equals: month } }
+                    ]
+                },
+                page_size: 1
+            })
+        });
+
+        if (reportQuery.results.length === 0) {
+            return res.status(404).send(`${month}월 리포트 데이터를 찾을 수 없습니다. (Cron Job이 아직 실행되지 않았거나 실패했을 수 있습니다.)`);
+        }
+
+        const reportProps = reportQuery.results[0].properties;
+        
+        // '학생 명부' DB에서 학생 ID로 이름 조회 (RT-Check Point 공지에 필요)
+        let studentName = '학생';
+        try {
+            const studentPage = await fetchNotion(`https://api.notion.com/v1/pages/${studentId}`);
+            studentName = studentPage.properties['이름']?.title?.[0]?.plain_text || '학생';
+        } catch (e) {
+            console.error('학생 이름 조회 실패:', e.message);
+        }
+
+        const stats = {
+            studentName: studentName, // 헤더님 요청
+            hwAvg: reportProps['숙제수행율(평균)']?.number ?? 0,
+            vocabAvg: reportProps['어휘점수(평균)']?.number ?? 0,
+            grammarAvg: reportProps['문법점수(평균)']?.number ?? 0,
+            totalBooks: reportProps['총 읽은 권수']?.number ?? 0,
+            aiSummary: reportProps['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
+        };
+
+        // --- 2. '진도 관리 DB'에서 독서 목록 상세 및 출석일수 조회 (헤더님 요청) ---
+        const [year, monthNum] = month.split('-').map(Number);
+        const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
+        const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0]; // 해당 월의 마지막 날
+        
+        const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '학생', relation: { contains: studentId } },
+                        { property: '🕐 날짜', date: { on_or_after: firstDay } },
+                        { property: '🕐 날짜', date: { on_or_before: lastDay } }
+                    ]
+                },
+                page_size: 100 // 한 달(최대 31개) 데이터를 모두 가져옴
+            })
+        });
+
+        const dailyPages = await Promise.all(progressQuery.results.map(parseDailyReportData));
+        
+        const attendanceDays = dailyPages.length; // '출석 수업일수'
+        const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
+
+        // [수정] 헤더님 요청: 시리즈, 제목, AR, Lexile 순서, 중복 제거
+        const bookMap = new Map();
+        dailyPages.forEach(page => {
+            const bookTitle = page.reading.bookTitle;
+            // 유효한 책 제목만 (중복 제외)
+            if (bookTitle && bookTitle !== '읽은 책 없음' && !bookMap.has(bookTitle)) {
+                bookMap.set(bookTitle, {
+                    series: page.reading.bookSeries || '시리즈 없음',
+                    title: bookTitle,
+                    ar: page.reading.bookAR ?? null,
+                    lexile: page.reading.bookLexile ?? null
+                });
+            }
+        });
+
+        let bookListHtml = '';
+        if (bookMap.size === 0) {
+            bookListHtml = '<li>이번 달에 읽은 원서가 없습니다.</li>';
+        } else {
+            bookMap.forEach(book => {
+                const arStr = book.ar ? `AR ${book.ar}` : '';
+                const lexStr = book.lexile ? `Lex ${book.lexile}L` : '';
+                let levelStr = (arStr || lexStr) ? `(${[arStr, lexStr].filter(Boolean).join(' / ')})` : '';
+                
+                bookListHtml += `<li class="mb-1">
+                    <span class="text-gray-500">[${book.series}]</span> ${book.title}
+                    ${levelStr ? `<span class="text-blue-600 ml-1 text-sm font-medium">${levelStr}</span>` : ''}
+                </li>`;
+            });
+        }
+        
+        // --- 3. 템플릿에 데이터 채우기 ---
+        
+        const hwScore = stats.hwAvg;
+        const vocabScore = stats.vocabAvg;
+        const grammarScore = stats.grammarAvg;
+
+        // 점수별 색상
+        const getScoreColorClass = (score) => {
+            if (score >= 80) return 'text-teal-600';
+            if (score >= 70) return 'text-blue-600';
+            if (score >= 50) return 'text-yellow-600';
+            return 'text-red-600'; // 70점 미만이 아닌 50점 미만
+        };
+        const hwScoreColorClass = (hwScore < 70) ? 'text-red-600' : 'text-teal-600'; // RT-Check Point는 70점 기준
+
+        // RT-Check Point 동적 메시지 (헤더님 요청)
+        let rtNotice = {};
+        if (hwScore < 70) {
+            rtNotice = {
+                title: '📢 숙제 수행율 70점 미만',
+                bgColor: 'bg-red-50',
+                borderColor: 'border-red-500',
+                titleColor: 'text-red-900',
+                textColor: 'text-red-800'
+            };
+        } else {
+            rtNotice = {
+                title: '👍 훌륭합니다! (숙제 수행율 70점 이상)',
+                bgColor: 'bg-teal-50',
+                borderColor: 'border-teal-500',
+                titleColor: 'text-teal-900',
+                textColor: 'text-teal-800'
+            };
+        }
+
+        // 월 표시 (예: 2025년 11월)
+        const monthDisplay = `${year}년 ${monthNum}월`;
+
+        const replacements = {
+            '{{STUDENT_NAME}}': stats.studentName,
+            '{{REPORT_MONTH}}': monthDisplay,
+            '{{START_DATE}}': firstDay,
+            '{{END_DATE}}': lastDay,
+            
+            // RT-Check Point
+            '{{HW_AVG_SCORE}}': hwScore,
+            '{{HW_SCORE_COLOR}}': hwScoreColorClass, // 70점 기준
+            
+            // RT-Check Point 공지
+            '{{RT_NOTICE_BG_COLOR}}': rtNotice.bgColor,
+            '{{RT_NOTICE_BORDER_COLOR}}': rtNotice.borderColor,
+            '{{RT_NOTICE_TITLE_COLOR}}': rtNotice.titleColor,
+            '{{RT_NOTICE_TITLE}}': rtNotice.title,
+            '{{RT_NOTICE_TEXT_COLOR}}': rtNotice.textColor,
+            // (메시지 본문은 템플릿에 고정됨)
+
+            // AI 요약
+            '{{AI_SUMMARY}}': stats.aiSummary, // CSS 'whitespace-pre-line'이 \n을 <br>로 자동 변환
+            
+            // 통계 그리드
+            '{{ATTENDANCE_DAYS}}': attendanceDays, // 헤더님 요청 (출석일수)
+            '{{TOTAL_DAYS_IN_MONTH}}': totalDaysInMonth,
+            '{{VOCAB_AVG_SCORE}}': vocabScore,
+            '{{VOCAB_SCORE_COLOR}}': getScoreColorClass(vocabScore), // 점수 구간별
+            '{{GRAMMAR_AVG_SCORE}}': grammarScore,
+            '{{GRAMMAR_SCORE_COLOR}}': getScoreColorClass(grammarScore), // 점수 구간별
+            '{{TOTAL_BOOKS_READ}}': stats.totalBooks, // Cron Job이 계산한 값
+
+            // 독서 목록 (헤더님 요청)
+            '{{BOOK_LIST_HTML}}': bookListHtml
+        };
+
+        let finalHtml = monthlyReportTemplate;
+        // {{BOOK_LIST_HTML}} 같이 긴 내용을 먼저 치환
+        finalHtml = finalHtml.replace(new RegExp('{{BOOK_LIST_HTML}}', 'g'), replacements['{{BOOK_LIST_HTML}}']);
+        
+        for (const [key, value] of Object.entries(replacements)) {
+            if (key === '{{BOOK_LIST_HTML}}') continue; // 이미 처리됨
+            finalHtml = finalHtml.replace(new RegExp(key, 'g'), value);
+        }
+        
+        // 혹시 치환되지 않은 플레이스홀더가 있다면 비워줌 (예: {{BOOK_LIST_TEXT}})
+        finalHtml = finalHtml.replace(/\{\{[A-Z_]+\}\}/g, '');
+
+        res.send(finalHtml);
+
+    } catch (error) {
+        console.error(`월간 리포트 생성 오류 (studentId: ${studentId}, month: ${month}):`, error);
+        res.status(500).send(`리포트 생성 중 오류가 발생했습니다: ${error.message}`);
+    }
+});
+
 
 // --- [신규] API 라우트: 월간 리포트 URL 조회 ---
 app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
