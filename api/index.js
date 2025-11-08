@@ -31,12 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 // [수정] 'src' 폴더로 이동함에 따라 public 폴더의 상대 경로가 변경됩니다.
-// '../public' -> 'public' (package.json과 같은 레벨이므로)
-const publicPath = path.join(__dirname, '../public'); // <-- 이 부분은 헤더님의 GitHub 구조에 따라 확인이 필요합니다.
-// 만약 api, public, package.json이 모두 src 폴더 *안에* 있다면,
-// __dirname은 /src/api/ 가 됩니다.
-// public은 /src/public/ 에 있습니다.
-// 따라서 ../public 이 맞습니다. (기존 코드 유지)
+const publicPath = path.join(__dirname, '../public');
 
 // [신규] Gemini AI 클라이언트 설정
 let genAI;
