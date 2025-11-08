@@ -962,7 +962,9 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 
 // --- [신규] 10월 리포트 수동 생성용 임시 API ---
 // (이전 Cron Job 로직을 기반으로 '지난 달' 리포트를 강제로 생성합니다)
-app.get('/api/manual-monthly-report-gen', requireAuth, async (req, res) => {
+// ▼ [수정] requireAuth 미들웨어 제거
+app.get('/api/manual-monthly-report-gen', async (req, res) => {
+// ▲ [수정]
     console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
     
     // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
