@@ -18,15 +18,25 @@ const {
     ENG_BOOKS_ID,
     GEMINI_API_KEY, // AI 요약 기능용 API 키
     MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
-    GRAMMAR_DB_ID, // [신규] 문법 숙제 관리 DB ID
-    PORT = 5001
+    GRAMMAR_DB_ID, // 문법 숙제 관리 DB ID
+    // [수정] .env에서 DOMAIN_URL을 읽어오도록 변경
+    DOMAIN_URL = 'http://localhost:5001' // 배포 시 .env 변수로 대체됨
 } = process.env;
+
+// [수정] PORT는 .env가 아닌 Render가 자동으로 주입하는 'process.env.PORT'를 사용해야 합니다.
+const PORT = process.env.PORT || 5001; // Render의 PORT 또는 로컬 5001
 
 // --- 기본 설정 ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const publicPath = path.join(__dirname, '../public');
+// [수정] 'src' 폴더로 이동함에 따라 public 폴더의 상대 경로가 변경됩니다.
+// '../public' -> 'public' (package.json과 같은 레벨이므로)
+const publicPath = path.join(__dirname, '../public'); // <-- 이 부분은 헤더님의 GitHub 구조에 따라 확인이 필요합니다.
+// 만약 api, public, package.json이 모두 src 폴더 *안에* 있다면,
+// __dirname은 /src/api/ 가 됩니다.
+// public은 /src/public/ 에 있습니다.
+// 따라서 ../public 이 맞습니다. (기존 코드 유지)
 
 // [신규] Gemini AI 클라이언트 설정
 let genAI;
@@ -237,9 +247,6 @@ async function parseDailyReportData(page) {
     // A. 학생 진도 DB의 '문법클래스' (롤업) 값을 가져옴 (예: "NN")
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
 
-    // [DEBUG] 1. '문법클래스' (예: "NN")가 제대로 넘어오는지 확인
-    // console.log(`[문법클래스 이름]: ${grammarClassName}`);
-
     let grammarTopic = '진도 해당 없음';
     let grammarHomework = '숙제 내용 없음';
 
@@ -251,7 +258,7 @@ async function parseDailyReportData(page) {
                     filter: {
                         // B. 문법 숙제 DB의 '반이름' (Select 속성)을 기준으로 필터링
                         property: '반이름', 
-                        select: { equals: grammarClassName } // [수정] 'title' -> 'select'
+                        select: { equals: grammarClassName } // [수정] 'select' 타입으로 조회
                     },
                     page_size: 1
                 })
@@ -259,11 +266,6 @@ async function parseDailyReportData(page) {
 
             if (grammarDbData.results.length > 0) {
                 const grammarProps = grammarDbData.results[0].properties;
-
-                // [DEBUG] 2. '문법 진도 내용'과 '문법 과제 내용'의 실제 데이터를 확인합니다.
-                // console.log("[Notion '문법 진도 내용' Property]:", JSON.stringify(grammarProps['문법 진도 내용'], null, 2));
-                // console.log("[Notion '문법 과제 내용' Property]:", JSON.stringify(grammarProps['문법 과제 내용'], null, 2));
-
                 // C. '문법 진도 내용' (rich_text 속성이라고 가정)
                 grammarTopic = getSimpleText(grammarProps['문법 진도 내용']) || '진도 해당 없음'; 
                 // D. '문법 과제 내용' (rich_text 속성이라고 가정)
@@ -530,6 +532,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
 let reportTemplate = '';
 try {
+    // [수정] public 폴더 경로 수정
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
     console.log('✅ dailyreport.html 템플릿을 성공적으로 불러왔습니다.');
 } catch (e) {
@@ -589,9 +592,6 @@ function getHwDetailColor(status) {
 function fillReportTemplate(template, data) {
     const { tests, homework, listening, reading, comment } = data;
     
-    // (데이터 예시가 없는 '문법 숙제 내용'은 임시 처리)
-    // const grammarHwDetail = '워크북 p.50 ~ p.52 풀기'; // (이 부분은 노션에 속성 추가 후 롤업 필요)
-    
     // HW 상세 포맷팅
     const hwGrammarStatus = getReportColors(homework.grammar, 'hw_detail');
     const hwVocabStatus = getReportColors(homework.vocabCards, 'hw_detail');
@@ -618,12 +618,12 @@ function fillReportTemplate(template, data) {
         
         '{{LISTENING_STATUS}}': formatReportValue(listening.study, 'listen_status'),
         '{{LISTENING_COLOR}}': getReportColors(listening.study, 'status'),
-        
+
         '{{READING_BOOK_STATUS}}': formatReportValue(reading.readingStatus, 'read_status'),
         '{{READING_BOOK_COLOR}}': getReportColors(reading.readingStatus, 'status'),
 
         '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarTopic || '진도 해당 없음', // [수정] 'comment.grammarClass' -> 'comment.grammarTopic'
-        '{{GRAMMAR_HW_DETAIL}}': comment.grammarHomework || '숙제 내용 없음', // [수정]
+        '{{GRAMMAR_HW_DETAIL}}': comment.grammarHomework || '숙제 내용 없음', // [수정] 
 
         '{{HW_GRAMMAR_STATUS}}': hwGrammarStatus,
         '{{HW_GRAMMAR_COLOR}}': getHwDetailColor(hwGrammarStatus),
@@ -682,7 +682,7 @@ app.get('/report', async (req, res) => {
 
     try {
         const pageData = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-        // [수정] parseDailyReportData가 비동기(async)가 되었으므로 await 추가
+        // [수정] parseDailyReportData가 async가 되었으므로 await 추가
         const parsedData = await parseDailyReportData(pageData);
         const finalHtml = fillReportTemplate(reportTemplate, parsedData);
         res.send(finalHtml);
@@ -779,7 +779,8 @@ cron.schedule('0 22 * * *', async () => {
 
         for (const page of pages) {
             const pageId = page.id;
-            const reportUrl = `http://localhost:${PORT}/report?pageId=${pageId}&date=${today}`; // (주의: 배포 시 'localhost'를 실제 도메인으로 변경)
+            // [수정] localhost -> DOMAIN_URL (배포용)
+            const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${today}`;
 
             const currentUrl = page.properties['데일리리포트URL']?.url;
             if (currentUrl === reportUrl) {
@@ -808,7 +809,6 @@ cron.schedule('0 22 * * *', async () => {
 
 
 // --- [신규] 2. 월간 리포트 URL 자동 생성 (매달 마지막 주 금요일 밤 9시) ---
-// [수정] 월간 리포트 생성 로직이 비동기 parseDailyReportData를 사용하므로 수정
 cron.schedule('0 21 * * 5', async () => {
     console.log('--- 🏃‍♂️ [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
     
@@ -862,8 +862,9 @@ cron.schedule('0 21 * * 5', async () => {
                 })
             });
             
-            // [수정] parseDailyReportData가 비동기이므로 Promise.all() 사용
+            // [수정] parseDailyReportData가 async가 되었으므로 Promise.all() 사용
             const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
+            
             if (monthPages.length === 0) {
                 console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
                 continue;
@@ -917,7 +918,8 @@ cron.schedule('0 21 * * 5', async () => {
             
             // '월간 리포트 DB'에 새 페이지로 저장
             const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
-            const reportUrl = `http://localhost:${PORT}/monthly-report?studentId=${studentPageId}&month=${monthString}`; // (주의: 이 API는 아직 안 만듦! / 배포 시 도메인 변경)
+            // [수정] localhost -> DOMAIN_URL (배포용)
+            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
 
             const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
@@ -986,7 +988,8 @@ cron.schedule('0 21 * * 5', async () => {
 
 
 // --- 서버 실행 ---
-app.listen(PORT, '127.0.0.1', () => {
-    console.log(`✅ 최종 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+// [수정] '127.0.0.1'을 제거하고, '0.0.0.0'을 추가해야 Render의 외부 접속(0.0.0.0)이 가능해집니다.
+app.listen(PORT, '0.0.0.0', () => {
+    // [수정] localhost -> 0.0.0.0 (또는 그냥 포트만)
+    console.log(`✅ 최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
 });
-
