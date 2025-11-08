@@ -19,18 +19,15 @@ const {
     GEMINI_API_KEY, // AI 요약 기능용 API 키
     MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
     GRAMMAR_DB_ID, // 문법 숙제 관리 DB ID
-    // [수정] .env에서 DOMAIN_URL을 읽어오도록 변경
     DOMAIN_URL = 'http://localhost:5001' // 배포 시 .env 변수로 대체됨
 } = process.env;
 
-// [수정] PORT는 .env가 아닌 Render가 자동으로 주입하는 'process.env.PORT'를 사용해야 합니다.
 const PORT = process.env.PORT || 5001; // Render의 PORT 또는 로컬 5001
 
 // --- 기본 설정 ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-// [유지] public 폴더의 상대 경로는 'api/index.js' 기준 '../public'이 맞습니다. (src 폴더 구조 기준)
 const publicPath = path.join(__dirname, '../public');
 
 // [신규] Gemini AI 클라이언트 설정
@@ -89,7 +86,6 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
         const isTitleProp = ['Title', '책제목', '이름'].includes(titlePropertyName);
-        // [수정] '반이름' 속성도 Title이 아닌 타입일 수 있으므로 분기 처리
         let filterBody;
         if (titlePropertyName === '반이름') {
             filterBody = { property: titlePropertyName, select: { equals: title } };
@@ -124,7 +120,7 @@ function requireAuth(req, res, next) {
     next();
 }
 
-// --- 페이지 라우트 (기존과 동일, management 제거) ---
+// --- 페이지 라우트 (기존과 동일) ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
@@ -138,18 +134,15 @@ function getKSTTodayRange() {
     const kstOffset = 9 * 60 * 60 * 1000; // KST는 UTC+9
     const kstNow = new Date(now.getTime() + kstOffset); // 현재 KST 시간 (값)
     
-    // KST 날짜 문자열 (YYYY-MM-DD)
     const kstDateString = kstNow.toISOString().split('T')[0]; // "2025-11-08" (KST 기준)
     
-    // KST 00:00:00
     const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
-    // KST 23:59:59
     const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
     
     return {
         start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
         end: end.toISOString(),     // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
-        dateString: kstDateString   // URL용 (예: "2025-11-08")
+        dateString: kstDateString     // URL용 (예: "2025-11-08")
     };
 }
 
@@ -171,7 +164,7 @@ const getRollupValue = (prop, isNumber = false) => {
         if (firstItem.type === 'rich_text' && firstItem.rich_text.length > 0) return firstItem.rich_text[0].plain_text;
         if (firstItem.type === 'number') return firstItem.number;
         if (firstItem.type === 'relation') return ''; // 관계형 자체는 빈값 처리
-        if (firstItem.type === 'select' && firstItem.select) return firstItem.select.name; // [수정] '선택' 속성 롤업 추가
+        if (firstItem.type === 'select' && firstItem.select) return firstItem.select.name; // '선택' 속성 롤업 추가
         if (firstItem.type === 'formula') {
             if (firstItem.formula.type === 'string') return firstItem.formula.string;
             if (firstItem.formula.type === 'number') return firstItem.formula.number;
@@ -185,12 +178,10 @@ const getRollupValue = (prop, isNumber = false) => {
 };
 
 // --- [신규] 헬퍼 함수: 데일리 리포트용 전체 파서 (async로 변경) ---
-// [수정] 함수를 async로 변경 (문법 DB를 별도 조회해야 하므로)
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-    // [수정] '날짜' -> '🕐 날짜'
-    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; // [수정] KST 날짜 사용
+    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; 
     
     let assignedTeachers = [];
     if (props['담당쌤']?.rollup?.array) {
@@ -241,10 +232,7 @@ async function parseDailyReportData(page) {
     };
 
     // --- [신규] 4. 문법 DB에서 진도/숙제 내용 가져오기 ---
-    
-    // A. 학생 진도 DB의 '문법클래스' (롤업) 값을 가져옴 (예: "NN")
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
-
     let grammarTopic = '진도 해당 없음';
     let grammarHomework = '숙제 내용 없음';
 
@@ -254,9 +242,8 @@ async function parseDailyReportData(page) {
                 method: 'POST',
                 body: JSON.stringify({
                     filter: {
-                        // B. 문법 숙제 DB의 '반이름' (Select 속성)을 기준으로 필터링
                         property: '반이름', 
-                        select: { equals: grammarClassName } // [수정] 'select' 타입으로 조회
+                        select: { equals: grammarClassName }
                     },
                     page_size: 1
                 })
@@ -264,9 +251,7 @@ async function parseDailyReportData(page) {
 
             if (grammarDbData.results.length > 0) {
                 const grammarProps = grammarDbData.results[0].properties;
-                // C. '문법 진도 내용' (rich_text 속성이라고 가정)
                 grammarTopic = getSimpleText(grammarProps['문법 진도 내용']) || '진도 해당 없음'; 
-                // D. '문법 과제 내용' (rich_text 속성이라고 가정)
                 grammarHomework = getSimpleText(grammarProps['문법 과제 내용']) || '숙제 내용 없음';
             }
         } catch (e) {
@@ -277,9 +262,9 @@ async function parseDailyReportData(page) {
     // 4. 코멘트
     const comment = {
         teacherComment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || '오늘의 코멘트가 없습니다.',
-        grammarClass: grammarClassName || '진도 해당 없음', // [수정] teacher.html 대시보드용 '문법반' 롤업
-        grammarTopic: grammarTopic, // [신규] dailyreport.html 리포트용 '오늘의 진도'
-        grammarHomework: grammarHomework // [신규] dailyreport.html 리포트용 '오늘의 숙제'
+        grammarClass: grammarClassName || '진도 해당 없음',
+        grammarTopic: grammarTopic, 
+        grammarHomework: grammarHomework 
     };
     
     // 5. [신규] 월간 리포트용 학생 ID (관계형)
@@ -302,7 +287,6 @@ async function parseDailyReportData(page) {
 
 
 // --- [공통] 데이터 조회 함수 (파서를 위 함수로 교체) ---
-// [수정] parseFunction이 async이므로 Promise.all()로 병렬 처리
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date, teacher } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
@@ -310,15 +294,10 @@ async function fetchProgressData(req, res, parseFunction) {
     }
 
     const filterConditions = [];
-    // [수정] '오늘' 날짜를 KST 기준으로 계산
     if (period === 'specific_date' && date) {
-        // [수정] '날짜' -> '🕐 날짜'
         filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
     } else { // 기본값 'today'
-        // [수정] KST '오늘' 날짜를 '문자열'이 아닌 '범위(range)'로 필터링 (시간대 문제 해결)
         const { start, end } = getKSTTodayRange();
-        
-        // [수정] 'equals' 대신 'on_or_after'와 'on_or_before'를 사용
         filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
         filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
     }
@@ -331,7 +310,6 @@ async function fetchProgressData(req, res, parseFunction) {
             method: 'POST',
             body: JSON.stringify({
                 filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
-                // [수정] '날짜' -> '🕐 날짜'
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
@@ -340,13 +318,8 @@ async function fetchProgressData(req, res, parseFunction) {
         hasMore = data.has_more; startCursor = data.next_cursor;
     }
 
-    // [수정] pages.map(parseFunction)은 이제 [Promise, Promise, ...] 배열을 반환
-    // Promise.all()을 사용해 모든 비동기 파싱이 완료될 때까지 기다림
     const parsedData = await Promise.all(pages.map(parseFunction));
-
-    let filteredData = parsedData;
-    // (프론트엔드에서 필터링하므로 백엔드 필터링 없음)
-    return filteredData;
+    return parsedData;
 }
 
 // --- API 라우트 (데이터 조회를 통합 파서로 변경) ---
@@ -492,8 +465,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
         const properties = {
             '이름': { title: [{ text: { content: studentName } }] },
-            // [수정] '날짜' -> '🕐 날짜' (KST 기준)
-            '🕐 날짜': { date: { start: getKSTTodayRange().dateString } }, // [수정] KST 날짜 사용
+            '🕐 날짜': { date: { start: getKSTTodayRange().dateString } }, 
         };
         const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
         const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
@@ -533,22 +505,21 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
 let reportTemplate = '';
 try {
-    // [수정] public 폴더 경로 수정
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
     console.log('✅ dailyreport.html 템플릿을 성공적으로 불러왔습니다.');
 } catch (e) {
-    console.error('❌ dailyreport.html 템플릿 파일을 읽을 수 없습니다. (경로: public/views/dailyreport.html)', e);
+    console.error('❌ dailyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
 }
 
-// --- [신규] 월간 리포트 템플릿 로드 ---
+// [신규] 월간 리포트 템플릿 로드
 let monthlyReportTemplate = '';
 try {
     monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
     console.log('✅ monthlyreport.html 템플릿을 성공적으로 불러왔습니다.');
 } catch (e) {
-    console.error('❌ monthlyreport.html 템플릿 파일을 읽을 수 없습니다. (경로: public/views/monthlyreport.html)', e);
+    console.error('❌ monthlyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
 }
-// --- [신규] ---
+
 
 function getReportColors(statusOrScore, type) {
     // #5bb3ac (초록), #72aaa6 (회청), #ffde59 (노랑), #ff5757 (빨강)
@@ -633,8 +604,8 @@ function fillReportTemplate(template, data) {
         '{{READING_BOOK_STATUS}}': formatReportValue(reading.readingStatus, 'read_status'),
         '{{READING_BOOK_COLOR}}': getReportColors(reading.readingStatus, 'status'),
 
-        '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarTopic || '진도 해당 없음', // [수정] 'comment.grammarClass' -> 'comment.grammarTopic'
-        '{{GRAMMAR_HW_DETAIL}}': comment.grammarHomework || '숙제 내용 없음', // [수정] 
+        '{{GRAMMAR_CLASS_TOPIC}}': comment.grammarTopic || '진도 해당 없음', 
+        '{{GRAMMAR_HW_DETAIL}}': comment.grammarHomework || '숙제 내용 없음', 
 
         '{{HW_GRAMMAR_STATUS}}': hwGrammarStatus,
         '{{HW_GRAMMAR_COLOR}}': getHwDetailColor(hwGrammarStatus),
@@ -653,7 +624,6 @@ function fillReportTemplate(template, data) {
     };
 
     return template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
-        // 정의되지 않은 값(null, undefined)이 템플릿에 그대로 노출되는 것을 방지
         const value = replacements[match];
         return value !== null && value !== undefined ? value : '';
     });
@@ -693,7 +663,6 @@ app.get('/report', async (req, res) => {
 
     try {
         const pageData = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-        // [수정] parseDailyReportData가 async가 되었으므로 await 추가
         const parsedData = await parseDailyReportData(pageData);
         const finalHtml = fillReportTemplate(reportTemplate, parsedData);
         res.send(finalHtml);
@@ -707,8 +676,8 @@ app.get('/report', async (req, res) => {
 // [신규] 월간 리포트 동적 생성 API (View)
 // =======================================================================
 app.get('/monthly-report', async (req, res) => {
-    const { studentId, month } = req.query; // (예: studentId=page-id, month=2025-11)
-    
+    const { studentId, month } = req.query; // (예: studentId=..., month=2025-10)
+
     if (!studentId || !month) {
         return res.status(400).send('필수 정보(studentId, month)가 누락되었습니다.');
     }
@@ -716,7 +685,7 @@ app.get('/monthly-report', async (req, res) => {
         return res.status(500).send('서버 오류: 월간 리포트 템플릿을 읽을 수 없습니다.');
     }
     if (!MONTHLY_REPORT_DB_ID || !PROGRESS_DATABASE_ID || !STUDENT_DATABASE_ID) {
-        return res.status(500).send('서버 오류: DB ID가 설정되지 않았습니다.');
+        return res.status(500).send('서버 오류: DB 환경변수가 설정되지 않았습니다.');
     }
 
     try {
@@ -726,6 +695,7 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
+                        // ▼ [수정] '학생' (Relation)
                         { property: '학생', relation: { contains: studentId } },
                         { property: '리포트 월', rich_text: { equals: month } }
                     ]
@@ -735,173 +705,134 @@ app.get('/monthly-report', async (req, res) => {
         });
 
         if (reportQuery.results.length === 0) {
-            return res.status(404).send(`${month}월 리포트 데이터를 찾을 수 없습니다. (Cron Job이 아직 실행되지 않았거나 실패했을 수 있습니다.)`);
+            return res.status(404).send(`[${month}]월 리포트 데이터를 찾을 수 없습니다. (DB 조회 실패)`);
         }
 
-        const reportProps = reportQuery.results[0].properties;
-        
-        // '학생 명부' DB에서 학생 ID로 이름 조회 (RT-Check Point 공지에 필요)
-        let studentName = '학생';
-        try {
-            const studentPage = await fetchNotion(`https://api.notion.com/v1/pages/${studentId}`);
-            studentName = studentPage.properties['이름']?.title?.[0]?.plain_text || '학생';
-        } catch (e) {
-            console.error('학생 이름 조회 실패:', e.message);
-        }
-
+        const reportData = reportQuery.results[0].properties;
+        const studentName = getRollupValue(reportData['학생이름 (롤업)']) || '학생';
         const stats = {
-            studentName: studentName, // 헤더님 요청
-            hwAvg: reportProps['숙제수행율(평균)']?.number ?? 0,
-            vocabAvg: reportProps['어휘점수(평균)']?.number ?? 0,
-            grammarAvg: reportProps['문법점수(평균)']?.number ?? 0,
-            totalBooks: reportProps['총 읽은 권수']?.number ?? 0,
-            aiSummary: reportProps['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
+            hwAvg: reportData['숙제수행율(평균)']?.number || 0,
+            vocabAvg: reportData['어휘점수(평균)']?.number || 0,
+            grammarAvg: reportData['문법점수(평균)']?.number || 0,
+            totalBooks: reportData['총 읽은 권수']?.number || 0,
+            aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.'
         };
 
-        // --- 2. '진도 관리 DB'에서 독서 목록 상세 및 출석일수 조회 (헤더님 요청) ---
+        // --- 2. '진도 관리 DB'에서 출석일수, 독서 목록 (상세) 조회 ---
         const [year, monthNum] = month.split('-').map(Number);
         const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
-        const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0]; // 해당 월의 마지막 날
-        
+        const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
+        const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
+
         const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
                     and: [
-                        { property: '학생', relation: { contains: studentId } },
+                        // ▼ [수정] '학생' (Relation) -> '이름' (Title)
+                        { property: '이름', title: { equals: studentName } },
                         { property: '🕐 날짜', date: { on_or_after: firstDay } },
                         { property: '🕐 날짜', date: { on_or_before: lastDay } }
                     ]
                 },
-                page_size: 100 // 한 달(최대 31개) 데이터를 모두 가져옴
+                page_size: 100 // 한 달 데이터 (최대 31개)
             })
         });
 
-        const dailyPages = await Promise.all(progressQuery.results.map(parseDailyReportData));
-        
-        const attendanceDays = dailyPages.length; // '출석 수업일수'
-        const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
+        const monthPages = await Promise.all(progressQuery.results.map(parseDailyReportData));
+        const attendanceDays = monthPages.length; // 출석일수
 
-        // [수정] 헤더님 요청: 시리즈, 제목, AR, Lexile 순서, 중복 제거
-        const bookMap = new Map();
-        dailyPages.forEach(page => {
-            const bookTitle = page.reading.bookTitle;
-            // 유효한 책 제목만 (중복 제외)
-            if (bookTitle && bookTitle !== '읽은 책 없음' && !bookMap.has(bookTitle)) {
-                bookMap.set(bookTitle, {
-                    series: page.reading.bookSeries || '시리즈 없음',
-                    title: bookTitle,
-                    ar: page.reading.bookAR ?? null,
-                    lexile: page.reading.bookLexile ?? null
-                });
-            }
-        });
+        // 독서 목록 (중복 제거)
+        const bookSet = new Set();
+        const bookListHtml = monthPages
+            .map(p => p.reading)
+            .filter(r => r.bookTitle && r.bookTitle !== '읽은 책 없음')
+            .map(r => {
+                // (시리즈, AR, Lexile이 없는 경우 'N/A'로 표시)
+                const series = r.bookSeries || '';
+                const ar = r.bookAR || 'N/A';
+                const lexile = r.bookLexile || 'N/A';
+                const title = r.bookTitle;
+                // [시리즈] 제목 (AR / Lexile)
+                const bookKey = `${series}|${title}|${ar}|${lexile}`;
+                return { key: bookKey, series, title, ar, lexile };
+            })
+            .filter(book => {
+                if (bookSet.has(book.key)) return false;
+                bookSet.add(book.key);
+                return true;
+            })
+            .map(book => {
+                const seriesText = book.series ? `[${book.series}] ` : '';
+                return `<li>${seriesText}${book.title} (AR ${book.ar} / ${book.lexile})</li>`;
+            })
+            .join('\n') || '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
-        let bookListHtml = '';
-        if (bookMap.size === 0) {
-            bookListHtml = '<li>이번 달에 읽은 원서가 없습니다.</li>';
-        } else {
-            bookMap.forEach(book => {
-                const arStr = book.ar ? `AR ${book.ar}` : '';
-                const lexStr = book.lexile ? `Lex ${book.lexile}L` : '';
-                let levelStr = (arStr || lexStr) ? `(${[arStr, lexStr].filter(Boolean).join(' / ')})` : '';
-                
-                bookListHtml += `<li class="mb-1">
-                    <span class="text-gray-500">[${book.series}]</span> ${book.title}
-                    ${levelStr ? `<span class="text-blue-600 ml-1 text-sm font-medium">${levelStr}</span>` : ''}
-                </li>`;
-            });
-        }
-        
-        // --- 3. 템플릿에 데이터 채우기 ---
-        
-        const hwScore = stats.hwAvg;
-        const vocabScore = stats.vocabAvg;
-        const grammarScore = stats.grammarAvg;
 
-        // 점수별 색상
-        const getScoreColorClass = (score) => {
-            if (score >= 80) return 'text-teal-600';
-            if (score >= 70) return 'text-blue-600';
-            if (score >= 50) return 'text-yellow-600';
-            return 'text-red-600'; // 70점 미만이 아닌 50점 미만
-        };
-        const hwScoreColorClass = (hwScore < 70) ? 'text-red-600' : 'text-teal-600'; // RT-Check Point는 70점 기준
+        // --- 3. 템플릿에 데이터 주입 ---
+        let html = monthlyReportTemplate;
 
-        // RT-Check Point 동적 메시지 (헤더님 요청)
-        let rtNotice = {};
+        // RT-Check Point (숙제 점수) 및 경고/칭찬 메시지
+        const hwScore = Math.round(stats.hwAvg);
+        const rtNotice = {};
         if (hwScore < 70) {
-            rtNotice = {
-                title: '📢 숙제 수행율 70점 미만',
-                bgColor: 'bg-red-50',
-                borderColor: 'border-red-500',
-                titleColor: 'text-red-900',
-                textColor: 'text-red-800'
-            };
+            rtNotice.bgColor = 'bg-red-50'; // 빨간색 배경
+            rtNotice.borderColor = 'border-red-400';
+            rtNotice.titleColor = 'text-red-900';
+            rtNotice.textColor = 'text-red-800';
+            rtNotice.title = '🚨 RT-Check Point 경고';
         } else {
-            rtNotice = {
-                title: '👍 훌륭합니다! (숙제 수행율 70점 이상)',
-                bgColor: 'bg-teal-50',
-                borderColor: 'border-teal-500',
-                titleColor: 'text-teal-900',
-                textColor: 'text-teal-800'
-            };
+            rtNotice.bgColor = 'bg-green-50'; // 초록색 배경
+            rtNotice.borderColor = 'border-green-400';
+            rtNotice.titleColor = 'text-green-900';
+            rtNotice.textColor = 'text-green-800';
+            rtNotice.title = '🎉 RT-Check Point 칭찬';
         }
 
-        // 월 표시 (예: 2025년 11월)
-        const monthDisplay = `${year}년 ${monthNum}월`;
+        // 테스트 점수 색상
+        const vocabScoreColor = (stats.vocabAvg < 80) ? 'text-red-600' : 'text-teal-600';
+        const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
 
         const replacements = {
-            '{{STUDENT_NAME}}': stats.studentName,
-            '{{REPORT_MONTH}}': monthDisplay,
+            '{{STUDENT_NAME}}': studentName,
+            '{{REPORT_MONTH}}': `${year}년 ${monthNum}월`,
             '{{START_DATE}}': firstDay,
             '{{END_DATE}}': lastDay,
             
-            // RT-Check Point
+            // RT-Check Point (숙제)
             '{{HW_AVG_SCORE}}': hwScore,
-            '{{HW_SCORE_COLOR}}': hwScoreColorClass, // 70점 기준
-            
-            // RT-Check Point 공지
+            '{{HW_SCORE_COLOR}}': (hwScore < 70) ? 'text-red-600' : 'text-teal-600',
             '{{RT_NOTICE_BG_COLOR}}': rtNotice.bgColor,
             '{{RT_NOTICE_BORDER_COLOR}}': rtNotice.borderColor,
             '{{RT_NOTICE_TITLE_COLOR}}': rtNotice.titleColor,
-            '{{RT_NOTICE_TITLE}}': rtNotice.title,
             '{{RT_NOTICE_TEXT_COLOR}}': rtNotice.textColor,
-            // (메시지 본문은 템플릿에 고정됨)
-
-            // AI 요약
-            '{{AI_SUMMARY}}': stats.aiSummary, // CSS 'whitespace-pre-line'이 \n을 <br>로 자동 변환
+            '{{RT_NOTICE_TITLE}}': rtNotice.title,
             
-            // 통계 그리드
-            '{{ATTENDANCE_DAYS}}': attendanceDays, // 헤더님 요청 (출석일수)
+            // AI 요약
+            '{{AI_SUMMARY}}': stats.aiSummary,
+            
+            // 월간 통계
+            '{{ATTENDANCE_DAYS}}': attendanceDays,
             '{{TOTAL_DAYS_IN_MONTH}}': totalDaysInMonth,
-            '{{VOCAB_AVG_SCORE}}': vocabScore,
-            '{{VOCAB_SCORE_COLOR}}': getScoreColorClass(vocabScore), // 점수 구간별
-            '{{GRAMMAR_AVG_SCORE}}': grammarScore,
-            '{{GRAMMAR_SCORE_COLOR}}': getScoreColorClass(grammarScore), // 점수 구간별
-            '{{TOTAL_BOOKS_READ}}': stats.totalBooks, // Cron Job이 계산한 값
-
-            // 독서 목록 (헤더님 요청)
-            '{{BOOK_LIST_HTML}}': bookListHtml
+            '{{VOCAB_AVG_SCORE}}': Math.round(stats.vocabAvg),
+            '{{VOCAB_SCORE_COLOR}}': vocabScoreColor,
+            '{{GRAMMAR_AVG_SCORE}}': Math.round(stats.grammarAvg),
+            '{{GRAMMAR_SCORE_COLOR}}': grammarScoreColor,
+            '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
+            
+            // 독서 목록
+            '{{BOOK_LIST_HTML}}': bookListHtml,
         };
 
-        let finalHtml = monthlyReportTemplate;
-        // {{BOOK_LIST_HTML}} 같이 긴 내용을 먼저 치환
-        finalHtml = finalHtml.replace(new RegExp('{{BOOK_LIST_HTML}}', 'g'), replacements['{{BOOK_LIST_HTML}}']);
-        
-        for (const [key, value] of Object.entries(replacements)) {
-            if (key === '{{BOOK_LIST_HTML}}') continue; // 이미 처리됨
-            finalHtml = finalHtml.replace(new RegExp(key, 'g'), value);
-        }
-        
-        // 혹시 치환되지 않은 플레이스홀더가 있다면 비워줌 (예: {{BOOK_LIST_TEXT}})
-        finalHtml = finalHtml.replace(/\{\{[A-Z_]+\}\}/g, '');
+        html = html.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
+            return replacements[match];
+        });
 
-        res.send(finalHtml);
+        res.send(html);
 
     } catch (error) {
-        console.error(`월간 리포트 생성 오류 (studentId: ${studentId}, month: ${month}):`, error);
-        res.status(500).send(`리포트 생성 중 오류가 발생했습니다: ${error.message}`);
+        console.error(`월간 리포트 렌더링 오류 (studentId: ${studentId}, month: ${month}):`, error);
+        res.status(500).send(`월간 리포트 렌더링 중 오류가 발생했습니다: ${error.message}`);
     }
 });
 
@@ -918,24 +849,17 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
     }
 
     try {
-        // 1. '지난 달' 문자열 생성 (예: '2025-10')
-        // [수정] KST 기준으로 날짜 계산
-        const requestedDate = new Date(date); // (date는 'YYYY-MM-DD' 문자열)
+        const requestedDate = new Date(date); 
         const lastMonth = new Date(requestedDate.getFullYear(), requestedDate.getMonth() - 1, 1);
         const lastMonthString = `${lastMonth.getFullYear()}-${(lastMonth.getMonth() + 1).toString().padStart(2, '0')}`; // "2025-10"
 
-        // 2. '월간 리포트 DB'에서 학생 이름과 리포트 월이 일치하는 항목 검색
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // [주의] '학생' 속성이 '학생 명부 DB'와 '관계형'으로 연결되어 있어야 함
-                        // (이름으로 검색하려면, '학생' 속성의 롤업 속성이 필요함)
-                        // (임시로 Title 속성에서 학생 이름을 검색)
                         // ▼ [수정] 'Title' -> '이름'
                         { property: '이름', title: { contains: studentName } },
-                        // ▲ [수정]
                         { property: '리포트 월', rich_text: { equals: lastMonthString } }
                     ]
                 },
@@ -964,25 +888,22 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 // (이전 Cron Job 로직을 기반으로 '지난 달' 리포트를 강제로 생성합니다)
 // ▼ [수정] requireAuth 미들웨어 제거
 app.get('/api/manual-monthly-report-gen', async (req, res) => {
-// ▲ [수정]
     console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
     
     // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
-    const todayForDate = new Date(); // e.g., 2025-11-09
-    const lastMonthDate = new Date(todayForDate.getFullYear(), todayForDate.getMonth() - 1, 1); // 2025-10-01
+    const { dateString } = getKSTTodayRange();
+    const today = new Date(dateString); // KST 기준 '오늘'
+    const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1); // 지난 달 1일
     
-    const currentYear = lastMonthDate.getFullYear(); // 2025
-    const currentMonth = lastMonthDate.getMonth(); // 9 (October, 0-indexed)
+    const currentYear = lastMonthDate.getFullYear();
+    const currentMonth = lastMonthDate.getMonth(); // (지난 달)
     const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-10"
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+    
+    console.log(`[수동 월간 리포트] ${monthString}월 리포트 생성을 시작합니다.`);
 
-    console.log(`🔥 [수동 월간 리포트] ${monthString}월 리포트 생성을 시작합니다.`);
-
-    // 2. Cron Job에서 나머지 로직 복사 (skip 로직 제외)
     if (!NOTION_ACCESS_TOKEN || !STUDENT_DATABASE_ID || !PROGRESS_DATABASE_ID || !MONTHLY_REPORT_DB_ID || !geminiModel) {
         console.error('[수동 월간 리포트] DB ID 또는 Gemini AI가 설정되지 않아 스케줄을 중단합니다.');
-        return res.status(500).json({ message: '서버 환경변수 설정 오류' });
+        return res.status(500).json({ success: false, message: '서버 환경변수(DB, AI)가 설정되지 않았습니다.' });
     }
 
     try {
@@ -992,143 +913,156 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
         const students = studentData.results;
         console.log(`[수동 월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
         
-        let processedCount = 0;
+        const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+        
+        let successCount = 0;
+        let failCount = 0;
 
         for (const student of students) {
             const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
             const studentName = student.properties['이름']?.title?.[0]?.plain_text;
             if (!studentName) continue;
 
-            console.log(`[수동 월간 리포트] ${studentName} 학생 통계 계산 중...`);
+            try {
+                console.log(`[수동 월간 리포트] ${studentName} 학생 통계 계산 중...`);
 
-            const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filter: {
-                        and: [
-                            { property: '학생', relation: { contains: studentPageId } },
-                            { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
-                            { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
-                        ]
-                    }
-                })
-            });
-            
-            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
-            
-            if (monthPages.length === 0) {
-                console.log(`[수동 월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
-                continue;
-            }
-
-            // (이하 로직은 Cron Job과 동일)
-            const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-            const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
-            const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
-            const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-            const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
-
-            const stats = {
-                hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
-                vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
-                grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
-                totalBooks: bookTitles.length,
-                bookList: bookTitles.join(', ') || '읽은 책 없음'
-            };
-
-            let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
-            if (geminiModel && comments) {
-                try {
-                    const prompt = `
-                        너는 15년 차 리디튜드 학습 컨설턴트야.
-                        아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
-                        
-                        [월간 통계]
-                        - 숙제 수행율(평균): ${stats.hwAvg}%
-                        - 어휘 점수(평균): ${stats.vocabAvg}점
-                        - 문법 점수(평균): ${stats.grammarAvg}점
-                        - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
-
-                        [일일 코멘트 모음]
-                        ${comments}
-                        
-                        [요청]
-                        위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
-                        학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
-                    `;
-                    const result = await geminiModel.generateContent(prompt);
-                    const response = await result.response;
-                    aiSummary = response.text();
-                    console.log(`[수동 월간 리포트] ${studentName} 학생 AI 요약 성공!`);
-                } catch (aiError) {
-                    console.error(`[수동 월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
-                    aiSummary = 'AI 요약 중 오류가 발생했습니다.';
-                }
-            }
-            
-            const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
-            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
-
-            const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filter: {
-                        and: [
-                            { property: '학생', relation: { contains: studentPageId } },
-                            { property: '리포트 월', rich_text: { equals: monthString } }
-                        ]
-                    },
-                    page_size: 1
-                })
-            });
-            
-            if (existingReport.results.length > 0) {
-                const existingPageId = existingReport.results[0].id;
-                await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        properties: {
-                            '월간리포트URL': { url: reportUrl },
-                            '숙제수행율(평균)': { number: stats.hwAvg },
-                            '어휘점수(평균)': { number: stats.vocabAvg },
-                            '문법점수(평균)': { number: stats.grammarAvg },
-                            '총 읽은 권수': { number: stats.totalBooks },
-                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
-                        }
-                    })
-                });
-                console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
-            } else {
-                await fetchNotion('https://api.notion.com/v1/pages', {
+                const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        parent: { database_id: MONTHLY_REPORT_DB_ID },
-                        properties: {
-                            '이름': { title: [{ text: { content: reportTitle } }] },
-                            '학생': { relation: [{ id: studentPageId }] },
-                            '리포트 월': { rich_text: [{ text: { content: monthString } }] },
-                            '월간리포트URL': { url: reportUrl },
-                            '숙제수행율(평균)': { number: stats.hwAvg },
-                            '어휘점수(평균)': { number: stats.vocabAvg },
-                            '문법점수(평균)': { number: stats.grammarAvg },
-                            '총 읽은 권수': { number: stats.totalBooks },
-                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        filter: {
+                            and: [
+                                // ▼ [수정] '학생' (Relation) -> '이름' (Title)
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+                                { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
+                            ]
                         }
                     })
                 });
-                console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+                
+                const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
+                
+                if (monthPages.length === 0) {
+                    console.log(`[수동 월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
+                    continue;
+                }
+
+                // (통계 계산 로직은 Cron Job과 동일)
+                const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
+                const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
+                const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
+                const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
+                const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
+
+                const stats = {
+                    hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
+                    vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
+                    grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
+                    totalBooks: bookTitles.length,
+                    bookList: bookTitles.join(', ') || '읽은 책 없음'
+                };
+                
+                // (AI 요약 로직은 Cron Job과 동일)
+                let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
+                if (geminiModel && comments) {
+                    try {
+                        const prompt = `
+                            너는 15년 차 리디튜드 학습 컨설턴트야.
+                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                            
+                            [월간 통계]
+                            - 숙제 수행율(평균): ${stats.hwAvg}%
+                            - 어휘 점수(평균): ${stats.vocabAvg}점
+                            - 문법 점수(평균): ${stats.grammarAvg}점
+                            - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
+
+                            [일일 코멘트 모음]
+                            ${comments}
+                            
+                            [요청]
+                            위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
+                            학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                        `;
+                        const result = await geminiModel.generateContent(prompt);
+                        const response = await result.response;
+                        aiSummary = response.text();
+                    } catch (aiError) {
+                        console.error(`[수동 월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
+                        aiSummary = 'AI 요약 중 오류가 발생했습니다.';
+                    }
+                }
+                
+                const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
+                const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
+
+                const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        filter: {
+                            and: [
+                                // ▼ [수정] '학생' (Relation)
+                                { property: '학생', relation: { contains: studentPageId } },
+                                { property: '리포트 월', rich_text: { equals: monthString } }
+                            ]
+                        },
+                        page_size: 1
+                    })
+                });
+                
+                if (existingReport.results.length > 0) {
+                    const existingPageId = existingReport.results[0].id;
+                    await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            properties: {
+                                '월간리포트URL': { url: reportUrl },
+                                '숙제수행율(평균)': { number: stats.hwAvg },
+                                '어휘점수(평균)': { number: stats.vocabAvg },
+                                '문법점수(평균)': { number: stats.grammarAvg },
+                                '총 읽은 권수': { number: stats.totalBooks },
+                                '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                                'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                            }
+                        })
+                    });
+                    console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
+                } else {
+                    await fetchNotion('https://api.notion.com/v1/pages', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            parent: { database_id: MONTHLY_REPORT_DB_ID },
+                            properties: {
+                                // ▼ [수정] 'Title' -> '이름'
+                                '이름': { title: [{ text: { content: reportTitle } }] },
+                                // ▼ [수정] '학생' (Relation)
+                                '학생': { relation: [{ id: studentPageId }] },
+                                '리포트 월': { rich_text: [{ text: { content: monthString } }] },
+                                '월간리포트URL': { url: reportUrl },
+                                '숙제수행율(평균)': { number: stats.hwAvg },
+                                '어휘점수(평균)': { number: stats.vocabAvg },
+                                '문법점수(평균)': { number: stats.grammarAvg },
+                                '총 읽은 권수': { number: stats.totalBooks },
+                                '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                                'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                            }
+                        })
+                    });
+                    console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+                }
+                successCount++;
+            } catch (studentError) {
+                console.error(`[수동 월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
+                failCount++;
             }
-            processedCount++;
         }
         
-        console.log(`--- ✅ [수동 월간 리포트] 자동화 스케줄 완료 (${processedCount}명 처리) ---`);
-        res.json({ success: true, message: `${monthString}월 리포트 생성을 성공적으로 완료했습니다. (총 ${processedCount}명)` });
+        console.log('--- ✅ [수동 월간 리포트] 자동화 스케줄 완료 ---');
+        res.json({ success: true, message: `${monthString}월 리포트 생성을 성공적으로 완료했습니다. (성공: ${successCount}건, 실패: ${failCount}건)` });
 
     } catch (error) {
         console.error('--- ❌ [수동 월간 리포트] 자동화 스케줄 중 오류 발생 ---', error);
-        res.status(500).json({ success: false, message: `리포트 생성 중 오류 발생: ${error.message}` });
+        res.status(500).json({ success: false, message: `리포트 생성 오류 발생: ${error.message}` });
     }
 });
 
@@ -1138,7 +1072,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 // =======================================================================
 
 // --- [신규] 1. 데일리 리포트 URL 자동 생성 (매일 밤 10시) ---
-// [수정] 헤더님 요청: 개별 페이지 오류가 전체를 중단시키지 않도록 try...catch 추가
 cron.schedule('0 22 * * *', async () => {
     console.log('--- 🏃‍♂️ [데일리 리포트] 자동화 스케줄 실행 (매일 밤 10시) ---');
     
@@ -1147,13 +1080,8 @@ cron.schedule('0 22 * * *', async () => {
         return;
     }
 
-    let pages = [];
-    let dateString = '';
-
     try {
-        // [수정] '오늘' 날짜를 KST 기준으로 계산 (범위 필터로 변경)
-        const { start, end, dateString: kstDateString } = getKSTTodayRange();
-        dateString = kstDateString; // 상위 스코프 변수에 할당
+        const { start, end, dateString } = getKSTTodayRange();
         
         const filter = { 
             and: [
@@ -1167,7 +1095,7 @@ cron.schedule('0 22 * * *', async () => {
             body: JSON.stringify({ filter: filter })
         });
         
-        pages = data.results;
+        const pages = data.results;
         if (!pages || pages.length === 0) {
             console.log(`[데일리 리포트] ${dateString} 날짜에 해당하는 진도 페이지가 없습니다.`);
             return;
@@ -1175,49 +1103,39 @@ cron.schedule('0 22 * * *', async () => {
 
         console.log(`[데일리 리포트] 총 ${pages.length}개의 오늘 진도 페이지를 찾았습니다.`);
 
-    } catch (error) {
-        console.error('--- ❌ [데일리 리포트] 자동화 스케줄 중 (페이지 조회 단계) 오류 발생 ---', error);
-        return; // 페이지 조회부터 실패하면 중단
-    }
+        for (const page of pages) {
+            // ▼ [수정] 개별 페이지 오류가 전체를 중단시키지 않도록 try...catch 추가
+            try {
+                const pageId = page.id;
+                const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${dateString}`;
 
-    // --- [신규] 개별 페이지 업데이트 로직 (오류 분리) ---
-    let successCount = 0;
-    let failCount = 0;
+                const currentUrl = page.properties['데일리리포트URL']?.url;
+                if (currentUrl === reportUrl) {
+                    console.log(`[데일리 리포트] ${pageId} - 이미 URL이 존재합니다. (스킵)`);
+                    continue;
+                }
 
-    for (const page of pages) {
-        const pageId = page.id;
-        try {
-            // [수정] localhost -> DOMAIN_URL (배포용)
-            const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${dateString}`;
-
-            const currentUrl = page.properties['데일리리포트URL']?.url;
-            if (currentUrl === reportUrl) {
-                console.log(`[데일리 리포트] ${pageId} - 이미 URL이 존재합니다. (스킵)`);
-                successCount++; // 이미 있으므로 성공으로 간주
-                continue;
+                await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        properties: {
+                            '데일리리포트URL': { url: reportUrl }
+                        }
+                    })
+                });
+                console.log(`[데일리 리포트] ${pageId} - URL 저장 성공: ${reportUrl}`);
+            
+            } catch (pageError) {
+                console.error(`[데일리 리포트] ${page.id} 업데이트 실패:`, pageError.message);
+                // (오류가 발생해도 다음 루프 계속 진행)
             }
-
-            await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    properties: {
-                        // [중요] '진도 관리 DB'에 '데일리리포트URL' (URL 타입) 속성이 있는지 확인!
-                        '데일리리포트URL': { url: reportUrl }
-                    }
-                })
-            });
-            console.log(`[데일리 리포트] ${pageId} - URL 저장 성공: ${reportUrl}`);
-            successCount++;
-
-        } catch (pageError) {
-            // [신규] 개별 페이지 오류 기록
-            console.error(`--- ❌ [데일리 리포트] ${pageId} 업데이트 실패 ---`, pageError.message);
-            failCount++;
+            // ▲ [수정]
         }
+        console.log('--- ✅ [데일리 리포트] 자동화 스케줄 완료 ---');
+
+    } catch (error) {
+        console.error('--- ❌ [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
     }
-    
-    console.log(`--- ✅ [데일리 리포트] 자동화 스케줄 완료 (성공: ${successCount} / 실패: ${failCount}) ---`);
-    
 }, {
     timezone: "Asia/Seoul"
 });
@@ -1227,7 +1145,6 @@ cron.schedule('0 22 * * *', async () => {
 cron.schedule('0 21 * * 5', async () => {
     console.log('--- 🏃‍♂️ [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
     
-    // [수정] '오늘'을 KST 기준으로 생성
     const { dateString } = getKSTTodayRange();
     const today = new Date(dateString); // KST 기준 '오늘' Date 객체
     
@@ -1258,141 +1175,147 @@ cron.schedule('0 21 * * 5', async () => {
         const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
 
         for (const student of students) {
+             // ▼ [수정] 개별 학생 오류가 전체를 중단시키지 않도록 try...catch 추가
             const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
             const studentName = student.properties['이름']?.title?.[0]?.plain_text;
             if (!studentName) continue;
 
-            console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
+            try {
+                console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
 
-            const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filter: {
-                        and: [
-                            { property: '학생', relation: { contains: studentPageId } },
-                            // [수정] '날짜' -> '🕐 날짜'
-                            { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
-                            { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
-                        ]
-                    }
-                })
-            });
-            
-            // [수정] parseDailyReportData가 async가 되었으므로 Promise.all() 사용
-            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
-            
-            if (monthPages.length === 0) {
-                console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
-                continue;
-            }
-
-            // 통계 계산
-            const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-            const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
-            const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
-            const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-            const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
-
-            const stats = {
-                hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
-                vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
-                grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
-                totalBooks: bookTitles.length,
-                bookList: bookTitles.join(', ') || '읽은 책 없음'
-            };
-
-            // Gemini AI로 코멘트 요약
-            let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
-            if (geminiModel && comments) {
-                try {
-                    const prompt = `
-                        너는 15년 차 리디튜드 학습 컨설턴트야.
-                        아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
-                        
-                        [월간 통계]
-                        - 숙제 수행율(평균): ${stats.hwAvg}%
-                        - 어휘 점수(평균): ${stats.vocabAvg}점
-                        - 문법 점수(평균): ${stats.grammarAvg}점
-                        - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
-
-                        [일일 코멘트 모음]
-                        ${comments}
-                        
-                        [요청]
-                        위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
-                        학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
-                    `;
-                    const result = await geminiModel.generateContent(prompt);
-                    const response = await result.response;
-                    aiSummary = response.text();
-                    console.log(`[월간 리포트] ${studentName} 학생 AI 요약 성공!`);
-                } catch (aiError) {
-                    console.error(`[월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
-                    aiSummary = 'AI 요약 중 오류가 발생했습니다.';
-                }
-            }
-            
-            // '월간 리포트 DB'에 새 페이지로 저장
-            const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
-            // [수정] localhost -> DOMAIN_URL (배포용)
-            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
-
-            const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filter: {
-                        and: [
-                            { property: '학생', relation: { contains: studentPageId } },
-                            { property: '리포트 월', rich_text: { equals: monthString } }
-                        ]
-                    },
-                    page_size: 1
-                })
-            });
-            
-            if (existingReport.results.length > 0) {
-                // 이미 있으면 업데이트
-                const existingPageId = existingReport.results[0].id;
-                await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        properties: {
-                            '월간리포트URL': { url: reportUrl },
-                            '숙제수행율(평균)': { number: stats.hwAvg },
-                            '어휘점수(평균)': { number: stats.vocabAvg },
-                            '문법점수(평균)': { number: stats.grammarAvg },
-                            '총 읽은 권수': { number: stats.totalBooks },
-                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
-                        }
-                    })
-                });
-                console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
-
-            } else {
-                // 없으면 새로 생성
-                await fetchNotion('https://api.notion.com/v1/pages', {
+                const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        parent: { database_id: MONTHLY_REPORT_DB_ID },
-                        properties: {
-                            // ▼ [수정] 'Title' -> '이름'
-                            '이름': { title: [{ text: { content: reportTitle } }] },
-                            // ▲ [수정]
-                            '학생': { relation: [{ id: studentPageId }] },
-                            '리포트 월': { rich_text: [{ text: { content: monthString } }] },
-                            '월간리포트URL': { url: reportUrl },
-                            '숙제수행율(평균)': { number: stats.hwAvg },
-                            '어휘점수(평균)': { number: stats.vocabAvg },
-                            '문법점수(평균)': { number: stats.grammarAvg },
-                            '총 읽은 권수': { number: stats.totalBooks },
-                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        filter: {
+                            and: [
+                                // ▼ [수정] '학생' (Relation) -> '이름' (Title)
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+                                { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
+                            ]
                         }
                     })
                 });
-                console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+                
+                const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
+                
+                if (monthPages.length === 0) {
+                    console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
+                    continue;
+                }
+
+                // 통계 계산
+                const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
+                const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
+                const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
+                const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
+                const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
+
+                const stats = {
+                    hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
+                    vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
+                    grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
+                    totalBooks: bookTitles.length,
+                    bookList: bookTitles.join(', ') || '읽은 책 없음'
+                };
+
+                // Gemini AI로 코멘트 요약
+                let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
+                if (geminiModel && comments) {
+                    try {
+                        const prompt = `
+                            너는 15년 차 리디튜드 학습 컨설턴트야.
+                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                            
+                            [월간 통계]
+                            - 숙제 수행율(평균): ${stats.hwAvg}%
+                            - 어휘 점수(평균): ${stats.vocabAvg}점
+                            - 문법 점수(평균): ${stats.grammarAvg}점
+                            - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
+
+                            [일일 코멘트 모음]
+                            ${comments}
+                            
+                            [요청]
+                            위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
+                            학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                        `;
+                        const result = await geminiModel.generateContent(prompt);
+                        const response = await result.response;
+                        aiSummary = response.text();
+                        console.log(`[월간 리포트] ${studentName} 학생 AI 요약 성공!`);
+                    } catch (aiError) {
+                        console.error(`[월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
+                        aiSummary = 'AI 요약 중 오류가 발생했습니다.';
+                    }
+                }
+                
+                // '월간 리포트 DB'에 새 페이지로 저장
+                const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
+                const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
+
+                const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        filter: {
+                            and: [
+                                // ▼ [수정] '학생' (Relation)
+                                { property: '학생', relation: { contains: studentPageId } },
+                                { property: '리포트 월', rich_text: { equals: monthString } }
+                            ]
+                        },
+                        page_size: 1
+                    })
+                });
+                
+                if (existingReport.results.length > 0) {
+                    // 이미 있으면 업데이트
+                    const existingPageId = existingReport.results[0].id;
+                    await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                            properties: {
+                                '월간리포트URL': { url: reportUrl },
+                                '숙제수행율(평균)': { number: stats.hwAvg },
+                                '어휘점수(평균)': { number: stats.vocabAvg },
+                                '문법점수(평균)': { number: stats.grammarAvg },
+                                '총 읽은 권수': { number: stats.totalBooks },
+                                '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                                'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                            }
+                        })
+                    });
+                    console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
+
+                } else {
+                    // 없으면 새로 생성
+                    await fetchNotion('https://api.notion.com/v1/pages', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            parent: { database_id: MONTHLY_REPORT_DB_ID },
+                            properties: {
+                                // ▼ [수정] 'Title' -> '이름'
+                                '이름': { title: [{ text: { content: reportTitle } }] },
+                                // ▼ [수정] '학생' (Relation)
+                                '학생': { relation: [{ id: studentPageId }] },
+                                '리포트 월': { rich_text: [{ text: { content: monthString } }] },
+                                '월간리포트URL': { url: reportUrl },
+                                '숙제수행율(평균)': { number: stats.hwAvg },
+                                '어휘점수(평균)': { number: stats.vocabAvg },
+                                '문법점수(평균)': { number: stats.grammarAvg },
+                                '총 읽은 권수': { number: stats.totalBooks },
+                                '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                                'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                            }
+                        })
+                    });
+                    console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+                }
+            } catch (studentError) {
+                console.error(`[월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
+                // (오류가 발생해도 다음 학생 계속 진행)
             }
+            // ▲ [수정]
         }
         
         console.log('--- ✅ [월간 리포트] 자동화 스케줄 완료 ---');
@@ -1406,8 +1329,6 @@ cron.schedule('0 21 * * 5', async () => {
 
 
 // --- 서버 실행 ---
-// [수정] '127.0.0.1'을 제거하고, '0.0.0.0'을 추가해야 Render의 외부 접속(0.0.0.0)이 가능해집니다.
 app.listen(PORT, '0.0.0.0', () => {
-    // [수정] localhost -> 0.0.0.0 (또는 그냥 포트만)
     console.log(`✅ 최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
 });
