@@ -960,6 +960,176 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
     }
 });
 
+// --- [신규] 10월 리포트 수동 생성용 임시 API ---
+// (이전 Cron Job 로직을 기반으로 '지난 달' 리포트를 강제로 생성합니다)
+app.get('/api/manual-monthly-report-gen', requireAuth, async (req, res) => {
+    console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
+    
+    // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
+    const todayForDate = new Date(); // e.g., 2025-11-09
+    const lastMonthDate = new Date(todayForDate.getFullYear(), todayForDate.getMonth() - 1, 1); // 2025-10-01
+    
+    const currentYear = lastMonthDate.getFullYear(); // 2025
+    const currentMonth = lastMonthDate.getMonth(); // 9 (October, 0-indexed)
+    const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-10"
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+    console.log(`🔥 [수동 월간 리포트] ${monthString}월 리포트 생성을 시작합니다.`);
+
+    // 2. Cron Job에서 나머지 로직 복사 (skip 로직 제외)
+    if (!NOTION_ACCESS_TOKEN || !STUDENT_DATABASE_ID || !PROGRESS_DATABASE_ID || !MONTHLY_REPORT_DB_ID || !geminiModel) {
+        console.error('[수동 월간 리포트] DB ID 또는 Gemini AI가 설정되지 않아 스케줄을 중단합니다.');
+        return res.status(500).json({ message: '서버 환경변수 설정 오류' });
+    }
+
+    try {
+        const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST'
+        });
+        const students = studentData.results;
+        console.log(`[수동 월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
+        
+        let processedCount = 0;
+
+        for (const student of students) {
+            const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
+            const studentName = student.properties['이름']?.title?.[0]?.plain_text;
+            if (!studentName) continue;
+
+            console.log(`[수동 월간 리포트] ${studentName} 학생 통계 계산 중...`);
+
+            const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '학생', relation: { contains: studentPageId } },
+                            { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+                            { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
+                        ]
+                    }
+                })
+            });
+            
+            const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
+            
+            if (monthPages.length === 0) {
+                console.log(`[수동 월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
+                continue;
+            }
+
+            // (이하 로직은 Cron Job과 동일)
+            const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
+            const vocabScores = monthPages.map(p => parseInt(p.tests.vocabScore)).filter(s => !isNaN(s));
+            const grammarScores = monthPages.map(p => parseInt(p.tests.grammarScore)).filter(s => !isNaN(s));
+            const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
+            const comments = monthPages.map((p, i) => `[${p.date}] ${p.comment.teacherComment}`).join('\n');
+
+            const stats = {
+                hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
+                vocabAvg: vocabScores.length > 0 ? Math.round(vocabScores.reduce((a, b) => a + b, 0) / vocabScores.length) : 0,
+                grammarAvg: grammarScores.length > 0 ? Math.round(grammarScores.reduce((a, b) => a + b, 0) / grammarScores.length) : 0,
+                totalBooks: bookTitles.length,
+                bookList: bookTitles.join(', ') || '읽은 책 없음'
+            };
+
+            let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
+            if (geminiModel && comments) {
+                try {
+                    const prompt = `
+                        너는 15년 차 리디튜드 학습 컨설턴트야.
+                        아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                        
+                        [월간 통계]
+                        - 숙제 수행율(평균): ${stats.hwAvg}%
+                        - 어휘 점수(평균): ${stats.vocabAvg}점
+                        - 문법 점수(평균): ${stats.grammarAvg}점
+                        - 읽은 책: ${stats.totalBooks}권 (${stats.bookList})
+
+                        [일일 코멘트 모음]
+                        ${comments}
+                        
+                        [요청]
+                        위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
+                        학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                    `;
+                    const result = await geminiModel.generateContent(prompt);
+                    const response = await result.response;
+                    aiSummary = response.text();
+                    console.log(`[수동 월간 리포트] ${studentName} 학생 AI 요약 성공!`);
+                } catch (aiError) {
+                    console.error(`[수동 월간 리포트] ${studentName} 학생 AI 요약 실패:`, aiError);
+                    aiSummary = 'AI 요약 중 오류가 발생했습니다.';
+                }
+            }
+            
+            const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
+            const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
+
+            const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '학생', relation: { contains: studentPageId } },
+                            { property: '리포트 월', rich_text: { equals: monthString } }
+                        ]
+                    },
+                    page_size: 1
+                })
+            });
+            
+            if (existingReport.results.length > 0) {
+                const existingPageId = existingReport.results[0].id;
+                await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        properties: {
+                            '월간리포트URL': { url: reportUrl },
+                            '숙제수행율(평균)': { number: stats.hwAvg },
+                            '어휘점수(평균)': { number: stats.vocabAvg },
+                            '문법점수(평균)': { number: stats.grammarAvg },
+                            '총 읽은 권수': { number: stats.totalBooks },
+                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        }
+                    })
+                });
+                console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
+            } else {
+                await fetchNotion('https://api.notion.com/v1/pages', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        parent: { database_id: MONTHLY_REPORT_DB_ID },
+                        properties: {
+                            '이름': { title: [{ text: { content: reportTitle } }] },
+                            '학생': { relation: [{ id: studentPageId }] },
+                            '리포트 월': { rich_text: [{ text: { content: monthString } }] },
+                            '월간리포트URL': { url: reportUrl },
+                            '숙제수행율(평균)': { number: stats.hwAvg },
+                            '어휘점수(평균)': { number: stats.vocabAvg },
+                            '문법점수(평균)': { number: stats.grammarAvg },
+                            '총 읽은 권수': { number: stats.totalBooks },
+                            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+                            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] }
+                        }
+                    })
+                });
+                console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+            }
+            processedCount++;
+        }
+        
+        console.log(`--- ✅ [수동 월간 리포트] 자동화 스케줄 완료 (${processedCount}명 처리) ---`);
+        res.json({ success: true, message: `${monthString}월 리포트 생성을 성공적으로 완료했습니다. (총 ${processedCount}명)` });
+
+    } catch (error) {
+        console.error('--- ❌ [수동 월간 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+        res.status(500).json({ success: false, message: `리포트 생성 중 오류 발생: ${error.message}` });
+    }
+});
+
 
 // =======================================================================
 // [신규] 자동화 스케줄링 (Cron Jobs)
