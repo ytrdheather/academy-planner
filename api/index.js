@@ -1206,7 +1206,7 @@ cron.schedule('0 22 * * *', async () => {
 
   } catch (error) {
     console.error('---  [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
-Click }
+ }
 }, {
   timezone: "Asia/Seoul"
 });
@@ -1351,65 +1351,65 @@ const reportTitle = `${studentName} - ${monthString} 월간 리포트`;
 const reportUrl = `${DOMAIN_URL}/monthly-report?studentId=${studentPageId}&month=${monthString}`;
 
 const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${MONTHLY_REPORT_DB_ID}/query`, {
-  method: 'POST',
-  body: JSON.stringify({
-    filter: {
-      and: [
-        { property: '학생', relation: { contains: studentPageId } },
-        { property: '리포트 월', rich_text: { equals: monthString } }
-      ]
-    },
-    page_size: 1
-  })
-});
+      method: 'POST',
+      body: JSON.stringify({
+        filter: {
+          and: [
+            { property: '학생', relation: { contains: studentPageId } },
+            { property: '리포트 월', rich_text: { equals: monthString } }
+          ]
+        },
+        page_size: 1
+      })
+    });
 
 if (existingReport.results.length > 0) {
-  const existingPageId = existingReport.results[0].id;
-  await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      properties: {
-        '월간리포트URL': { url: reportUrl },
-        '숙제수행율(평균)': { number: stats.hwAvg },
-        '어휘점수(평균)': { number: stats.vocabAvg },
-        '문법점수(평균)': { number: stats.grammarAvg },
-        '총 읽은 권수': { number: stats.totalBooks },
-        '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-        'AI 요약': { rich_text: [{ text: { content: aiSummary } }] },
-        '독해 통과율(%)': { number: stats.readingPassRate }
-      }
-    })
-  });
-  console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
-} else {
-  await fetchNotion('https://api.notion.com/v1/pages', {
-    method: 'POST',
-    body: JSON.stringify({
-      parent: { database_id: MONTHLY_REPORT_DB_ID },
-      properties: {
-        '이름': { title: [{ text: { content: reportTitle } }] },
-        '학생': { relation: [{ id: studentPageId }] },
-        '리포트 월': { rich_text: [{ text: { content: monthString } }] },
-        '월간리포트URL': { url: reportUrl },
-        '숙제수행율(평균)': { number: stats.hwAvg },
-        '어휘점수(평균)': { number: stats.vocabAvg },
-        '문법점수(평균)': { number: stats.grammarAvg },
-        '총 읽은 권수': { number: stats.totalBooks },
-        '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
-        'AI 요약': { rich_text: [{ text: { content: aiSummary } }] },
-        '독해 통과율(%)': { number: stats.readingPassRate }
-      }
-    })
-  });
-  console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
-}
+      const existingPageId = existingReport.results[0].id;
+      await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            '월간리포트URL': { url: reportUrl },
+            '숙제수행율(평균)': { number: stats.hwAvg },
+            '어휘점수(평균)': { number: stats.vocabAvg },
+            '문법점수(평균)': { number: stats.grammarAvg },
+            '총 읽은 권수': { number: stats.totalBooks },
+            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] },
+            '독해 통과율(%)': { number: stats.readingPassRate }
+          }
+        })
+      });
+      console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '업데이트' 성공!`);
+    } else {
+      await fetchNotion('https://api.notion.com/v1/pages', {
+        method: 'POST',
+        body: JSON.stringify({
+          parent: { database_id: MONTHLY_REPORT_DB_ID },
+          properties: {
+            '이름': { title: [{ text: { content: reportTitle } }] },
+            '학생': { relation: [{ id: studentPageId }] },
+            '리포트 월': { rich_text: [{ text: { content: monthString } }] },
+            '월간리포트URL': { url: reportUrl },
+            '숙제수행율(평균)': { number: stats.hwAvg },
+            '어휘점수(평균)': { number: stats.vocabAvg },
+            '문법점수(평균)': { number: stats.grammarAvg },
+            '총 읽은 권수': { number: stats.totalBooks },
+            '읽은 책 목록': { rich_text: [{ text: { content: stats.bookList } }] },
+            'AI 요약': { rich_text: [{ text: { content: aiSummary } }] },
+            '독해 통과율(%)': { number: stats.readingPassRate }
+          }
+        })
+      });
+      console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
+    }
 
-console.log('---  [월간 리포트] 자동화 스케줄 완료 ---');
+    console.log('---  [월간 리포트] 자동화 스케줄 완료 ---');
 
 } catch (error) {
-  console.error('---  [월간 리포트] 자동화 스케줄 중 오류 발생 ---', error);
-}
-}, {
+    console.error('---  [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+  } 
+}, { 
   timezone: "Asia/Seoul"
 });
 
