@@ -182,7 +182,7 @@ const getRollupValue = (prop, isNumber = false) => {
 async function parseDailyReportData(page) {
   const props = page.properties;
   const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-  const pageDate = props[' 날짜']?.date?.start || getKSTTodayRange().dateString;
+  const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
  
   let assignedTeachers = [];
   if (props['담당쌤']?.rollup?.array) {
@@ -298,11 +298,11 @@ async function fetchProgressData(req, res, parseFunction) {
 
   const filterConditions = [];
   if (period === 'specific_date' && date) {
-    filterConditions.push({ property: ' 날짜', date: { equals: date } });
+    filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
   } else { // 기본값 'today'
     const { start, end } = getKSTTodayRange();
-    filterConditions.push({ property: ' 날짜', date: { on_or_after: start } });
-    filterConditions.push({ property: ' 날짜', date: { on_or_before: end } });
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
   }
 
   const pages = [];
@@ -313,7 +313,7 @@ async function fetchProgressData(req, res, parseFunction) {
       method: 'POST',
       body: JSON.stringify({
         filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
-        sorts: [{ property: ' 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
+        sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
         page_size: 100, start_cursor: startCursor
       })
     });
@@ -468,7 +468,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
     const properties = {
       '이름': { title: [{ text: { content: studentName } }] },
-      ' 날짜': { date: { start: getKSTTodayRange().dateString } },
+      '🕐 날짜': { date: { start: getKSTTodayRange().dateString } },
     };
     const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": " 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
     const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
@@ -759,8 +759,8 @@ readingPassRate: reportData['독해 통과율(%)']?.number || 0 // [독해 통�
           and: [
 //  [버그 수정] studentName 변수가 이제 정상적으로 학생 이름을 담고 있음
             { property: '이름', title: { equals: studentName } },
-            { property: ' 날짜', date: { on_or_after: firstDay } },
-            { property: ' 날짜', date: { on_or_before: lastDay } }
+            { property: '🕐 날짜', date: { on_or_after: firstDay } },
+            { property: '🕐 날짜', date: { on_or_before: lastDay } }
           ]
         },
         page_size: 100 // 한 달 데이터 (최대 31개)
@@ -981,8 +981,8 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             filter: {
               and: [
                 { property: '이름', title: { equals: studentName } },
-                { property: ' 날짜', date: { on_or_after: firstDayOfMonth } },
-                { property: ' 날짜', date: { on_or_before: lastDayOfMonth } }
+                { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+                { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
               ]
             }
           })
@@ -1160,8 +1160,8 @@ cron.schedule('0 22 * * *', async () => {
    
     const filter = {
       and: [
-        { property: ' 날짜', date: { on_or_after: start } },
-        { property: ' 날짜', date: { on_or_before: end } }
+        { property: '🕐 날짜', date: { on_or_after: start } },
+        { property: '🕐 날짜', date: { on_or_before: end } }
       ]
     };
    
@@ -1239,7 +1239,7 @@ cron.schedule('0 21 * * 5', async () => {
     const students = studentData.results;
     console.log(`[월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
    
-    const currentYear = today.getFullYear();
+// ... (line 1240)
     const currentMonth = today.getMonth(); // (0 = 1월, 11 = 12월)
     const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-11"
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
@@ -1258,8 +1258,8 @@ const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PR
            filter: {
               and: [
                 { property: '이름', title: { equals: studentName } },
-                { property: ' 날짜', date: { on_or_after: firstDayOfMonth } },
-               { property: ' 날짜', date: { on_or_before: lastDayOfMonth } }
+                { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
+               { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
               ]
             }
           })
@@ -1299,7 +1299,7 @@ if (geminiModel) {
   try {
     //  [수정] AI 프롬프트 교체 (헤더님 최신 지침 + shortName 로직)
 
-    // [신규] '짧은 이름' 생성 로직
+// ... (line 1307)
     let shortName = studentName;
     if (studentName.startsWith('Test ')) {
       shortName = studentName.substring(5); // "Test 원장" -> "원장"
@@ -1313,7 +1313,7 @@ if (geminiModel) {
 
 **[AI의 역할 및 톤]**
 1. **가장 중요:** 너는 선생님 본인이기 때문에, **"안녕하세요, OOO 컨설턴트입니다" 혹은 "xxx쌤 입니다"라고 너 자신을 소개하는 문장을 절대로 쓰지 마.**
-2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 10월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
+2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 ${currentMonth + 1}월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
 5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}이는', '${shortName}이가'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
