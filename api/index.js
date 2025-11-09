@@ -908,7 +908,7 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
       if (reportUrl) {
         res.json({ success: true, url: reportUrl });
       } else {
-        res.status(404).json({ success: false, message: '리포트를 찾았으나 URL이 없습니다.' });
+        res.status(404).json({ success: false, message: '리포트를 찾으나 URL이 없습니다.' });
       }
     } else {
       res.status(404).json({ success: false, message: `[${lastMonthString}]월 리포트를 찾을 수 없습니다.` });
@@ -1026,7 +1026,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             let shortName = studentName;
             if (studentName.startsWith('Test ')) {
               shortName = studentName.substring(5); // "Test 원장" -> "원장"
-           _ } else if (studentName.length === 3 && !studentName.includes(' ')) {
+            } else if (studentName.length === 3 && !studentName.includes(' ')) {
               shortName = studentName.substring(1); // "유환호" -> "환호"
             }
             // (이름이 2글자이거나 4글자 이상이면 full-name 사용)
@@ -1403,13 +1403,19 @@ if (existingReport.results.length > 0) {
       });
       console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
     }
+  } catch (studentError) { // <-- [수정] 'studentError'로 변수명 변경 (중복 방지)
+    console.error(`[월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
+  }
+} // <-- [수정] 이 '}' 괄호가 for...of 루프를 닫습니다.
 
     console.log('---  [월간 리포트] 자동화 스케줄 완료 ---');
 
-} catch (error) {
-    console.error('---  [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
+  } catch (error) {
+    console.error('---  [월간 리포트] 자동화 스케줄 중 오류 발생 ---', error); // [수정] 로그 메시지를 '월간 리포트'로 변경
   
-}, { 
+} // <-- [수정] 이 '}' 괄호가 바깥쪽 try-catch를 닫습니다.
+
+}, { // <-- [수정] 여기가 cron.schedule의 세 번째 인자인 options 객체가 시작되는 곳입니다.
   timezone: "Asia/Seoul"
 });
 
@@ -1417,3 +1423,4 @@ if (existingReport.results.length > 0) {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
 });
+// <-- [수정] 파일 맨 끝의 불필요한 '}' 괄호를 삭제했습니다.
