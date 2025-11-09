@@ -714,8 +714,23 @@ app.get('/monthly-report', async (req, res) => {
         // --- 1-B. '학생 명부 DB'에서 학생 이름 조회 (신규 추가) ---
         const studentRelationId = reportData['학생']?.relation?.[0]?.id;
         if (!studentRelationId) {
-            return res.status(404).send('월간 리포트에서 학생 관계형 ID를 찾을 수 없습니다.');
+            // [방어 코드] 관계형 ID가 없으면, '이름' Title 속성에서라도 학생 이름을 가져옴
+            const studentNameFromTitle = reportData['이름']?.title?.[0]?.plain_text.split(' - ')[0] || '학생';
+             console.warn(`[월간 리포트 렌더링] ${month}월 ${studentId} 리포트에 '학생' 관계형 ID가 없습니다. Title에서 이름을 대신 사용합니다: ${studentNameFromTitle}`);
+             
+             // 이 경우, '학생 명부 DB' 조회가 불가능하므로 AI 요약만 반환 (독서 목록 등은 조회가 안 됨)
+             // (이 시나리오는 수동 생성 API가 버그로 인해 '학생' relation을 저장하지 못했을 때만 발생)
+             const statsOnly = {
+                hwAvg: reportData['숙제수행율(평균)']?.number || 0,
+                vocabAvg: reportData['어휘점수(평균)']?.number || 0,
+                grammarAvg: reportData['문법점수(평균)']?.number || 0,
+                totalBooks: reportData['총 읽은 권수']?.number || 0,
+                aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.'
+             };
+             // (임시로 렌더링 함수 호출 - 독서 목록 등은 비어있게 됨)
+             return renderMonthlyReportHTML(res, monthlyReportTemplate, studentNameFromTitle, month, statsOnly, [], 0);
         }
+        
         const studentPage = await fetchNotion(`https://api.notion.com/v1/pages/${studentRelationId}`);
         const studentName = studentPage.properties['이름']?.title?.[0]?.plain_text || '학생';
         // --- (신규 추가 끝) ---
@@ -732,7 +747,6 @@ app.get('/monthly-report', async (req, res) => {
         const [year, monthNum] = month.split('-').map(Number);
         const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
         const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
-        const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
 
         const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
@@ -752,97 +766,104 @@ app.get('/monthly-report', async (req, res) => {
         const monthPages = await Promise.all(progressQuery.results.map(parseDailyReportData));
         const attendanceDays = monthPages.length; // 출석일수
 
-        // 독서 목록 (중복 제거)
-        const bookSet = new Set();
-        const bookListHtml = monthPages
-            .map(p => p.reading)
-            .filter(r => r.bookTitle && r.bookTitle !== '읽은 책 없음')
-            .map(r => {
-                const series = r.bookSeries || '';
-                const ar = r.bookAR || 'N/A';
-                const lexile = r.bookLexile || 'N/A';
-                const title = r.bookTitle;
-                const bookKey = `${series}|${title}|${ar}|${lexile}`;
-                return { key: bookKey, series, title, ar, lexile };
-            })
-            .filter(book => {
-                if (bookSet.has(book.key)) return false;
-                bookSet.add(book.key);
-                return true;
-            })
-            .map(book => {
-                const seriesText = book.series ? `[${book.series}] ` : '';
-                return `<li>${seriesText}${book.title} (AR ${book.ar} / ${book.lexile})</li>`;
-            })
-            .join('\n') || '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
-
-
-        // --- 3. 템플릿에 데이터 주입 ---
-        let html = monthlyReportTemplate;
-
-        // RT-Check Point (숙제 점수) 및 경고/칭찬 메시지
-        const hwScore = Math.round(stats.hwAvg);
-        const rtNotice = {};
-        if (hwScore < 70) {
-            rtNotice.bgColor = 'bg-red-50'; // 빨간색 배경
-            rtNotice.borderColor = 'border-red-400';
-            rtNotice.titleColor = 'text-red-900';
-            rtNotice.textColor = 'text-red-800';
-            rtNotice.title = '🚨 RT-Check Point 경고';
-        } else {
-            rtNotice.bgColor = 'bg-green-50'; // 초록색 배경
-            rtNotice.borderColor = 'border-green-400';
-            rtNotice.titleColor = 'text-green-900';
-            rtNotice.textColor = 'text-green-800';
-            rtNotice.title = '🎉 RT-Check Point 칭찬';
-        }
-
-        // 테스트 점수 색상
-        const vocabScoreColor = (stats.vocabAvg < 80) ? 'text-red-600' : 'text-teal-600';
-        const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
-
-        const replacements = {
-            '{{STUDENT_NAME}}': studentName,
-            '{{REPORT_MONTH}}': `${year}년 ${monthNum}월`,
-            '{{START_DATE}}': firstDay,
-            '{{END_DATE}}': lastDay,
-            
-            // RT-Check Point (숙제)
-            '{{HW_AVG_SCORE}}': hwScore,
-            '{{HW_SCORE_COLOR}}': (hwScore < 70) ? 'text-red-600' : 'text-teal-600',
-            '{{RT_NOTICE_BG_COLOR}}': rtNotice.bgColor,
-            '{{RT_NOTICE_BORDER_COLOR}}': rtNotice.borderColor,
-            '{{RT_NOTICE_TITLE_COLOR}}': rtNotice.titleColor,
-            '{{RT_NOTICE_TEXT_COLOR}}': rtNotice.textColor,
-            '{{RT_NOTICE_TITLE}}': rtNotice.title,
-            
-            // AI 요약
-            '{{AI_SUMMARY}}': stats.aiSummary,
-            
-            // 월간 통계
-            '{{ATTENDANCE_DAYS}}': attendanceDays,
-            '{{TOTAL_DAYS_IN_MONTH}}': totalDaysInMonth,
-            '{{VOCAB_AVG_SCORE}}': Math.round(stats.vocabAvg),
-            '{{VOCAB_SCORE_COLOR}}': vocabScoreColor,
-            '{{GRAMMAR_AVG_SCORE}}': Math.round(stats.grammarAvg),
-            '{{GRAMMAR_SCORE_COLOR}}': grammarScoreColor,
-            '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
-            
-            // 독서 목록
-            '{{BOOK_LIST_HTML}}': bookListHtml,
-        };
-
-        html = html.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
-            return replacements[match];
-        });
-
-        res.send(html);
+        // --- 3. 템플릿에 데이터 주입 (별도 함수로 분리) ---
+        renderMonthlyReportHTML(res, monthlyReportTemplate, studentName, month, stats, monthPages, attendanceDays);
 
     } catch (error) {
         console.error(`월간 리포트 렌더링 오류 (studentId: ${studentId}, month: ${month}):`, error);
         res.status(500).send(`월간 리포트 렌더링 중 오류가 발생했습니다: ${error.message}`);
     }
 });
+
+// [신규] 월간 리포트 HTML 렌더링 헬퍼 함수
+function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays) {
+    const [year, monthNum] = month.split('-').map(Number);
+    const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
+    const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
+    const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
+
+    // 독서 목록 (중복 제거)
+    const bookSet = new Set();
+    const bookListHtml = monthPages
+        .map(p => p.reading)
+        .filter(r => r.bookTitle && r.bookTitle !== '읽은 책 없음')
+        .map(r => {
+            const series = r.bookSeries || '';
+            const ar = r.bookAR || 'N/A';
+            const lexile = r.bookLexile || 'N/A';
+            const title = r.bookTitle;
+            const bookKey = `${series}|${title}|${ar}|${lexile}`;
+            return { key: bookKey, series, title, ar, lexile };
+        })
+        .filter(book => {
+            if (bookSet.has(book.key)) return false;
+            bookSet.add(book.key);
+            return true;
+        })
+        .map(book => {
+            const seriesText = book.series ? `[${book.series}] ` : '';
+            return `<li>${seriesText}${book.title} (AR ${book.ar} / Lexile ${book.lexile})</li>`; // [수정] Lexile 포맷
+        })
+        .join('\n') || '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
+
+    // RT-Check Point (숙제 점수) 및 경고/칭찬 메시지
+    const hwScore = Math.round(stats.hwAvg);
+    const rtNotice = {};
+    if (hwScore < 70) {
+        rtNotice.bgColor = 'bg-red-50'; // 빨간색 배경
+        rtNotice.borderColor = 'border-red-400';
+        rtNotice.titleColor = 'text-red-900';
+        rtNotice.textColor = 'text-red-800';
+        rtNotice.title = '🚨 RT-Check Point 경고';
+    } else {
+        rtNotice.bgColor = 'bg-green-50'; // 초록색 배경
+        rtNotice.borderColor = 'border-green-400';
+        rtNotice.titleColor = 'text-green-900';
+        rtNotice.textColor = 'text-green-800';
+        rtNotice.title = '🎉 RT-Check Point 칭찬';
+    }
+
+    // 테스트 점수 색상
+    const vocabScoreColor = (stats.vocabAvg < 80) ? 'text-red-600' : 'text-teal-600';
+    const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
+
+    const replacements = {
+        '{{STUDENT_NAME}}': studentName,
+        '{{REPORT_MONTH}}': `${year}년 ${monthNum}월`,
+        '{{START_DATE}}': firstDay,
+        '{{END_DATE}}': lastDay,
+        
+        // RT-Check Point (숙제)
+        '{{HW_AVG_SCORE}}': hwScore,
+        '{{HW_SCORE_COLOR}}': (hwScore < 70) ? 'text-red-600' : 'text-teal-600',
+        '{{RT_NOTICE_BG_COLOR}}': rtNotice.bgColor,
+        '{{RT_NOTICE_BORDER_COLOR}}': rtNotice.borderColor,
+        '{{RT_NOTICE_TITLE_COLOR}}': rtNotice.titleColor,
+        '{{RT_NOTICE_TEXT_COLOR}}': rtNotice.textColor,
+        '{{RT_NOTICE_TITLE}}': rtNotice.title,
+        
+        // AI 요약
+        '{{AI_SUMMARY}}': stats.aiSummary,
+        
+        // 월간 통계
+        '{{ATTENDANCE_DAYS}}': attendanceDays,
+        '{{TOTAL_DAYS_IN_MONTH}}': totalDaysInMonth,
+        '{{VOCAB_AVG_SCORE}}': Math.round(stats.vocabAvg),
+        '{{VOCAB_SCORE_COLOR}}': vocabScoreColor,
+        '{{GRAMMAR_AVG_SCORE}}': Math.round(stats.grammarAvg),
+        '{{GRAMMAR_SCORE_COLOR}}': grammarScoreColor,
+        '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
+        
+        // 독서 목록
+        '{{BOOK_LIST_HTML}}': bookListHtml,
+    };
+
+    let html = template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
+        return replacements[match];
+    });
+
+    res.send(html);
+}
 
 
 // --- [신규] API 라우트: 월간 리포트 URL 조회 ---
@@ -896,8 +917,8 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 app.get('/api/manual-monthly-report-gen', async (req, res) => {
     console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
     
-    // ▼ [수정] "Test 원장" 학생으로 이름 고정
-    const targetStudentName = "Test 원장";
+    // ▼ [수정] "Test 원장" -> "유환호" 학생으로 이름 고정
+    const targetStudentName = "유환호";
     console.log(`[수동 월간 리포트] 타겟 학생 고정: ${targetStudentName}`);
     
     // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
@@ -917,7 +938,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
     }
 
     try {
-        // ▼ [수정] "Test 원장" 학생만 '이름' 속성으로 조회
+        // ▼ [수정] "유환호" 학생만 '이름' 속성으로 조회
         const studentQueryFilter = {
             property: '이름',
             title: { equals: targetStudentName }
@@ -987,13 +1008,13 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                 let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
                 if (geminiModel) { // [수정] comments가 비어있어도 AI가 통계 기반으로 쓰도록
                     try {
-                        // ▼ [수정] AI 프롬프트 교체 (헤더님 피드백 반영: 강조 제거, 호칭 변경)
+                        // ▼ [수정] AI 프롬프트 교체 (헤더님 최신 지침)
                         const prompt = `
-너는 '리디튜드' 학원을 운영하는 '헤더쌤'이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
+너는 '리디튜드' 학원의 선생님이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
 
 **[AI의 역할 및 톤]**
-1.  **가장 중요:** 너는 '헤더쌤' 본인이기 때문에, **"안녕하세요, OOO 컨설턴트입니다" 혹은 "헤더쌤입니다"라고 너 자신을 소개하는 문장을 절대로 쓰지 마.**
-2.  마치 헤더쌤이 학부모님께 카톡을 보내는 것처럼, "어머님(아버님), 안녕하세요. ${studentName}이 10월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
+1.  **가장 중요:** 너는 선생님 본인이기 때문에, **"안녕하세요, OOO 컨설턴트입니다" 혹은 "xxx쌤 입니다"라고 너 자신을 소개하는 문장을 절대로 쓰지 마.**
+2.  마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${studentName}의 10월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
 3.  전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4.  \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
 5.  **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${studentName}이는', '${studentName}이가'처럼 이름을 자연스럽게 불러주세요.
@@ -1001,8 +1022,8 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 **[내용 작성 지침]**
 1.  **[데이터]** 아래 제공되는 [월간 통계]와 [일일 코멘트]를 **절대로 나열하지 말고,** 자연스럽게 문장 속에 녹여내 줘.
 2.  **[정량 평가]** "숙제 수행율 6%"처럼 부정적인 수치도 숨기지 말고 **정확히 언급**하되, "시급합니다" 같은 차가운 표현 대신 "다음 달엔 이 부분을 꼭 함께 챙겨보고 싶어요"처럼 **따뜻한 권유형**으로 표현해 줘.
-3.  **[정성 평가]** "Dora's Mystery..."를 읽은 것처럼 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${studentName}이가 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
-4.  **[개선점]** 가장 아쉬웠던 점(예: 숙제 6%)을 명확히 짚어주고, "매일 꾸준히 숙제하는 습관"처럼 **구체적이고 쉬운 개선안**을 제시해 줘.
+3.  **[정성 평가]** 월간 통계 부분에서 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${studentName}이가 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
+4.  **[개선점]** 가장 아쉬웠던 점(예: 숙제 6%)을 명확히 짚어주고, "매일 꾸준히 숙제하는 습관", "어휘는 클래스 카드를 매일 5분 보기 처럼 짬짬히 해라", "문법 점수가 낮은 건 문법은 학원와서 3분 복습 처럼 개념을 빠르게 복습하도록 하겠다." 처럼 **구체적이고 쉬운 개선안**을 제시해 줘.
 5.  **[마무리]** 마지막은 항상 다음 달을 응원하는 격려의 메시지나, 학부모님께 드리는 감사 인사(예: "한 달간 리디튜드를 믿고 맡겨주셔서 감사합니다.")로 따뜻하게 마무리해 줘.
 6.  **[강조 금지]** 절대로 마크다운(\`**\` or \`*\`)을 사용하여 텍스트를 강조하지 마세요.
 
@@ -1248,7 +1269,7 @@ cron.schedule('0 21 * * 5', async () => {
                 // ▼ [수정] 코멘트가 비어있어도 AI가 통계 기반으로 글을 쓰도록 '&& comments' 제거
                 if (geminiModel) { 
                     try {
-                        // ▼ [수정] AI 프롬프트 교체 (헤더님 피드백 반영: 강조 제거, 호칭 변경)
+                        // ▼ [수정] AI 프롬프트 교체 (헤더님 최신 지침)
                         const prompt = `
 너는 '리디튜드' 학원의 선생님이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
 
