@@ -201,19 +201,23 @@ async function parseDailyReportData(page) {
     diary: props['6 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
   };
 
+  // [수정] formula가 문자열(예: "80%")로 점수를 반환하므로, .number가 아닌 .string에서 값을 읽고 숫자로 변환합니다.
+  const vocabScoreString = props[' 단어 테스트 점수']?.formula?.string || 'N/A';
+  const grammarScoreString = props[' 문법 시험 점수']?.formula?.string || 'N/A';
+
   const tests = {
     vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
     vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
     vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-    //  [0점 버그 수정] .string -> .number로 변경
-    vocabScore: props[' 단어 테스트 점수']?.formula?.number ?? 'N/A', // N/A 또는 점수(%)
+    //  [0점 버그 수정] .number -> .string을 읽고 숫자로 변환
+    vocabScore: vocabScoreString === 'N/A' ? 'N/A' : (parseFloat(vocabScoreString) || 0), // "80%" or "80" -> 80
     readingWrong: props['독해 (틀린 개수)']?.number ?? null,
     readingResult: props[' 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
     havruta: props['독해 하브루타']?.select?.name || '숙제없음',
     grammarTotal: props['문법 (전체 개수)']?.number ?? null,
     grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-    //  [0점 버그 수정] .string -> .number로 변경
-    grammarScore: props[' 문법 시험 점수']?.formula?.number ?? 'N/A' // N/A 또는 점수(%)
+    //  [0점 버그 수정] .number -> .string을 읽고 숫자로 변환
+    grammarScore: grammarScoreString === 'N/A' ? 'N/A' : (parseFloat(grammarScoreString) || 0) // "80%" or "80" -> 80
   };
  
   // 2. 리스닝
