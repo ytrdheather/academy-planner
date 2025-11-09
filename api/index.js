@@ -19,7 +19,8 @@ const {
     GEMINI_API_KEY, // AI 요약 기능용 API 키
     MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
     GRAMMAR_DB_ID, // 문법 숙제 관리 DB ID
-    DOMAIN_URL = 'http://localhost:5001' // 배포 시 .env 변수로 대체됨
+    // ▼ [수정] localhost -> 실제 서비스 주소로 기본값 변경
+    DOMAIN_URL = 'https://readitude.onrender.com' // 배포 시 .env 변수로 대체됨
 } = process.env;
 
 const PORT = process.env.PORT || 5001; // Render의 PORT 또는 로컬 5001
@@ -695,7 +696,6 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] '학생' (Relation)으로 조회
                         { property: '학생', relation: { contains: studentId } },
                         { property: '리포트 월', rich_text: { equals: month } }
                     ]
@@ -709,10 +709,8 @@ app.get('/monthly-report', async (req, res) => {
         }
 
         const reportData = reportQuery.results[0].properties;
-        // ▼ [수정] '학생이름 (롤업)' 속성에서 이름 가져오기
         const studentName = getRollupValue(reportData['학생이름 (롤업)']) || '학생';
         
-        // ▼ [수정] '#' 아이콘 제거
         const stats = {
             hwAvg: reportData['숙제수행율(평균)']?.number || 0,
             vocabAvg: reportData['어휘점수(평균)']?.number || 0,
@@ -720,7 +718,6 @@ app.get('/monthly-report', async (req, res) => {
             totalBooks: reportData['총 읽은 권수']?.number || 0,
             aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.'
         };
-        // ▲ [수정]
 
         // --- 2. '진도 관리 DB'에서 출석일수, 독서 목록 (상세) 조회 ---
         const [year, monthNum] = month.split('-').map(Number);
@@ -733,7 +730,6 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] '이름' (Title)으로 조회
                         { property: '이름', title: { equals: studentName } },
                         { property: '🕐 날짜', date: { on_or_after: firstDay } },
                         { property: '🕐 날짜', date: { on_or_before: lastDay } }
@@ -860,7 +856,6 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
-                        // ▼ [수정] 'Title' -> '이름'
                         { property: '이름', title: { contains: studentName } },
                         { property: '리포트 월', rich_text: { equals: lastMonthString } }
                     ]
@@ -982,9 +977,10 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                 let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
                 if (geminiModel && comments) {
                     try {
+                        // ▼ [수정] AI 프롬프트 수정 (더 따뜻하고 상세하게)
                         const prompt = `
-                            너는 15년 차 리디튜드 학습 컨설턴트야.
-                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                            너는 15년 차 리디튜드 학습 컨설턴트 '헤더쌤'이야.
+                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트 모음이야.
                             
                             [월간 통계]
                             - 숙제 수행율(평균): ${stats.hwAvg}%
@@ -996,9 +992,13 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                             ${comments}
                             
                             [요청]
-                            위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
-                            학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                            1. 위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 "따뜻하고, 친근하며, 학생을 격려하는 전문가"의 톤으로 3~4문장의 월간 총평을 작성해줘.
+                            2. 긍정적인 점(예: 원서 읽기, 특정 테스트 성적)을 먼저 언급하며 칭찬으로 시작해줘.
+                            3. 아쉬운 점(예: 숙제 수행율 6%)이 있다면, "시급합니다" 같은 차가운 단어 대신 "조금 아쉬웠습니다", "다음 달에는 이 부분을 함께 개선해봐요" 처럼 부드럽고 긍정적인 권유형으로 작성해줘.
+                            4. "구조화된 활동" 같은 딱딱한 단어 대신 "매일 꾸준히 숙제하는 습관"처럼 쉬운 표현을 사용해줘.
+                            5. 마지막은 항상 다음 달을 응원하는 격려의 메시지로 마무리해줘.
                         `;
+                        // ▲ [수정]
                         const result = await geminiModel.generateContent(prompt);
                         const response = await result.response;
                         aiSummary = response.text();
@@ -1016,7 +1016,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation)으로 조회
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1025,7 +1024,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     })
                 });
                 
-                // ▼ [수정] '#' 아이콘 제거
                 if (existingReport.results.length > 0) {
                     const existingPageId = existingReport.results[0].id;
                     await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
@@ -1064,7 +1062,6 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     });
                     console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
                 }
-                // ▲ [수정]
                 successCount++;
             } catch (studentError) {
                 console.error(`[수동 월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
@@ -1119,7 +1116,6 @@ cron.schedule('0 22 * * *', async () => {
         console.log(`[데일리 리포트] 총 ${pages.length}개의 오늘 진도 페이지를 찾았습니다.`);
 
         for (const page of pages) {
-            // ▼ [수정] 개별 페이지 오류가 전체를 중단시키지 않도록 try...catch 추가
             try {
                 const pageId = page.id;
                 const reportUrl = `${DOMAIN_URL}/report?pageId=${pageId}&date=${dateString}`;
@@ -1142,9 +1138,7 @@ cron.schedule('0 22 * * *', async () => {
             
             } catch (pageError) {
                 console.error(`[데일리 리포트] ${page.id} 업데이트 실패:`, pageError.message);
-                // (오류가 발생해도 다음 루프 계속 진행)
             }
-            // ▲ [수정]
         }
         console.log('--- ✅ [데일리 리포트] 자동화 스케줄 완료 ---');
 
@@ -1190,7 +1184,6 @@ cron.schedule('0 21 * * 5', async () => {
         const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
 
         for (const student of students) {
-             // ▼ [수정] 개별 학생 오류가 전체를 중단시키지 않도록 try...catch 추가
             const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
             const studentName = student.properties['이름']?.title?.[0]?.plain_text;
             if (!studentName) continue;
@@ -1198,7 +1191,6 @@ cron.schedule('0 21 * * 5', async () => {
             try {
                 console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
 
-                // ▼ [수정] '진도 관리 DB'를 '이름'으로 조회
                 const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -1211,7 +1203,6 @@ cron.schedule('0 21 * * 5', async () => {
                         }
                     })
                 });
-                // ▲ [수정]
                 
                 const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
                 
@@ -1239,9 +1230,10 @@ cron.schedule('0 21 * * 5', async () => {
                 let aiSummary = 'AI 요약 기능을 사용할 수 없습니다.';
                 if (geminiModel && comments) {
                     try {
+                        // ▼ [수정] AI 프롬프트 수정 (더 따뜻하고 상세하게)
                         const prompt = `
-                            너는 15년 차 리디튜드 학습 컨설턴트야.
-                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트야.
+                            너는 15년 차 리디튜드 학습 컨설턴트 '헤더쌤'이야.
+                            아래는 학생의 한 달간 데이터와 담당 선생님의 일일 코멘트 모음이야.
                             
                             [월간 통계]
                             - 숙제 수행율(평균): ${stats.hwAvg}%
@@ -1253,9 +1245,17 @@ cron.schedule('0 21 * * 5', async () => {
                             ${comments}
                             
                             [요청]
-                            위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 학생의 한 달간 성과를 "부드럽고 객관적인" 톤으로 3~4문장으로 요약해줘.
-                            학생의 강점, 개선이 필요한 점, 그리고 전반적인 성실도를 포함해서 작성해줘.
+                            1. 위 데이터를 바탕으로, 학부모가 이해하기 쉽도록 "따뜻하고, 친근하며, 학생을 격려하는 전문가"의 톤을 유지해서 10줄 내외의 평가 문장을 작성해줘.
+                            2. 내가 전문가라고 꼭 밝히지 않아도 되고 어투는 ~입니다. ~요. 를 적절하게 섞어서 부드럽고 전문적인 어조를 유지해줘.
+                            3. 첫 파트는 한 달의 정량적인 수치들에 대한 브리핑을 중립적으로 해줘. 숙제 수행율, 평균적 단어 점수, 평균 적인 문법 점수, 총 읽은 원서의 갯수를 브리핑 해 주는거야.
+                            4. 다음으로는 숙제 수행율 퍼센테이지가 70을 넘으면 숙제 수행율을 80 이상으로 높일 수 있도록 성실도를 높여 달라는 당부의 말을 해 보자.
+                            5. 숙제 수행율이 90이 넘으면 성실함에 대해 크게 칭찬하는 코멘트가 필요해. 
+                            6. 아쉬운 부분을 언급할 때도 "시급합니다" 같은 차가운 단어 대신 "조금 아쉬웠습니다", "다음 달에는 이 부분을 함께 개선해봐요" 처럼 부드럽고 긍정적인 권유형으로 작성해줘.
+                            7. "구조화된 활동" 같은 딱딱한 단어 대신 "매일 꾸준히 숙제하는 습관"처럼 쉬운 표현을 사용해줘.
+                            8. 마지막은 항상 다음 달을 응원하는 격려의 메시지와 이번 달에 가장 약했던 부분을 어떻게 강화시킬지에 대한 계획으로 마무리해줘.
+                            9. 항상 마무리 멘트는 한달간 리디튜드를 믿어주신 학부모님께 감사의 말씀을 드리거나 한 달 해당 학생이 매일 노력해서 자라고 있음을 감사한다고 말하거나 더 나은 다음 달이 되도록 학생과 함께 하는 리디튜드가 되겠다는 다짐 중 3개 중 1개만 랜덤으로 골라서 언급하고 끝내줘.
                         `;
+                        // ▲ [수정]
                         const result = await geminiModel.generateContent(prompt);
                         const response = await result.response;
                         aiSummary = response.text();
@@ -1275,7 +1275,6 @@ cron.schedule('0 21 * * 5', async () => {
                     body: JSON.stringify({
                         filter: {
                             and: [
-                                // ▼ [수정] '학생' (Relation)으로 조회
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1284,7 +1283,6 @@ cron.schedule('0 21 * * 5', async () => {
                     })
                 });
                 
-                // ▼ [수정] '#' 아이콘 제거
                 if (existingReport.results.length > 0) {
                     // 이미 있으면 업데이트
                     const existingPageId = existingReport.results[0].id;
@@ -1326,12 +1324,9 @@ cron.schedule('0 21 * * 5', async () => {
                     });
                     console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
                 }
-                // ▲ [수정]
             } catch (studentError) {
                 console.error(`[월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
-                // (오류가 발생해도 다음 학생 계속 진행)
             }
-            // ▲ [수정]
         }
         
         console.log('--- ✅ [월간 리포트] 자동화 스케줄 완료 ---');
