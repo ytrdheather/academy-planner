@@ -1408,7 +1408,7 @@ if (existingReport.results.length > 0) {
 
 } catch (error) {
     console.error('---  [데일리 리포트] 자동화 스케줄 중 오류 발생 ---', error);
-  } 
+  
 }, { 
   timezone: "Asia/Seoul"
 });
