@@ -695,6 +695,7 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
+                        // ▼ [수정] '학생' (Relation)으로 조회
                         { property: '학생', relation: { contains: studentId } },
                         { property: '리포트 월', rich_text: { equals: month } }
                     ]
@@ -708,7 +709,10 @@ app.get('/monthly-report', async (req, res) => {
         }
 
         const reportData = reportQuery.results[0].properties;
+        // ▼ [수정] '학생이름 (롤업)' 속성에서 이름 가져오기
         const studentName = getRollupValue(reportData['학생이름 (롤업)']) || '학생';
+        
+        // ▼ [수정] '#' 아이콘 제거
         const stats = {
             hwAvg: reportData['숙제수행율(평균)']?.number || 0,
             vocabAvg: reportData['어휘점수(평균)']?.number || 0,
@@ -716,6 +720,7 @@ app.get('/monthly-report', async (req, res) => {
             totalBooks: reportData['총 읽은 권수']?.number || 0,
             aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.'
         };
+        // ▲ [수정]
 
         // --- 2. '진도 관리 DB'에서 출석일수, 독서 목록 (상세) 조회 ---
         const [year, monthNum] = month.split('-').map(Number);
@@ -728,6 +733,7 @@ app.get('/monthly-report', async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
+                        // ▼ [수정] '이름' (Title)으로 조회
                         { property: '이름', title: { equals: studentName } },
                         { property: '🕐 날짜', date: { on_or_after: firstDay } },
                         { property: '🕐 날짜', date: { on_or_before: lastDay } }
@@ -746,12 +752,10 @@ app.get('/monthly-report', async (req, res) => {
             .map(p => p.reading)
             .filter(r => r.bookTitle && r.bookTitle !== '읽은 책 없음')
             .map(r => {
-                // (시리즈, AR, Lexile이 없는 경우 'N/A'로 표시)
                 const series = r.bookSeries || '';
                 const ar = r.bookAR || 'N/A';
                 const lexile = r.bookLexile || 'N/A';
                 const title = r.bookTitle;
-                // [시리즈] 제목 (AR / Lexile)
                 const bookKey = `${series}|${title}|${ar}|${lexile}`;
                 return { key: bookKey, series, title, ar, lexile };
             })
@@ -856,6 +860,7 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
             body: JSON.stringify({
                 filter: {
                     and: [
+                        // ▼ [수정] 'Title' -> '이름'
                         { property: '이름', title: { contains: studentName } },
                         { property: '리포트 월', rich_text: { equals: lastMonthString } }
                     ]
@@ -886,10 +891,9 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
 app.get('/api/manual-monthly-report-gen', async (req, res) => {
     console.log('--- 🏃‍♂️ [수동 월간 리포트] 생성 요청 받음 ---');
     
-    // ▼ [수정] URL 쿼리 대신 "Test 원장" 학생으로 이름 고정
+    // ▼ [수정] "Test 원장" 학생으로 이름 고정
     const targetStudentName = "Test 원장";
     console.log(`[수동 월간 리포트] 타겟 학생 고정: ${targetStudentName}`);
-    // ▲ [수정]
     
     // 1. 날짜 로직: '오늘' 대신 '지난 달'을 기준으로 강제 설정
     const { dateString } = getKSTTodayRange();
@@ -908,7 +912,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
     }
 
     try {
-        // ▼ [수정] "Test 원장" 학생만 조회하도록 필터 고정
+        // ▼ [수정] "Test 원장" 학생만 '이름' 속성으로 조회
         const studentQueryFilter = {
             property: '이름',
             title: { equals: targetStudentName }
@@ -916,7 +920,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 
         const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: studentQueryFilter }) // 필터 적용
+            body: JSON.stringify({ filter: studentQueryFilter })
         });
         // ▲ [수정]
 
@@ -937,6 +941,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             try {
                 console.log(`[수동 월간 리포트] ${studentName} 학생 통계 계산 중...`);
 
+                // ▼ [수정] '진도 관리 DB'를 '이름'으로 조회
                 const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -949,6 +954,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                         }
                     })
                 });
+                // ▲ [수정]
                 
                 const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
                 
@@ -1010,6 +1016,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     body: JSON.stringify({
                         filter: {
                             and: [
+                                // ▼ [수정] '학생' (Relation)으로 조회
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1018,6 +1025,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     })
                 });
                 
+                // ▼ [수정] '#' 아이콘 제거
                 if (existingReport.results.length > 0) {
                     const existingPageId = existingReport.results[0].id;
                     await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
@@ -1056,6 +1064,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
                     });
                     console.log(`[수동 월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
                 }
+                // ▲ [수정]
                 successCount++;
             } catch (studentError) {
                 console.error(`[수동 월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
@@ -1189,6 +1198,7 @@ cron.schedule('0 21 * * 5', async () => {
             try {
                 console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
 
+                // ▼ [수정] '진도 관리 DB'를 '이름'으로 조회
                 const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -1201,6 +1211,7 @@ cron.schedule('0 21 * * 5', async () => {
                         }
                     })
                 });
+                // ▲ [수정]
                 
                 const monthPages = await Promise.all(progressData.results.map(parseDailyReportData));
                 
@@ -1264,6 +1275,7 @@ cron.schedule('0 21 * * 5', async () => {
                     body: JSON.stringify({
                         filter: {
                             and: [
+                                // ▼ [수정] '학생' (Relation)으로 조회
                                 { property: '학생', relation: { contains: studentPageId } },
                                 { property: '리포트 월', rich_text: { equals: monthString } }
                             ]
@@ -1272,6 +1284,7 @@ cron.schedule('0 21 * * 5', async () => {
                     })
                 });
                 
+                // ▼ [수정] '#' 아이콘 제거
                 if (existingReport.results.length > 0) {
                     // 이미 있으면 업데이트
                     const existingPageId = existingReport.results[0].id;
@@ -1313,6 +1326,7 @@ cron.schedule('0 21 * * 5', async () => {
                     });
                     console.log(`[월간 리포트] ${studentName} 학생의 ${monthString}월 리포트 DB '새로 저장' 성공!`);
                 }
+                // ▲ [수정]
             } catch (studentError) {
                 console.error(`[월간 리포트] ${studentName} 학생 처리 중 오류 발생:`, studentError.message);
                 // (오류가 발생해도 다음 학생 계속 진행)
