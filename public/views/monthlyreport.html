@@ -1,184 +1,186 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 1. 페이지 제목 (서버에서 동적 생성) -->
-    <title>{{STUDENT_NAME}} - 월간 리포트</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Pretendard 폰트 (데일리 리포트와 동일) -->
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 1. 페이지 제목 (서버에서 동적 생성) -->
+    <title>{{STUDENT_NAME}} - 월간 리포트</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Pretendard 폰트 (데일리 리포트와 동일) -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
-    <style>
-        body {
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-            /* 데일리 리포트와 동일한 배경색 */
-            background-color: #dbe7e6;
-        }
-    </style>
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+            /* 데일리 리포트와 동일한 배경색 */
+            background-color: #dbe7e6;
+        }
+    </style>
 </head>
 <body class="p-4 sm:p-8">
 
-    <!-- 
-      [개발자 참고]
-      이 템플릿은 '/monthly-report' 라우트가 처리합니다.
-      서버는 'MONTHLY_REPORT_DB_ID'에서 통계 데이터를 조회한 후,
-      아래 '{{PLACEHOLDER}}'들을 실제 데이터로 교체(replace)하여 
-      최종 HTML을 사용자에게 전송합니다.
-    -->
+    <!-- 
+      [개발자 참고]
+      이 템플릿은 '/monthly-report' 라우트가 처리합니다.
+      서버는 'MONTHLY_REPORT_DB_ID'에서 통계 데이터를 조회한 후,
+      아래 '{{PLACEHOLDER}}'들을 실제 데이터로 교체(replace)하여 
+      최종 HTML을 사용자에게 전송합니다.
+    -->
 
-    <!-- 리포트 메인 콘텐츠 컨테이너 (흰색 배경) -->
-    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-        
-        <main class="bg-white p-6 sm:p-8 space-y-8">
-            
-            <!-- 1. 리포트 헤더 -->
-            <section class="text-center border-b border-gray-100 pb-6">
-                <!-- 학원 로고 (데일리 리포트와 동일한 경로 사용) -->
-                <img src="/assets/daily-report-header.png" alt="리디튜드 리포트 헤더" class="w-full h-auto max-w-sm mx-auto mb-4" onerror="this.style.display='none';">
-                
-                <!-- 텍스트 제목 -->
-                <h1 class="text-3xl font-extrabold text-gray-800 mb-1">
-                    {{STUDENT_NAME}}님의 월간 학습 리포트
-                </h1>
-                <!-- 리포트 기간 (서버에서 생성) -->
-                <p class="text-base text-gray-500">{{REPORT_MONTH}} ({{START_DATE}} ~ {{END_DATE}})</p>
-            </section>
-            
-            <!-- 
-              2. [핵심] RT-Check Point (숙제 수행율)
-              - 헤더님 요청 사항: 100점 만점 환산 점수 표시
-            -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">🎯</span> 월간 RT-Check Point
-                </h2>
-                <div class="bg-gray-50 p-6 rounded-xl shadow-sm border border-gray-200 text-center">
-                    <div class="text-sm font-bold text-gray-600 mb-2">총 숙제 수행율 (100점 만점)</div>
-                    <!-- 
-                      '{{HW_SCORE_COLOR}}'는 서버에서 점수에 따라
-                      (예: 70점 미만 'text-red-600', 70점 이상 'text-teal-600')
-                      동적으로 주입됩니다.
-                    -->
-                    <div class="text-7xl font-extrabold {{HW_SCORE_COLOR}}">
-                        {{HW_AVG_SCORE}}<span class="text-5xl text-gray-400">점</span>
-                    </div>
-                </div>
-            </section>
+    <!-- 리포트 메인 콘텐츠 컨테이너 (흰색 배경) -->
+    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+        
+        <main class="bg-white p-6 sm:p-8 space-y-8">
+            
+            <!-- 1. 리포트 헤더 -->
+            <section class="text-center border-b border-gray-100 pb-6">
+                <!-- 학원 로고 (데일리 리포트와 동일한 경로 사용) -->
+                <img src="/assets/daily-report-header.png" alt="리디튜드 리포트 헤더" class="w-full h-auto max-w-sm mx-auto mb-4" onerror="this.style.display='none';">
+                
+                <!-- 텍스트 제목 -->
+                <h1 class="text-3xl font-extrabold text-gray-800 mb-1">
+                    {{STUDENT_NAME}}님의 월간 학습 리포트
+                </h1>
+                <!-- 리포트 기간 (서버에서 생성) -->
+                <p class="text-base text-gray-500">{{REPORT_MONTH}} ({{START_DATE}} ~ {{END_DATE}})</p>
+            </section>
+            
+            <!-- 
+              2. [핵심] RT-Check Point (숙제 수행율)
+              - 헤더님 요청 사항: 100점 만점 환산 점수 표시
+            -->
+            <section>
+                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
+                    <span class="text-3xl mr-2">🎯</span> 월간 RT-Check Point
+                </h2>
+                <div class="bg-gray-50 p-6 rounded-xl shadow-sm border border-gray-200 text-center">
+                    <div class="text-sm font-bold text-gray-600 mb-2">총 숙제 수행율 (100점 만점)</div>
+                    <!-- 
+                      '{{HW_SCORE_COLOR}}'는 서버에서 점수에 따라
+                      (예: 70점 미만 'text-red-600', 70점 이상 'text-teal-600')
+                      동적으로 주입됩니다.
+                    -->
+                    <div class="text-7xl font-extrabold {{HW_SCORE_COLOR}}">
+                        {{HW_AVG_SCORE}}<span class="text-5xl text-gray-400">점</span>
+                    </div>
+                </div>
+            </section>
 
-            <!-- 
-              3. [핵심] RT-Check Point 패널티 공지
-              - 헤더님 요청 사항: 70점 미만 시 강력한 경고 메시지
-              - 서버는 점수에 따라 이 칸의 색상과 메시지를 동적으로 변경합니다.
-            -->
-            <section>
-                <!-- 
-                  [수정됨]
-                  타이틀(Title)과 색상(Color)은 서버에서 점수에 따라 동적으로 채워지지만,
-                  메시지(Message)는 헤더님이 요청하신 고정 텍스트로 변경합니다.
-                -->
-                <div class="{{RT_NOTICE_BG_COLOR}} border-l-4 {{RT_NOTICE_BORDER_COLOR}} p-5 rounded-r-lg shadow-sm">
-                    <h3 class="font-bold {{RT_NOTICE_TITLE_COLOR}} mb-1">{{RT_NOTICE_TITLE}}</h3>
-                    <!-- ▼ [수정] 헤더님 요청 텍스트로 변경, {{STUDENT_NAME}} 삽입 ▼ -->
-                    <p class="text-sm {{RT_NOTICE_TEXT_COLOR}} leading-relaxed">
-                        RT-Check Point는 한 달간 리디튜더 {{STUDENT_NAME}}의 성실도를 나타낸 직관적인 포인트 입니다. 70점이 넘은 친구들은 많은 칭찬을 해 주세요. ^^ 70점 이하가 연속 3번 반복되면 리디튜드와 헤어져야 하는 패널티를 줄 예정입니다!
-                    </p>
-                    <!-- ▲ [수정] ▲ -->
-                </div>
-            </section>
+            <!-- 
+              3. [핵심] RT-Check Point 패널티 공지
+              - 헤더님 요청 사항: 70점 미만 시 강력한 경고 메시지
+              - 서버는 점수에 따라 이 칸의 색상과 메시지를 동적으로 변경합니다.
+            -->
+            <section>
+                <!-- 
+                  [수정됨]
+                  타이틀(Title)과 색상(Color)은 서버에서 점수에 따라 동적으로 채워지지만,
+                  메시지(Message)는 헤더님이 요청하신 고정 텍스트로 변경합니다.
+                -->
+                <div class="{{RT_NOTICE_BG_COLOR}} border-l-4 {{RT_NOTICE_BORDER_COLOR}} p-5 rounded-r-lg shadow-sm">
+                    <h3 class="font-bold {{RT_NOTICE_TITLE_COLOR}} mb-1">{{RT_NOTICE_TITLE}}</h3>
+                    <!-- ▼ [수정] 헤더님 요청 텍스트로 변경, {{STUDENT_NAME}} 삽입 ▼ -->
+                    <p class="text-sm {{RT_NOTICE_TEXT_COLOR}} leading-relaxed">
+                        RT-Check Point는 한 달간 리디튜더 {{STUDENT_NAME}}의 성실도를 나타낸 직관적인 포인트 입니다. 70점이 넘은 친구들은 많은 칭찬을 해 주세요. ^^ 70점 이하가 연속 3번 반복되면 리디튜드와 헤어져야 하는 패널티를 줄 예정입니다!
+                    </p>
+                    <!-- ▲ [수정] ▲ -->
+                </div>
+            </section>
 
-            <!-- 
-              4. Monthly Report Review (AI 자동 생성 코멘트)
-            -->
-            <section>
-                <!-- ▼ [수정] 제목 변경: Monthly AI Summary -> Monthly Report Review ▼ -->
-                <h2 class="text-2xl font-bold text-teal-700 mb-3 flex items-center">
-                    <span class="text-3xl mr-2">💬</span> Monthly Report Review
-                </h2>
-                <!-- ▲ [수정] ▲ -->
-                <div class="bg-teal-50 border-l-4 border-teal-500 p-5 rounded-r-lg shadow-sm">
-                    <!-- '{{AI_SUMMARY}}'는 Gemini AI가 생성한 텍스트 (줄바꿈 포함) -->
-                    <p class="text-gray-700 text-base leading-relaxed whitespace-pre-line">
-                        {{AI_SUMMARY}}
-                    </p>
-                </div>
-            </section>
-            
-            <!-- 5. 월간 학습 요약 (통계) -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">📊</span> 월간 학습 요약
-                </h2>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                    
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
-                        <div class="text-4xl font-extrabold text-gray-700">
-                            {{ATTENDANCE_DAYS}} <span class="text-3xl text-gray-400">/ {{TOTAL_DAYS_IN_MONTH}}일</span>
-                        </div>
-                        <!-- ▼ [수정] 라벨 변경: 총 학습 일수 -> 출석 수업일수 ▼ -->
-                        <div class="text-sm font-bold text-gray-600 mt-1">출석 수업일수</div>
-                        <!-- ▲ [수정] ▲ -->
-                    </div>
-                    
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
-                        <div class="text-4xl font-extrabold {{VOCAB_SCORE_COLOR}}">
-                            {{VOCAB_AVG_SCORE}}<span class="text-3xl text-gray-400">점</span>
-                        </div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">평균 어휘 점수</div>
-                    </div>
-                    
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
-                        <div class="text-4xl font-extrabold {{GRAMMAR_SCORE_COLOR}}">
-                            {{GRAMMAR_AVG_SCORE}}<span class="text-3xl text-gray-400">점</span>
-                        </div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">평균 문법 점수</div>
-                    </div>
-                    
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
-                        <div class="text-4xl font-extrabold text-blue-600">
-                            {{TOTAL_BOOKS_READ}}<span class="text-3xl text-gray-400">권</span>
-                        </div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">읽은 원서</div>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- 6. 월간 독서 목록 -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">📚</span> 월간 독서 목록
-                </h2>
-                <!-- ▼ [수정] <dl> -> <ul> 리스트 구조로 변경 ▼ -->
-                <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                    <ul class="space-y-2 text-gray-800 font-semibold list-disc list-outside pl-5">
-                        <!-- 
-                          [개발자 참고]
-                          서버 'index.js'에서 이 {{BOOK_LIST_HTML}} 플레이스홀더를
-                          중복 제거된 <li> 태그 리스트로 교체합니다.
-                          
-                          (예시)
-                          <li>[Magic Tree House] Dinosaurs... (AR 3.5 / Lex 550L)</li>
-                          <li>[Nate the Great] ... (AR 3.4 / Lex 410L)</li>
-                        -->
-                        {{BOOK_LIST_HTML}}
-                    </ul>
-                </div>
-                <!-- ▲ [수정] ▲ -->
-            </section>
+            <!-- 
+              4. Monthly Report Review (AI 자동 생성 코멘트)
+            -->
+            <section>
+                <!-- ▼ [수정] 제목 변경: Monthly AI Summary -> Monthly Report Review ▼ -->
+                <h2 class="text-2xl font-bold text-teal-700 mb-3 flex items-center">
+                    <span class="text-3xl mr-2">💬</span> Monthly Report Review
+                </h2>
+                <!-- ▲ [수정] ▲ -->
+                <div class="bg-teal-50 border-l-4 border-teal-500 p-5 rounded-r-lg shadow-sm">
+                    <!-- '{{AI_SUMMARY}}'는 Gemini AI가 생성한 텍스트 (줄바꿈 포함) -->
+                    <p class="text-gray-700 text-base leading-relaxed whitespace-pre-line">
+                        {{AI_SUMMARY}}
+                    </p>
+                </div>
+            </section>
+            
+            <!-- 5. 월간 학습 요약 (통계) - [헤더님 요청대로 4개 항목 수정] -->
+            <section>
+                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
+                    <span class="text-3xl mr-2">📊</span> 월간 학습 요약
+                </h2>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                    
+                    <!-- 1. 평균 어휘 점수 -->
+                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="text-4xl font-extrabold {{VOCAB_SCORE_COLOR}}">
+                            {{VOCAB_AVG_SCORE}}<span class="text-3xl text-gray-400">점</span>
+                        </div>
+                        <div class="text-sm font-bold text-gray-600 mt-1">평균 어휘 점수</div>
+                    </div>
+                    
+                    <!-- 2. 평균 문법 점수 -->
+                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="text-4xl font-extrabold {{GRAMMAR_SCORE_COLOR}}">
+                            {{GRAMMAR_AVG_SCORE}}<span class="text-3xl text-gray-400">점</span>
+                        </div>
+                        <div class="text-sm font-bold text-gray-600 mt-1">평균 문법 점수</div>
+                    </div>
+                    
+                    <!-- 3. 독해 통과율 (신규) -->
+                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="text-4xl font-extrabold {{READING_PASS_RATE_COLOR}}">
+                            {{READING_PASS_RATE}}<span class="text-3xl text-gray-400">%</span>
+                        </div>
+                        <div class="text-sm font-bold text-gray-600 mt-1">독해 통과율</div>
+                    </div>
 
-        </main>
-        
-        <!-- 푸터 (데일리 리포트와 동일) -->
-        <footer class="p-6 text-center bg-gray-50 border-t border-gray-100">
-            <p class="text-sm text-gray-500">
-                © 2025 Readitude. All rights reserved.<br>
-                궁금한 점은 언제든 학원 카카오 채널로 문의해 주세요.
-            </p>
-        </footer>
+                    <!-- 4. 원서 총 독서 (라벨 수정) -->
+                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="text-4xl font-extrabold text-blue-600">
+                            {{TOTAL_BOOKS_READ}}<span class="text-3xl text-gray-400">권</span>
+                        </div>
+                        <div class="text-sm font-bold text-gray-600 mt-1">원서 총 독서</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 6. 월간 독서 목록 -->
+            <section>
+                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
+                    <span class="text-3xl mr-2">📚</span> 월간 독서 목록
+                </h2>
+                <!-- ▼ [수정] <dl> -> <ul> 리스트 구조로 변경 ▼ -->
+                <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <ul class="space-y-2 text-gray-800 font-semibold list-disc list-outside pl-5">
+                        <!-- 
+                          [개발자 참고]
+                          서버 'index.js'에서 이 {{BOOK_LIST_HTML}} 플레이스홀더를
+                          중복 제거된 <li> 태그 리스트로 교체합니다.
+                          
+                          (예시)
+                          <li>[Magic Tree House] Dinosaurs... (AR 3.5 / Lex 550L)</li>
+                          <li>[Nate the Great] ... (AR 3.4 / Lex 410L)</li>
+                        -->
+                        {{BOOK_LIST_HTML}}
+                    </ul>
+                </div>
+                <!-- ▲ [수정] ▲ -->
+            </section>
 
-    </div>
+        </main>
+        
+        <!-- 푸터 (데일리 리포트와 동일) -->
+        <footer class="p-6 text-center bg-gray-50 border-t border-gray-100">
+            <p class="text-sm text-gray-500">
+                © 2025 Readitude. All rights reserved.<br>
+                궁금한 점은 언제든 학원 카카오 채널로 문의해 주세요.
+            </p>
+        </footer>
+
+    </div>
 
 </body>
 </html>
