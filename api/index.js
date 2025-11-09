@@ -182,6 +182,7 @@ const getRollupValue = (prop, isNumber = false) => {
 async function parseDailyReportData(page) {
   const props = page.properties;
   const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
+  // [아이콘 수정] '🕐 날짜'로 수정
   const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
  
   let assignedTeachers = [];
@@ -190,6 +191,7 @@ async function parseDailyReportData(page) {
   }
  
   // 1. 숙제 및 테스트
+  // [아이콘 수정] '수행율'로 수정 (헤더님 확인)
   const performanceRateString = props['수행율']?.formula?.string || '0%';
   const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
  
@@ -202,8 +204,9 @@ async function parseDailyReportData(page) {
   };
 
   // [수정] formula가 문자열(예: "80%")로 점수를 반환하므로, .number가 아닌 .string에서 값을 읽고 숫자로 변환합니다.
-  const vocabScoreString = props[' 단어 테스트 점수']?.formula?.string || 'N/A';
-  const grammarScoreString = props[' 문법 시험 점수']?.formula?.string || 'N/A';
+  // [최종 수정] 헤더님이 알려주신 아이콘이 포함된 정확한 속성 이름으로 수정합니다.
+  const vocabScoreString = props['📰 단어 테스트 점수']?.formula?.string || 'N/A';
+  const grammarScoreString = props['📑 문법 시험 점수']?.formula?.string || 'N/A';
 
   const tests = {
     vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
@@ -212,7 +215,8 @@ async function parseDailyReportData(page) {
     //  [0점 버그 수정] .number -> .string을 읽고 숫자로 변환
     vocabScore: vocabScoreString === 'N/A' ? 'N/A' : (parseFloat(vocabScoreString) || 0), // "80%" or "80" -> 80
     readingWrong: props['독해 (틀린 개수)']?.number ?? null,
-    readingResult: props[' 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
+    // [최종 수정] 헤더님이 알려주신 아이콘이 포함된 정확한 속성 이름으로 수정합니다.
+    readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
     havruta: props['독해 하브루타']?.select?.name || '숙제없음',
     grammarTotal: props['문법 (전체 개수)']?.number ?? null,
     grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
@@ -302,9 +306,11 @@ async function fetchProgressData(req, res, parseFunction) {
 
   const filterConditions = [];
   if (period === 'specific_date' && date) {
+    // [아이콘 수정] '🕐 날짜'로 수정
     filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
   } else { // 기본값 'today'
     const { start, end } = getKSTTodayRange();
+    // [아이콘 수정] '🕐 날짜'로 수정
     filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
     filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
   }
@@ -317,6 +323,7 @@ async function fetchProgressData(req, res, parseFunction) {
       method: 'POST',
       body: JSON.stringify({
         filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
+        // [아이콘 수정] '🕐 날짜'로 수정
         sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
         page_size: 100, start_cursor: startCursor
       })
@@ -472,6 +479,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
     const properties = {
       '이름': { title: [{ text: { content: studentName } }] },
+      // [아이콘 수정] '🕐 날짜'로 수정
       '🕐 날짜': { date: { start: getKSTTodayRange().dateString } },
     };
     const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": " 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
@@ -763,6 +771,7 @@ readingPassRate: reportData['독해 통과율(%)']?.number || 0 // [독해 통�
           and: [
 //  [버그 수정] studentName 변수가 이제 정상적으로 학생 이름을 담고 있음
             { property: '이름', title: { equals: studentName } },
+            // [아이콘 수정] '🕐 날짜'로 수정
             { property: '🕐 날짜', date: { on_or_after: firstDay } },
             { property: '🕐 날짜', date: { on_or_before: lastDay } }
           ]
@@ -912,7 +921,7 @@ app.get('/api/monthly-report-url', requireAuth, async (req, res) => {
       if (reportUrl) {
         res.json({ success: true, url: reportUrl });
       } else {
-        res.status(404).json({ success: false, message: '리포트를 찾으나 URL이 없습니다.' });
+        res.status(404).json({ success: false, message: '리포트를 찾았으나 URL이 없습니다.' });
       }
     } else {
       res.status(404).json({ success: false, message: `[${lastMonthString}]월 리포트를 찾을 수 없습니다.` });
@@ -985,6 +994,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             filter: {
               and: [
                 { property: '이름', title: { equals: studentName } },
+                // [아이콘 수정] '🕐 날짜'로 수정
                 { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
                 { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
               ]
@@ -1001,11 +1011,10 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
         }
 
         // (통계 계산 로직은 Cron Job과 동일)
+        // [최종 수정] 헤더님 요청 로직 적용 (숙제 0점 포함, 시험 0점 제외)
         const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-        //  [0점 버그 수정] 0점은 통계에서 제외
         const vocabScores = monthPages.map(p => p.tests.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
         const grammarScores = monthPages.map(p => p.tests.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
-        //  [0점 버그 수정]
         const readingResults = monthPages.map(p => p.tests.readingResult).filter(r => r === 'PASS' || r === 'FAIL'); // [독해 통과율 추가]
        
         const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
@@ -1044,6 +1053,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
 5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}이는', '${shortName}이가'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
+6. 한국어 이름을 쓸 때 뒤의 조사를 꼭 이름의 발음과 어울리는 것으로 올바르게 사용해 주세요. (EX: 환호이가(X) 환호가(O))
 
 **[내용 작성 지침]**
 1. **[데이터]** 아래 제공되는 [월간 통계]와 [일일 코멘트]를 **절대로 나열하지 말고,** 자연스럽게 문장 속에 녹여내 줘.
@@ -1164,6 +1174,7 @@ cron.schedule('0 22 * * *', async () => {
    
     const filter = {
       and: [
+        // [아이콘 수정] '🕐 날짜'로 수정
         { property: '🕐 날짜', date: { on_or_after: start } },
         { property: '🕐 날짜', date: { on_or_before: end } }
       ]
@@ -1243,7 +1254,7 @@ cron.schedule('0 21 * * 5', async () => {
     const students = studentData.results;
     console.log(`[월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
    
-// ... (line 1240)
+    const currentYear = today.getFullYear();
     const currentMonth = today.getMonth(); // (0 = 1월, 11 = 12월)
     const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-11"
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
@@ -1262,6 +1273,7 @@ const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PR
            filter: {
               and: [
                 { property: '이름', title: { equals: studentName } },
+                // [아이콘 수정] '🕐 날짜'로 수정
                 { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
                { property: '🕐 날짜', date: { on_or_before: lastDayOfMonth } }
               ]
@@ -1277,11 +1289,10 @@ continue;
         }
 
         // 통계 계산
+        // [최종 수정] 헤더님 요청 로직 적용 (숙제 0점 포함, 시험 0점 제외)
         const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-        //  [0점 버그 수정] 0점은 통계에서 제외
         const vocabScores = monthPages.map(p => p.tests.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
         const grammarScores = monthPages.map(p => p.tests.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
-        //  [0점 버그 수정]
         const readingResults = monthPages.map(p => p.tests.readingResult).filter(r => r === 'PASS' || r === 'FAIL'); // [독해 통과율 추가]
        
         const bookTitles = [...new Set(monthPages.map(p => p.reading.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
@@ -1303,7 +1314,7 @@ if (geminiModel) {
   try {
     //  [수정] AI 프롬프트 교체 (헤더님 최신 지침 + shortName 로직)
 
-// ... (line 1307)
+    // [신규] '짧은 이름' 생성 로직
     let shortName = studentName;
     if (studentName.startsWith('Test ')) {
       shortName = studentName.substring(5); // "Test 원장" -> "원장"
@@ -1321,6 +1332,7 @@ if (geminiModel) {
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
 5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}이는', '${shortName}이가'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
+6. 한국어 이름을 쓸 때 뒤의 조사를 꼭 이름의 발음과 어울리는 것으로 올바르게 사용해 주세요. (EX: 환호이가(X) 환호가(O))
 
 **[내용 작성 지침]**
 1. **[데이터]** 아래 제공되는 [월간 통계]와 [일일 코멘트]를 **절대로 나열하지 말고,** 자연스럽게 문장 속에 녹여내 줘.
