@@ -357,11 +357,17 @@ async function fetchProgressData(req, res, parseFunction) {
 
   const filterConditions = [];
   if (period === 'specific_date' && date) {
-    filterConditions.push({ property: '🕐 날짜', date: { equals: date } });
+    // [버그 수정] "특정 날짜" (예: "2025-10-31")의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
+    const specificDate = date; // "2025-10-31"
+    const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
+    const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
   } else { // 기본값 'today'
-    // [수정] '오늘' 날짜를 KST 기준으로 계산
-    const todayStr = getKSTDateString(); // KST 기준 '오늘' (YYYY-MM-DD)
-    filterConditions.push({ property: '🕐 날짜', date: { equals: todayStr } });
+    // [버그 수정] "오늘"의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
+    const { start, end } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+    filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
   }
 
   const pages = [];
