@@ -1110,7 +1110,15 @@
                 
                 if (row && (propertyName === '단어 (맞은 개수)' || propertyName === '단어 (전체 개수)')) { const correct = Number(row.querySelector('[data-property-name="단어 (맞은 개수)"]').value); const total = Number(row.querySelector('[data-property-name="단어 (전체 개수)"]').value); const newScore = (total > 0) ? Math.round((correct / total) * 100) : 0; row.querySelector('.vocab-score').innerHTML = formatScoreCircle(newScore); }
                 if (row && (propertyName === '문법 (전체 개수)' || propertyName === '문법 (틀린 개수)')) { const total = Number(row.querySelector('[data-property-name="문법 (전체 개수)"]').value); const wrong = Number(row.querySelector('[data-property-name="문법 (틀린 개수)"]').value); const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0; row.querySelector('.grammar-score').innerHTML = formatScoreCircle(newScore); }
-                
+                 
+                // [💡 수정]
+                // 단일 업데이트가 성공했을 때 (배치가 아닐 때),
+                // 노션 수식 등으로 변경된 최신 데이터를 가져오기 위해 전체 데이터를 다시 로드합니다.
+                if (!isBatch) {
+                    console.log('단일 업데이트 성공. 데이터 자동 새로고침을 시작합니다...');
+                    await loadDataForCurrentTab(); // 모든 데이터를 다시 불러옵니다.
+                    console.log('데이터 자동 새로고침 완료.');
+                } 
             } catch (error) { 
                 console.error('필드 업데이트 오류:', error); 
                 if (element) { 
