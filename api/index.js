@@ -447,6 +447,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         break;
     }
    
+    // [최종 버그 수정] 망가졌던 URL을 'api.notion.com'으로 완벽하게 복구합니다.
     await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({ properties: { [propertyName]: notionUpdatePayload } })
