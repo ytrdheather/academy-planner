@@ -280,8 +280,15 @@ async function parseDailyReportData(page) {
   }
  
   // 4. 코멘트
+  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, 배열 전체를 map으로 순회하며 join하도록 수정
+  const commentBlocks_daily = props['❤ Today\'s Notice!']?.rich_text;
+  let fullComment_daily = '오늘의 코멘트가 없습니다.';
+  if (commentBlocks_daily && commentBlocks_daily.length > 0) {
+    fullComment_daily = commentBlocks_daily.map(block => block.plain_text).join('\n');
+  }
+
   const comment = {
-    teacherComment: props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || '오늘의 코멘트가 없습니다.',
+    teacherComment: fullComment_daily,
     grammarClass: grammarClassName || '진도 해당 없음',
     grammarTopic: grammarTopic,
     grammarHomework: grammarHomework
@@ -330,7 +337,12 @@ async function parseMonthlyStatsData(page) {
   const bookTitle = getRollupValue(props['📖 책제목 (롤업)']) || '읽은 책 없음';
   
   // 4. 일일 코멘트 (AI 요약용)
-  const teacherComment = props['❤ Today\'s Notice!']?.rich_text?.[0]?.plain_text || '';
+  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, 배열 전체를 map으로 순회하며 join하도록 수정
+  const commentBlocks_monthly = props['❤ Today\'s Notice!']?.rich_text;
+  let teacherComment = '';
+  if (commentBlocks_monthly && commentBlocks_monthly.length > 0) {
+    teacherComment = commentBlocks_monthly.map(block => block.plain_text).join('\n');
+  }
 
   // 5. 날짜
   const pageDate = props['🕐 날짜']?.date?.start || '';
