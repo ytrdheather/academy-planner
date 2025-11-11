@@ -499,10 +499,11 @@ app.post('/login', async (req, res) => {
     });
     if (data.results.length > 0) {
       const studentRecord = data.results[0].properties;
-      // [수정] '이름' 속성을 'rich_text'가 아닌 'title'로 다시 되돌립니다.
+      // [최종 수정] '이름' 속성을 'title'로 올바르게 읽습니다. (헤더님 확인)
       const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
       const token = generateToken({ userId: studentId, role: 'student', name: realName });
-      // [수정] 'userName' 필드를 제거하고, token만 반환하도록 (원래대로) 되돌립니다.
+      // [최종 수정] 'userName' 필드를 제거하고, token만 반환하도록 수정합니다.
+      // (planner.html은 token을 받고 /api/user-info를 다시 호출하는 방식입니다.)
       res.json({ success: true, message: '로그인 성공!', token });
     } else {
       res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -540,16 +541,16 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
 // [학생 플래너 저장 API - 수정됨]
 // planner.html에서 보낸 form key (예: '어휘정답')를
 // 실제 Notion DB의 속성 이름 (예: '단어 (맞은 개수)')으로 매핑합니다.
+// + "Find/Update or Create" 로직으로 수정 (헤더님 요청)
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
   const formData = req.body;
-  const studentName = req.user.name;
+  const studentName = req.user.name; // 토큰에 저장된 학생 이름
   try {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
     
-    // [수정] 1. 'planner.html'의 form key -> 'Notion DB'의 실제 속성 이름 매핑 테이블
+    // 1. 'planner.html'의 form key -> 'Notion DB'의 실제 속성 이름 매핑 테이블
     const propertyNameMap = {
-      // Status 속성
       "영어 더빙 학습": "영어 더빙 학습 완료",
       "더빙 워크북": "더빙 워크북 완료",
       "지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
@@ -557,42 +558,32 @@ app.post('/save-progress', requireAuth, async (req, res) => {
       "독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
       "Summary 숙제": "4️⃣ Summary 숙제",
       "영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-      // Number 속성
       "어휘정답": "단어 (맞은 개수)",
       "어휘총문제": "단어 (전체 개수)",
       "문법 전체 개수": "문법 (전체 개수)",
       "문법숙제오답": "문법 (틀린 개수)",
       "독해오답갯수": "독해 (틀린 개수)",
-      // Select 속성
       "완료 여부": "📕 책 읽는 거인",
       "영어독서": "📖 영어독서",
-      // Text 속성
       "오늘의 소감": "오늘의 학습 소감"
-      // (이 외 key는 planner.html과 Notion DB의 속성 이름이 동일하다고 가정)
-      // (예: '어휘유닛', '독해 하브루타', '어휘학습', 'Writing' 등)
     };
     
-    // [수정] 2. 'planner.html'의 form key를 기준으로 데이터 타입을 분류
+    // 2. 'planner.html'의 form key를 기준으로 데이터 타입을 분류
     const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
     const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "완료 여부"];
     const textProps = ["어휘유닛", "오늘의 소감"];
-    // [수정] Status 속성 key 추가
     const statusProps = ["영어 더빙 학습", "더빙 워크북", "지난 문법 숙제 검사", "어휘 클카 암기 숙제", "독해 단어 클카 숙제", "Summary 숙제", "매일 독해 숙제", "영어일기 or 개인 독해서"];
 
-    // 3. Notion에 저장할 properties 객체 생성
-    const properties = {
-      '이름': { title: [{ text: { content: studentName } }] },
-      '🕐 날짜': { date: { start: getKSTDateString() } },
-    };
+    // 3. Notion에 저장할 properties 객체 생성 (비어있는 상태로 시작)
+    const properties = {};
 
+    // 4. 폼 데이터를 properties 객체로 변환
     for (let key in formData) {
       const value = formData[key];
-      // [수정] key(form key)를 기반으로 notionPropName(DB 속성명)을 찾음
       const notionPropName = propertyNameMap[key] || key;
       
       if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
       
-      // [수정] 데이터 타입 분류는 key(form key)를 기준으로 수행
       if (numberProps.includes(key)) {
         properties[notionPropName] = { number: Number(value) };
       }
@@ -604,25 +595,60 @@ app.post('/save-progress', requireAuth, async (req, res) => {
       }
       else if (key === '오늘 읽은 영어 책') {
         const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-        if (bookPageId) { properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] }; } // 'notionPropName' 대신 원본 key 사용
+        if (bookPageId) { properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] }; }
       }
       else if (key === '3독 독서 제목') {
         const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-        if (bookPageId) { properties['3독 독서 제목'] = { relation: [{ id: bookPageId }] }; } // 'notionPropName' 대신 원본 key 사용
+        if (bookPageId) { properties['3독 독서 제목'] = { relation: [{ id: bookPageId }] }; }
       }
-      // [수정] Status 속성 처리
       else if (statusProps.includes(key)) {
         properties[notionPropName] = { status: { name: value } };
       }
-      // (기타 알 수 없는 속성)
-      // else { }
     }
    
-    await fetchNotion('https://api.notion.com/v1/pages', {
+    // --- [신규] "Find or Create/Update" 로직 ---
+    
+    // 5. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
+    const { start, end, dateString } = getKSTTodayRange();
+
+    // 6. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
+    const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
       method: 'POST',
-      body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties: properties })
+      body: JSON.stringify({
+        filter: {
+          and: [
+            { property: '이름', title: { equals: studentName } },
+            { property: '🕐 날짜', date: { on_or_after: start } },
+            { property: '🕐 날짜', date: { on_or_before: end } }
+          ]
+        },
+        page_size: 1
+      })
     });
-   
+
+    // 7. 기존 페이지가 있는지 여부에 따라 '업데이트' 또는 '생성'을 수행합니다.
+    if (existingPageQuery.results.length > 0) {
+      // --- 7A. 기존 페이지가 있으면: '업데이트' (PATCH) ---
+      const existingPageId = existingPageQuery.results[0].id;
+      console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지(${existingPageId})를 '업데이트'합니다.`);
+      await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ properties: properties }) // 폼 데이터만 덮어씁니다.
+      });
+    } else {
+      // --- 7B. 기존 페이지가 없으면: '새로 생성' (POST) ---
+      console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지를 '새로 생성'합니다.`);
+      // '이름'과 '날짜' 속성을 'properties' 객체에 추가합니다.
+      properties['이름'] = { title: [{ text: { content: studentName } }] };
+      properties['🕐 날짜'] = { date: { start: dateString } }; // KST 날짜 문자열 사용
+      
+      await fetchNotion('https://api.notion.com/v1/pages', {
+        method: 'POST',
+        body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties: properties })
+      });
+    }
+    // --- [신규] 로직 끝 ---
+
     res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
   } catch (error) { 
     console.error('Error saving student progress:', error); 
