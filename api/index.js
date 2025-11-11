@@ -129,7 +129,6 @@ app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
 // --- [신규] 헬퍼 함수: KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환 ---
-// (KSTDateString()과 KSTTodayRange() 두 함수를 모두 사용합니다)
 function getKSTDate() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
 }
@@ -540,26 +539,65 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
   } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
 });
 
+// =======================================================================
+// [학생 플래너 저장 API - 수정됨]
+// planner.html에서 보낸 form key (예: '어휘정답')를
+// 실제 Notion DB의 속성 이름 (예: '단어 (맞은 개수)')으로 매핑합니다.
+// =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
   const formData = req.body;
   const studentName = req.user.name;
   try {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
+    
+    // [수정] 1. 'planner.html'의 form key -> 'Notion DB'의 실제 속성 이름 매핑 테이블
+    const propertyNameMap = {
+      // Status 속성
+      "영어 더빙 학습": "영어 더빙 학습 완료",
+      "더빙 워크북": "더빙 워크북 완료",
+      // Number 속성
+      "어휘정답": "단어 (맞은 개수)",
+      "어휘총문제": "단어 (전체 개수)",
+      "문법 전체 개수": "문법 (전체 개수)",
+      "문법숙제오답": "문법 (틀린 개수)", // (가정: '문법 (틀린 개수)'와 동일)
+      "독해오답갯수": "독해 (틀린 개수)", // (가정: '독해 (틀린 개수)'와 동일)
+      // Select 속성
+      "완료 여부": "📕 책 읽는 거인",
+      "영어독서": "📖 영어독서",
+      // Text 속성
+      "오늘의 소감": "오늘의 학습 소감"
+      // (이 외 key는 planner.html과 Notion DB의 속성 이름이 동일하다고 가정)
+      // (예: '어휘유닛', '독해 하브루타', '어휘학습', 'Writing' 등)
+    };
+    
+    // [수정] 2. 'planner.html'의 form key를 기준으로 데이터 타입을 분류
+    const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
+    const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "완료 여부"];
+    const textProps = ["어휘유닛", "오늘의 소감"];
+
+    // 3. Notion에 저장할 properties 객체 생성
     const properties = {
       '이름': { title: [{ text: { content: studentName } }] },
       '🕐 날짜': { date: { start: getKSTDateString() } },
     };
-    const propertyNameMap = { "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감" };
-    const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
-    const selectProps = ["독해 하브루타", "📖 영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"]; // [복구] '영어독서' -> '📖 영어독서'
-    const textProps = ["어휘유닛", "오늘의 학습 소감"];
+
     for (let key in formData) {
       const value = formData[key];
+      // [수정] key(form key)를 기반으로 notionPropName(DB 속성명)을 찾음
       const notionPropName = propertyNameMap[key] || key;
+      
       if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
-      if (numberProps.includes(notionPropName)) { properties[notionPropName] = { number: Number(value) }; }
-      else if (selectProps.includes(notionPropName)) { properties[notionPropName] = { select: { name: value } }; }
-else if (textProps.includes(notionPropName)) { properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; }
+      
+      // [수정] 데이터 타입 분류는 key(form key)를 기준으로 수행
+      if (numberProps.includes(key)) {
+        properties[notionPropName] = { number: Number(value) };
+      }
+      else if (selectProps.includes(key)) {
+        properties[notionPropName] = { select: { name: value } };
+      }
+      else if (textProps.includes(key)) {
+        properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
+      }
       else if (key === '오늘 읽은 영어 책') {
         const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
         if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
@@ -568,7 +606,10 @@ else if (textProps.includes(notionPropName)) { properties[notionPropName] = { ri
         const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
         if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
       }
-      else { properties[notionPropName] = { status: { name: value } }; }
+      else {
+        // (분류에 없는 나머지는 Status 속성으로 처리 (예: '1️⃣ 어휘...'))
+        properties[notionPropName] = { status: { name: value } };
+      }
     }
    
     await fetchNotion('https://api.notion.com/v1/pages', {
@@ -577,7 +618,10 @@ else if (textProps.includes(notionPropName)) { properties[notionPropName] = { ri
     });
    
     res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
-  } catch (error) { console.error('Error saving student progress:', error); res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' }); }
+  } catch (error) { 
+    console.error('Error saving student progress:', error); 
+    res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' }); 
+  }
 });
 
 
@@ -666,7 +710,8 @@ function fillReportTemplate(template, data) {
   const replacements = {
     '{{STUDENT_NAME}}': data.studentName,
     '{{REPORT_DATE}}': getKoreanDate(data.date),
-    '{{TEACHER_COMMENT}}': comment.teacherComment || '오늘의 코멘트가 없습니다.',
+    // [버그 수정] 코멘트가 여러 줄일 경우 <br>로 변환
+    '{{TEACHER_COMMENT}}': (comment.teacherComment || '오늘의 코멘트가 없습니다.').replace(/\n/g, '<br>'),
    
     '{{HW_SCORE}}': formatReportValue(data.completionRate, 'percent'),
     '{{HW_SCORE_COLOR}}': getReportColors(data.completionRate, 'hw_summary'),
@@ -854,7 +899,6 @@ app.get('/monthly-report', async (req, res) => {
 });
 
 // [신규] 월간 리포트 HTML 렌더링 헬퍼 함수
-// [수정] monthPages는 이제 'parseMonthlyStatsData'의 결과물입니다.
 function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays) {
   const [year, monthNum] = month.split('-').map(Number);
   const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
@@ -864,11 +908,9 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
   // 독서 목록 (중복 제거)
   const bookSet = new Set();
   const bookListHtml = monthPages
-    .map(p => p.bookTitle) // [수정] p.reading.bookTitle -> p.bookTitle
+    .map(p => p.bookTitle)
     .filter(title => title && title !== '읽은 책 없음')
     .map(title => {
-      // [수정] 통계 파서는 AR/Lexile/Series를 가져오지 않으므로, 제목만 표시합니다.
-      // (이 정보가 꼭 필요하다면 'parseMonthlyStatsData'도 수정해야 합니다.)
       const bookKey = title;
       return { key: bookKey, title: title };
     })
@@ -878,8 +920,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
       return true;
     })
     .map(book => {
-      // return `<li>${seriesText}${book.title} (AR ${book.ar} / Lexile ${book.lexile})</li>`;
-      return `<li>${book.title}</li>`; // [수정] 제목만 표시
+      return `<li>${book.title}</li>`;
     })
     .join('\n') || '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
@@ -921,7 +962,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     '{{RT_NOTICE_TITLE}}': rtNotice.title,
    
     // AI 요약
-    '{{AI_SUMMARY}}': stats.aiSummary.replace(/\n/g, '<br>'), // [수정] AI 요약 개행문자 처리
+    '{{AI_SUMMARY}}': stats.aiSummary.replace(/\n/g, '<br>'),
    
     // 월간 통계
     '{{ATTENDANCE_DAYS}}': attendanceDays,
@@ -1092,20 +1133,24 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             }
             
             // [AI 가이드라인 수정] 헤더님 최신 가이드라인 반영 (조사 수정)
-            let studentNameParticle = (shortName.endsWith('호') || shortName.endsWith('준')) ? '는' : '이는'; // 예: 환호는, 기준이는
-            let studentNameParticle2 = (shortName.endsWith('호') || shortName.endsWith('준')) ? '가' : '이가'; // 예: 환호가, 기준이가
+            let studentNameParticle = '이는';
+            let studentNameParticle2 = '이가';
             
-            // "환호"의 경우 "환호는", "환호가"가 자연스러움
-            if (shortName === '환호') {
-                 studentNameParticle = '는';
-                 studentNameParticle2 = '가';
-            }
-            // 이름이 2글자이거나 4글자 이상이면 (예: 원장, 강시정) '이는', '이가'가 자연스러움
-            else if (shortName.length === 2 || shortName.length >= 4) {
-                 studentNameParticle = '이는';
-                 studentNameParticle2 = '이가';
-            }
-            // (그 외 3글자 이름은 기본 로직 사용)
+            try {
+                // 한글 이름의 마지막 글자 받침 여부 확인
+                const lastChar = shortName.charCodeAt(shortName.length - 1);
+                // 한글 범위 (가: 44032, 힣: 55203)
+                if (lastChar >= 44032 && lastChar <= 55203) {
+                    const jongseong = (lastChar - 44032) % 28;
+                    if (jongseong > 0) { // 받침 있음
+                        studentNameParticle = '이는';
+                        studentNameParticle2 = '이가';
+                    } else { // 받침 없음
+                        studentNameParticle = '는';
+                        studentNameParticle2 = '가';
+                    }
+                }
+            } catch (e) { /* 이름이 한글이 아니거나 예외 발생 시 기본값 사용 */ }
 
 
             const prompt = `
@@ -1113,7 +1158,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 
 **[AI의 역할 및 톤]**
 1. **가장 중요:** 너는 선생님 본인이기 때문에, **"안녕하세요, OOO 컨설턴트입니다" 혹은 "xxx쌤 입니다"라고 너 자신을 소개하는 문장을 절대로 쓰지 마.**
-2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 10월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
+2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 ${currentMonth + 1}월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
 5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}${studentNameParticle}', '${shortName}${studentNameParticle2}'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
@@ -1380,17 +1425,23 @@ cron.schedule('0 21 * * 5', async () => {
             }
             
             // [AI 가이드라인 수정] 헤더님 최신 가이드라인 반영 (조사 수정)
-            let studentNameParticle = (shortName.endsWith('호') || shortName.endsWith('준')) ? '는' : '이는'; // 예: 환호는, 기준이는
-            let studentNameParticle2 = (shortName.endsWith('호') || shortName.endsWith('준')) ? '가' : '이가'; // 예: 환호가, 기준이가
+            let studentNameParticle = '이는';
+            let studentNameParticle2 = '이가';
             
-            if (shortName === '환호') {
-                 studentNameParticle = '는';
-                 studentNameParticle2 = '가';
-            }
-            else if (shortName.length === 2 || shortName.length >= 4) {
-                 studentNameParticle = '이는';
-                 studentNameParticle2 = '이가';
-            }
+            try {
+                const lastChar = shortName.charCodeAt(shortName.length - 1);
+                if (lastChar >= 44032 && lastChar <= 55203) {
+                    const jongseong = (lastChar - 44032) % 28;
+                    if (jongseong > 0) {
+                        studentNameParticle = '이는';
+                        studentNameParticle2 = '이가';
+                    } else {
+                        studentNameParticle = '는';
+                        studentNameParticle2 = '가';
+                    }
+                }
+            } catch (e) { /* 이름이 한글이 아니거나 예외 발생 시 기본값 사용 */ }
+
 
             const prompt = `
 너는 '리디튜드' 학원의 선생님이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
