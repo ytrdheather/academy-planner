@@ -76,7 +76,10 @@ function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catc
 // [신규] 헬퍼 함수: 롤업 또는 속성에서 간단한 텍스트 추출
 const getSimpleText = (prop) => {
   if (!prop) return '';
-  if (prop.type === 'rich_text' && prop.rich_text.length > 0) return prop.rich_text[0].plain_text;
+  // [버그 수정] 코멘트가 여러 줄일 경우, 모든 텍스트를 \n으로 합쳐서 반환
+  if (prop.type === 'rich_text') {
+    return prop.rich_text.map(t => t.plain_text).join('\n');
+  }
   if (prop.type === 'title' && prop.title.length > 0) return prop.title[0].plain_text;
   if (prop.type === 'select' && prop.select) return prop.select.name;
   return '';
@@ -279,12 +282,8 @@ async function parseDailyReportData(page) {
   }
  
   // 4. 코멘트
-  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, 배열 전체를 map으로 순회하며 join하도록 수정
-  const commentBlocks_daily = props['❤ Today\'s Notice!']?.rich_text;
-  let fullComment_daily = '오늘의 코멘트가 없습니다.';
-  if (commentBlocks_daily && commentBlocks_daily.length > 0) {
-    fullComment_daily = commentBlocks_daily.map(block => block.plain_text).join('\n');
-  }
+  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, getSimpleText 헬퍼 함수를 사용하도록 수정
+  const fullComment_daily = getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.';
 
   const comment = {
     teacherComment: fullComment_daily,
@@ -336,12 +335,8 @@ async function parseMonthlyStatsData(page) {
   const bookTitle = getRollupValue(props['📖 책제목 (롤업)']) || '읽은 책 없음';
   
   // 4. 일일 코멘트 (AI 요약용)
-  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, 배열 전체를 map으로 순회하며 join하도록 수정
-  const commentBlocks_monthly = props['❤ Today\'s Notice!']?.rich_text;
-  let teacherComment = '';
-  if (commentBlocks_monthly && commentBlocks_monthly.length > 0) {
-    teacherComment = commentBlocks_monthly.map(block => block.plain_text).join('\n');
-  }
+  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, getSimpleText 헬퍼 함수를 사용하도록 수정
+  const teacherComment = getSimpleText(props['❤ Today\'s Notice!']) || '';
 
   // 5. 날짜
   const pageDate = props['🕐 날짜']?.date?.start || '';
@@ -504,8 +499,10 @@ app.post('/login', async (req, res) => {
     });
     if (data.results.length > 0) {
       const studentRecord = data.results[0].properties;
+      // [수정] '이름' 속성을 'rich_text'가 아닌 'title'로 다시 되돌립니다.
       const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
       const token = generateToken({ userId: studentId, role: 'student', name: realName });
+      // [수정] 'userName' 필드를 제거하고, token만 반환하도록 (원래대로) 되돌립니다.
       res.json({ success: true, message: '로그인 성공!', token });
     } else {
       res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -555,12 +552,17 @@ app.post('/save-progress', requireAuth, async (req, res) => {
       // Status 속성
       "영어 더빙 학습": "영어 더빙 학습 완료",
       "더빙 워크북": "더빙 워크북 완료",
+      "지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
+      "어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
+      "독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
+      "Summary 숙제": "4️⃣ Summary 숙제",
+      "영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
       // Number 속성
       "어휘정답": "단어 (맞은 개수)",
       "어휘총문제": "단어 (전체 개수)",
       "문법 전체 개수": "문법 (전체 개수)",
-      "문법숙제오답": "문법 (틀린 개수)", // (가정: '문법 (틀린 개수)'와 동일)
-      "독해오답갯수": "독해 (틀린 개수)", // (가정: '독해 (틀린 개수)'와 동일)
+      "문법숙제오답": "문법 (틀린 개수)",
+      "독해오답갯수": "독해 (틀린 개수)",
       // Select 속성
       "완료 여부": "📕 책 읽는 거인",
       "영어독서": "📖 영어독서",
@@ -574,6 +576,8 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
     const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "완료 여부"];
     const textProps = ["어휘유닛", "오늘의 소감"];
+    // [수정] Status 속성 key 추가
+    const statusProps = ["영어 더빙 학습", "더빙 워크북", "지난 문법 숙제 검사", "어휘 클카 암기 숙제", "독해 단어 클카 숙제", "Summary 숙제", "매일 독해 숙제", "영어일기 or 개인 독해서"];
 
     // 3. Notion에 저장할 properties 객체 생성
     const properties = {
@@ -600,16 +604,18 @@ app.post('/save-progress', requireAuth, async (req, res) => {
       }
       else if (key === '오늘 읽은 영어 책') {
         const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
+        if (bookPageId) { properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] }; } // 'notionPropName' 대신 원본 key 사용
       }
       else if (key === '3독 독서 제목') {
         const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-        if (bookPageId) { properties[notionPropName] = { relation: [{ id: bookPageId }] }; }
+        if (bookPageId) { properties['3독 독서 제목'] = { relation: [{ id: bookPageId }] }; } // 'notionPropName' 대신 원본 key 사용
       }
-      else {
-        // (분류에 없는 나머지는 Status 속성으로 처리 (예: '1️⃣ 어휘...'))
+      // [수정] Status 속성 처리
+      else if (statusProps.includes(key)) {
         properties[notionPropName] = { status: { name: value } };
       }
+      // (기타 알 수 없는 속성)
+      // else { }
     }
    
     await fetchNotion('https://api.notion.com/v1/pages', {
@@ -848,7 +854,7 @@ app.get('/monthly-report', async (req, res) => {
         vocabAvg: reportData['어휘점수(평균)']?.number || 0,
         grammarAvg: reportData['문법점수(평균)']?.number || 0,
         totalBooks: reportData['총 읽은 권수']?.number || 0,
-        aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
+        aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
         readingPassRate: reportData['독해 통과율(%)']?.number || 0
       };
       return renderMonthlyReportHTML(res, monthlyReportTemplate, studentNameFromTitle, month, statsOnly, [], 0);
@@ -862,7 +868,7 @@ app.get('/monthly-report', async (req, res) => {
       vocabAvg: reportData['어휘점수(평균)']?.number || 0,
       grammarAvg: reportData['문법점수(평균)']?.number || 0,
       totalBooks: reportData['총 읽은 권수']?.number || 0,
-      aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
+      aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
       readingPassRate: reportData['독해 통과율(%)']?.number || 0
     };
 
@@ -1111,7 +1117,7 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
         const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
        
         const bookTitles = [...new Set(monthPages.map(p => p.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).join('\n');
+        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim() !== '[]').join('\n');
 
         const stats = {
           hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
@@ -1402,7 +1408,7 @@ cron.schedule('0 21 * * 5', async () => {
         const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
        
         const bookTitles = [...new Set(monthPages.map(p => p.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).join('\n');
+        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim() !== '[]').join('\n');
 
         const stats = {
           hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
