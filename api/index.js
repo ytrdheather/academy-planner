@@ -19,6 +19,7 @@ const {
   GEMINI_API_KEY, // AI 요약 기능용 API 키
   MONTHLY_REPORT_DB_ID, // 월간 리포트 저장용 DB ID
   GRAMMAR_DB_ID, // 문법 숙제 관리 DB ID
+  //  [수정] localhost -> 실제 서비스 주소로 기본값 변경
   DOMAIN_URL = 'https://readitude.onrender.com' // 배포 시 .env 변수로 대체됨
 } = process.env;
 
@@ -36,9 +37,9 @@ let geminiModel;
 if (GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
-  console.log('✅ Gemini AI가 성공적으로 연결되었습니다.');
+  console.log(' Gemini AI가 성공적으로 연결되었습니다.');
 } else {
-  console.warn('⚠️ GEMINI_API_KEY가 .env 파일에 없습니다. AI 요약 기능이 비활성화됩니다.');
+  console.warn(' GEMINI_API_KEY가 .env 파일에 없습니다. AI 요약 기능이 비활성화됩니다.');
 }
 
 // (교사 계정 정보는 변경 없음)
@@ -60,7 +61,7 @@ async function fetchNotion(url, options) {
     'Notion-Version': '2022-06-28'
   };
   const response = await fetch(url, { ...options, headers });
- 
+
   if (!response.ok) {
     const errorData = await response.json();
     console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
@@ -76,7 +77,7 @@ function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catc
 // [신규] 헬퍼 함수: 롤업 또는 속성에서 간단한 텍스트 추출
 const getSimpleText = (prop) => {
   if (!prop) return '';
-  // [버그 수정] 코멘트가 여러 줄일 경우, 모든 텍스트를 \n으로 합쳐서 반환
+  // [수정] 코멘트 잘림 버그 해결 (여러 개의 텍스트 조각을 \n으로 합침)
   if (prop.type === 'rich_text') {
     return prop.rich_text.map(t => t.plain_text).join('\n');
   }
@@ -132,35 +133,22 @@ app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
 // --- [신규] 헬퍼 함수: KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환 ---
-function getKSTDate() {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-}
-
-function getKSTDateString() {
-  const now = getKSTDate();
-  const options = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'Asia/Seoul'
-  };
-  return new Intl.DateTimeFormat('en-CA', options).format(now);
-}
-
-function getKSTTodayRange() {
-  const now = new Date(); // 현재 UTC 시간
-  const kstOffset = 9 * 60 * 60 * 1000; // KST는 UTC+9
-  const kstNow = new Date(now.getTime() + kstOffset); // 현재 KST 시간 (값)
- 
-  const kstDateString = kstNow.toISOString().split('T')[0]; // "2025-11-08" (KST 기준)
- 
+function getKSTDayRange(dateString) {
+  // dateString이 없으면 KST 기준 '오늘'을 사용
+  const kstNow = dateString ? new Date(dateString) : new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  
+  // 'YYYY-MM-DD' 형식의 문자열 생성 (KST 기준)
+  const kstDateString = kstNow.toISOString().split('T')[0];
+  
+  // KST 기준의 시작과 끝
+  // (Notion API는 ISO 8601 형식의 UTC 또는 오프셋 포함 문자열을 선호)
   const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
   const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
- 
+  
   return {
-    start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
-    end: end.toISOString(),  // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
-    dateString: kstDateString  // URL용 (예: "2025-11-08")
+    start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-09T15:00:00.000Z")
+    end: end.toISOString(),   // UTC로 변환된 값 (예: "2025-11-10T14:59:59.999Z")
+    dateString: kstDateString  // URL용 (예: "2025-11-10")
   };
 }
 
@@ -182,7 +170,7 @@ const getRollupValue = (prop, isNumber = false) => {
     if (firstItem.type === 'rich_text' && firstItem.rich_text.length > 0) return firstItem.rich_text[0].plain_text;
     if (firstItem.type === 'number') return firstItem.number;
     if (firstItem.type === 'relation') return ''; // 관계형 자체는 빈값 처리
-    if (firstItem.type === 'select' && firstItem.select) return firstItem.select.name;
+    if (firstItem.type === 'select' && firstItem.select) return firstItem.select.name; // '선택' 속성 롤업 추가
     if (firstItem.type === 'formula') {
       if (firstItem.formula.type === 'string') return firstItem.formula.string;
       if (firstItem.formula.type === 'number') return firstItem.formula.number;
@@ -196,14 +184,14 @@ const getRollupValue = (prop, isNumber = false) => {
 };
 
 // =======================================================================
-// [기능 분리 1: 데일리 대시보드 복구]
-// 헤더님이 찾아주신 "어제 잘 되던" 원본 `parseDailyReportData` 함수로 복원합니다.
-// 이 함수는 '데일리 대시보드'와 '데일리 리포트'가 사용합니다.
+// [기능 분리 1: 데일리 대시보드용 파서]
+// '어제 잘 되던' 원본 코드로 완벽하게 복구된 함수입니다.
+// (속성 이름: ⭕, 1️⃣, 📰, 📖, ❤ 등)
 // =======================================================================
 async function parseDailyReportData(page) {
   const props = page.properties;
   const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-  const pageDate = props['🕐 날짜']?.date?.start || getKSTDateString();
+  const pageDate = props['🕐 날짜']?.date?.start || getKSTDayRange().dateString;
 
   let assignedTeachers = [];
   if (props['담당쌤']?.rollup?.array) {
@@ -211,6 +199,7 @@ async function parseDailyReportData(page) {
   }
 
   // 1. 숙제 및 테스트
+  // [수정] '수행율' 속성도 'formula.string'으로 읽어옵니다.
   const performanceRateString = props['수행율']?.formula?.string || '0%';
   const performanceRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
@@ -226,12 +215,14 @@ async function parseDailyReportData(page) {
     vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
     vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
     vocabTotal: props['단어 (전체 개수)']?.number ?? null,
+    // [수정] 'formula.string'으로 읽어옵니다. (원본 복구)
     vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
     readingWrong: props['독해 (틀린 개수)']?.number ?? null,
     readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
     havruta: props['독해 하브루타']?.select?.name || '숙제없음',
     grammarTotal: props['문법 (전체 개수)']?.number ?? null,
     grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
+    // [수정] 'formula.string'으로 읽어옵니다. (원본 복구)
     grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
   };
 
@@ -280,20 +271,18 @@ async function parseDailyReportData(page) {
       console.error(`[문법 DB 조회 오류] (반이름: ${grammarClassName}):`, e.message);
     }
   }
- 
-  // 4. 코멘트
-  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, getSimpleText 헬퍼 함수를 사용하도록 수정
-  const fullComment_daily = getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.';
 
+  // 4. 코멘트
   const comment = {
-    teacherComment: fullComment_daily,
+    // [수정] 코멘트 잘림 버그 해결 (getSimpleText 사용)
+    teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
     grammarClass: grammarClassName || '진도 해당 없음',
     grammarTopic: grammarTopic,
     grammarHomework: grammarHomework
   };
- 
+
   // 5. 월간 리포트용 학생 ID (관계형)
-  const studentRelationId = props['학생']?.relation?.[0]?.id || null; 
+  const studentRelationId = props['학생']?.relation?.[0]?.id || null;
 
   return {
     pageId: page.id,
@@ -311,67 +300,89 @@ async function parseDailyReportData(page) {
 }
 
 // =======================================================================
-// [기능 분리 2: 월간 리포트 신설]
-// '월간 리포트 통계' 전용 파서 함수를 새로 추가합니다.
-// 이 함수는 '월간 리포트' API 2개(수동, 자동)만 사용합니다.
+// [기능 분리 2: 월간 리포트 통계용 파서]
+// '월간 리포트' 통계에만 필요한 속성을 읽어오는 새 함수입니다.
+// (속성 이름: 수행율, 📰..., 🕐 날짜 등)
 // =======================================================================
-async function parseMonthlyStatsData(page) {
+function parseMonthlyStatsData(page) {
   const props = page.properties;
+  
+  // 1. 날짜
+  const pageDate = props['🕐 날짜']?.date?.start || null;
+  
+  // 2. 학생 ID
+  const studentRelationId = props['학생']?.relation?.[0]?.id || null;
 
-  // 1. 숙제 수행율 (0점 포함)
+  // 3. 숙제 수행율 (0점 포함)
   const performanceRateString = props['수행율']?.formula?.string || '0%';
-  const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0; // 0%도 0으로 포함
+  const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0; // 0%는 0으로
 
-  // 2. 시험 점수 (0점 제외 로직은 API 호출부에서 .filter()로 처리)
+  // 4. 어휘/문법 점수 (0점은 N/A로)
   const vocabScoreString = props['📰 단어 테스트 점수']?.formula?.string || 'N/A';
-  const vocabScore = (vocabScoreString === 'N/A') ? 'N/A' : (parseFloat(vocabScoreString) || 0); // 0점은 0으로. N/A는 N/A로.
-
   const grammarScoreString = props['📑 문법 시험 점수']?.formula?.string || 'N/A';
-  const grammarScore = (grammarScoreString === 'N/A') ? 'N/A' : (parseFloat(grammarScoreString) || 0);
 
-  const readingResult = props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A'; // 'PASS', 'FAIL', 'N/A'
+  // 5. 독해 결과
+  const readingResult = props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A'; // PASS, FAIL, N/A
 
-  // 3. 총 읽은 권수
+  // 6. 읽은 책
   const bookTitle = getRollupValue(props['📖 책제목 (롤업)']) || '읽은 책 없음';
   
-  // 4. 일일 코멘트 (AI 요약용)
-  // [버그 수정] rich_text 배열의 [0]만 읽던 것을, getSimpleText 헬퍼 함수를 사용하도록 수정
+  // 7. 코멘트
+  // [수정] 코멘트 잘림 버그 해결 (getSimpleText 사용)
   const teacherComment = getSimpleText(props['❤ Today\'s Notice!']) || '';
 
-  // 5. 날짜
-  const pageDate = props['🕐 날짜']?.date?.start || '';
+  // [수정] 통계 계산 로직 (숙제 0점 포함 / 시험 0점 제외)
+  
+  // 'N/A' 또는 null이 아닌 실제 점수만 숫자로 변환
+  const parseScore = (scoreString) => {
+    if (scoreString === 'N/A' || scoreString === null || scoreString === undefined) {
+      return null; // 통계 계산에서 제외
+    }
+    const score = parseFloat(scoreString.replace('%', ''));
+    if (isNaN(score)) {
+      return null; // "PASS" 같은 문자열이 숫자로 변환 실패 시 제외
+    }
+    // 0점('시험 안 봄')은 제외, 0%('수행율')는 포함
+    // -> 이 함수는 점수만 다루므로 0점은 제외
+    if (score === 0) {
+      return null; 
+    }
+    return score;
+  };
+  
+  const vocabScore = parseScore(vocabScoreString);
+  const grammarScore = parseScore(grammarScoreString);
 
   return {
-    completionRate: (completionRate === null) ? null : Math.round(completionRate),
-    vocabScore: vocabScore,
-    grammarScore: grammarScore,
+    studentRelationId,
+    date: pageDate,
+    completionRate: completionRate, // 0점 포함
+    vocabScore: vocabScore,     // 0점 제외 (null)
+    grammarScore: grammarScore, // 0점 제외 (null)
     readingResult: readingResult,
     bookTitle: bookTitle,
-    teacherComment: teacherComment,
-    date: pageDate
+    teacherComment: teacherComment
   };
 }
 
 
 // --- [공통] 데이터 조회 함수 (파서를 위 함수로 교체) ---
-// (이 함수는 데일리 대시보드 전용이 되었습니다. 'parseDailyReportData'를 호출합니다.)
 async function fetchProgressData(req, res, parseFunction) {
   const { period = 'today', date, teacher } = req.query;
   if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
     throw new Error('서버 환경 변수가 설정되지 않았습니다.');
   }
 
+  // [수정] '오늘' 또는 '특정 날짜'의 KST 범위를 가져오도록 수정
   const filterConditions = [];
   if (period === 'specific_date' && date) {
-    // [버그 수정] "특정 날짜" (예: "2025-10-31")의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
-    const specificDate = date; // "2025-10-31"
-    const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
-    const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
+    // '날짜 지정'
+    const { start, end } = getKSTDayRange(date);
     filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
     filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
-  } else { // 기본값 'today'
-    // [버그 수정] "오늘"의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
-    const { start, end } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
+  } else { 
+    // 기본값 'today'
+    const { start, end } = getKSTDayRange(); // 오늘 KST 범위
     filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
     filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
   }
@@ -392,6 +403,7 @@ async function fetchProgressData(req, res, parseFunction) {
     hasMore = data.has_more; startCursor = data.next_cursor;
   }
 
+  // [수정] parseFunction이 동기/비동기일 수 있으므로 Promise.all()로 안전하게 처리
   const parsedData = await Promise.all(pages.map(parseFunction));
   return parsedData;
 }
@@ -400,7 +412,7 @@ async function fetchProgressData(req, res, parseFunction) {
 
 app.get('/api/daily-report-data', requireAuth, async (req, res) => {
   try {
-    // [복구] 'parseDailyReportData' 원본 함수를 호출하므로, 대시보드가 정상 복구됩니다.
+    // [수정] "데일리 대시보드"용 파서를 명시적으로 사용
     const data = await fetchProgressData(req, res, parseDailyReportData);
     res.json(data);
   } catch (error) {
@@ -413,7 +425,7 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 app.post('/api/update-homework', requireAuth, async (req, res) => {
   const { pageId, propertyName, newValue, propertyType } = req.body;
   if (!pageId || !propertyName || newValue === undefined) { return res.status(400).json({ success: false, message: '필수 정보 누락' }); }
- 
+
   try {
     if (!NOTION_ACCESS_TOKEN) { throw new Error('서버 토큰 오류'); }
     let notionUpdatePayload;
@@ -440,13 +452,13 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         } else { notionUpdatePayload = { status: { name: newValue } }; }
         break;
     }
-   
-    // [최종 버그 수정] 망가졌던 URL을 'api.notion.com'으로 완벽하게 복구합니다.
+    
+    // [수정] URL 버그 수정 (notion.com 추가)
     await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({ properties: { [propertyName]: notionUpdatePayload } })
     });
-   
+    
     res.json({ success: true, message: '업데이트 성공' });
   } catch (error) {
     console.error(`숙제 업데이트 처리 중 오류 (PageID: ${pageId}):`, error);
@@ -485,14 +497,16 @@ app.get('/api/teacher/user-info', requireAuth, (req, res) => {
   res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId });
 });
 
-app.get('/api/user-info', requireAuth, (req, res) => {
-  // [수정] "userName"이 아니라 "studentName", "studentRealName"을 반환하도록
-  // "잘 되던" 원본 코드로 복구합니다. (planner.html이 이 키를 사용합니다.)
+// [수정] 학생 플래너가 호출하는 /api/student-info 복구
+app.get('/api/student-info', requireAuth, (req, res) => {
+  if (!req.user || req.user.role !== 'student') {
+    return res.status(401).json({ error: '학생 인증이 필요합니다' });
+  }
+  // planner.html이 기대하는 studentName, studentRealName을 반환
   res.json({ 
-    userId: req.user.userId || req.user.loginId, 
+    studentId: req.user.userId, 
     studentName: req.user.name, 
-    studentRealName: req.user.name, 
-    userRole: req.user.role 
+    studentRealName: req.user.name 
   });
 });
 
@@ -508,9 +522,7 @@ app.post('/login', async (req, res) => {
       const studentRecord = data.results[0].properties;
       const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
       const token = generateToken({ userId: studentId, role: 'student', name: realName });
-      
-      // [수정] "userName"을 제거하고 "token"만 반환하도록
-      // "잘 되던" 원본 코드로 복구합니다.
+      // [수정] 'userName'을 제거하고 'token'만 반환 (원본 '잘 되던' 코드 복구)
       res.json({ success: true, message: '로그인 성공!', token });
     } else {
       res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -544,82 +556,18 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
   } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
 });
 
-// =======================================================================
-// [학생 플래너 저장 API - 수정됨]
-// planner.html에서 보낸 form key (예: '어휘정답')를
-// 실제 Notion DB의 속성 이름 (예: '단어 (맞은 개수)')으로 매핑합니다.
-// + "Find/Update or Create" 로직으로 수정 (헤더님 요청)
-// =======================================================================
+// [수정] 학생 플래너 저장 (Find or Create -> Find and Update)
 app.post('/save-progress', requireAuth, async (req, res) => {
   const formData = req.body;
-  const studentName = req.user.name; // 토큰에 저장된 학생 이름
+  const studentName = req.user.name;
+  const { dateString } = getKSTDayRange(); // KST 기준 오늘 날짜
+
   try {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
-    
-    // 1. 'planner.html'의 form key -> 'Notion DB'의 실제 속성 이름 매핑 테이블
-    const propertyNameMap = {
-      "영어 더빙 학습": "영어 더빙 학습 완료",
-      "더빙 워크북": "더빙 워크북 완료",
-      "지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
-      "어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
-      "독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
-      "Summary 숙제": "4️⃣ Summary 숙제",
-      "영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-      "어휘정답": "단어 (맞은 개수)",
-      "어휘총문제": "단어 (전체 개수)",
-      "문법 전체 개수": "문법 (전체 개수)",
-      "문법숙제오답": "문법 (틀린 개수)",
-      "독해오답갯수": "독해 (틀린 개수)",
-      "완료 여부": "📕 책 읽는 거인",
-      "영어독서": "📖 영어독서",
-      "오늘의 소감": "오늘의 학습 소감"
-    };
-    
-    // 2. 'planner.html'의 form key를 기준으로 데이터 타입을 분류
-    const numberProps = ["어휘정답", "어휘총문제", "문법 전체 개수", "문법숙제오답", "독해오답갯수"];
-    const selectProps = ["독해 하브루타", "영어독서", "어휘학습", "Writing", "완료 여부"];
-    const textProps = ["어휘유닛", "오늘의 소감"];
-    const statusProps = ["영어 더빙 학습", "더빙 워크북", "지난 문법 숙제 검사", "어휘 클카 암기 숙제", "독해 단어 클카 숙제", "Summary 숙제", "매일 독해 숙제", "영어일기 or 개인 독해서"];
 
-    // 3. Notion에 저장할 properties 객체 생성 (비어있는 상태로 시작)
-    const properties = {};
-
-    // 4. 폼 데이터를 properties 객체로 변환
-    for (let key in formData) {
-      const value = formData[key];
-      const notionPropName = propertyNameMap[key] || key;
-      
-      if (!value || ['해당없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(value)) { continue; }
-      
-      if (numberProps.includes(key)) {
-        properties[notionPropName] = { number: Number(value) };
-      }
-      else if (selectProps.includes(key)) {
-        properties[notionPropName] = { select: { name: value } };
-      }
-      else if (textProps.includes(key)) {
-        properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
-      }
-      else if (key === '오늘 읽은 영어 책') {
-        const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-        if (bookPageId) { properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] }; }
-      }
-      else if (key === '3독 독서 제목') {
-        const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-        if (bookPageId) { properties['3독 독서 제목'] = { relation: [{ id: bookPageId }] }; }
-      }
-      else if (statusProps.includes(key)) {
-        properties[notionPropName] = { status: { name: value } };
-      }
-    }
-   
-    // --- [신규] "Find or Create/Update" 로직 ---
-    
-    // 5. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
-    const { start, end, dateString } = getKSTTodayRange();
-
-    // 6. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
-    const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+    // --- 1. 오늘 날짜와 학생 이름으로 기존 기록이 있는지 먼저 검색 ---
+    const { start, end } = getKSTDayRange();
+    const searchResponse = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({
         filter: {
@@ -633,33 +581,113 @@ app.post('/save-progress', requireAuth, async (req, res) => {
       })
     });
 
-    // 7. 기존 페이지가 있는지 여부에 따라 '업데이트' 또는 '생성'을 수행합니다.
-    if (existingPageQuery.results.length > 0) {
-      // --- 7A. 기존 페이지가 있으면: '업데이트' (PATCH) ---
-      const existingPageId = existingPageQuery.results[0].id;
-      console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지(${existingPageId})를 '업데이트'합니다.`);
+    const existingPageId = searchResponse.results[0]?.id || null;
+
+    // --- 2. 폼 데이터 -> 노션 속성 이름으로 매핑 ---
+    const properties = {};
+    const propertyNameMap = {
+      "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
+      "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
+      "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
+      "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
+      "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
+      "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
+      "단어 (맞은 개수)": "단어 (맞은 개수)",
+      "단어 (전체 개수)": "단어 (전체 개수)",
+      "어휘유닛": "어휘유닛",
+      "문법 (전체 개수)": "문법 (전체 개수)",
+      "문법 (틀린 개수)": "문법 (틀린 개수)",
+      "독해 (틀린 개수)": "독해 (틀린 개수)",
+      "독해 하브루타": "독해 하브루타",
+      "영어 더빙 학습 완료": "영어 더빙 학습 완료",
+      "더빙 워크북 완료": "더빙 워크북 완료",
+      "오늘 읽은 영어 책 ID": "오늘 읽은 영어 책", // ID는 relation으로 특별 처리
+      "📖 영어독서": "📖 영어독서",
+      "어휘학습": "어휘학습",
+      "Writing": "Writing",
+      "국어 독서 제목": "국어 독서 제목", // relation으로 특별 처리
+      "📕 책 읽는 거인": "📕 책 읽는 거인",
+      "오늘의 학습 소감": "오늘의 학습 소감"
+    };
+    
+    const numberProps = ["단어 (맞은 개수)", "단어 (전체 개수)", "문법 (전체 개수)", "문법 (틀린 개수)", "독해 (틀린 개수)"];
+    const selectProps = ["독해 하브루타", "📖 영어독서", "어휘학습", "Writing", "📕 책 읽는 거인"];
+    const textProps = ["어휘유닛", "오늘의 학습 소감"];
+    const statusProps = [
+      "⭕ 지난 문법 숙제 검사", "1️⃣ 어휘 클카 암기 숙제", "2️⃣ 독해 단어 클카 숙제", 
+      "4️⃣ Summary 숙제", "5️⃣ 매일 독해 숙제", "6️⃣ 영어일기 or 개인 독해서",
+      "영어 더빙 학습 완료", "더빙 워크북 완료"
+    ];
+
+    for (let key in formData) {
+      const value = formData[key];
+      const notionPropName = propertyNameMap[key] || null; // 매핑된 이름 찾기
+
+      if (!notionPropName || value === null || value === undefined || value === '') {
+        // '해당없음' 등 빈 값으로 해석되는 경우 (기존 로직과 약간 다름, 빈 값은 무시)
+        if (value === '해당없음' || value === '진행하지 않음' || value === '숙제없음') {
+           // (의도적으로) 빈 값으로 남겨두어 업데이트에서 제외하거나,
+           // Notion에서 기본값으로 처리하도록 둘 수 있습니다.
+           // 여기서는 'null'이 아닌 유효한 기본값으로 처리합니다.
+           if (statusProps.includes(notionPropName)) {
+             properties[notionPropName] = { status: { name: value } };
+           } else if (selectProps.includes(notionPropName)) {
+             properties[notionPropName] = { select: { name: value } };
+           }
+        }
+        continue; // 매핑되지 않거나 빈 값은 건너뛰기
+      }
+
+      // --- 타입별로 Notion 페이로드 생성 ---
+      if (key === '오늘 읽은 영어 책 ID') {
+        properties['오늘 읽은 영어 책'] = { relation: [{ id: value }] };
+      } 
+      else if (key === '국어 독서 제목') {
+        // 국어책은 Title로 검색하여 ID를 찾아야 함
+        const bookPageId = await findPageIdByTitle(KOR_BOOKS_ID, value, '책제목');
+        if (bookPageId) { properties['국어 독서 제목'] = { relation: [{ id: bookPageId }] }; }
+      } 
+      else if (numberProps.includes(notionPropName)) {
+        properties[notionPropName] = { number: Number(value) };
+      } 
+      else if (selectProps.includes(notionPropName)) {
+        properties[notionPropName] = { select: { name: value } };
+      } 
+      else if (textProps.includes(notionPropName)) {
+        properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
+      } 
+      else if (statusProps.includes(notionPropName)) {
+        properties[notionPropName] = { status: { name: value } };
+      }
+    }
+
+    // --- 3. 기존 페이지 ID 유무에 따라 [생성] 또는 [업데이트] ---
+    if (existingPageId) {
+      // [업데이트]
       await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ properties: properties }) // 폼 데이터만 덮어씁니다.
+        body: JSON.stringify({ properties: properties })
       });
+      res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 업데이트되었습니다!' });
     } else {
-      // --- 7B. 기존 페이지가 없으면: '새로 생성' (POST) ---
-      console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지를 '새로 생성'합니다.`);
-      // '이름'과 '날짜' 속성을 'properties' 객체에 추가합니다.
+      // [생성]
+      // 생성 시에는 '이름'과 '날짜'가 필수입니다.
       properties['이름'] = { title: [{ text: { content: studentName } }] };
-      properties['🕐 날짜'] = { date: { start: dateString } }; // KST 날짜 문자열 사용
+      properties['🕐 날짜'] = { date: { start: dateString } };
       
       await fetchNotion('https://api.notion.com/v1/pages', {
         method: 'POST',
-        body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties: properties })
+        body: JSON.stringify({
+          parent: { database_id: PROGRESS_DATABASE_ID },
+          properties: properties
+        })
       });
+      res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
     }
-    // --- [신규] 로직 끝 ---
 
-    res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
-  } catch (error) { 
-    console.error('Error saving student progress:', error); 
-    res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' }); 
+  } catch (error) {
+    console.error('Error saving student progress:', error);
+    res.status(500).json({ success: false, message: '저장 중 서버 오류 발생.' });
   }
 });
 
@@ -671,18 +699,18 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 let reportTemplate = '';
 try {
   reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
-  console.log('✅ dailyreport.html 템플릿을 성공적으로 불러왔습니다.');
+  console.log(' dailyreport.html 템플릿을 성공적으로 불러왔습니다.');
 } catch (e) {
-  console.error('❌ dailyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
+  console.error(' dailyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
 }
 
 // [신규] 월간 리포트 템플릿 로드
 let monthlyReportTemplate = '';
 try {
   monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
-  console.log('✅ monthlyreport.html 템플릿을 성공적으로 불러왔습니다.');
+  console.log(' monthlyreport.html 템플릿을 성공적으로 불러왔습니다.');
 } catch (e) {
-  console.error('❌ monthlyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
+  console.error(' monthlyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
 }
 
 
@@ -704,7 +732,7 @@ function getReportColors(statusOrScore, type) {
     return colors.red;
   }
   if (type === 'test_score') { // 문법/어휘 (N/A 또는 숫자 %)
-    if (statusOrScore === 'N/A' || statusOrScore === null) return colors.gray;
+    if (statusOrScore === 'N/A' || statusOrScore === null) return colors.gray; // [수정] null 체크
     const score = parseInt(statusOrScore) || 0;
     if (score >= 80) return colors.green;
     if (score >= 70) return colors.teal;
@@ -749,8 +777,7 @@ function fillReportTemplate(template, data) {
   const replacements = {
     '{{STUDENT_NAME}}': data.studentName,
     '{{REPORT_DATE}}': getKoreanDate(data.date),
-    // [버그 수정] 코멘트가 여러 줄일 경우 <br>로 변환
-    '{{TEACHER_COMMENT}}': (comment.teacherComment || '오늘의 코멘트가 없습니다.').replace(/\n/g, '<br>'),
+    '{{TEACHER_COMMENT}}': comment.teacherComment || '오늘의 코멘트가 없습니다.',
    
     '{{HW_SCORE}}': formatReportValue(data.completionRate, 'percent'),
     '{{HW_SCORE_COLOR}}': getReportColors(data.completionRate, 'hw_summary'),
@@ -791,6 +818,10 @@ function fillReportTemplate(template, data) {
 
   return template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
     const value = replacements[match];
+    // [수정] 코멘트에서 \n을 <br>로 변경
+    if (match === '{{TEACHER_COMMENT}}') {
+      return (value || '').replace(/\n/g, '<br>');
+    }
     return value !== null && value !== undefined ? value : '';
   });
 }
@@ -829,7 +860,6 @@ app.get('/report', async (req, res) => {
 
   try {
     const pageData = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-    // [복구] 'parseDailyReportData' 원본 함수를 호출합니다.
     const parsedData = await parseDailyReportData(pageData);
     const finalHtml = fillReportTemplate(reportTemplate, parsedData);
     res.send(finalHtml);
@@ -875,8 +905,8 @@ app.get('/monthly-report', async (req, res) => {
     }
 
     const reportData = reportQuery.results[0].properties;
-
-    // --- 1-B. '학생 명부 DB'에서 학생 이름 조회 ---
+    
+    // --- 1-B. '학생 명부 DB'에서 학생 이름 조회 (신규 추가) ---
     const studentRelationId = reportData['학생']?.relation?.[0]?.id;
     if (!studentRelationId) {
       const studentNameFromTitle = reportData['이름']?.title?.[0]?.plain_text.split(' - ')[0] || '학생';
@@ -887,7 +917,7 @@ app.get('/monthly-report', async (req, res) => {
         vocabAvg: reportData['어휘점수(평균)']?.number || 0,
         grammarAvg: reportData['문법점수(평균)']?.number || 0,
         totalBooks: reportData['총 읽은 권수']?.number || 0,
-        aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
+        aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
         readingPassRate: reportData['독해 통과율(%)']?.number || 0
       };
       return renderMonthlyReportHTML(res, monthlyReportTemplate, studentNameFromTitle, month, statsOnly, [], 0);
@@ -901,7 +931,7 @@ app.get('/monthly-report', async (req, res) => {
       vocabAvg: reportData['어휘점수(평균)']?.number || 0,
       grammarAvg: reportData['문법점수(평균)']?.number || 0,
       totalBooks: reportData['총 읽은 권수']?.number || 0,
-      aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
+      aiSummary: reportData['AI 요약']?.rich_text?.[0]?.plain_text || '월간 요약 코멘트가 없습니다.',
       readingPassRate: reportData['독해 통과율(%)']?.number || 0
     };
 
@@ -924,8 +954,8 @@ app.get('/monthly-report', async (req, res) => {
       })
     });
 
-    // [기능 분리] 월간 리포트는 '데일리' 파서가 아닌 '통계' 파서를 사용합니다.
-    const monthPages = await Promise.all(progressQuery.results.map(parseMonthlyStatsData));
+    // [수정] 데일리 파서를 사용하여 독서 목록 등을 가져옴
+    const monthPages = await Promise.all(progressQuery.results.map(parseDailyReportData));
     const attendanceDays = monthPages.length; // 출석일수
 
     // --- 3. 템플릿에 데이터 주입 (별도 함수로 분리) ---
@@ -942,16 +972,20 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
   const [year, monthNum] = month.split('-').map(Number);
   const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
   const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
-  const totalDaysInMonth = new Date(year, monthNum, 0).getDate(); // 해당 월의 총 일수
+  const totalDaysInMonth = new Date(year, monthNum, 0).getDate();
 
   // 독서 목록 (중복 제거)
   const bookSet = new Set();
   const bookListHtml = monthPages
-    .map(p => p.bookTitle)
-    .filter(title => title && title !== '읽은 책 없음')
-    .map(title => {
-      const bookKey = title;
-      return { key: bookKey, title: title };
+    .map(p => p.reading) // [수정] monthPages는 이미 parseDailyReportData를 거쳤음
+    .filter(r => r.bookTitle && r.bookTitle !== '읽은 책 없음')
+    .map(r => {
+      const series = r.bookSeries || '';
+      const ar = r.bookAR || 'N/A';
+      const lexile = r.bookLexile || 'N/A';
+      const title = r.bookTitle;
+      const bookKey = `${series}|${title}|${ar}|${lexile}`;
+      return { key: bookKey, series, title, ar, lexile };
     })
     .filter(book => {
       if (bookSet.has(book.key)) return false;
@@ -959,7 +993,8 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
       return true;
     })
     .map(book => {
-      return `<li>${book.title}</li>`;
+      const seriesText = book.series ? `[${book.series}] ` : '';
+      return `<li>${seriesText}${book.title} (AR ${book.ar} / Lexile ${book.lexile})</li>`;
     })
     .join('\n') || '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
@@ -967,13 +1002,13 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
   const hwScore = Math.round(stats.hwAvg);
   const rtNotice = {};
   if (hwScore < 70) {
-    rtNotice.bgColor = 'bg-red-50'; // 빨간색 배경
+    rtNotice.bgColor = 'bg-red-50';
     rtNotice.borderColor = 'border-red-400';
     rtNotice.titleColor = 'text-red-900';
     rtNotice.textColor = 'text-red-800';
     rtNotice.title = ' RT-Check Point 경고';
   } else {
-    rtNotice.bgColor = 'bg-green-50'; // 초록색 배경
+    rtNotice.bgColor = 'bg-green-50';
     rtNotice.borderColor = 'border-green-400';
     rtNotice.titleColor = 'text-green-900';
     rtNotice.textColor = 'text-green-800';
@@ -1001,7 +1036,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     '{{RT_NOTICE_TITLE}}': rtNotice.title,
    
     // AI 요약
-    '{{AI_SUMMARY}}': stats.aiSummary.replace(/\n/g, '<br>'),
+    '{{AI_SUMMARY}}': (stats.aiSummary || '').replace(/\n/g, '<br>'), // [수정] \n -> <br>
    
     // 월간 통계
     '{{ATTENDANCE_DAYS}}': attendanceDays,
@@ -1079,13 +1114,13 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
   const targetStudentName = "유환호";
   console.log(`[수동 월간 리포트] 타겟 학생 고정: ${targetStudentName}`);
  
-  const { dateString } = getKSTTodayRange();
+  const { dateString } = getKSTDayRange(); // KST 기준 '오늘'
   const today = new Date(dateString);
-  const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1); // 지난 달 1일
  
   const currentYear = lastMonthDate.getFullYear();
   const currentMonth = lastMonthDate.getMonth();
-  const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-10"
+  const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`;
  
   console.log(`[수동 월간 리포트] ${monthString}월 리포트 생성을 시작합니다.`);
 
@@ -1135,22 +1170,27 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
           })
         });
        
-        // [기능 분리] 월간 리포트는 '데일리' 파서가 아닌 '통계' 파서를 사용합니다.
-        const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
+        // [수정] 월간 통계용 파서 사용
+        const monthPages = progressData.results.map(parseMonthlyStatsData);
        
         if (monthPages.length === 0) {
           console.log(`[수동 월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
           continue;
         }
 
-        // [최종 통계 로직] 헤더님 요청 로직 적용 (숙제 0점 포함, 시험 0점 제외)
+        // --- 통계 계산 (헤더님 최종 로직) ---
+        // 1. 숙제 (0점 포함)
         const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-        const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
-        const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
+        // 2. 어휘 (0점 제외)
+        const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== null);
+        // 3. 문법 (0점 제외)
+        const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== null);
+        // 4. 독해 통과율
         const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
-       
+        // 5. 독서
         const bookTitles = [...new Set(monthPages.map(p => p.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim() !== '[]').join('\n');
+        // 6. 코멘트
+        const comments = monthPages.map((p) => p.date ? `[${p.date}] ${p.teacherComment}` : p.teacherComment).filter(Boolean).join('\n');
 
         const stats = {
           hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
@@ -1167,31 +1207,15 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
             let shortName = studentName;
             if (studentName.startsWith('Test ')) {
               shortName = studentName.substring(5);
-            } else if (studentName.length === 3 && !studentName.includes(' ')) {
-              shortName = studentName.substring(1); // "유환호" -> "환호"
+           _ } else if (studentName.length === 3 && !studentName.includes(' ')) {
+              // [수정] 조사(이가) 오류 수정
+              const lastChar = shortName.charCodeAt(shortName.length - 1);
+              const hasBatchim = (lastChar - 0xAC00) % 28 > 0;
+              shortName = studentName.substring(1); // "환호"
+              // (이름이 2글자이거나 4글자 이상이면 full-name 사용) - 이 로직은 프롬프트에서 처리
             }
-            
-            // [AI 가이드라인 수정] 헤더님 최신 가이드라인 반영 (조사 수정)
-            let studentNameParticle = '이는';
-            let studentNameParticle2 = '이가';
-            
-            try {
-                // 한글 이름의 마지막 글자 받침 여부 확인
-                const lastChar = shortName.charCodeAt(shortName.length - 1);
-                // 한글 범위 (가: 44032, 힣: 55203)
-                if (lastChar >= 44032 && lastChar <= 55203) {
-                    const jongseong = (lastChar - 44032) % 28;
-                    if (jongseong > 0) { // 받침 있음
-                        studentNameParticle = '이는';
-                        studentNameParticle2 = '이가';
-                    } else { // 받침 없음
-                        studentNameParticle = '는';
-                        studentNameParticle2 = '가';
-                    }
-                }
-            } catch (e) { /* 이름이 한글이 아니거나 예외 발생 시 기본값 사용 */ }
 
-
+            // [수정] AI 프롬프트 (최신 가이드라인)
             const prompt = `
 너는 '리디튜드' 학원의 선생님이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
 
@@ -1200,13 +1224,13 @@ app.get('/api/manual-monthly-report-gen', async (req, res) => {
 2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 ${currentMonth + 1}월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
-5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}${studentNameParticle}', '${shortName}${studentNameParticle2}'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
+5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}이는', '${shortName}이가'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
 6. 한국어 이름을 쓸 때 뒤의 조사를 꼭 이름의 발음과 어울리는 것으로 올바르게 사용해 주세요. (EX: 환호이가(X) 환호가(O))
 
 **[내용 작성 지침]**
 1. **[데이터]** 아래 제공되는 [월간 통계]와 [일일 코멘트]를 **절대로 나열하지 말고,** 자연스럽게 문장 속에 녹여내 줘.
 2. **[정량 평가]** "숙제 수행율 6%"처럼 부정적인 수치도 숨기지 말고 **정확히 언급**하되, "시급합니다" 같은 차가운 표현 대신 "다음 달엔 이 부분을 꼭 함께 챙겨보고 싶어요"처럼 **따뜻한 권유형**으로 표현해 줘.
-3. **[정성 평가]** 월간 통계 부분에서 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${shortName}${studentNameParticle2} 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
+3. **[정성 평가]** 월간 통계 부분에서 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${shortName}이가 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
 4. **[개선점]** 가장 아쉬웠던 점(예: 숙제 6%)을 명확히 짚어주고, "매일 꾸준히 숙제하는 습관", "어휘는 클래스 카드를 매일 5분 보기 처럼 짬짬히 해라", "문법 점수가 낮은 건 문법은 학원와서 3분 복습 처럼 개념을 빠르게 복습하도록 하겠다." 처럼 **구체적이고 쉬운 개선안**을 제시해 줘.
 5. **[마무리]** 마지막은 항상 다음 달을 응원하는 격려의 메시지나, 학부모님께 드리는 감사 인사(예: "한 달간 리디튜드를 믿고 맡겨주셔서 감사합니다.")로 따뜻하게 마무리해 줘.
 6. **[강조 금지]** 절대로 마크다운(\`**\` or \`*\`)을 사용하여 텍스트를 강조하지 마세요.
@@ -1317,7 +1341,7 @@ cron.schedule('0 22 * * *', async () => {
   }
 
   try {
-    const { start, end, dateString } = getKSTTodayRange();
+    const { start, end, dateString } = getKSTDayRange(); // KST 기준 '오늘'
    
     const filter = {
       and: [
@@ -1377,8 +1401,8 @@ cron.schedule('0 22 * * *', async () => {
 cron.schedule('0 21 * * 5', async () => {
   console.log('---  [월간 리포트] 자동화 스케줄 실행 (매주 금요일 밤 9시) ---');
  
-  const { dateString } = getKSTTodayRange();
-  const today = new Date(dateString); // KST 기준 '오늘' Date 객체
+  const { dateString } = getKSTDayRange(); // KST 기준 '오늘'
+  const today = new Date(dateString);
  
   const nextFriday = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
   if (today.getMonth() === nextFriday.getMonth()) {
@@ -1401,13 +1425,13 @@ cron.schedule('0 21 * * 5', async () => {
     console.log(`[월간 리포트] 총 ${students.length}명의 학생을 대상으로 통계를 시작합니다.`);
    
     const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth(); // (0 = 1월, 11 = 12월)
-    const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`; // "2025-11"
+    const currentMonth = today.getMonth();
+    const monthString = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`;
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
 
     for (const student of students) {
-      const studentPageId = student.id; // '학생 명부 DB'의 학생 ID
+      const studentPageId = student.id;
       const studentName = student.properties['이름']?.title?.[0]?.plain_text;
       if (!studentName) continue;
 
@@ -1416,7 +1440,7 @@ cron.schedule('0 21 * * 5', async () => {
         const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
           method: 'POST',
           body: JSON.stringify({
-           filter: {
+            filter: {
               and: [
                 { property: '이름', title: { equals: studentName } },
                 { property: '🕐 날짜', date: { on_or_after: firstDayOfMonth } },
@@ -1426,22 +1450,27 @@ cron.schedule('0 21 * * 5', async () => {
           })
         });
        
-        // [기능 분리] 월간 리포트는 '데일리' 파서가 아닌 '통계' 파서를 사용합니다.
-        const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
+        // [수정] 월간 통계용 파서 사용
+        const monthPages = progressData.results.map(parseMonthlyStatsData);
        
         if (monthPages.length === 0) {
           console.log(`[월간 리포트] ${studentName} 학생은 ${monthString}월 데이터가 없습니다. (스킵)`);
           continue;
         }
 
-        // [최종 통계 로직] 헤더님 요청 로직 적용 (숙제 0점 포함, 시험 0점 제외)
+        // --- 통계 계산 (헤더님 최종 로직) ---
+        // 1. 숙제 (0점 포함)
         const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
-        const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
-        const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
+        // 2. 어휘 (0점 제외)
+        const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== null);
+        // 3. 문법 (0점 제외)
+        const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== null);
+        // 4. 독해 통과율
         const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
-       
+        // 5. 독서
         const bookTitles = [...new Set(monthPages.map(p => p.bookTitle).filter(t => t && t !== '읽은 책 없음'))];
-        const comments = monthPages.map((p, i) => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim() !== '[]').join('\n');
+        // 6. 코멘트
+        const comments = monthPages.map((p) => p.date ? `[${p.date}] ${p.teacherComment}` : p.teacherComment).filter(Boolean).join('\n');
 
         const stats = {
           hwAvg: hwRates.length > 0 ? Math.round(hwRates.reduce((a, b) => a + b, 0) / hwRates.length) : 0,
@@ -1460,43 +1489,25 @@ cron.schedule('0 21 * * 5', async () => {
             if (studentName.startsWith('Test ')) {
               shortName = studentName.substring(5);
             } else if (studentName.length === 3 && !studentName.includes(' ')) {
-              shortName = studentName.substring(1);
+              shortName = studentName.substring(1); // "유환호" -> "환호"
             }
-            
-            // [AI 가이드라인 수정] 헤더님 최신 가이드라인 반영 (조사 수정)
-            let studentNameParticle = '이는';
-            let studentNameParticle2 = '이가';
-            
-            try {
-                const lastChar = shortName.charCodeAt(shortName.length - 1);
-                if (lastChar >= 44032 && lastChar <= 55203) {
-                    const jongseong = (lastChar - 44032) % 28;
-                    if (jongseong > 0) {
-                        studentNameParticle = '이는';
-                        studentNameParticle2 = '이가';
-                    } else {
-                        studentNameParticle = '는';
-                        studentNameParticle2 = '가';
-                    }
-                }
-            } catch (e) { /* 이름이 한글이 아니거나 예외 발생 시 기본값 사용 */ }
 
-
+            // [수정] AI 프롬프트 (최신 가이드라인)
             const prompt = `
 너는 '리디튜드' 학원의 선생님이야. 지금부터 너는 학생의 학부모님께 보낼 월간 리포트 총평을 "직접" 작성해야 해.
 
 **[AI의 역할 및 톤]**
 1. **가장 중요:** 너는 선생님 본인이기 때문에, **"안녕하세요, OOO 컨설턴트입니다" 혹은 "xxx쌤 입니다"라고 너 자신을 소개하는 문장을 절대로 쓰지 마.**
-2. [수정] "안녕하세요. ${shortName}의 ${currentMonth + 1}월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
+2. 마치 선생님이 학부모님께 카톡을 보내는 것처럼, "안녕하세요. ${shortName}의 ${currentMonth + 1}월 리포트 보내드립니다."처럼 자연스럽고 친근하게 첫인사를 시작해 줘.
 3. 전체적인 톤은 **따뜻하고, 친근하며, 학생을 격려**해야 하지만, 동시에 데이터에 기반한 **전문가의 통찰력**이 느껴져야 해.
 4. \`~입니다.\`와 \`~요.\`를 적절히 섞어서 부드럽지만 격식 있는 어투를 사용해 줘.
-5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}${studentNameParticle}', '${shortName}${studentNameParticle2}'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
+5. **가장 중요:** 학생을 지칭할 때 '${studentName} 학생' 대신 '${shortName}이는', '${shortName}이가'처럼 '${shortName}'(짧은이름)을 자연스럽게 불러주세요.
 6. 한국어 이름을 쓸 때 뒤의 조사를 꼭 이름의 발음과 어울리는 것으로 올바르게 사용해 주세요. (EX: 환호이가(X) 환호가(O))
 
 **[내용 작성 지침]**
 1. **[데이터]** 아래 제공되는 [월간 통계]와 [일일 코멘트]를 **절대로 나열하지 말고,** 자연스럽게 문장 속에 녹여내 줘.
 2. **[정량 평가]** "숙제 수행율 6%"처럼 부정적인 수치도 숨기지 말고 **정확히 언급**하되, "시급합니다" 같은 차가운 표현 대신 "다음 달엔 이 부분을 꼭 함께 챙겨보고 싶어요"처럼 **따뜻한 권유형**으로 표현해 줘.
-3. **[정성 평가]** 월간 통계 부분에서 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${shortName}${studentNameParticle2} 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
+3. **[정성 평가]** 월간 통계 부분에서 긍정적인 부분이 있다면, **그것을 먼저 칭찬**하면서 코멘트를 시작해 줘. (예: "이번 달에 ${shortName}이가 'Dora's Mystery' 원서를 1권 완독했네요! 정말 기특합니다.")
 4. **[개선점]** 가장 아쉬웠던 점(예: 숙제 6%)을 명확히 짚어주고, "매일 꾸준히 숙제하는 습관", "어휘는 클래스 카드를 매일 5분 보기 처럼 짬짬히 해라", "문법 점수가 낮은 건 문법은 학원와서 3분 복습 처럼 개념을 빠르게 복습하도록 하겠다." 처럼 **구체적이고 쉬운 개선안**을 제시해 줘.
 5. **[마무리]** 마지막은 항상 다음 달을 응원하는 격려의 메시지나, 학부모님께 드리는 감사 인사(예: "한 달간 리디튜드를 믿고 맡겨주셔서 감사합니다.")로 따뜻하게 마무리해 줘.
 6. **[강조 금지]** 절대로 마크다운(\`**\` or \`*\`)을 사용하여 텍스트를 강조하지 마세요.
@@ -1594,5 +1605,5 @@ ${comments}
 
 // --- 서버 실행 ---
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ 최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
+  console.log(`최종 서버가 ${PORT} 포트에서 실행 중입니다.`);
 });
