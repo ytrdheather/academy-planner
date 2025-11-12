@@ -489,6 +489,19 @@ app.get('/api/user-info', requireAuth, (req, res) => {
     res.json({ userId: req.user.userId || req.user.loginId, userName: req.user.name, userRole: req.user.role });
 });
 
+// [수정] 'planner.html'이 학생 이름을 가져오기 위해 호출하는 '/api/student-info' 엔드포인트를 복구합니다.
+app.get('/api/student-info', requireAuth, (req, res) => {
+    if (!req.user || req.user.role !== 'student') {
+        return res.status(401).json({ error: '학생 인증 실패' });
+    }
+    // planner.html이 기대하는 'studentId'와 'studentName'을 반환합니다.
+    res.json({
+        studentId: req.user.userId,
+        studentName: req.user.name
+    });
+});
+
+
 app.post('/login', async (req, res) => {
     const { studentId, studentPassword } = req.body;
     try {
