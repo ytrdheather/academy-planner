@@ -505,7 +505,8 @@ app.post('/login', async (req, res) => {
             // [최종 수정] 'userName' 필드를 **제거**하고, token만 반환하도록 수정합니다.
             // (planner.html은 token을 받고 /api/user-info를 다시 호출하는 방식입니다.)
             // [수정] 클라이언트(planner.html)가 /login 응답에서 바로 이름을 사용할 수 있도록 'userName'을 다시 추가합니다.
-            res.json({ success: true, message: '로그인 성공!', token, userName: realName });
+            // [진짜.최종.수정] 'index예전.js'와 동일하게 token만 반환하도록 userName 필드를 제거합니다.
+            res.json({ success: true, message: '로그인 성공!', token });
         } else {
             res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         }
