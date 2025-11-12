@@ -380,7 +380,7 @@ async function fetchProgressData(req, res, parseFunction) {
   let hasMore = true;
   let startCursor = undefined;
   while (hasMore) {
-    const data = await fetchNotion(`https.api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({
         filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
@@ -486,24 +486,31 @@ app.get('/api/teacher/user-info', requireAuth, (req, res) => {
 });
 
 app.get('/api/user-info', requireAuth, (req, res) => {
-  res.json({ userId: req.user.userId || req.user.loginId, userName: req.user.name, userRole: req.user.role });
+  // [수정] "userName"이 아니라 "studentName", "studentRealName"을 반환하도록
+  // "잘 되던" 원본 코드로 복구합니다. (planner.html이 이 키를 사용합니다.)
+  res.json({ 
+    userId: req.user.userId || req.user.loginId, 
+    studentName: req.user.name, 
+    studentRealName: req.user.name, 
+    userRole: req.user.role 
+  });
 });
 
 app.post('/login', async (req, res) => {
   const { studentId, studentPassword } = req.body;
   try {
     if (!NOTION_ACCESS_TOKEN || !STUDENT_DATABASE_ID) { return res.status(500).json({ success: false, message: '서버 설정 오류.' }); }
-    const data = await fetchNotion(`https.api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } })
     });
     if (data.results.length > 0) {
       const studentRecord = data.results[0].properties;
-      // [최종 수정] '이름' 속성을 'title'로 올바르게 읽습니다. (헤더님 확인)
       const realName = studentRecord['이름']?.title?.[0]?.plain_text || studentId;
       const token = generateToken({ userId: studentId, role: 'student', name: realName });
-      // [최종 수정] 'userName' 필드를 **제거**하고, token만 반환하도록 수정합니다.
-      // (planner.html은 token을 받고 /api/user-info를 다시 호출하는 방식입니다.)
+      
+      // [수정] "userName"을 제거하고 "token"만 반환하도록
+      // "잘 되던" 원본 코드로 복구합니다.
       res.json({ success: true, message: '로그인 성공!', token });
     } else {
       res.json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -515,7 +522,7 @@ app.get('/api/search-books', requireAuth, async (req, res) => {
   const { query } = req.query;
   try {
     if (!NOTION_ACCESS_TOKEN || !ENG_BOOKS_ID) { throw new Error('Server config error for Eng Books.'); }
-    const data = await fetchNotion(`https.api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({ filter: { property: 'Title', title: { contains: query } }, page_size: 10 })
     });
@@ -528,7 +535,7 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
   const { query } = req.query;
   try {
     if (!NOTION_ACCESS_TOKEN || !KOR_BOOKS_ID) { throw new Error('Server config error for Kor Books.'); }
-    const data = await fetchNotion(`https.api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({ filter: { property: '책제목', rich_text: { contains: query } }, page_size: 10 })
     });
@@ -612,7 +619,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     const { start, end, dateString } = getKSTTodayRange();
 
     // 6. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
-    const existingPageQuery = await fetchNotion(`https.api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+    const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({
         filter: {
@@ -1319,7 +1326,7 @@ cron.schedule('0 22 * * *', async () => {
       ]
     };
    
-    const data = await fetchNotion(`https.api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
       method: 'POST',
       body: JSON.stringify({ filter: filter })
     });
@@ -1387,7 +1394,7 @@ cron.schedule('0 21 * * 5', async () => {
   }
 
   try {
-    const studentData = await fetchNotion(`https.api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+    const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
       method: 'POST'
     });
     const students = studentData.results;
@@ -1406,7 +1413,7 @@ cron.schedule('0 21 * * 5', async () => {
 
       try {
         console.log(`[월간 리포트] ${studentName} 학생 통계 계산 중...`);
-        const progressData = await fetchNotion(`https.api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+        const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
           method: 'POST',
           body: JSON.stringify({
            filter: {
