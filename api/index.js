@@ -529,29 +529,85 @@ app.post('/login', async (req, res) => {
 app.get('/api/search-books', requireAuth, async (req, res) => {
     const { query } = req.query;
     try {
-        if (!NOTION_ACCESS_TOKEN || !ENG_BOOKS_ID) { throw new Error('Server config error for Eng Books.'); }
+        if (!NOTION_ACCESS_TOKEN || !ENG_BOOKS_ID) { 
+            throw new Error('Server config error for Eng Books.'); 
+        }
+        
+        // 전체 데이터 먼저 가져오기 (필터 없이)
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: { property: 'Title', title: { contains: query } }, page_size: 10 })
+            body: JSON.stringify({ 
+                page_size: 100  // 더 많은 책 가져오기
+            })
         });
-        const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.Title?.title?.[0]?.plain_text, author: props.Author?.rich_text?.[0]?.plain_text, level: props.Level?.select?.name }; });
-        res.json(books);
-    } catch (error) { console.error('English book search API error:', error); res.status(500).json([]); }
+        
+        // 데이터 파싱
+        const books = data.results.map(page => {
+            const props = page.properties;
+            return {
+                id: page.id,
+                title: props.Title?.title?.[0]?.plain_text || 'No Title',
+                author: props.Author?.rich_text?.[0]?.plain_text || '',
+                level: props.Level?.select?.name || ''
+            };
+        });
+        
+        // 클라이언트 측에서 필터링
+        if (query && query.trim() !== '') {
+            const filtered = books.filter(book => 
+                book.title && book.title.toLowerCase().includes(query.toLowerCase())
+            );
+            res.json(filtered);
+        } else {
+            res.json(books);
+        }
+        
+    } catch (error) { 
+        console.error('English book search API error:', error); 
+        res.status(500).json([]); 
+    }
 });
 
 app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
     const { query } = req.query;
     try {
-        if (!NOTION_ACCESS_TOKEN || !KOR_BOOKS_ID) { throw new Error('Server config error for Kor Books.'); }
+        if (!NOTION_ACCESS_TOKEN || !KOR_BOOKS_ID) { 
+            throw new Error('Server config error for Kor Books.'); 
+        }
+        
+        // 전체 데이터 먼저 가져오기 (필터 없이)
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
             method: 'POST',
-            // [수정] 'rich_text' 필터를 'title' 필터로 변경합니다.
-            body: JSON.stringify({ filter: { property: '책제목', title: { contains: query } }, page_size: 10 })
+            body: JSON.stringify({ 
+                page_size: 100  // 더 많은 책 가져오기
+            })
         });
-        // [수정] '책제목' 속성의 타입을 title로 올바르게 읽습니다.
-        const books = data.results.map(page => { const props = page.properties; return { id: page.id, title: props.책제목?.title?.[0]?.plain_text, author: props.지은이?.rich_text?.[0]?.plain_text, publisher: props.출판사?.rich_text?.[0]?.plain_text }; });
-        res.json(books);
-    } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
+        
+        // 데이터 파싱
+        const books = data.results.map(page => {
+            const props = page.properties;
+            return {
+                id: page.id,
+                title: props.책제목?.title?.[0]?.plain_text || props['책제목']?.title?.[0]?.plain_text || 'No Title',
+                author: props.지은이?.rich_text?.[0]?.plain_text || props['지은이']?.rich_text?.[0]?.plain_text || '',
+                publisher: props.출판사?.rich_text?.[0]?.plain_text || props['출판사']?.rich_text?.[0]?.plain_text || ''
+            };
+        });
+        
+        // 클라이언트 측에서 필터링
+        if (query && query.trim() !== '') {
+            const filtered = books.filter(book => 
+                book.title && book.title.toLowerCase().includes(query.toLowerCase())
+            );
+            res.json(filtered);
+        } else {
+            res.json(books);
+        }
+        
+    } catch (error) { 
+        console.error('Korean book search API error:', error); 
+        res.status(500).json([]); 
+    }
 });
 
 app.get('/api/test-all-books', requireAuth, async (req, res) => {
@@ -825,6 +881,88 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: error.message || '저장 중 오류가 발생했습니다.' 
+        });
+    }
+});
+
+app.get('/api/get-today-progress', requireAuth, async (req, res) => {
+    const studentName = req.user.name;
+    
+    try {
+        if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
+            throw new Error('Server config error.');
+        }
+        
+        // KST 기준 오늘 날짜
+        const { start, end, dateString } = getKSTTodayRange();
+        
+        // 오늘 날짜의 데이터 검색
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '이름', title: { equals: studentName } },
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                page_size: 1
+            })
+        });
+        
+        if (query.results.length === 0) {
+            console.log(`[get-today-progress] ${studentName} 학생의 오늘 데이터가 없습니다.`);
+            return res.json({ success: true, progress: null, message: '오늘 저장된 데이터가 없습니다.' });
+        }
+        
+        // 데이터 파싱
+        const page = query.results[0];
+        const properties = page.properties;
+        const progress = {};
+        
+        // 각 속성을 읽어서 객체로 변환
+        for (const [key, value] of Object.entries(properties)) {
+            // 타이틀 (이름)
+            if (value.type === 'title' && value.title.length > 0) {
+                progress[key] = value.title[0].plain_text;
+            }
+            // 텍스트
+            else if (value.type === 'rich_text' && value.rich_text.length > 0) {
+                progress[key] = value.rich_text[0].plain_text;
+            }
+            // 숫자
+            else if (value.type === 'number') {
+                progress[key] = value.number;
+            }
+            // 선택
+            else if (value.type === 'select' && value.select) {
+                progress[key] = value.select.name;
+            }
+            // 상태
+            else if (value.type === 'status' && value.status) {
+                progress[key] = value.status.name;
+            }
+            // 날짜
+            else if (value.type === 'date' && value.date) {
+                progress[key] = value.date.start;
+            }
+            // 관계형 (책은 ID만 있으므로 제목은 따로 가져와야 함)
+            else if (value.type === 'relation' && value.relation.length > 0) {
+                // 영어책이나 국어책의 경우 실제 제목을 가져와야 하지만
+                // 지금은 간단히 ID만 저장
+                progress[key] = value.relation[0].id;
+            }
+        }
+        
+        console.log(`[get-today-progress] ${studentName} 학생의 오늘 데이터를 불러왔습니다.`);
+        res.json({ success: true, progress, message: '데이터 로드 성공' });
+        
+    } catch (error) {
+        console.error('[get-today-progress] 오류:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message || '데이터 로드 중 오류가 발생했습니다.' 
         });
     }
 });
