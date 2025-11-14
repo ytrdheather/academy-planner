@@ -280,18 +280,191 @@ class StudyPlanner {
     /**
      * 책 자동완성 초기화
      */
-    initializeBookAutocomplete() {
-        const bookInput = document.getElementById('englishBookTitle');
-        const korBookInput = document.getElementById('koreanBookTitle');
-
-        if (bookInput) {
-            this.setupBookSearch(bookInput, 'english');
-        }
-
-        if (korBookInput) {
-            this.setupBookSearch(korBookInput, 'korean');
-        }
+   initializeBookAutocomplete() {
+    // 영어책 자동완성
+    const engBookInput = document.querySelector('[name="오늘 읽은 영어 책"]');
+    if (engBookInput) {
+        // 드롭다운 컨테이너 생성
+        let dropdown = document.createElement('div');
+        dropdown.className = 'book-dropdown';
+        dropdown.style.cssText = `
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            width: 100%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        `;
+        engBookInput.parentElement.style.position = 'relative';
+        engBookInput.parentElement.appendChild(dropdown);
+        
+        let searchTimer;
+        engBookInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimer);
+            const query = e.target.value;
+            
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            searchTimer = setTimeout(async () => {
+                try {
+                    const books = await this.api.searchBooks(query);
+                    
+                    if (books.length === 0) {
+                        dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
+                        dropdown.style.display = 'block';
+                        return;
+                    }
+                    
+                    // 드롭다운에 검색 결과 표시
+                    dropdown.innerHTML = books.map(book => `
+                        <div class="book-option" data-id="${book.id}" data-title="${book.title}" style="
+                            padding: 10px;
+                            cursor: pointer;
+                            border-bottom: 1px solid #eee;
+                        ">
+                            <div style="font-weight: bold;">${book.title}</div>
+                            ${book.author ? `<div style="font-size: 0.9em; color: #666;">저자: ${book.author}</div>` : ''}
+                            ${book.level ? `<div style="font-size: 0.9em; color: #999;">레벨: ${book.level}</div>` : ''}
+                        </div>
+                    `).join('');
+                    
+                    dropdown.style.display = 'block';
+                    
+                    // 각 옵션에 클릭 이벤트 추가
+                    dropdown.querySelectorAll('.book-option').forEach(option => {
+                        option.addEventListener('click', () => {
+                            engBookInput.value = option.dataset.title;
+                            // ID도 저장 (숨겨진 필드가 있다면)
+                            const hiddenInput = document.querySelector('[name="오늘 읽은 영어 책 ID"]');
+                            if (hiddenInput) {
+                                hiddenInput.value = option.dataset.id;
+                            }
+                            dropdown.style.display = 'none';
+                        });
+                        
+                        // 호버 효과
+                        option.addEventListener('mouseenter', () => {
+                            option.style.backgroundColor = '#f0f0f0';
+                        });
+                        option.addEventListener('mouseleave', () => {
+                            option.style.backgroundColor = 'white';
+                        });
+                    });
+                    
+                } catch (error) {
+                    console.error('책 검색 실패:', error);
+                    dropdown.style.display = 'none';
+                }
+            }, 300); // 300ms 디바운스
+        });
+        
+        // 클릭 외부 영역 시 드롭다운 닫기
+        document.addEventListener('click', (e) => {
+            if (!engBookInput.parentElement.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     }
+    
+    // 한국책 자동완성 (동일한 패턴)
+    const korBookInput = document.querySelector('[name="국어 독서 제목"]');
+    if (korBookInput) {
+        // 드롭다운 컨테이너 생성
+        let dropdown = document.createElement('div');
+        dropdown.className = 'book-dropdown';
+        dropdown.style.cssText = `
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            width: 100%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        `;
+        korBookInput.parentElement.style.position = 'relative';
+        korBookInput.parentElement.appendChild(dropdown);
+        
+        let searchTimer;
+        korBookInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimer);
+            const query = e.target.value;
+            
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            searchTimer = setTimeout(async () => {
+                try {
+                    const books = await this.api.searchSayuBooks(query);
+                    
+                    if (books.length === 0) {
+                        dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
+                        dropdown.style.display = 'block';
+                        return;
+                    }
+                    
+                    // 드롭다운에 검색 결과 표시
+                    dropdown.innerHTML = books.map(book => `
+                        <div class="book-option" data-id="${book.id}" data-title="${book.title}" style="
+                            padding: 10px;
+                            cursor: pointer;
+                            border-bottom: 1px solid #eee;
+                        ">
+                            <div style="font-weight: bold;">${book.title}</div>
+                            ${book.author ? `<div style="font-size: 0.9em; color: #666;">저자: ${book.author}</div>` : ''}
+                            ${book.publisher ? `<div style="font-size: 0.9em; color: #999;">출판사: ${book.publisher}</div>` : ''}
+                        </div>
+                    `).join('');
+                    
+                    dropdown.style.display = 'block';
+                    
+                    // 각 옵션에 클릭 이벤트 추가
+                    dropdown.querySelectorAll('.book-option').forEach(option => {
+                        option.addEventListener('click', () => {
+                            korBookInput.value = option.dataset.title;
+                            // ID도 저장 (숨겨진 필드가 있다면)
+                            const hiddenInput = document.querySelector('[name="국어 독서 제목 ID"]');
+                            if (hiddenInput) {
+                                hiddenInput.value = option.dataset.id;
+                            }
+                            dropdown.style.display = 'none';
+                        });
+                        
+                        // 호버 효과
+                        option.addEventListener('mouseenter', () => {
+                            option.style.backgroundColor = '#f0f0f0';
+                        });
+                        option.addEventListener('mouseleave', () => {
+                            option.style.backgroundColor = 'white';
+                        });
+                    });
+                    
+                } catch (error) {
+                    console.error('책 검색 실패:', error);
+                    dropdown.style.display = 'none';
+                }
+            }, 300); // 300ms 디바운스
+        });
+        
+        // 클릭 외부 영역 시 드롭다운 닫기
+        document.addEventListener('click', (e) => {
+            if (!korBookInput.parentElement.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+}
 
     /**
      * 책 검색 설정

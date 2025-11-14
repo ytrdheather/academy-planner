@@ -583,6 +583,11 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
             })
         });
         
+        // 아무 곳에나 (예: 550줄 근처)
+app.get('/test', (req, res) => {
+    res.json({ message: '서버 작동 중', time: new Date() });
+});
+
         // 데이터 파싱
         const books = data.results.map(page => {
             const props = page.properties;
@@ -722,10 +727,10 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         
         const selectProps = [
             "독해 하브루타", 
-            "📖 영어독서", 
+            "영어독서", 
             "어휘학습", 
             "Writing", 
-            "📕 책 읽는 거인"
+            "완료 여부"
         ];
         
         const textProps = [
@@ -734,8 +739,8 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         ];
         
         const statusProps = [
-            "영어 더빙 학습 완료",
-            "더빙 워크북 완료",
+            "영어 더빙 학습",
+            "더빙 워크북",
             "⭕ 지난 문법 숙제 검사",
             "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제",
@@ -746,7 +751,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
         const relationProps = [
             "오늘 읽은 영어 책",
-            "오늘 읽은 한국 책"
+            "국어 독서 제목"
         ];
 
         // 4. Notion에 저장할 properties 객체 생성
