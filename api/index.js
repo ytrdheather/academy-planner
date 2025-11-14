@@ -627,7 +627,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
             // 어휘학습
             "못함": "못함",
-            "완료함": "완료함"
+            "완료함": "완료함",
 
             // Writing
             "3 SENTENCE": "3 SENTENCE",
