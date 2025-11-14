@@ -31,6 +31,9 @@ class StudyPlanner {
             // 저장된 데이터 복원
             this.loadSavedData();
 
+            // 오늘 서버에 저장된 데이터 불러오기
+            await this.loadTodayData();
+
             // 이벤트 리스너 설정
             this.attachEventListeners();
 
@@ -94,7 +97,139 @@ class StudyPlanner {
             }
         }
     }
+ /**
+     * 오늘 저장된 데이터 불러오기
+     */
+    async loadTodayData() {
+        try {
+            console.log('오늘 데이터 불러오기 시작...');
+            
+            const response = await fetch('/api/get-today-progress', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.api.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
 
+            if (!response.ok) {
+                console.log('데이터 로드 실패:', response.status);
+                return;
+            }
+
+            const data = await response.json();
+            
+            if (data.success && data.progress) {
+                console.log('불러온 데이터:', data.progress);
+                this.fillFormWithData(data.progress);
+                
+                // 상태 메시지는 선택적으로 표시
+                const statusElement = document.getElementById('autoSaveStatus');
+                if (statusElement) {
+                    statusElement.textContent = '저장된 데이터를 불러왔습니다';
+                }
+            }
+        } catch (error) {
+            console.log('오늘 데이터 로드 중 에러 (정상적일 수 있음):', error);
+            // 첫 사용자는 데이터가 없을 수 있으므로 에러 메시지 표시 안 함
+        }
+    }
+
+    /**
+     * 폼에 데이터 채우기
+     */
+    fillFormWithData(progress) {
+        // 숙제 확인 섹션
+        this.setFieldValue('[name="⭕ 지난 문법 숙제 검사"]', progress['⭕ 지난 문법 숙제 검사'], true);
+        this.setFieldValue('[name="1️⃣ 어휘 클카 암기 숙제"]', progress['1️⃣ 어휘 클카 암기 숙제'], true);
+        this.setFieldValue('[name="2️⃣ 독해 단어 클카 숙제"]', progress['2️⃣ 독해 단어 클카 숙제'], true);
+        this.setFieldValue('[name="4️⃣ Summary 숙제"]', progress['4️⃣ Summary 숙제'], true);
+        this.setFieldValue('[name="5️⃣ 매일 독해 숙제"]', progress['5️⃣ 매일 독해 숙제'], true);
+        this.setFieldValue('[name="6️⃣ 영어일기 or 개인 독해서"]', progress['6️⃣ 영어일기 or 개인 독해서'], true);
+        
+        // 시험 결과 섹션 (괄호 앞 공백 주의!)
+        this.setFieldValue('[name="단어 (맞은 개수)"]', progress['단어(맞은 개수)']);  // DB는 공백 없음
+        this.setFieldValue('[name="단어 (전체 개수)"]', progress['단어(전체 개수)']);
+        this.setFieldValue('[name="어휘유닛"]', progress['어휘유닛']);
+        this.setFieldValue('[name="문법 (전체 개수)"]', progress['문법(전체 개수)']);
+        this.setFieldValue('[name="문법 (틀린 개수)"]', progress['문법(틀린 개수)']);
+        this.setFieldValue('[name="독해 (틀린 개수)"]', progress['독해(틀린 개수)']);
+        this.setFieldValue('[name="독해 하브루타"]', progress['독해 하브루타'], true);
+        
+        // 리스닝 학습 섹션
+        this.setFieldValue('[name="영어 더빙 학습 완료"]', progress['영어 더빙 학습 완료'], true);
+        this.setFieldValue('[name="더빙 워크북 완료"]', progress['더빙 워크북 완료'], true);
+        
+        // 원서 독서 섹션
+        this.setFieldValue('[name="오늘 읽은 영어 책"]', progress['오늘 읽은 영어 책']);
+        this.setFieldValue('[name="📖 영어독서"]', progress['📖 영어독서'], true);
+        this.setFieldValue('[name="어휘학습"]', progress['어휘학습'], true);
+        this.setFieldValue('[name="Writing"]', progress['Writing'], true);
+        
+        // 한국 독서 섹션
+        this.setFieldValue('[name="국어 독서 제목"]', progress['국어 독서 제목']);
+        this.setFieldValue('[name="완료 여부"]', progress['📕 책 읽는 거인'], true);
+        
+        // 학습 소감
+        this.setFieldValue('[name="오늘의 학습 소감"]', progress['오늘의 학습 소감']);
+    }
+
+    /**
+     * 필드 값 설정 헬퍼 함수
+     */
+    setFieldValue(selector, value, needsConversion = false) {
+        if (!value) return;
+        
+        const element = document.querySelector(selector);
+        if (element) {
+            if (needsConversion) {
+                element.value = this.convertNotionToWebValue(value);
+            } else {
+                element.value = value;
+            }
+        }
+    }
+
+    /**
+     * Notion 값을 웹앱 표시 값으로 변환
+     */
+    convertNotionToWebValue(value) {
+        const reverseMapping = {
+            // 숙제 상태
+            "숙제 없음": "해당없음",
+            "안 해옴": "안 해옴",
+            "숙제 함": "숙제 함",
+            
+            // 리스닝 상태
+            "진행하지 않음": "진행하지 않음",
+            "완료": "완료",
+            "미완료": "미완료",
+            
+            // 독서 관련
+            "못함": "못함",
+            "완료함": "완료함",
+            "진행하지 않음": "진행하지 않음",
+            "미완료": "미완료",
+            
+            // 어휘학습
+            "못함": "못함",
+            "완료함": "완료함",
+            
+            // Writing
+            "3 SENTENCE": "3 SENTENCE",
+            "SKIP": "SKIP",
+            "북 리포트": "북 리포트",
+
+            // 하브루타
+            "숙제없음": "숙제없음",
+            "못하고감": "못하고감",
+            "완료함": "완료함"
+        };
+        
+        return reverseMapping[value] || value;
+    }
+
+    
     /**
      * UI 초기화
      */

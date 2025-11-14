@@ -554,6 +554,26 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
     } catch (error) { console.error('Korean book search API error:', error); res.status(500).json([]); }
 });
 
+app.get('/api/test-all-books', requireAuth, async (req, res) => {
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ page_size: 5 })
+        });
+        
+        console.log('전체 책 개수:', data.results.length);
+        if(data.results.length > 0) {
+            console.log('첫 번째 책 속성들:', Object.keys(data.results[0].properties));
+            console.log('Title 속성:', data.results[0].properties.Title);
+        }
+        
+        res.json(data.results);
+    } catch (error) {
+        console.error('테스트 에러:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // =======================================================================
 // [학생 플래너 저장 API - 완전 수정 버전]
 // planner-modular.html에서 보낸 form data를 Notion DB에 저장
