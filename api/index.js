@@ -555,23 +555,19 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [학생 플래너 저장 API - 수정됨]
-// planner.html에서 보낸 form key (예: '어휘정답')를
-// 실제 Notion DB의 속성 이름 (예: '단어 (맞은 개수)')으로 매핑합니다.
-// + "Find/Update or Create" 로직으로 수정 (헤더님 요청)
-// =======================================================================
-// =======================================================================
-// [수정된 학생 플래너 저장 API]
+// [학생 플래너 저장 API - 완전 수정 버전]
 // planner-modular.html에서 보낸 form data를 Notion DB에 저장
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name; // 토큰에 저장된 학생 이름
+    
     try {
-        if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { throw new Error('Server config error.'); }
+        if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) { 
+            throw new Error('Server config error.'); 
+        }
 
         // 1. HTML의 name 속성 -> Notion DB의 실제 속성 이름 매핑
-        // 주의: HTML에서 이미 이모지가 포함된 name을 사용하고 있음
         const propertyNameMap = {
             // 리스닝 섹션
             "영어 더빙 학습 완료": "영어 더빙 학습 완료",
@@ -582,25 +578,27 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",  // 추가
+            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
             
-            // 시험 결과 섹션
-            "단어 (맞은 개수)": "단어 (맞은 개수)",
-            "단어 (전체 개수)": "단어 (전체 개수)",
+            // 시험 결과 섹션 (Notion DB는 공백 없음!)
+            "단어 (맞은 개수)": "단어(맞은 개수)",
+            "단어 (전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛",
-            "문법 (전체 개수)": "문법 (전체 개수)",
-            "문법 (틀린 개수)": "문법 (틀린 개수)",
-            "독해 (틀린 개수)": "독해 (틀린 개수)",
+            "문법 (전체 개수)": "문법(전체 개수)",
+            "문법 (틀린 개수)": "문법(틀린 개수)",
+            "독해 (틀린 개수)": "독해(틀린 개수)",
             "독해 하브루타": "독해 하브루타",
             
             // 원서 독서 섹션
+            "오늘 읽은 영어 책": "오늘 읽은 영어 책",  // 관계형
             "📖 영어독서": "📖 영어독서",
             "어휘학습": "어휘학습",
             "Writing": "Writing",
             
             // 한국 독서 섹션
-            "📕 책 읽는 거인": "📕 책 읽는 거인",
+            "국어 독서 제목": "국어 독서 제목",  // 관계형 - Notion에서는 "국어 독서 제목"
+            "완료 여부": "📕 책 읽는 거인",  // select 속성
             
             // 학습 소감
             "오늘의 학습 소감": "오늘의 학습 소감"
@@ -621,23 +619,25 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             // 독서 관련
             "못함": "못함",
             "완료함": "완료함",
-            "시작함": "시작함",
-            "절반": "절반",
-            "거의다읽음": "거의다읽음",
             
             // 하브루타
             "숙제없음": "숙제없음",
             "못하고감": "못하고감",
-            
-            // 어휘학습/Writing
-            "안함": "SKIP",
-            "했음": "완료함",
-            "완료": "완료함"
+            "완료함": "완료함",
+
+            // 어휘학습
+            "못함": "못함",
+            "완료함": "완료함"
+
+            // Writing
+            "3 SENTENCE": "3 SENTENCE",
+            "SKIP": "SKIP",
+            "북 리포트": "북 리포트"
         };
 
-        // 3. 데이터 타입 분류 (HTML name 기준)
+        // 3. 데이터 타입 분류 (HTML의 name 기준)
         const numberProps = [
-            "단어 (맞은 개수)", 
+            "단어 (맞은 개수)",  // HTML은 공백 있음
             "단어 (전체 개수)", 
             "문법 (전체 개수)", 
             "문법 (틀린 개수)", 
@@ -668,6 +668,11 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "6️⃣ 영어일기 or 개인 독해서"
         ];
 
+        const relationProps = [
+            "오늘 읽은 영어 책",
+            "오늘 읽은 한국 책"
+        ];
+
         // 4. Notion에 저장할 properties 객체 생성
         const properties = {};
 
@@ -681,61 +686,64 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             // 값 변환 (웹앱 표시값 -> Notion 값)
             const convertedValue = valueMapping[value] || value;
             
-            // 건너뛸 값들 체크 (변환 후 값으로 체크)
-            if (['숙제 없음', '진행하지 않음', '숙제없음', 'SKIP'].includes(convertedValue)) {
-                // 상태 속성은 기본값도 저장해야 함
-                if (statusProps.includes(key)) {
-                    properties[key] = { status: { name: convertedValue } };
+            // Notion 속성명 가져오기
+            const notionPropName = propertyNameMap[key] || key;
+            
+            // 관계형 속성 처리 (책)
+            if (key === '오늘 읽은 영어 책' || key === '오늘 읽은 영어 책 ID') {
+                const bookId = formData['오늘 읽은 영어 책 ID'];
+                const bookTitle = formData['오늘 읽은 영어 책'];
+                
+                if (bookId && bookId !== '') {
+                    properties['오늘 읽은 영어 책'] = { relation: [{ id: bookId }] };
+                } else if (bookTitle && bookTitle !== '') {
+                    const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, bookTitle, 'Title');
+                    if (bookPageId) {
+                        properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] };
+                    }
                 }
                 continue;
             }
             
-            // Notion 속성명 가져오기 (매핑이 없으면 원래 key 사용)
-            const notionPropName = propertyNameMap[key] || key;
+            if (key === '오늘 읽은 한국 책' || key === '오늘 읽은 한국 책 ID') {
+                const bookId = formData['오늘 읽은 한국 책 ID'];
+                const bookTitle = formData['오늘 읽은 한국 책'];
+                
+                if (bookId && bookId !== '') {
+                    properties['국어 독서 제목'] = { relation: [{ id: bookId }] };  // Notion에서는 "국어 독서 제목"
+                } else if (bookTitle && bookTitle !== '') {
+                    const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, bookTitle, '책제목');
+                    if (bookPageId) {
+                        properties['국어 독서 제목'] = { relation: [{ id: bookPageId }] };
+                    }
+                }
+                continue;
+            }
             
-            // 데이터 타입별 처리
+            // 숫자 속성 처리
             if (numberProps.includes(key)) {
                 const numValue = Number(convertedValue);
                 if (!isNaN(numValue)) {
                     properties[notionPropName] = { number: numValue };
                 }
             }
+            // Select 속성 처리
             else if (selectProps.includes(key)) {
-                properties[notionPropName] = { select: { name: convertedValue } };
+                // 건너뛸 값들 체크 (select는 값을 저장해야 할 수도 있음)
+                if (!['숙제 없음', '숙제없음', 'SKIP'].includes(convertedValue) || key === '독해 하브루타') {
+                    properties[notionPropName] = { select: { name: convertedValue } };
+                }
             }
+            // 텍스트 속성 처리
             else if (textProps.includes(key)) {
                 properties[notionPropName] = { rich_text: [{ text: { content: convertedValue } }] };
             }
-            else if (key === '오늘 읽은 영어 책' || key === '오늘 읽은 영어 책 ID') {
-                // ID가 있으면 ID 사용, 없으면 제목으로 검색
-                const bookId = formData['오늘 읽은 영어 책 ID'];
-                if (bookId) {
-                    properties['오늘 읽은 영어 책'] = { relation: [{ id: bookId }] };
-                } else if (value && value !== '') {
-                    const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, value, 'Title');
-                    if (bookPageId) {
-                        properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] };
-                    }
-                }
-            }
-            else if (key === '오늘 읽은 한국 책' || key === '오늘 읽은 한국 책 ID') {
-                // ID가 있으면 ID 사용, 없으면 제목으로 검색
-                const bookId = formData['오늘 읽은 한국 책 ID'];
-                if (bookId) {
-                    properties['국어 독서 제목'] = { relation: [{ id: bookId }] };
-                } else if (value && value !== '') {
-                    const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, value, '책제목');
-                    if (bookPageId) {
-                        properties['국어 독서 제목'] = { relation: [{ id: bookPageId }] };
-                    }
-                }
-            }
+            // Status 속성 처리
             else if (statusProps.includes(key)) {
+                // Status는 모든 값을 저장 (숙제 없음, 진행하지 않음 포함)
                 properties[notionPropName] = { status: { name: convertedValue } };
             }
         }
-
-        // --- "Find or Create/Update" 로직 ---
 
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
         const { start, end, dateString } = getKSTTodayRange();
@@ -762,6 +770,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             // --- 기존 페이지가 있으면: '업데이트' (PATCH) ---
             const existingPageId = existingPageQuery.results[0].id;
             console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지(${existingPageId})를 '업데이트'합니다.`);
+            console.log('[save-progress] 업데이트할 속성들:', Object.keys(properties));
 
             await fetchNotion(`https://api.notion.com/v1/pages/${existingPageId}`, {
                 method: 'PATCH',
@@ -770,6 +779,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
             console.log(`[save-progress] 업데이트 성공: ${studentName} (${dateString})`);
             res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
+            
         } else {
             // --- 기존 페이지가 없으면: '생성' (POST) ---
             console.log(`[save-progress] ${studentName} 학생의 '오늘' 페이지가 없으므로 '생성'합니다.`);
@@ -789,6 +799,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             console.log(`[save-progress] 생성 성공: ${studentName} (${dateString})`);
             res.json({ success: true, message: '오늘의 학습 내용이 성공적으로 저장되었습니다!' });
         }
+        
     } catch (error) {
         console.error('[save-progress] 처리 중 오류:', error);
         res.status(500).json({ 
