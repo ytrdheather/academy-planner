@@ -40,8 +40,6 @@ class StudyPlanner {
             // 자동 저장 시작
             this.startAutoSave();
 
-            // 책 자동완성 초기화
-            this.initializeBookAutocomplete();
 
         } catch (error) {
             console.error('플래너 초기화 실패:', error);
