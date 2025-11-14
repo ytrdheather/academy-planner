@@ -312,7 +312,7 @@ class StudyPlanner {
             
             searchTimer = setTimeout(async () => {
                 try {
-                    const books = await this.api.searchBooks(query);
+                    const books = await this.api.searchEnglishBooks(query);
                     
                     if (books.length === 0) {
                         dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
@@ -404,7 +404,7 @@ class StudyPlanner {
             
             searchTimer = setTimeout(async () => {
                 try {
-                    const books = await this.api.searchSayuBooks(query);
+                    const books = await this.api.searchKoreanBooks(query);
                     
                     if (books.length === 0) {
                         dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
