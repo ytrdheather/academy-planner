@@ -51,6 +51,7 @@ class StudyPlanner {
      */
     async loadStudentInfo() {
         try {
+            // 먼저 /api/student-info를 시도
             this.studentInfo = await this.api.getStudentInfo();
             
             // 학생 이름 표시
@@ -64,10 +65,32 @@ class StudyPlanner {
             Utils.storage.save(CONFIG.STORAGE_KEYS.USER_NAME, this.studentInfo.studentName);
 
         } catch (error) {
-            console.error('학생 정보 로드 실패:', error);
-            // 토큰이 유효하지 않은 경우 로그인 페이지로
-            if (error.message.includes('401') || error.message.includes('인증')) {
-                window.location.href = '/';
+            console.error('학생 정보 로드 실패, user-info로 재시도:', error);
+            
+            // /api/user-info로 폴백
+            try {
+                const userInfo = await this.api.getUserInfo();
+                this.studentInfo = {
+                    studentId: userInfo.userId,
+                    studentName: userInfo.userName
+                };
+                
+                // 학생 이름 표시
+                const nameElement = document.getElementById('studentName');
+                if (nameElement) {
+                    nameElement.textContent = `${this.studentInfo.studentName}(이)의`;
+                }
+
+                // 로컬 스토리지에 저장
+                Utils.storage.save(CONFIG.STORAGE_KEYS.USER_ID, this.studentInfo.studentId);
+                Utils.storage.save(CONFIG.STORAGE_KEYS.USER_NAME, this.studentInfo.studentName);
+                
+            } catch (fallbackError) {
+                console.error('user-info도 실패:', fallbackError);
+                // 토큰이 유효하지 않은 경우 로그인 페이지로
+                if (fallbackError.message.includes('401') || fallbackError.message.includes('인증')) {
+                    window.location.href = '/';
+                }
             }
         }
     }
@@ -179,16 +202,29 @@ class StudyPlanner {
      */
     async searchBooks(query, type, suggestionsList) {
         try {
+            console.log(`책 검색 시작: ${type}, 쿼리: ${query}`);
+            
             const books = type === 'english' 
                 ? await this.api.searchEnglishBooks(query)
                 : await this.api.searchKoreanBooks(query);
 
+            console.log(`검색 결과:`, books);
             this.currentBooks = books;
             this.showSuggestions(books, suggestionsList, type);
 
         } catch (error) {
-            console.error('책 검색 오류:', error);
-            this.hideSuggestions(suggestionsList);
+            console.error(`책 검색 오류 (${type}):`, error);
+            
+            // 인증 오류인 경우 특별 처리
+            if (error.message.includes('401')) {
+                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">⚠️ 로그인이 필요합니다</div>';
+            } else {
+                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">❌ 검색 중 오류가 발생했습니다</div>';
+            }
+            suggestionsList.style.display = 'block';
+            
+            // 2초 후 숨기기
+            setTimeout(() => this.hideSuggestions(suggestionsList), 2000);
         }
     }
 

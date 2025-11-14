@@ -40,9 +40,13 @@ class ReaditudeAPI {
         const url = `${this.baseURL}${endpoint}`;
         
         const headers = {
-            'Content-Type': 'application/json',
             ...options.headers
         };
+
+        // GET 요청이 아닌 경우에만 Content-Type 추가
+        if (options.method && options.method !== 'GET') {
+            headers['Content-Type'] = 'application/json';
+        }
 
         // 인증이 필요한 경우 토큰 추가
         if (this.token && !options.skipAuth) {
@@ -50,10 +54,17 @@ class ReaditudeAPI {
         }
 
         try {
-            const response = await fetch(url, {
-                ...options,
+            const fetchOptions = {
+                method: options.method || 'GET',
                 headers
-            });
+            };
+
+            // body는 GET 요청이 아닐 때만 추가
+            if (options.body) {
+                fetchOptions.body = options.body;
+            }
+
+            const response = await fetch(url, fetchOptions);
 
             // 인증 오류 처리
             if (response.status === 401) {
