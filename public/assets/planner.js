@@ -283,9 +283,11 @@ class StudyPlanner {
     const engBookInput = document.querySelector('[name="오늘 읽은 영어 책"]');
     if (engBookInput) {
         // 드롭다운 컨테이너 생성
-        let dropdown = document.createElement('div');
+        let dropdown = document.crea
+        teElement('div');
         dropdown.className = 'book-dropdown';
         dropdown.style.cssText = `
+
             position: absolute;
             background: white;
             border: 1px solid #ddd;
@@ -506,33 +508,33 @@ class StudyPlanner {
     /**
      * 책 검색 실행
      */
-    async searchBooks(query, type, suggestionsList) {
-        try {
-            console.log(`책 검색 시작: ${type}, 쿼리: ${query}`);
+ async searchBooks(query, type, suggestionsList) {
+    try {
+        console.log(`책 검색 시작: ${type}, 쿼리: ${query}`);
+        
+        const endpoint = type === 'english' 
+            ? `/api/search-books?query=${encodeURIComponent(query)}`
+            : `/api/search-sayu-books?query=${encodeURIComponent(query)}`;
             
-            const books = type === 'english' 
-                ? await this.api.searchEnglishBooks(query)
-                : await this.api.searchKoreanBooks(query);
-
-            console.log(`검색 결과:`, books);
-            this.currentBooks = books;
-            this.showSuggestions(books, suggestionsList, type);
-
-        } catch (error) {
-            console.error(`책 검색 오류 (${type}):`, error);
-            
-            // 인증 오류인 경우 특별 처리
-            if (error.message.includes('401')) {
-                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">⚠️ 로그인이 필요합니다</div>';
-            } else {
-                suggestionsList.innerHTML = '<div class="autocomplete-suggestion">❌ 검색 중 오류가 발생했습니다</div>';
+        const response = await fetch(endpoint, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             }
-            suggestionsList.style.display = 'block';
-            
-            // 2초 후 숨기기
-            setTimeout(() => this.hideSuggestions(suggestionsList), 2000);
-        }
+        });
+        
+        const books = await response.json();
+        
+        console.log(`검색 결과:`, books);
+        this.currentBooks = books;
+        this.showSuggestions(books, suggestionsList, type);
+
+    } catch (error) {
+        console.error(`책 검색 오류 (${type}):`, error);
+        suggestionsList.innerHTML = '<div class="autocomplete-suggestion">❌ 검색 중 오류가 발생했습니다</div>';
+        suggestionsList.style.display = 'block';
+        setTimeout(() => this.hideSuggestions(suggestionsList), 2000);
     }
+}
 
     /**
      * 검색 결과 표시
