@@ -37,6 +37,21 @@ class StudyPlanner {
             // 이벤트 리스너 설정
             this.attachEventListeners();
 
+            // [--- 수정된 부분 ---]
+            // 책 검색 자동완성 기능을 초기화합니다.
+            const engBookInput = document.getElementById('englishBookTitle');
+            const korBookInput = document.getElementById('koreanBookTitle');
+            
+            if (engBookInput) {
+                console.log('영어책 검색 기능 초기화');
+                this.setupBookSearch(engBookInput, 'english');
+            }
+            if (korBookInput) {
+                console.log('한국책 검색 기능 초기화');
+                this.setupBookSearch(korBookInput, 'korean');
+            }
+            // [--- 수정 종료 ---]
+
             // 자동 저장 시작
             this.startAutoSave();
 
@@ -137,39 +152,77 @@ class StudyPlanner {
      * 폼에 데이터 채우기
      */
     fillFormWithData(progress) {
-        // 숙제 확인 섹션
-        this.setFieldValue('[name="⭕ 지난 문법 숙제 검사"]', progress['⭕ 지난 문법 숙제 검사'], true);
-        this.setFieldValue('[name="1️⃣ 어휘 클카 암기 숙제"]', progress['1️⃣ 어휘 클카 암기 숙제'], true);
-        this.setFieldValue('[name="2️⃣ 독해 단어 클카 숙제"]', progress['2️⃣ 독해 단어 클카 숙제'], true);
-        this.setFieldValue('[name="4️⃣ Summary 숙제"]', progress['4️⃣ Summary 숙제'], true);
-        this.setFieldValue('[name="5️⃣ 매일 독해 숙제"]', progress['5️⃣ 매일 독해 숙제'], true);
-        this.setFieldValue('[name="6️⃣ 영어일기 or 개인 독해서"]', progress['6️⃣ 영어일기 or 개인 독해서'], true);
+        // Notion DB의 속성 이름 (progress 객체의 key)을 기반으로 폼을 채웁니다.
         
-        // 시험 결과 섹션 (괄호 앞 공백 주의!)
-        this.setFieldValue('[name="단어 (맞은 개수)"]', progress['단어(맞은 개수)']);  // DB는 공백 없음
-        this.setFieldValue('[name="단어 (전체 개수)"]', progress['단어(전체 개수)']);
-        this.setFieldValue('[name="어휘유닛"]', progress['어휘유닛']);
-        this.setFieldValue('[name="문법 (전체 개수)"]', progress['문법(전체 개수)']);
-        this.setFieldValue('[name="문법 (틀린 개수)"]', progress['문법(틀린 개수)']);
-        this.setFieldValue('[name="독해 (틀린 개수)"]', progress['독해(틀린 개수)']);
-        this.setFieldValue('[name="독해 하브루타"]', progress['독해 하브루타'], true);
+        // Notion 속성명 -> HTML name 속성 매핑 (일치하지 않는 경우)
+        const nameMap = {
+            '단어(맞은 개수)': '단어 (맞은 개수)',
+            '단어(전체 개수)': '단어 (전체 개수)',
+            '문법(전체 개수)': '문법 (전체 개수)',
+            '문법(틀린 개수)': '문법 (틀린 개수)',
+            '독해(틀린 개수)': '독해 (틀린 개수)',
+            '국어 독서 제목': '오늘 읽은 한국 책', // 롤업된 제목이 이 키로 올 수 있음
+            '📕 책 읽는 거인': '📕 책 읽는 거인',
+            // '오늘 읽은 영어 책'은 롤업 속성('📖 책제목 (롤업)')을 통해 이름이 채워짐
+            '📖 책제목 (롤업)': '오늘 읽은 영어 책'
+        };
         
-        // 리스닝 학습 섹션
-        this.setFieldValue('[name="영어 더빙 학습 완료"]', progress['영어 더빙 학습 완료'], true);
-        this.setFieldValue('[name="더빙 워크북 완료"]', progress['더빙 워크북 완료'], true);
+        // 값 변환이 필요한 select/status 필드 목록
+        const conversionMap = {
+            // 숙제 상태
+            "숙제 없음": "해당없음",
+            "안 해옴": "안 해옴",
+            "숙제 함": "숙제 함",
+            
+            // 리스닝 상태
+            "진행하지 않음": "진행하지 않음",
+            "완료": "완료",
+            "미완료": "미완료",
+            
+            // 독서 관련 (📖 영어독서)
+            "못함": "못함",
+            "완료함": "완료함",
+            
+            // 어휘학습
+            "안함": "안함",
+            "했음": "했음",
+            
+            // Writing
+            "안함": "안함",
+            "완료": "완료",
+
+            // 하브루타
+            "숙제없음": "숙제없음",
+            "못하고감": "못하고감",
+            "완료함": "완료함",
+            
+            // 책 읽는 거인 (📕 책 읽는 거인)
+            "못함": "못함",
+            "시작함": "시작함",
+            "절반": "절반",
+            "거의다읽음": "거의다읽음",
+            "완료함": "완료함"
+        };
         
-        // 원서 독서 섹션
-        this.setFieldValue('[name="오늘 읽은 영어 책"]', progress['오늘 읽은 영어 책']);
-        this.setFieldValue('[name="📖 영어독서"]', progress['📖 영어독서'], true);
-        this.setFieldValue('[name="어휘학습"]', progress['어휘학습'], true);
-        this.setFieldValue('[name="Writing"]', progress['Writing'], true);
-        
-        // 한국 독서 섹션
-        this.setFieldValue('[name="국어 독서 제목"]', progress['국어 독서 제목']);
-        this.setFieldValue('[name="완료 여부"]', progress['📕 책 읽는 거인'], true);
-        
-        // 학습 소감
-        this.setFieldValue('[name="오늘의 학습 소감"]', progress['오늘의 학습 소감']);
+        for (const notionKey in progress) {
+            const value = progress[notionKey];
+            if (value === null || value === undefined) continue;
+
+            // 1. HTML의 name 속성 찾기
+            // '이름' 같은 기본 속성은 nameMap에 없을 수 있으므로, notionKey 자체도 확인
+            const htmlName = nameMap[notionKey] || notionKey;
+            
+            // 2. 해당 name 속성을 가진 요소 찾기
+            const element = document.querySelector(`[name="${htmlName}"]`);
+            if (!element) {
+                // console.log(`[fillForm] '${htmlName}' 요소를 찾을 수 없습니다 (NotionKey: ${notionKey})`);
+                continue;
+            }
+
+            // 3. 값 변환 (필요한 경우)
+            // conversionMap에 value가 키로 존재하면 변환된 값을 사용, 아니면 원래 값 사용
+            element.value = conversionMap[value] || value;
+        }
     }
 
     /**
@@ -192,36 +245,25 @@ class StudyPlanner {
      * Notion 값을 웹앱 표시 값으로 변환
      */
     convertNotionToWebValue(value) {
+        // [fillFormWithData] 함수 내부 로직과 중복되어 해당 함수로 통합함.
+        // 이 함수는 이전 버전 호환성을 위해 남겨둘 수 있으나,
+        // loadTodayData -> fillFormWithData 로직에서는 더 이상 직접 사용되지 않음.
         const reverseMapping = {
-            // 숙제 상태
             "숙제 없음": "해당없음",
             "안 해옴": "안 해옴",
             "숙제 함": "숙제 함",
-            
-            // 리스닝 상태
             "진행하지 않음": "진행하지 않음",
             "완료": "완료",
             "미완료": "미완료",
-            
-            // 독서 관련
             "못함": "못함",
             "완료함": "완료함",
-            "진행하지 않음": "진행하지 않음",
-            "미완료": "미완료",
-            
-            // 어휘학습
-            "못함": "못함",
-            "완료함": "완료함",
-            
-            // Writing
-            "3 SENTENCE": "3 SENTENCE",
-            "SKIP": "SKIP",
-            "북 리포트": "북 리포트",
-
-            // 하브루타
+            "안함": "안함",
+            "했음": "했음",
             "숙제없음": "숙제없음",
             "못하고감": "못하고감",
-            "완료함": "완료함"
+            "시작함": "시작함",
+            "절반": "절반",
+            "거의다읽음": "거의다읽음"
         };
         
         return reverseMapping[value] || value;
@@ -276,195 +318,12 @@ class StudyPlanner {
     }
 
     /**
-     * 책 자동완성 초기화
+     * 책 자동완성 초기화 (이전 버전 - 현재 미사용)
      */
    initializeBookAutocomplete() {
-    // 영어책 자동완성
-    const engBookInput = document.querySelector('[name="오늘 읽은 영어 책"]');
-    if (engBookInput) {
-        // 드롭다운 컨테이너 생성
-        let dropdown = document.crea
-        teElement('div');
-        dropdown.className = 'book-dropdown';
-        dropdown.style.cssText = `
-
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-            z-index: 1000;
-            width: 100%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        `;
-        engBookInput.parentElement.style.position = 'relative';
-        engBookInput.parentElement.appendChild(dropdown);
-        
-        let searchTimer;
-        engBookInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimer);
-            const query = e.target.value;
-            
-            if (query.length < 1) {
-                dropdown.style.display = 'none';
-                return;
-            }
-            
-            searchTimer = setTimeout(async () => {
-                try {
-                    const books = await this.api.searchEnglishBooks(query);
-                    
-                    if (books.length === 0) {
-                        dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
-                        dropdown.style.display = 'block';
-                        return;
-                    }
-                    
-                    // 드롭다운에 검색 결과 표시
-                    dropdown.innerHTML = books.map(book => `
-                        <div class="book-option" data-id="${book.id}" data-title="${book.title}" style="
-                            padding: 10px;
-                            cursor: pointer;
-                            border-bottom: 1px solid #eee;
-                        ">
-                            <div style="font-weight: bold;">${book.title}</div>
-                            ${book.author ? `<div style="font-size: 0.9em; color: #666;">저자: ${book.author}</div>` : ''}
-                            ${book.level ? `<div style="font-size: 0.9em; color: #999;">레벨: ${book.level}</div>` : ''}
-                        </div>
-                    `).join('');
-                    
-                    dropdown.style.display = 'block';
-                    
-                    // 각 옵션에 클릭 이벤트 추가
-                    dropdown.querySelectorAll('.book-option').forEach(option => {
-                        option.addEventListener('click', () => {
-                            engBookInput.value = option.dataset.title;
-                            // ID도 저장 (숨겨진 필드가 있다면)
-                            const hiddenInput = document.querySelector('[name="오늘 읽은 영어 책 ID"]');
-                            if (hiddenInput) {
-                                hiddenInput.value = option.dataset.id;
-                            }
-                            dropdown.style.display = 'none';
-                        });
-                        
-                        // 호버 효과
-                        option.addEventListener('mouseenter', () => {
-                            option.style.backgroundColor = '#f0f0f0';
-                        });
-                        option.addEventListener('mouseleave', () => {
-                            option.style.backgroundColor = 'white';
-                        });
-                    });
-                    
-                } catch (error) {
-                    console.error('책 검색 실패:', error);
-                    dropdown.style.display = 'none';
-                }
-            }, 300); // 300ms 디바운스
-        });
-        
-        // 클릭 외부 영역 시 드롭다운 닫기
-        document.addEventListener('click', (e) => {
-            if (!engBookInput.parentElement.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
-        });
-    }
-    
-    // 한국책 자동완성 (동일한 패턴)
-    const korBookInput = document.querySelector('[name="국어 독서 제목"]');
-    if (korBookInput) {
-        // 드롭다운 컨테이너 생성
-        let dropdown = document.createElement('div');
-        dropdown.className = 'book-dropdown';
-        dropdown.style.cssText = `
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-            z-index: 1000;
-            width: 100%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        `;
-        korBookInput.parentElement.style.position = 'relative';
-        korBookInput.parentElement.appendChild(dropdown);
-        
-        let searchTimer;
-        korBookInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimer);
-            const query = e.target.value;
-            
-            if (query.length < 1) {
-                dropdown.style.display = 'none';
-                return;
-            }
-            
-            searchTimer = setTimeout(async () => {
-                try {
-                    const books = await this.api.searchKoreanBooks(query);
-                    
-                    if (books.length === 0) {
-                        dropdown.innerHTML = '<div style="padding: 10px; color: #666;">검색 결과가 없습니다</div>';
-                        dropdown.style.display = 'block';
-                        return;
-                    }
-                    
-                    // 드롭다운에 검색 결과 표시
-                    dropdown.innerHTML = books.map(book => `
-                        <div class="book-option" data-id="${book.id}" data-title="${book.title}" style="
-                            padding: 10px;
-                            cursor: pointer;
-                            border-bottom: 1px solid #eee;
-                        ">
-                            <div style="font-weight: bold;">${book.title}</div>
-                            ${book.author ? `<div style="font-size: 0.9em; color: #666;">저자: ${book.author}</div>` : ''}
-                            ${book.publisher ? `<div style="font-size: 0.9em; color: #999;">출판사: ${book.publisher}</div>` : ''}
-                        </div>
-                    `).join('');
-                    
-                    dropdown.style.display = 'block';
-                    
-                    // 각 옵션에 클릭 이벤트 추가
-                    dropdown.querySelectorAll('.book-option').forEach(option => {
-                        option.addEventListener('click', () => {
-                            korBookInput.value = option.dataset.title;
-                            // ID도 저장 (숨겨진 필드가 있다면)
-                            const hiddenInput = document.querySelector('[name="국어 독서 제목 ID"]');
-                            if (hiddenInput) {
-                                hiddenInput.value = option.dataset.id;
-                            }
-                            dropdown.style.display = 'none';
-                        });
-                        
-                        // 호버 효과
-                        option.addEventListener('mouseenter', () => {
-                            option.style.backgroundColor = '#f0f0f0';
-                        });
-                        option.addEventListener('mouseleave', () => {
-                            option.style.backgroundColor = 'white';
-                        });
-                    });
-                    
-                } catch (error) {
-                    console.error('책 검색 실패:', error);
-                    dropdown.style.display = 'none';
-                }
-            }, 300); // 300ms 디바운스
-        });
-        
-        // 클릭 외부 영역 시 드롭다운 닫기
-        document.addEventListener('click', (e) => {
-            if (!korBookInput.parentElement.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
-        });
-    }
-}
+    // 이 함수는 setupBookSearch로 대체되었습니다.
+    // ... (이전 코드 생략) ...
+   }
 
     /**
      * 책 검색 설정
@@ -474,11 +333,25 @@ class StudyPlanner {
             ? document.getElementById('bookSuggestions')
             : document.getElementById('korBookSuggestions');
 
-        if (!suggestionsList) return;
+        if (!suggestionsList) {
+            console.error(`[setupBookSearch] ${type} suggestions list를 찾을 수 없습니다.`);
+            return;
+        }
 
         // 입력 이벤트
         input.addEventListener('input', () => {
             const query = input.value.trim();
+            
+            // [--- 수정 ---]
+            // 사용자가 직접 입력한 경우, 관련 ID를 지웁니다.
+            // (선택한 후에 다시 타이핑을 시작하는 경우)
+            const idInput = type === 'english'
+                ? document.getElementById('englishBookId')
+                : document.getElementById('koreanBookId');
+            if (idInput) {
+                idInput.value = '';
+            }
+            // [--- 수정 종료 ---]
             
             clearTimeout(this.searchTimeout);
             
@@ -496,7 +369,10 @@ class StudyPlanner {
 
         // 포커스 아웃
         input.addEventListener('blur', () => {
-            setTimeout(() => this.hideSuggestions(suggestionsList), 200);
+            // 사용자가 제안을 클릭할 시간을 주기 위해 약간 지연
+            setTimeout(() => {
+                this.hideSuggestions(suggestionsList);
+            }, 200);
         });
 
         // 키보드 네비게이션
@@ -521,6 +397,10 @@ class StudyPlanner {
                 'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             }
         });
+
+        if (!response.ok) {
+            throw new Error(`API returned ${response.status}`);
+        }
         
         const books = await response.json();
         
@@ -540,7 +420,7 @@ class StudyPlanner {
      * 검색 결과 표시
      */
     showSuggestions(books, suggestionsList, type) {
-        if (books.length === 0) {
+        if (!books || books.length === 0) {
             suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>';
             suggestionsList.style.display = 'block';
             return;
@@ -566,9 +446,10 @@ class StudyPlanner {
             }
         }).join('');
 
-        // 클릭 이벤트 추가
+        // 클릭 이벤트 추가 (mousedown이 blur보다 먼저 실행됨)
         suggestionsList.querySelectorAll('.autocomplete-suggestion').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // blur 이벤트 방지
                 const index = parseInt(item.dataset.index);
                 this.selectBook(index, type);
             });
@@ -624,9 +505,14 @@ class StudyPlanner {
             this.hideSuggestions(suggestionsList);
             return;
         }
+        
+        if (suggestionsList.style.display === 'none' || !suggestionsList) return;
 
         const suggestions = suggestionsList.querySelectorAll('.autocomplete-suggestion');
-        const activeIndex = Array.from(suggestions).findIndex(s => s.classList.contains('active'));
+        if (suggestions.length === 0) return;
+
+        const activeItem = suggestionsList.querySelector('.autocomplete-suggestion.active');
+        let activeIndex = Array.from(suggestions).indexOf(activeItem);
 
         if (event.key === 'ArrowDown') {
             event.preventDefault();
@@ -649,6 +535,7 @@ class StudyPlanner {
         suggestions.forEach(s => s.classList.remove('active'));
         if (suggestions[index]) {
             suggestions[index].classList.add('active');
+            suggestions[index].scrollIntoView({ block: 'nearest' });
         }
     }
 
@@ -665,7 +552,7 @@ class StudyPlanner {
         // 상태 표시
         const statusElement = document.getElementById('autoSaveStatus');
         if (statusElement) {
-            statusElement.textContent = '자동 저장됨 ' + new Date().toLocaleTimeString();
+            statusElement.textContent = '임시 저장됨 ' + new Date().toLocaleTimeString();
         }
     }
 
@@ -710,6 +597,19 @@ class StudyPlanner {
 
         const formData = new FormData(event.target);
         const data = Object.fromEntries(formData);
+        
+        // [--- 수정 ---]
+        // 제출 시, ID가 없는 책 이름(직접 타이핑한 경우)을 Notion에 
+        // 관계형으로 저장하려 시도하는 것을 방지하기 위해 ID 확인
+        if (data['오늘 읽은 영어 책'] && !data['오늘 읽은 영어 책 ID']) {
+            console.log('영어책 ID가 없습니다. 텍스트만 전송합니다.');
+            // index.js의 /save-progress는 ID가 없으면 관계형 저장을 시도하지 않음
+        }
+        if (data['오늘 읽은 한국 책'] && !data['오늘 읽은 한국 책 ID']) {
+            console.log('한국책 ID가 없습니다. 텍스트만 전송합니다.');
+            // index.js의 /save-progress는 ID가 없으면 관계형 저장을 시도하지 않음
+        }
+        // [--- 수정 종료 ---]
 
         Utils.ui.showLoading('저장 중...');
 

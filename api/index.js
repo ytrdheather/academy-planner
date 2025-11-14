@@ -93,9 +93,12 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
         if (titlePropertyName === '반이름') {
             filterBody = { property: titlePropertyName, select: { equals: title } };
         } else if (isTitleProp) {
-            filterBody = { property: titlePropertyName, title: { contains: title } };
+            // --- [핵심 수정 3] ---
+            // 'contains' (포함) 대신 'equals' (일치)를 사용해야
+            // "Harry Pot"이라고 썼을 때 "Harry Potter"가 저장되는 문제를 막을 수 있습니다.
+            filterBody = { property: titlePropertyName, title: { equals: title } };
         } else {
-            filterBody = { property: titlePropertyName, rich_text: { contains: title } };
+            filterBody = { property: titlePropertyName, rich_text: { equals: title } };
         }
 
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${databaseId}/query`, {
@@ -125,7 +128,8 @@ function requireAuth(req, res, next) {
 
 // --- 페이지 라우트 (기존과 동일) ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
-app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner.html')));
+// [수정] planner-modular.html을 서빙하도록 경로 수정
+app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
@@ -533,11 +537,16 @@ app.get('/api/search-books', requireAuth, async (req, res) => {
             throw new Error('Server config error for Eng Books.'); 
         }
         
-        // 전체 데이터 먼저 가져오기 (필터 없이)
+        // --- [핵심 수정 4] ---
+        // Notion API에서 직접 필터링하도록 수정합니다. (성능 향상)
+        // 'contains'를 사용하여 부분 일치 검색을 지원합니다.
+        const filter = query ? { property: 'Title', title: { contains: query } } : undefined;
+        
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({ 
-                page_size: 100  // 더 많은 책 가져오기
+                filter: filter,
+                page_size: 20 // 검색 결과는 20개로 제한
             })
         });
         
@@ -552,15 +561,8 @@ app.get('/api/search-books', requireAuth, async (req, res) => {
             };
         });
         
-        // 클라이언트 측에서 필터링
-        if (query && query.trim() !== '') {
-            const filtered = books.filter(book => 
-                book.title && book.title.toLowerCase().includes(query.toLowerCase())
-            );
-            res.json(filtered);
-        } else {
-            res.json(books);
-        }
+        // [수정] 서버 측 필터링 로직 제거 (Notion이 이미 필터링함)
+        res.json(books);
         
     } catch (error) { 
         console.error('English book search API error:', error); 
@@ -575,15 +577,19 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
             throw new Error('Server config error for Kor Books.'); 
         }
         
-        // 전체 데이터 먼저 가져오기 (필터 없이)
+        // --- [핵심 수정 5] ---
+        // Notion API에서 직접 필터링 (한국책 속성명: '책제목')
+        const filter = query ? { property: '책제목', title: { contains: query } } : undefined;
+        
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({ 
-                page_size: 100  // 더 많은 책 가져오기
+                filter: filter,
+                page_size: 20 // 검색 결과는 20개로 제한
             })
         });
         
-        // 아무 곳에나 (예: 550줄 근처)
+// 아무 곳에나 (예: 550줄 근처)
 app.get('/test', (req, res) => {
     res.json({ message: '서버 작동 중', time: new Date() });
 });
@@ -599,15 +605,8 @@ app.get('/test', (req, res) => {
             };
         });
         
-        // 클라이언트 측에서 필터링
-        if (query && query.trim() !== '') {
-            const filtered = books.filter(book => 
-                book.title && book.title.toLowerCase().includes(query.toLowerCase())
-            );
-            res.json(filtered);
-        } else {
-            res.json(books);
-        }
+        // [수정] 서버 측 필터링 로직 제거
+        res.json(books);
         
     } catch (error) { 
         console.error('Korean book search API error:', error); 
@@ -675,17 +674,20 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "오늘 읽은 영어 책": "오늘 읽은 영어 책",  // 관계형
             "📖 영어독서": "📖 영어독서",
             "어휘학습": "어휘학습",
+            
+            // [수정] HTML의 name 속성 'Writing'을 매핑
             "Writing": "Writing",
             
-            // 한국 독서 섹션
-            "국어 독서 제목": "국어 독서 제목",  // 관계형 - Notion에서는 "국어 독서 제목"
-            "완료 여부": "📕 책 읽는 거인",  // select 속성
+            // 한국 독서 섹션 (HTML name 속성 기준)
+            "오늘 읽은 한국 책": "국어 독서 제목",  // 관계형 - Notion에서는 "국어 독서 제목"
+            "📕 책 읽는 거인": "📕 책 읽는 거인",  // select 속성
             
             // 학습 소감
             "오늘의 학습 소감": "오늘의 학습 소감"
         };
 
         // 2. 값 변환 매핑 (웹앱 표시값 -> Notion 저장값)
+        // [수정] HTML 폼의 <option> value에 맞춰서 매핑 테이블 보강
         const valueMapping = {
             // 숙제 상태 변환
             "해당없음": "숙제 없음",
@@ -697,28 +699,34 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "완료": "완료",
             "미완료": "미완료",
             
-            // 독서 관련
+            // 독서 관련 (📖 영어독서)
             "못함": "못함",
             "완료함": "완료함",
             
+            // 어휘학습
+            "안함": "안함",
+            "했음": "했음",
+
             // 하브루타
             "숙제없음": "숙제없음",
             "못하고감": "못하고감",
             "완료함": "완료함",
 
-            // 어휘학습
+            // 책 읽는 거인
             "못함": "못함",
+            "시작함": "시작함",
+            "절반": "절반",
+            "거의다읽음": "거의다읽음",
             "완료함": "완료함",
-
+            
             // Writing
-            "3 SENTENCE": "3 SENTENCE",
-            "SKIP": "SKIP",
-            "북 리포트": "북 리포트"
+            "안함": "안함",
+            "완료": "완료"
         };
 
         // 3. 데이터 타입 분류 (HTML의 name 기준)
         const numberProps = [
-            "단어 (맞은 개수)",  // HTML은 공백 있음
+            "단어 (맞은 개수)",
             "단어 (전체 개수)", 
             "문법 (전체 개수)", 
             "문법 (틀린 개수)", 
@@ -727,10 +735,10 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         
         const selectProps = [
             "독해 하브루타", 
-            "영어독서", 
+            "📖 영어독서", // [수정] 이모지 포함
             "어휘학습", 
             "Writing", 
-            "완료 여부"
+            "📕 책 읽는 거인" // [수정] 이모지 포함
         ];
         
         const textProps = [
@@ -739,8 +747,9 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         ];
         
         const statusProps = [
-            "영어 더빙 학습",
-            "더빙 워크북",
+            // [수정] HTML의 name 속성 기준으로 수정
+            "영어 더빙 학습 완료",
+            "더빙 워크북 완료",
             "⭕ 지난 문법 숙제 검사",
             "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제",
@@ -751,7 +760,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
         const relationProps = [
             "오늘 읽은 영어 책",
-            "국어 독서 제목"
+            "오늘 읽은 한국 책" // [수정] HTML의 name 속성 기준
         ];
 
         // 4. Notion에 저장할 properties 객체 생성
@@ -778,10 +787,12 @@ app.post('/save-progress', requireAuth, async (req, res) => {
                 if (bookId && bookId !== '') {
                     properties['오늘 읽은 영어 책'] = { relation: [{ id: bookId }] };
                 } else if (bookTitle && bookTitle !== '') {
+                    // [수정] ID가 없고 텍스트만 있을 경우, '정확히 일치'하는 책만 찾습니다. (findPageIdByTitle 수정됨)
                     const bookPageId = await findPageIdByTitle(process.env.ENG_BOOKS_ID, bookTitle, 'Title');
                     if (bookPageId) {
                         properties['오늘 읽은 영어 책'] = { relation: [{ id: bookPageId }] };
                     }
+                    // [수정] ID가 없으면 아무것도 저장하지 않습니다 (잘못된 관계형 저장을 막음)
                 }
                 continue;
             }
@@ -793,6 +804,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
                 if (bookId && bookId !== '') {
                     properties['국어 독서 제목'] = { relation: [{ id: bookId }] };  // Notion에서는 "국어 독서 제목"
                 } else if (bookTitle && bookTitle !== '') {
+                    // [핵심 수정 6] 한국책 DB의 Title 속성명인 '책제목'으로 찾아야 합니다.
                     const bookPageId = await findPageIdByTitle(process.env.KOR_BOOKS_ID, bookTitle, '책제목');
                     if (bookPageId) {
                         properties['국어 독서 제목'] = { relation: [{ id: bookPageId }] };
@@ -801,6 +813,9 @@ app.post('/save-progress', requireAuth, async (req, res) => {
                 continue;
             }
             
+            // ID 필드는 건너뜁니다 (위에서 이미 처리됨)
+            if (key === '오늘 읽은 영어 책 ID' || key === '오늘 읽은 한국 책 ID') continue;
+
             // 숫자 속성 처리
             if (numberProps.includes(key)) {
                 const numValue = Number(convertedValue);
@@ -810,10 +825,8 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             }
             // Select 속성 처리
             else if (selectProps.includes(key)) {
-                // 건너뛸 값들 체크 (select는 값을 저장해야 할 수도 있음)
-                if (!['숙제 없음', '숙제없음', 'SKIP'].includes(convertedValue) || key === '독해 하브루타') {
-                    properties[notionPropName] = { select: { name: convertedValue } };
-                }
+                // [수정] 기본값('못함', '안함' 등)도 저장해야 하므로 조건 제거
+                properties[notionPropName] = { select: { name: convertedValue } };
             }
             // 텍스트 속성 처리
             else if (textProps.includes(key)) {
@@ -868,6 +881,15 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             // 필수 속성 추가
             properties['이름'] = { title: [{ text: { content: studentName } }] };
             properties['🕐 날짜'] = { date: { start: dateString } };
+            
+            // [추가] 학생 명부와 관계형 연결 (월간 리포트용)
+            const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름');
+            if (studentPageId) {
+                properties['학생'] = { relation: [{ id: studentPageId }] };
+                console.log(`[save-progress] 학생 명부(${studentPageId}) 관계형 연결 완료.`);
+            } else {
+                 console.warn(`[save-progress] 학생 명부에서 ${studentName} 학생을 찾을 수 없어 관계형 연결에 실패했습니다.`);
+            }
 
             await fetchNotion(`https://api.notion.com/v1/pages`, {
                 method: 'POST',
@@ -952,14 +974,32 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
             else if (value.type === 'date' && value.date) {
                 progress[key] = value.date.start;
             }
-            // 관계형 (책은 ID만 있으므로 제목은 따로 가져와야 함)
-            else if (value.type === 'relation' && value.relation.length > 0) {
-                // 영어책이나 국어책의 경우 실제 제목을 가져와야 하지만
-                // 지금은 간단히 ID만 저장
-                progress[key] = value.relation[0].id;
+            // [수정] 관계형 속성은 롤업 속성(책 제목)을 대신 사용합니다.
+            // (planner.js의 fillFormWithData가 롤업 제목을 사용하도록 설정해야 합니다)
+            else if (value.type === 'rollup' && value.rollup.array.length > 0) {
+                 const firstItem = value.rollup.array[0];
+                 if (firstItem.type === 'title' && firstItem.title.length > 0) {
+                     // 롤업 속성명 (예: '📖 책제목 (롤업)') 대신 관계형 속성명 (예: '오늘 읽은 영어 책')에
+                     // 롤업된 '제목'을 넣어주어 폼을 채울 수 있게 합니다.
+                     if (key === '📖 책제목 (롤업)') {
+                         progress['오늘 읽은 영어 책'] = firstItem.title[0].plain_text;
+                     } else if (key === '국어책제목(롤업)') { // (Notion DB에 이 롤업이 있다고 가정)
+                         progress['국어 독서 제목'] = firstItem.title[0].plain_text;
+                     }
+                 }
             }
         }
         
+        // [추가] planner.js의 fillFormWithData가 Notion의 '국어 독서 제목' 속성을
+        // HTML의 '오늘 읽은 한국 책' 필드에 매핑하므로, progress 객체의 키를 맞춰줍니다.
+        if (progress['국어 독서 제목']) {
+            progress['오늘 읽은 한국 책'] = progress['국어 독서 제목'];
+        }
+        // [추가] '📕 책 읽는 거인' 속성
+        if (progress['📕 책 읽는 거인']) {
+             progress['📕 책 읽는 거인'] = progress['📕 책 읽는 거인'];
+        }
+
         console.log(`[get-today-progress] ${studentName} 학생의 오늘 데이터를 불러왔습니다.`);
         res.json({ success: true, progress, message: '데이터 로드 성공' });
         
