@@ -11,7 +11,20 @@
     <style>
         * {
             font-family: "NanumSquareRound", "나눔스퀘어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
+            /* box-sizing을 border-box로 설정하면 
+              padding과 border가 width/height에 포함되어 계산됩니다.
+              레이아웃 문제를 방지하기 위해 전체 선택자에 적용하는 것이 좋습니다.
+            */
+            box-sizing: border-box;
         }
+        
+        /* 위의 * 선택자에 box-sizing을 추가했으므로, 
+           개별 input 스타일에서 box-sizing을 추가할 필요가 없어졌습니다.
+           만약 * 선택자에 추가하는 것을 원치 않으시면, 
+           아래 .input-group의 input, select, textarea 스타일에 
+           box-sizing: border-box; 를 추가하셔도 동일하게 작동합니다.
+        */
+
         body { 
             background: #ffffff;
             min-height: 100vh;
@@ -103,6 +116,9 @@
             font-size: 14px; 
             transition: all 0.3s;
             background: #f8fafc;
+            /* box-sizing: border-box; 가 
+              * 선택자에 이미 적용되었습니다.
+            */
         }
         .input-group input:focus, .input-group select:focus, .input-group textarea:focus { 
             outline: none; 
