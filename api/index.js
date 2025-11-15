@@ -8,7 +8,7 @@ import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모�
 import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
 import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
 // [신규] 월간 리포트 모듈 임포트 (경로 수정)
-import { initializeMonthlyReportRoutes } from '../monthlyReportModule.js';
+import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 
 // --- .env 파일에서 환경 변수 로드 ---
 const {
