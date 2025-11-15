@@ -88,7 +88,7 @@ const getSimpleText = (prop) => {
 async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
-        const isTitleProp = ['Title', '책제목', '이름'].includes(titlePropertyName);
+        const isTitleProp = ['Title', '이름'].includes(titlePropertyName);
         let filterBody;
         if (titlePropertyName === '반이름') {
             filterBody = { property: titlePropertyName, select: { equals: title } };
@@ -579,7 +579,7 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
         
         // --- [핵심 수정 5] ---
         // Notion API에서 직접 필터링 (한국책 속성명: '책제목')
-        const filter = query ? { property: '책제목', title: { contains: query } } : undefined;
+        const filter = query ? { property: '책제목', rich_text: { contains: query } } : undefined;
         
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${KOR_BOOKS_ID}/query`, {
             method: 'POST',
@@ -599,7 +599,7 @@ app.get('/test', (req, res) => {
             const props = page.properties;
             return {
                 id: page.id,
-                title: props.책제목?.title?.[0]?.plain_text || props['책제목']?.title?.[0]?.plain_text || 'No Title',
+                title: props.책제목?.rich_text?.[0]?.plain_text || props['책제목']?.rich_text?.[0]?.plain_text || 'No Title',
                 author: props.지은이?.rich_text?.[0]?.plain_text || props['지은이']?.rich_text?.[0]?.plain_text || '',
                 publisher: props.출판사?.rich_text?.[0]?.plain_text || props['출판사']?.rich_text?.[0]?.plain_text || ''
             };
