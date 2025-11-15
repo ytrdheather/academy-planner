@@ -362,8 +362,8 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <!-- [수정] '리포트' 컬럼 제거 -->
-                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
+                                <!-- [수정] 2번, 5번 라벨 변경 -->
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해서</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
                             </thead>
                             <tbody id="homeworkTableBody">
                                 <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
@@ -886,7 +886,8 @@
                     <td>${formatHomeworkDropdown(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                    <td>${formatHomeworkDropdown(st.pageId, '5️⃣ 매일 독해 숙제', "해당 없음")}</td>
+                    <!-- [수정] 5번 숙제 값을 하드코딩("해당 없음") 대신 st.homework.dailyReading 에서 읽어오도록 변경 -->
+                    <td>${formatHomeworkDropdown(st.pageId, '5️⃣ 매일 독해 숙제', st.homework.dailyReading)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '6️⃣ 영어일기 or 개인 독해서', st.homework.diary)}</td>
                     <td>
                         <span class="completion-rate ${rateClass(st.completionRate)}">${st.completionRate || 0}%</span>
@@ -1010,14 +1011,18 @@
             const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
             let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
             
+            // [삭제] 5번 숙제를 '해당 없음'으로 강제 고정하고 비활성화하던 로직을 제거합니다.
+            /*
             if (propertyName === '5️⃣ 매일 독해 숙제') {
                 options = ['숙제 함', '안 해옴', '숙제 없음', '해당 없음'];
                 displayStatus = '해당 없음'; // 5번 숙제는 항상 '해당 없음'으로 고정
             }
+            */
 
             const statusClass = getSelectStatusClass(propertyName, displayStatus);
 
-            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)" ${propertyName === '5️⃣ 매일 독해 숙제' ? 'disabled' : ''}>
+            // [수정] 5번 숙제에 대한 'disabled' 속성 부여 로직을 제거합니다.
+            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
                         ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
         }
@@ -1112,13 +1117,12 @@
                 if (row && (propertyName === '문법 (전체 개수)' || propertyName === '문법 (틀린 개수)')) { const total = Number(row.querySelector('[data-property-name="문법 (전체 개수)"]').value); const wrong = Number(row.querySelector('[data-property-name="문법 (틀린 개수)"]').value); const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0; row.querySelector('.grammar-score').innerHTML = formatScoreCircle(newScore); }
                  
                 // [💡 수정]
-                // 단일 업데이트가 성공했을 때 (배치가 아닐 때),
-                // 노션 수식 등으로 변경된 최신 데이터를 가져오기 위해 전체 데이터를 다시 로드합니다.
-                if (!isBatch) {
-                    // console.log('단일 업데이트 성공. 데이터 자동 새로고침을 시작합니다...');
-                    // await loadDataForCurrentTab(); // [문제의 원인] 이 줄을 주석 처리하여 전체 새로고침을 방지합니다.
-                    // console.log('데이터 자동 새로고침 완료.');
-                } 
+        // 2025-11-15: 헤더님 요청으로 전체 새로고침(깜빡임) 방지를 위해 주석 처리
+        // if (!isBatch) {
+        //     console.log('단일 업데이트 성공. 데이터 자동 새로고침을 시작합니다...');
+        //     await loadDataForCurrentTab(); // [문제의 원인] 이 줄을 주석 처리하여 전체 새로고침을 방지합니다.
+        //     console.log('데이터 자동 새로고침 완료.');
+        // } 
             } catch (error) { 
                 console.error('필드 업데이트 오류:', error); 
                 if (element) { 
@@ -1487,4 +1491,3 @@
     </script>
 </body>
 </html>
-

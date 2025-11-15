@@ -7,8 +7,8 @@ import { fileURLToPath } from 'url';
 import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모듈 추가
 import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
 import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
-// [신규] 월간 리포트 모듈 임포트
-import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
+// [신규] 월간 리포트 모듈 임포트 (경로 수정)
+import { initializeMonthlyReportRoutes } from '../monthlyReportModule.js';
 
 // --- .env 파일에서 환경 변수 로드 ---
 const {
@@ -236,6 +236,7 @@ async function parseDailyReportData(page) {
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
+        dailyReading: props['5️⃣ 매일 독해 숙제']?.status?.name || '해당 없음', // [추가] 5번 숙제 값을 읽어오도록 추가
         diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
     };
 
