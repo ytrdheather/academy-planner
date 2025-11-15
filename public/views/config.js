@@ -29,10 +29,10 @@ const CONFIG = {
     HAVRUTA_STATUS: ['숙제없음', '완료함', '못하고감'],
     
     // 책 읽는 거인 상태
-    GIANT_STATUS: ['못함', '시작함', '절반', '거의다읽음', '완료함'],
+    GIANT_STATUS: ['미완료', '진행하지 않음','완료'],
     
     // 쓰기 상태
-    WRITING_STATUS: ['안함', '완료'],
+    WRITING_STATUS: ['3 SENTENCE', 'SKIP','북 리포트'],
     
     // 로컬 스토리지 키
     STORAGE_KEYS: {
