@@ -144,6 +144,179 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         return replacements[match];
     });
 
+    res.send(html);
+}
+
+
+// ----------------------------------------------------------------------
+// [ 메인 로직 ]
+// [수정] 모든 로직을 이 함수로 감싸고 export 합니다.
+// ----------------------------------------------------------------------
+
+export function initializeMonthlyReportRoutes(dependencies) {
+    // 의존성 주입
+    const app = dependencies.app;
+    fetchNotion = dependencies.fetchNotion;
+    geminiModel = dependencies.geminiModel;
+    dbIds = dependencies.dbIds;
+    domainUrl = dependencies.domainUrl;
+    publicPath = dependencies.publicPath;
+    getRollupValue = dependencies.getRollupValue;
+    getSimpleText = dependencies.getSimpleText;
+    getKSTTodayRange = dependencies.getKSTTodayRange;
+    getKoreanDate = dependencies.getKoreanDate;
+
+    // --- 월간 리포트 템플릿 로드 ---
+    let monthlyReportTemplate = '';
+    try {
+        monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
+        console.log('✅ (모듈) monthlyreport.html 템플릿을 성공적으로 불러왔습니다.');
+    } catch (e) {
+        console.error('❌ (모듈) monthlyreport.html 템플릿 파일을 읽을 수 없습니다.', e);
+    }
+
+    // --- API 라우트: 월간 리포트 동적 생성 (View) ---
+    app.get('/monthly-report', async (req, res) => {
+        const { studentId, month } = req.query; // (예: studentId=..., month=2025-10)
+
+        if (!studentId || !month) {
+            return res.status(400).send('필수 정보(studentId, month)가 누락되었습니다.');
+        }
+        if (!monthlyReportTemplate) {
+            return res.status(500).send('서버 오류: 월간 리포트 템플릿을 읽을 수 없습니다.');
+        }
+        if (!dbIds.MONTHLY_REPORT_DB_ID || !dbIds.PROGRESS_DATABASE_ID || !dbIds.STUDENT_DATABASE_ID) {
+            return res.status(500).send('서버 오류: DB 환경변수가 설정되지 않았습니다.');
+        }
+
+        try {
+            // --- 1. '월간 리포트 DB'에서 통계 및 AI 요약 조회 ---
+            const reportQuery = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '학생', relation: { contains: studentId } },
+                            { property: '리포트 월', rich_text: { equals: month } }
+                        ]
+                    },
+                    page_size: 1
+                })
+            });
+
+            if (reportQuery.results.length === 0) {
+                return res.status(404).send(`[${month}]월 리포트 데이터를 찾을 수 없습니다. (DB 조회 실패)`);
+            }
+
+            const reportData = reportQuery.results[0].properties;
+
+            // --- 1-B. '학생 명부 DB'에서 학생 이름 조회 ---
+            const studentRelationId = reportData['학생']?.relation?.[0]?.id;
+            if (!studentRelationId) {
+                const studentNameFromTitle = reportData['이름']?.title?.[0]?.plain_text.split(' - ')[0] || '학생';
+                console.warn(`[월간 리포트 렌더링] ${month}월 ${studentId} 리포트에 '학생' 관계형 ID가 없습니다. Title에서 이름을 대신 사용합니다: ${studentNameFromTitle}`);
+
+                const statsOnly = {
+                    hwAvg: reportData['숙제수행율(평균)']?.number || 0,
+                    vocabAvg: reportData['어휘점수(평균)']?.number || 0,
+                    grammarAvg: reportData['문법점수(평균)']?.number || 0,
+                    totalBooks: reportData['총 읽은 권수']?.number || 0,
+                    aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
+                    readingPassRate: reportData['독해 통과율(%)']?.number || 0
+                };
+                return renderMonthlyReportHTML(res, monthlyReportTemplate, studentNameFromTitle, month, statsOnly, [], 0);
+            }
+
+            const studentPage = await fetchNotion(`https://api.notion.com/v1/pages/${studentRelationId}`);
+            const studentName = studentPage.properties['이름']?.title?.[0]?.plain_text || '학생';
+
+            const stats = {
+                hwAvg: reportData['숙제수행율(평균)']?.number || 0,
+                vocabAvg: reportData['어휘점수(평균)']?.number || 0,
+                grammarAvg: reportData['문법점수(평균)']?.number || 0,
+                totalBooks: reportData['총 읽은 권수']?.number || 0,
+                aiSummary: getSimpleText(reportData['AI 요약']) || '월간 요약 코멘트가 없습니다.',
+                readingPassRate: reportData['독해 통과율(%)']?.number || 0
+            };
+
+            // --- 2. '진도 관리 DB'에서 출석일수, 독서 목록 (상세) 조회 ---
+            const [year, monthNum] = month.split('-').map(Number);
+            const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
+            const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
+
+            const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '이름', title: { equals: studentName } },
+                            { property: '🕐 날짜', date: { on_or_after: firstDay } },
+                            { property: '🕐 날짜', date: { on_or_before: lastDay } }
+                        ]
+                    },
+                    page_size: 100
+                })
+            });
+
+            // [기능 분리] 월간 리포트는 '데일리' 파서가 아닌 '통계' 파서를 사용합니다.
+            const monthPages = await Promise.all(progressQuery.results.map(parseMonthlyStatsData));
+            const attendanceDays = monthPages.length; // 출석일수
+
+            // --- 3. 템플릿에 데이터 주입 (별도 함수로 분리) ---
+            renderMonthlyReportHTML(res, monthlyReportTemplate, studentName, month, stats, monthPages, attendanceDays);
+
+        } catch (error) {
+            console.error(`월간 리포트 렌더링 오류 (studentId: ${studentId}, month: ${month}):`, error);
+            res.status(500).send(`월간 리포트 렌더링 중 오류가 발생했습니다: ${error.message}`);
+        }
+    });
+
+    // --- API 라우트: 월간 리포트 URL 조회 ---
+    app.get('/api/monthly-report-url', async (req, res) => {
+        const { studentName, date } = req.query; // (예: 2025-11-02)
+
+        if (!studentName || !date) {
+            return res.status(400).json({ message: '학생 이름과 날짜가 필요합니다.' });
+        }
+        if (!dbIds.MONTHLY_REPORT_DB_ID) {
+            return res.status(500).json({ message: '월간 리포트 DB가 설정되지 않았습니다.' });
+        }
+
+        try {
+            const requestedDate = new Date(date);
+            const lastMonth = new Date(requestedDate.getFullYear(), requestedDate.getMonth() - 1, 1);
+            const lastMonthString = `${lastMonth.getFullYear()}-${(lastMonth.getMonth() + 1).toString().padStart(2, '0')}`; // "2025-10"
+
+            const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '이름', title: { contains: studentName } },
+                            { property: '리포트 월', rich_text: { equals: lastMonthString } }
+                        ]
+                    },
+                    page_size: 1
+                })
+            });
+
+            const reportPage = data.results[0];
+            if (reportPage) {
+                const reportUrl = reportPage.properties['월간리포트URL']?.url;
+                if (reportUrl) {
+                    res.json({ success: true, url: reportUrl });
+                } else {
+                    res.status(404).json({ success: false, message: '리포트를 찾았으나 URL이 없습니다.' });
+                }
+            } else {
+                res.status(404).json({ success: false, message: `[${lastMonthString}]월 리포트를 찾을 수 없습니다.` });
+            }
+        } catch (error) {
+            console.error(`월간 리포트 URL 조회 오류 (${studentName}, ${date}):`, error);
+            res.status(500).json({ message: error.message || '서버 오류' });
+        }
+    });
+
     // --- [수정] 10월 리포트 수동 생성용 임시 API ---
     // 이제 URL 쿼리 파라미터로 학생 이름과 월을 받습니다.
     // 예: /api/manual-monthly-report-gen?studentName=유환호&month=2025-10
