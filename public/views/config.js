@@ -30,6 +30,9 @@ const CONFIG = {
     
     // 책 읽는 거인 상태
     GIANT_STATUS: ['미완료', '진행하지 않음','완료'],
+
+    // 어휘 학습 상태
+    VOCAB_STATUS: ['완료', 'SKIP','미완료'], 
     
     // 쓰기 상태
     WRITING_STATUS: ['3 SENTENCE', 'SKIP','북 리포트'],
