@@ -346,18 +346,44 @@ async function fetchProgressData(req, res, parseFunction) {
     }
 
     const filterConditions = [];
+    let finalFilter; // [수정] filterConditions 대신 finalFilter 사용
+
     if (period === 'specific_date' && date) {
-        // [버그 수정] "특정 날짜" (예: "2025-10-31")의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
+        // [수정] 특정 날짜 조회 시에도 '날짜 문자열'과 '타임스탬프' 모두 조회
         const specificDate = date; // "2025-10-31"
         const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
         const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
+        
+        finalFilter = {
+            "or": [
+                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { // 2. 날짜 문자열(YYYY-MM-DD)이 일치하는 데이터
+                    "property": "🕐 날짜", "date": { "equals": specificDate }
+                }
+            ]
+        };
     } else { // 기본값 'today'
-        // [버그 수정] "오늘"의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
-        const { start, end } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
+        // [수정] "오늘" 조회 시에도 '날짜 문자열'과 '타임스탬프' 모두 조회
+        const { start, end, dateString } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
+        
+        finalFilter = {
+            "or": [
+                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { // 2. 날짜 문자열(YYYY-MM-DD)이 일치하는 데이터
+                    "property": "🕐 날짜", "date": { "equals": dateString }
+                }
+            ]
+        };
     }
 
     const pages = [];
@@ -367,7 +393,7 @@ async function fetchProgressData(req, res, parseFunction) {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: filterConditions.length > 0 ? { and: filterConditions } : undefined,
+                filter: finalFilter, // [수정] filterConditions -> finalFilter
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
