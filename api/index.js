@@ -118,23 +118,31 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
 // [신규] 월간 리포트 모듈에 필요한 헬퍼 함수 3개 (오류 수정)
 // =======================================================================
 
-// [신규] KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환
+// =======================================================================
+// [수정됨] 1. '오늘' 날짜 계산 버그 수정 (가장 큰 문제)
+// 서버 시간대와 관계없이 KST '오늘'을 계산하도록 수정합니다.
+// =======================================================================
 function getKSTTodayRange() {
-    const now = new Date(); // 현재 UTC 시간
-    const kstOffset = 9 * 60 * 60 * 1000; // KST는 UTC+9
-    const kstNow = new Date(now.getTime() + kstOffset); // 현재 KST 시간 (값)
+    // 서버의 타임존과 관계없이 항상 KST를 기준으로 '오늘' 날짜 객체를 생성합니다.
+    const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
 
-    const kstDateString = kstNow.toISOString().split('T')[0]; // "2025-11-08" (KST 기준)
+    // KST 기준 '오늘' 날짜의 YYYY-MM-DD 문자열을 생성합니다.
+    const year = kstNow.getFullYear();
+    const month = (kstNow.getMonth() + 1).toString().padStart(2, '0');
+    const day = kstNow.getDate().toString().padStart(2, '0');
+    const kstDateString = `${year}-${month}-${day}`; // 예: "2025-11-17"
 
+    // KST 00:00:00 부터 23:59:59.999 까지의 범위를 생성합니다.
     const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
     const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
 
     return {
-        start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
-        end: end.toISOString(), // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
-        dateString: kstDateString // URL용 (예: "2025-11-08")
+        start: start.toISOString(),
+        end: end.toISOString(),
+        dateString: kstDateString
     };
 }
+
 
 // [신규] 날짜를 'YYYY년 MM월 DD일 (요일)' 형식으로 변환
 function getKoreanDate(dateString) {
@@ -220,8 +228,15 @@ const getRollupValue = (prop, isNumber = false) => { ... };
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-    // [*** 유일한 수정 ***] 헤더님이 주신 파일의 getKSTDateString()는 정의되지 않은 함수이므로, getKSTTodayRange().dateString으로 변경합니다.
-    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; 
+    
+    // =======================================================================
+    // [수정됨] 2. 날짜 파싱 버그 수정
+    // 특정 날짜(어제) 조회 시 '오늘' 날짜로 덮어쓰던 버그를 수정합니다.
+    // =======================================================================
+    const pageDate = props['🕐 날짜']?.date?.start || ''; 
+    if (!pageDate) {
+        console.warn(`[parseDailyReportData] 페이지 ${page.id}에 날짜 값이 없습니다. (비어있음)`);
+    }
 
     let assignedTeachers = [];
     if (props['담당쌤']?.rollup?.array) {
@@ -852,6 +867,10 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
         const { start, end, dateString } = getKSTTodayRange();
 
+        // =======================================================================
+        // [수정됨] 3. 학생 저장 API 버그 수정
+        // Make.com이 만든 '날짜만 있는' 데이터를 찾도록 'or' 필터를 추가합니다.
+        // =======================================================================
         // 7. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
@@ -859,8 +878,17 @@ app.post('/save-progress', requireAuth, async (req, res) => {
                 filter: {
                     and: [
                         { property: '이름', title: { equals: studentName } },
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
+                        { // 🌟 "or" 필터를 여기에도 추가합니다.
+                            "or": [
+                                {
+                                    "and": [
+                                        { property: '🕐 날짜', date: { on_or_after: start } },
+                                        { property: '🕐 날짜', date: { on_or_before: end } }
+                                    ]
+                                },
+                                { "property": "🕐 날짜", "date": { "equals": dateString } }
+                            ]
+                        }
                     ]
                 },
                 page_size: 1
@@ -935,15 +963,27 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         // KST 기준 오늘 날짜
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직(KST 타임스탬프 범위)으로 복구합니다.
+        // =======================================================================
+        // [수정됨] 4. 학생 조회 API 버그 수정
+        // Make.com이 만든 '날짜만 있는' 데이터를 찾도록 'or' 필터를 추가합니다.
+        // =======================================================================
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
                     and: [
                         { property: '이름', title: { equals: studentName } },
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
+                        { // 🌟 "or" 필터를 여기에 추가합니다.
+                            "or": [
+                                {
+                                    "and": [
+                                        { property: '🕐 날짜', date: { on_or_after: start } },
+                                        { property: '🕐 날짜', date: { on_or_before: end } }
+                                    ]
+                                },
+                                { "property": "🕐 날짜", "date": { "equals": dateString } }
+                            ]
+                        }
                     ]
                 },
                 page_size: 1
@@ -1215,9 +1255,15 @@ cron.schedule('0 22 * * *', async () => {
         const { start, end, dateString } = getKSTTodayRange();
 
         const filter = {
-            and: [
-                { property: '🕐 날짜', date: { on_or_after: start } },
-                { property: '🕐 날짜', date: { on_or_before: end } }
+            // [수정] 스케줄러도 'or' 필터를 사용해야 합니다.
+            "or": [
+                {
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { "property": "🕐 날짜", "date": { "equals": dateString } }
             ]
         };
 
