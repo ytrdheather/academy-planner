@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모듈 추가
 import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
 import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
-// [수정] 경로를 '../' (상위 폴더)에서 './' (현재 폴더)로 변경합니다.
+// [신규] 월간 리포트 모듈 임포트 (경로 수정)
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 
 // --- .env 파일에서 환경 변수 로드 ---
@@ -215,12 +215,13 @@ const getRollupValue = (prop, isNumber = false) => { ... };
 // =======================================================================
 // [기능 분리 1: 데일리 대시보드 복구]
 // 헤더님이 찾아주신 "어제 잘 되던" 원본 `parseDailyReportData` 함수로 복원합니다.
- // =======================================================================
+// 이 함수는 '데일리 대시보드'와 '데일리 리포트'가 사용합니다.
+// =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-    // [오류 수정] getKSTDateString()은 정의되지 않은 함수입니다. getKSTTodayRange().dateString으로 변경합니다.
-    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
+    // [*** 유일한 수정 ***] 헤더님이 주신 파일의 getKSTDateString()는 정의되지 않은 함수이므로, getKSTTodayRange().dateString으로 변경합니다.
+    const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; 
 
     let assignedTeachers = [];
     if (props['담당쌤']?.rollup?.array) {
@@ -244,15 +245,13 @@ async function parseDailyReportData(page) {
         vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
         vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
         vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-        // [수정] .string 대신 .number를 읽도록 변경
-        vocabScore: props['📰 단어 테스트 점수']?.formula?.number?.toString() || props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
+        vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
         readingWrong: props['독해 (틀린 개수)']?.number ?? null,
         readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
         grammarTotal: props['문법 (전체 개수)']?.number ?? null,
         grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-        // [수정] .string 대신 .number를 읽도록 변경
-        grammarScore: props['📑 문법 시험 점수']?.formula?.number?.toString() || props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
+        grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
     };
 
     // 2. 리스닝
@@ -344,46 +343,21 @@ async function fetchProgressData(req, res, parseFunction) {
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
         throw new Error('서버 환경 변수가 설정되지 않았습니다.');
     }
-
+    
+    // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직으로 복구합니다.
     const filterConditions = [];
-    let finalFilter; // [수정] filterConditions 대신 finalFilter 사용
-
     if (period === 'specific_date' && date) {
-        // [수정] 특정 날짜 조회 시에도 '날짜 문자열'과 '타임스탬프' 모두 조회
+        // [버그 수정] "특정 날짜" (예: "2025-10-31")의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
         const specificDate = date; // "2025-10-31"
         const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
         const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
-        
-        finalFilter = {
-            "or": [
-                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터
-                    "and": [
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
-                    ]
-                },
-                { // 2. 날짜 문자열(YYYY-MM-DD)이 일치하는 데이터
-                    "property": "🕐 날짜", "date": { "equals": specificDate }
-                }
-            ]
-        };
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
     } else { // 기본값 'today'
-        // [수정] "오늘" 조회 시에도 '날짜 문자열'과 '타임스탬프' 모두 조회
-        const { start, end, dateString } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
-        
-        finalFilter = {
-            "or": [
-                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터
-                    "and": [
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
-                    ]
-                },
-                { // 2. 날짜 문자열(YYYY-MM-DD)이 일치하는 데이터
-                    "property": "🕐 날짜", "date": { "equals": dateString }
-                }
-            ]
-        };
+        // [버그 수정] "오늘"의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
+        const { start, end } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
+        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
     }
 
     const pages = [];
@@ -393,7 +367,7 @@ async function fetchProgressData(req, res, parseFunction) {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: finalFilter, // [수정] filterConditions -> finalFilter
+                filter: filterConditions.length > 0 ? { and: filterConditions } : undefined, // [복구] { and: ... } 로직
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
@@ -847,7 +821,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         }
 
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
-        // *** [버그 수정] *** // dateString (YYYY-MM-DD) 대신 start (KST 자정의 UTC 타임스탬프)를 사용합니다.
         const { start, end, dateString } = getKSTTodayRange();
 
         // 7. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
@@ -889,11 +862,8 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             // 필수 속성 추가
             properties['이름'] = { title: [{ text: { content: studentName } }] };
             
-            // *** [버그 수정] ***
-            // 'dateString' (YYYY-MM-DD) 대신 'start' (KST 자정의 UTC 타임스탬프)를 저장합니다.
-            // 이렇게 하면 '날짜만 있는' 데이터가 아닌 '정확한 타임스탬프'가 저장되어
-            // 'fetchProgressData'의 범위 쿼리와 정확하게 일치하게 됩니다.
-            properties['🕐 날짜'] = { date: { start: start } }; // [수정됨] dateString -> start
+            // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직(dateString 사용)으로 복구합니다.
+            properties['🕐 날짜'] = { date: { start: dateString } };
             
             // [추가] 학생 명부와 관계형 연결 (월간 리포트용)
             const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름');
@@ -936,7 +906,7 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         // KST 기준 오늘 날짜
         const { start, end, dateString } = getKSTTodayRange();
         
-        // 오늘 날짜의 데이터 검색
+        // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직(KST 타임스탬프 범위)으로 복구합니다.
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
@@ -1160,8 +1130,7 @@ function formatReportValue(value, type) {
     if (type === 'listen_status') {
         if (value === '완료') return '완료';
         if (value === '미완료') return '미완료';
-        // [수정] 'N/A' 대신 '진행 안함'을 반환
-        if (value === '진행하지 않음') return '진행 안함';
+        // [*** 유일한 수정 ***] 헤더님 파일 원본 로직 복구
         return 'N/A';
     }
     if (type === 'read_status') {
