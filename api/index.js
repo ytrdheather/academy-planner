@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모듈 추가
 import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
 import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
-// [신규] 월간 리포트 모듈 임포트 (경로 수정)
+// [수정] 경로를 '../' (상위 폴더)에서 './' (현재 폴더)로 변경합니다.
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 
 // --- .env 파일에서 환경 변수 로드 ---
@@ -214,6 +214,8 @@ const getRollupValue = (prop, isNumber = false) => { ... };
 
 // =======================================================================
 // [기능 분리 1: 데일리 대시보드 복구]
+// 헤더님이 찾아주신 "어제 잘 되던" 원본 `parseDailyReportData` 함수로 복원합니다.
+// 이 함수는 '데일리 대시보드'와 '데일리 리포트'가 사용합니다.
 // =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
@@ -242,13 +244,15 @@ async function parseDailyReportData(page) {
         vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
         vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
         vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-        vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
+        // [수정] .string 대신 .number를 읽도록 변경
+        vocabScore: props['📰 단어 테스트 점수']?.formula?.number?.toString() || props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
         readingWrong: props['독해 (틀린 개수)']?.number ?? null,
         readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
         grammarTotal: props['문법 (전체 개수)']?.number ?? null,
         grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-        grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
+        // [수정] .string 대신 .number를 읽도록 변경
+        grammarScore: props['📑 문법 시험 점수']?.formula?.number?.toString() || props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
     };
 
     // 2. 리스닝
@@ -1124,6 +1128,8 @@ function formatReportValue(value, type) {
     if (type === 'listen_status') {
         if (value === '완료') return '완료';
         if (value === '미완료') return '미완료';
+        // [수정] 'N/A' 대신 '진행 안함'을 반환
+        if (value === '진행하지 않음') return '진행 안함';
         return 'N/A';
     }
     if (type === 'read_status') {
