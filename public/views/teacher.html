@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>선생님 대시보드 - 리디튜드</title>
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+<!-- ... (스타일 시트 등 head 내용은 동일) ... -->
     <style>
+/* ... (스타일 내용은 동일) ... */
         /* --- 기본 스타일 --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
@@ -362,8 +363,8 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <!-- [수정] 2번, 5번 라벨 변경 -->
-                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해서</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
+                                <!-- [수정] 2번, 5번 라벨 변경 (이전 수정사항) -->
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클가</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해서풀이</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
                             </thead>
                             <tbody id="homeworkTableBody">
                                 <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
@@ -652,6 +653,16 @@
         let currentModalContext = {}; // { pageId, propertyName, type }
         let bookSearchTimer = null;
 
+        // [수정] 탭 접미사를 반환하는 헬퍼 함수를 공용으로 사용할 수 있도록 전역 스코프로 이동
+        function getSuffixForTab(tabName) {
+            if (tabName === 'homework') return '_hw';
+            if (tabName === 'tests') return '_test';
+            if (tabName === 'reading') return '_reading';
+            if (tabName === 'listening') return '_listening';
+            if (tabName === 'comments') return '_comments';
+            return ''; // admin 탭 등
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { console.error('인증 토큰 없음'); window.location.href='/teacher-login'; return; }
             initializePage();
@@ -661,13 +672,8 @@
             try {
                 await loadUserInfo();
                 setupEventListeners();
-                // [수정] 첫 로드는 '오늘의 코멘트' 탭으로 변경
-                showTab('comments'); 
-                
-                // [이전 수정] 
-                // 페이지 로드 시 데이터를 즉시 가져옵니다.
+                showTab('homework'); 
                 await loadDataForCurrentTab();
-                
             } catch (e) { console.error("초기화 오류:", e); }
         }
 
@@ -731,60 +737,64 @@
 
         // [수정] loadDataForCurrentTab (단일 API 호출)
         async function loadDataForCurrentTab() {
-    console.log('🚀 ===== 데이터 로드 시작 =====');
-    console.log('📍 API_BASE_URL:', API_BASE_URL);
-    console.log('🔑 authToken 존재 여부:', !!authToken);
-    
-    const params = getFilterParams('_hw'); 
-    console.log('📊 요청 파라미터:', params);
-    
-    setAllTablesLoading();
+            console.log('🚀 ===== 데이터 로드 시작 =====');
+            
+            // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 필터 값을 읽어옵니다.
+            const suffix = getSuffixForTab(currentActiveTab); 
+            const params = getFilterParams(suffix || '_hw'); // (기본값은 _hw)
+            
+            console.log(`📊 요청 파라미터 (현재 탭 ${currentActiveTab}):`, params);
+            
+            setAllTablesLoading();
 
-    try {
-        const url = `${API_BASE_URL}/api/daily-report-data?${params}`;
-        console.log('🔗 전체 요청 URL:', url);
-        
-        const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
-        console.log('📡 응답 상태 코드:', response.status);
-        console.log('📡 응답 상태 텍스트:', response.statusText);
-        
-        if (!response.ok) { 
-            if (response.status === 401) { 
-                console.error('❌ 401 인증 오류 - 로그인 만료');
-                alert('로그인이 만료되었습니다.'); 
-                logout(); 
-                return; 
+            try {
+                const url = `${API_BASE_URL}/api/daily-report-data?${params}`;
+                console.log('🔗 전체 요청 URL:', url);
+                
+                const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
+                console.log('📡 응답 상태 코드:', response.status);
+                console.log('📡 응답 상태 텍스트:', response.statusText);
+                
+                if (!response.ok) { 
+                    if (response.status === 401) { 
+                        console.error('❌ 401 인증 오류 - 로그인 만료');
+                        alert('로그인이 만료되었습니다.'); 
+                        logout(); 
+                        return; 
+                    }
+                    const errorText = await response.text(); 
+                    console.error('❌ 응답 에러 내용:', errorText);
+                    throw new Error(errorText || "네트워크 오류"); 
+                }
+                
+                const combinedData = await response.json();
+                console.log('✅ 데이터 수신 완료!');
+                console.log('📈 받은 데이터 개수:', combinedData ? combinedData.length : 0);
+                console.log('📦 데이터 샘플 (첫 번째 항목):', combinedData && combinedData.length > 0 ? combinedData[0] : '데이터 없음');
+                
+                allReportData = combinedData;
+                displayDataForAllTabs(combinedData);
+                
+                console.log('✅ ===== 데이터 로드 완료 =====');
+
+            } catch(e) {
+                console.error('❌ ===== 데이터 로드 실패 =====');
+                console.error('❌ 에러 타입:', e.name);
+                console.error('❌ 에러 메시지:', e.message);
+                console.error('❌ 에러 스택:', e.stack);
+                setAllTablesError(e.message || '로드 실패');
             }
-            const errorText = await response.text(); 
-            console.error('❌ 응답 에러 내용:', errorText);
-            throw new Error(errorText || "네트워크 오류"); 
         }
-        
-        const combinedData = await response.json();
-        console.log('✅ 데이터 수신 완료!');
-        console.log('📈 받은 데이터 개수:', combinedData ? combinedData.length : 0);
-        console.log('📦 데이터 샘플 (첫 번째 항목):', combinedData && combinedData.length > 0 ? combinedData[0] : '데이터 없음');
-        
-        allReportData = combinedData;
-        displayDataForAllTabs(combinedData);
-        
-        console.log('✅ ===== 데이터 로드 완료 =====');
-
-    } catch(e) {
-        console.error('❌ ===== 데이터 로드 실패 =====');
-        console.error('❌ 에러 타입:', e.name);
-        console.error('❌ 에러 메시지:', e.message);
-        console.error('❌ 에러 스택:', e.stack);
-        setAllTablesError(e.message || '로드 실패');
-    }
-}
 
         // [수정] displayDataForAllTabs (모든 탭을 그림)
         function displayDataForAllTabs(data) {
              // 매니저인 경우, 강사 필터링 적용
             let filteredData = data;
             if (currentUserRole === 'manager') {
-                const selectedTeacher = document.getElementById(`teacherFilter_hw`).value;
+                // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 강사 필터 값을 읽어옵니다.
+                const suffix = getSuffixForTab(currentActiveTab);
+                const selectedTeacher = document.getElementById(`teacherFilter${suffix || '_hw'}`).value; 
+
                 if (selectedTeacher) {
                     filteredData = data.filter(item => item.teachers.includes(selectedTeacher));
                 }
@@ -806,7 +816,10 @@
              // 매니저인 경우, 강사 필터링 적용
             let filteredData = data;
             if (currentUserRole === 'manager') {
-                const selectedTeacher = document.getElementById(`teacherFilter_hw`).value;
+                // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 강사 필터 값을 읽어옵니다.
+                const suffix = getSuffixForTab(currentActiveTab);
+                const selectedTeacher = document.getElementById(`teacherFilter${suffix || '_hw'}`).value; 
+                
                 if (selectedTeacher) {
                     filteredData = data.filter(item => item.teachers.includes(selectedTeacher));
                 }
@@ -1011,17 +1024,17 @@
             const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
             let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
             
-            // [삭제] 5번 숙제를 '해당 없음'으로 강제 고정하고 비활성화하던 로직을 제거합니다.
+            // [삭제] 5번 숙제를 '해당 없음'으로 강제 고정하고 비활성화하던 로직을 제거합니다. (이전 수정사항)
             /*
             if (propertyName === '5️⃣ 매일 독해 숙제') {
                 options = ['숙제 함', '안 해옴', '숙제 없음', '해당 없음'];
-                displayStatus = '해당 없음'; // 5번 숙제는 항상 '해당 없음'으로 고정
+                displayStatus = '해당 없음'; 
             }
             */
 
             const statusClass = getSelectStatusClass(propertyName, displayStatus);
 
-            // [수정] 5번 숙제에 대한 'disabled' 속성 부여 로직을 제거합니다.
+            // [수정] 5번 숙제에 대한 'disabled' 속성 부여 로직을 제거합니다. (이전 수정사항)
             return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
                         ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
@@ -1170,7 +1183,6 @@
             syncFilters(tabName);
             
             if (tabName !== 'admin') {
-                // (데이터는 '새로고침' 시에만 로드되므로, 여기서는 캐시된 데이터로 필터링만 다시 함)
                 displayDataForCurrentTab(allReportData);
             }
         }
@@ -1178,16 +1190,11 @@
         function syncFilters(targetTabName) {
             const sourceTabName = 'homework';
             if (targetTabName === sourceTabName) { toggleSpecificDateInput('_hw'); return; }
-            function getSuffixForTab(tabName) {
-                if (tabName === 'homework') return '_hw';
-                if (tabName === 'tests') return '_test';
-                if (tabName === 'reading') return '_reading';
-                if (tabName === 'listening') return '_listening';
-                if (tabName === 'comments') return '_comments';
-                return '';
-            }
+            
+            // [수정] 헬퍼 함수를 (이제 전역에 있는) getSuffixForTab으로 호출합니다.
             const sourceSuffix = getSuffixForTab(sourceTabName);
             const targetSuffix = getSuffixForTab(targetTabName); 
+            
             if (!sourceSuffix || !targetSuffix) return;
             if (targetTabName === 'admin') return; 
 
@@ -1198,9 +1205,12 @@
             const teacherSourceEl = document.getElementById(`teacherFilter${sourceSuffix}`);
             const teacherTargetEl = document.getElementById(`teacherFilter${targetSuffix}`);
 
-            if(periodSourceEl && periodTargetEl) periodTargetEl.value = periodSourceEl.value;
-            if(dateSourceEl && dateTargetEl) dateTargetEl.value = dateSourceEl.value;
-            if(teacherSourceEl && teacherTargetEl) teacherTargetEl.value = teacherSourceEl.value;
+            // [버그 수정] 탭을 바꿀 때마다 '숙제 현황' 탭의 값으로 덮어씌우던 아래 3줄을 주석 처리합니다.
+            // if(periodSourceEl && periodTargetEl) periodTargetEl.value = periodSourceEl.value;
+            // if(dateSourceEl && dateTargetEl) dateTargetEl.value = dateSourceEl.value;
+            // if(teacherSourceEl && teacherTargetEl) teacherTargetEl.value = teacherSourceEl.value;
+            
+            // 이 로직은 탭마다 '날짜 지정' input을 보여주거나 숨기기 위해 필요하므로 유지합니다.
             toggleSpecificDateInput(targetSuffix);
         }
 

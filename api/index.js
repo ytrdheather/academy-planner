@@ -214,8 +214,6 @@ const getRollupValue = (prop, isNumber = false) => { ... };
 
 // =======================================================================
 // [기능 분리 1: 데일리 대시보드 복구]
-// 헤더님이 찾아주신 "어제 잘 되던" 원본 `parseDailyReportData` 함수로 복원합니다.
-// 이 함수는 '데일리 대시보드'와 '데일리 리포트'가 사용합니다.
 // =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
