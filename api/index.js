@@ -344,21 +344,50 @@ async function fetchProgressData(req, res, parseFunction) {
         throw new Error('서버 환경 변수가 설정되지 않았습니다.');
     }
     
-    // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직으로 복구합니다.
-    const filterConditions = [];
+    // [*** 여기부터 수정 ***]
+    // const filterConditions = []; // 이 줄을 삭제합니다.
+    let finalFilter; // filterConditions 대신 finalFilter 변수를 사용합니다.
+
     if (period === 'specific_date' && date) {
-        // [버그 수정] "특정 날짜" (예: "2025-10-31")의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
-        const specificDate = date; // "2025-10-31"
+        // "특정 날짜" 조회 시
+        const specificDate = date; // "2025-11-16"
         const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
         const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
-    } else { // 기본값 'today'
-        // [버그 수정] "오늘"의 00:00:00 KST부터 23:59:59 KST까지의 범위 생성
-        const { start, end } = getKSTTodayRange(); // KST 기준 '오늘'의 시작과 끝
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_after: start } });
-        filterConditions.push({ property: '🕐 날짜', date: { on_or_before: end } });
+        
+        // [수정] '타임스탬프 범위' 또는 '날짜 문자열'이 일치하는 모든 데이터를 찾도록 "or" 필터 사용
+        finalFilter = {
+            "or": [
+                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터 (예: 11/16 00:00 ~ 23:59)
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { // 2. 날짜 문자열(YYYY-MM-DD)이 정확히 일치하는 데이터 (예: "2025-11-16")
+                    "property": "🕐 날짜", "date": { "equals": specificDate }
+                }
+            ]
+        };
+    } else { // 기본값 'today' 조회 시
+        // [수정] "오늘" 조회 시에도 '타임스탬프 범위' 또는 '날짜 문자열' 모두 조회
+        const { start, end, dateString } = getKSTTodayRange(); // KST 기준 '오늘'
+        
+        finalFilter = {
+            "or": [
+                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
+                    "property": "🕐 날짜", "date": { "equals": dateString }
+                }
+            ]
+        };
     }
+    // [*** 여기까지 수정 ***]
+
 
     const pages = [];
     let hasMore = true;
@@ -367,7 +396,7 @@ async function fetchProgressData(req, res, parseFunction) {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: filterConditions.length > 0 ? { and: filterConditions } : undefined, // [복구] { and: ... } 로직
+                filter: finalFilter, // [수정] filterConditions.length > 0 ? { and: filterConditions } : undefined -> finalFilter
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
