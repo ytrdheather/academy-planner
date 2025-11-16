@@ -821,6 +821,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         }
 
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
+        // *** [버그 수정] *** // dateString (YYYY-MM-DD) 대신 start (KST 자정의 UTC 타임스탬프)를 사용합니다.
         const { start, end, dateString } = getKSTTodayRange();
 
         // 7. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
@@ -861,7 +862,12 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
             // 필수 속성 추가
             properties['이름'] = { title: [{ text: { content: studentName } }] };
-            properties['🕐 날짜'] = { date: { start: dateString } };
+            
+            // *** [버그 수정] ***
+            // 'dateString' (YYYY-MM-DD) 대신 'start' (KST 자정의 UTC 타임스탬프)를 저장합니다.
+            // 이렇게 하면 '날짜만 있는' 데이터가 아닌 '정확한 타임스탬프'가 저장되어
+            // 'fetchProgressData'의 범위 쿼리와 정확하게 일치하게 됩니다.
+            properties['🕐 날짜'] = { date: { start: start } }; // [수정됨] dateString -> start
             
             // [추가] 학생 명부와 관계형 연결 (월간 리포트용)
             const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름');
