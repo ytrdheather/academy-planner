@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs'; // 1. 리포트 템플릿 파일을 읽기 위해 'fs' 모듈 추가
 import cron from 'node-cron'; // 2. 스케줄링(자동화)을 위해 'node-cron' 모듈 추가
 import { GoogleGenerativeAI } from '@google/generative-ai'; // 3. Gemini AI 연결을 위해 모듈 추가
-// [신규] 월간 리포트 모듈 임포트 (경로 수정)
+// [수정] 경로를 '../' (상위 폴더)에서 './' (현재 폴더)로 변경합니다.
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 
 // --- .env 파일에서 환경 변수 로드 ---
@@ -192,35 +192,13 @@ app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 't
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
-// --- [신규] 헬퍼 함수: KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환 ---
-// [중복 삭제] (위로 이동)
-/*
-function getKSTDate() { ... }
-function getKSTDateString() { ... }
-function getKSTTodayRange() { ... }
-*/
-
-// [유지] 헬퍼 함수: 날짜를 'YYYY년 MM월 DD일 (요일)' 형식으로 변환 ---
-// [중복 삭제] (위로 이동)
-/*
-function getKoreanDate(dateString) { ... }
-*/
-
-// --- [공통] 헬퍼 함수: 롤업 데이터 추출 (수정됨) ---
-// [중복 삭제] (위로 이동)
-/*
-const getRollupValue = (prop, isNumber = false) => { ... };
-*/
-
 // =======================================================================
 // [기능 분리 1: 데일리 대시보드 복구]
-// 헤더님이 찾아주신 "어제 잘 되던" 원본 `parseDailyReportData` 함수로 복원합니다.
-// 이 함수는 '데일리 대시보드'와 '데일리 리포트'가 사용합니다.
 // =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-    // [*** 유일한 수정 ***] 헤더님이 주신 파일의 getKSTDateString()는 정의되지 않은 함수이므로, getKSTTodayRange().dateString으로 변경합니다.
+    // [*** 참고 ***] 이 부분의 수정은 헤더님이 주신 "잘 되던" 코드로 이미 반영되어 있습니다.
     const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; 
 
     let assignedTeachers = [];
@@ -330,14 +308,10 @@ async function parseDailyReportData(page) {
 }
 
 // =======================================================================
-// [기능 분리 2: 월간 리포트 신설]
-// '월간 리포트 통계' 전용 파서 함수를 새로 추가합니다.
-// 이 함수는 '월간 리포트' API 2개(수동, 자동)만 사용합니다.
+// [*** 핵심 수정 1 ***]
+// 선생님 대시보드 조회 함수 (`fetchProgressData`)
+// "타임스탬프" 또는 "날짜 문자열" 중 하나라도 맞으면 조회하도록 'or' 필터로 변경
 // =======================================================================
-// [삭제] parseMonthlyStatsData 함수 (monthlyReportModule.js로 이동)
-
-// --- [공통] 데이터 조회 함수 (파서를 위 함수로 교체) ---
-// (이 함수는 데일리 대시보드 전용이 되었습니다. 'parseDailyReportData'를 호출합니다.)
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date, teacher } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) {
@@ -387,7 +361,6 @@ async function fetchProgressData(req, res, parseFunction) {
         };
     }
     // [*** 여기까지 수정 ***]
-
 
     const pages = [];
     let hasMore = true;
@@ -644,8 +617,9 @@ app.get('/api/test-all-books', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [학생 플래너 저장 API - 완전 수정 버전]
-// planner-modular.html에서 보낸 form data를 Notion DB에 저장
+// [*** 핵심 수정 2 ***]
+// 학생 플래너 저장 API (`/save-progress`)
+// "기존 데이터 검색" 시, "타임스탬프" 또는 "날짜 문자열" 모두 검색하도록 'or' 필터로 변경
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
@@ -852,20 +826,34 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
         const { start, end, dateString } = getKSTTodayRange();
 
+        // [*** 여기부터 수정 ***]
         // 7. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
+        // '타임스탬프' 또는 '날짜 문자열' 모두 검색하도록 'or' 필터 적용
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
-                    and: [
+                    "and": [ // 이름은 반드시 일치해야 함
                         { property: '이름', title: { equals: studentName } },
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
+                        { // 날짜는 둘 중 하나만 일치하면 됨
+                            "or": [
+                                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
+                                    "and": [
+                                        { property: '🕐 날짜', date: { on_or_after: start } },
+                                        { property: '🕐 날짜', date: { on_or_before: end } }
+                                    ]
+                                },
+                                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
+                                    "property": "🕐 날짜", "date": { "equals": dateString }
+                                }
+                            ]
+                        }
                     ]
                 },
                 page_size: 1
             })
         });
+        // [*** 여기까지 수정 ***]
 
         console.log(`[save-progress] ${studentName} 학생의 오늘(${dateString}) 데이터 검색 결과: ${existingPageQuery.results.length}개`);
 
@@ -924,6 +912,12 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     }
 });
 
+
+// =======================================================================
+// [*** 핵심 수정 3 ***]
+// 학생 플래너 로드 API (`/api/get-today-progress`)
+// "타임스탬프" 또는 "날짜 문자열" 모두 검색하도록 'or' 필터로 변경
+// =======================================================================
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     
@@ -935,20 +929,33 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         // KST 기준 오늘 날짜
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [*** 복구 ***] 헤더님이 주신 "잘 되던" 로직(KST 타임스탬프 범위)으로 복구합니다.
+        // [*** 여기부터 수정 ***]
+        // '타임스탬프' 또는 '날짜 문자열' 모두 검색하도록 'or' 필터 적용
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
-                    and: [
+                     "and": [ // 이름은 반드시 일치해야 함
                         { property: '이름', title: { equals: studentName } },
-                        { property: '🕐 날짜', date: { on_or_after: start } },
-                        { property: '🕐 날짜', date: { on_or_before: end } }
+                        { // 날짜는 둘 중 하나만 일치하면 됨
+                            "or": [
+                                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
+                                    "and": [
+                                        { property: '🕐 날짜', date: { on_or_after: start } },
+                                        { property: '🕐 날짜', date: { on_or_before: end } }
+                                    ]
+                                },
+                                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
+                                    "property": "🕐 날짜", "date": { "equals": dateString }
+                                }
+                            ]
+                        }
                     ]
                 },
                 page_size: 1
             })
         });
+        // [*** 여기까지 수정 ***]
         
         if (query.results.length === 0) {
             console.log(`[get-today-progress] ${studentName} 학생의 오늘 데이터가 없습니다.`);
@@ -1160,6 +1167,7 @@ function formatReportValue(value, type) {
         if (value === '완료') return '완료';
         if (value === '미완료') return '미완료';
         // [*** 유일한 수정 ***] 헤더님 파일 원본 로직 복구
+        if (value === '진행하지 않음') return '진행 안함'; // [수정] 'N/A' 대신 '진행 안함'을 반환
         return 'N/A';
     }
     if (type === 'read_status') {
@@ -1214,10 +1222,20 @@ cron.schedule('0 22 * * *', async () => {
     try {
         const { start, end, dateString } = getKSTTodayRange();
 
+        // [*** 핵심 수정 4 ***]
+        // 데일리 리포트 URL 생성 시에도 'or' 필터를 사용하여
+        // "날짜 문자열"로 저장된 오늘자 데이터를 놓치지 않도록 합니다.
         const filter = {
-            and: [
-                { property: '🕐 날짜', date: { on_or_after: start } },
-                { property: '🕐 날짜', date: { on_or_before: end } }
+            "or": [
+                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
+                    "and": [
+                        { property: '🕐 날짜', date: { on_or_after: start } },
+                        { property: '🕐 날짜', date: { on_or_before: end } }
+                    ]
+                },
+                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
+                    "property": "🕐 날짜", "date": { "equals": dateString }
+                }
             ]
         };
 
