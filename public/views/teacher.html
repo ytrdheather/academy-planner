@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>선생님 대시보드 - 리디튜드</title>
-<!-- ... (스타일 시트 등 head 내용은 동일) ... -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-/* ... (스타일 내용은 동일) ... */
         /* --- 기본 스타일 --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
@@ -20,7 +22,7 @@
 
         /* --- 탭 메뉴 --- */
         .tab-menu { display: flex; background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 0 40px; margin-top: 20px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); flex-wrap: wrap; }
-        .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s ease; /* <a> 태그용 스타일 */ text-decoration: none; display: inline-block; }
+        .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s ease; text-decoration: none; display: inline-block; }
         .tab-button::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; transform: scaleX(0); transition: transform 0.3s ease; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { transform: scaleX(1); }
@@ -47,65 +49,16 @@
         .filter-group { display:flex; align-items:center; gap:8px; }
         .filter-label { font-weight:600; color:#6b46c1; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; background:white; font-size: 14px; }
-        #specificDateContainer_hw, #specificDateContainer_test, #specificDateContainer_reading, #specificDateContainer_listening, #specificDateContainer_comments { display:none; align-items:center; gap:8px; }
-        #teacherFilterContainer_hw, #teacherFilterContainer_test, #teacherFilterContainer_reading, #teacherFilterContainer_listening, #teacherFilterContainer_comments { display:none; }
         
         /* --- 관리자 탭 버튼 스타일 --- */
-        .admin-links-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        .admin-link-button {
-            background: #ffffff;
-            color: #6b46c1;
-            border: 2px solid #e2e8f0;
-            padding: 20px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 700;
-            text-align: left;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-        }
-        .admin-link-button:hover {
-            border-color: #c0b3e2;
-            background-color: #fcfbfe;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.05);
-            transform: translateY(-2px);
-        }
+        .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: left; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
+        .admin-link-button:hover { border-color: #c0b3e2; background-color: #fcfbfe; box-shadow: 0 6px 15px rgba(0,0,0,0.05); transform: translateY(-2px); }
+        .admin-section-title { font-size: 1.3em; font-weight: 700; color: #333; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .manager-only-link { display: none; background-color: #fcfbfe; border-color: #c0b3e2; }
 
-        .admin-section-title {
-            font-size: 1.3em;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 10px;
-        }
-
-        .manager-only-link {
-            display: none;
-            background-color: #fcfbfe;
-            border-color: #c0b3e2;
-        }
-
-        .notice-text {
-            background-color: #f8f9ff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            font-size: 14px;
-            color: #4b5563;
-            line-height: 1.6;
-        }
-        .notice-text strong {
-            color: #ef4444; 
-            font-weight: 700;
-        }
-
+        .notice-text { background-color: #f8f9ff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; font-size: 14px; color: #4b5563; line-height: 1.6; }
+        .notice-text strong { color: #ef4444; font-weight: 700; }
 
         /* --- 테이블 --- */
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
@@ -143,116 +96,30 @@
         .book-title-button:hover { border-color: #d1d5db; background-color: #f9fafb; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1); }
         .book-title-button.empty { color: #6b7280; font-style: italic; text-align: center; }
 
-        /* --- [수정] 리포트 버튼 (코멘트 탭) --- */
-        .report-btn-group {
-            display: flex;
-            flex-direction: row; /* [수정] column -> row (가로 정렬) */
-            flex-wrap: wrap; /* [추가] 5개 버튼이 넘칠 경우 줄바꿈 */
-            gap: 4px;
-            align-items: center; /* [수정] stretch -> center (세로 중앙 정렬) */
-            justify-content: flex-start; /* [수정] center -> flex-start (왼쪽 정렬) */
-        }
-        
-        /* [수정] 공통 버튼 스타일 */
-        .report-btn-copy-daily, .report-btn-copy-monthly, .report-btn-view {
-            border: none;
-            padding: 6px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: center;
-        }
+        /* --- 리포트 버튼 --- */
+        .report-btn-group { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-start; }
+        .report-btn-copy-daily, .report-btn-copy-monthly, .report-btn-view { border: none; padding: 6px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center; }
+        .report-btn-copy-daily { background-color: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
+        .report-btn-copy-daily:hover { background-color: #e0e7ff; }
+        .report-btn-copy-monthly { background-color: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; }
+        .report-btn-copy-monthly:hover { background-color: #fae8ff; }
+        .report-btn-copy-monthly:disabled { background-color: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; }
+        .report-btn-view { background-color: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+        .report-btn-view:hover { background-color: #bae6fd; }
+        .report-btn-view:disabled { background-color: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; }
 
-        .report-btn-copy-daily { /* 데일리 복사 버튼 (기존 daily) */
-            background-color: #eef2ff;
-            color: #4f46e5;
-            border: 1px solid #c7d2fe;
-        }
-        .report-btn-copy-daily:hover {
-            background-color: #e0e7ff;
-        }
-        .report-btn-copy-monthly { /* 월간 복사 버튼 (기존 monthly) */
-            background-color: #fdf4ff;
-            color: #a855f7;
-            border: 1px solid #f0abfc;
-        }
-        .report-btn-copy-monthly:hover {
-            background-color: #fae8ff;
-        }
-        .report-btn-copy-monthly:disabled {
-            background-color: #f3f4f6;
-            color: #9ca3af;
-            border-color: #e5e7eb;
-            cursor: not-allowed;
-        }
-
-        /* [신규] '보기' 버튼 스타일 */
-        .report-btn-view {
-            background-color: #e0f2fe; /* Light blue */
-            color: #0284c7; /* Dark blue */
-            border: 1px solid #bae6fd;
-        }
-        .report-btn-view:hover {
-            background-color: #bae6fd;
-        }
-        .report-btn-view:disabled {
-            background-color: #f3f4f6;
-            color: #9ca3af;
-            border-color: #e5e7eb;
-            cursor: not-allowed;
-        }
-
-        /* --- 코멘트 탭 스타일 --- */
-        .comment-textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: "NanumSquareRound", sans-serif;
-            resize: none; /* [수정] vertical -> none (자동 크기 조절) */
-            min-height: 38px;
-            transition: all 0.2s ease;
-            overflow-y: hidden; /* [추가] 스크롤바 숨김 */
-        }
-        .comment-textarea:focus {
-            border-color: #8b5cf6;
-            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
-            outline: none;
-        }
-        .comment-save-btn {
-            background: #10b981; /* 초록색 (저장됨) */
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: background 0.2s ease;
-            width: auto; /* [수정] 100% -> auto (가로 정렬을 위해) */
-            margin-right: 4px; /* [추가] 저장 버튼과 보기 버튼 사이 간격 */
-        }
+        /* --- 코멘트 탭 --- */
+        .comment-textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: "NanumSquareRound", sans-serif; resize: none; min-height: 38px; transition: all 0.2s ease; overflow-y: hidden; }
+        .comment-textarea:focus { border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); outline: none; }
+        .comment-save-btn { background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.2s ease; width: auto; margin-right: 4px; }
         .comment-save-btn:hover { background: #059669; }
         .comment-save-btn:disabled { background: #d1d5db; cursor: not-allowed; }
-        .batch-save-btn {
-            background: #6b46c1;
-            color: white;
-            margin-left: auto; /* 맨 오른쪽으로 밀어내기 */
-        }
+        .batch-save-btn { background: #6b46c1; color: white; margin-left: auto; }
         .batch-save-btn:hover { background: #5a3eaa; }
-        .batch-save-btn.loading {
-            background: #a78bfa;
-            cursor: wait;
-        }
-        .comment-textarea.changed { /* 변경된 textarea 스타일 */
-            background-color: #fffbeb; 
-            border-color: #f59e0b;
-        }
+        .batch-save-btn.loading { background: #a78bfa; cursor: wait; }
+        .comment-textarea.changed { background-color: #fffbeb; border-color: #f59e0b; }
 
-        /* --- 책 검색 모달 --- */
+        /* --- 모달 --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
@@ -269,36 +136,16 @@
         .btn-cancel { background: #f3f4f6; color: #4b5563; }
         .btn-clear { background: #fee2e2; color: #991b1b; }
 
-        /* --- 리포트 링크 복사 모달 --- */
-        .report-modal-content {
-            background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 600px;
-        }
-        .report-modal-title {
-            font-size: 1.4em; font-weight: 700; color: #6b46c1; margin-bottom: 15px;
-        }
-        .report-link-input {
-            width: 100%; padding: 10px 12px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; background: #f8f9fa; color: #1e293b;
-        }
-        .report-modal-actions {
-            margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;
-        }
-        .report-modal-btn {
-             padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none;
-        }
+        /* --- 리포트 링크 모달 --- */
+        .report-modal-content { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 600px; }
+        .report-modal-title { font-size: 1.4em; font-weight: 700; color: #6b46c1; margin-bottom: 15px; }
+        .report-link-input { width: 100%; padding: 10px 12px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; background: #f8f9fa; color: #1e293b; }
+        .report-modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+        .report-modal-btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
         .btn-modal-close { background: #f3f4f6; color: #4b5563; }
         .btn-modal-copy { background: #6b46c1; color: white; }
         .btn-modal-copy:disabled { background: #c7d2fe; cursor: not-allowed; }
-
-        /* [신규] 월간 리포트 모달 메시지 */
-        .monthly-report-message {
-            font-size: 14px;
-            color: #374151;
-            line-height: 1.6;
-            background-color: #f9fafb;
-            border-radius: 8px;
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-        }
+        .monthly-report-message { font-size: 14px; color: #374151; line-height: 1.6; background-color: #f9fafb; border-radius: 8px; padding: 15px; border: 1px solid #e5e7eb; }
 
         /* --- 토스트 메시지 --- */
         .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-weight: 600; z-index: 3000; opacity: 0; transform: translateX(100%); transition: all 0.3s ease; }
@@ -323,13 +170,10 @@
             <button class="tab-button" onclick="showTab('reading')">원서 독서 현황</button>
             <button class="tab-button" onclick="showTab('listening')">리스닝 현황</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
-            <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">
-                ⚙️ 관리자 메뉴
-            </button>
+            <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">⚙️ 관리자 메뉴</button>
         </div>
 
         <div class="main-content">
-            <!-- ========== 숙제 현황 탭 ========== -->
             <div id="homework-view" class="tab-content active">
                 <div class="stats-summary" id="statsContainer_hw"></div>
                 <div class="content-section">
@@ -353,28 +197,17 @@
                             </select>
                         </div>
                     </div>
-
-                    <div class="notice-text">
-                        📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
-                        <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
-                        매일의 성실함을 지킬 수 있도록 해주세요!
-                    </div>
-
+                    <div class="notice-text">📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 매일의 성실함을 지킬 수 있도록 해주세요!</div>
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <!-- [수정] 2번, 5번 라벨 변경 (이전 수정사항) -->
                                 <tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클가</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해서풀이</th> <th>6️⃣ 일기 등</th> <th>수행율</th> </tr>
                             </thead>
-                            <tbody id="homeworkTableBody">
-                                <tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr>
-                            </tbody>
+                            <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">숙제 현황을 불러오는 중입니다...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
-
-            <!-- ========== 테스트 결과 탭 ========== -->
             <div id="tests-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'📝'">담당 학생 테스트 결과</div>
@@ -400,28 +233,13 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <tr>
-                                    <th>학생 이름</th>
-                                    <th>어휘유닛</th>
-                                    <th>어휘정답</th>
-                                    <th>총갯수</th>
-                                    <th>어휘점수</th>
-                                    <th>독해오답</th>
-                                    <th>독해결과</th>
-                                    <th>하브루타</th>
-                                    <th>문법문항</th> <th>문법오답</th> <th>문법점수</th>
-                                    <!-- [수정] '리포트' 컬럼 제거 -->
-                                </tr>
+                                <tr> <th>학생 이름</th> <th>어휘유닛</th> <th>어휘정답</th> <th>총갯수</th> <th>어휘점수</th> <th>독해오답</th> <th>독해결과</th> <th>하브루타</th> <th>문법문항</th> <th>문법오답</th> <th>문법점수</th> </tr>
                             </thead>
-                            <tbody id="testsTableBody">
-                                <tr><td colspan="11" class="loading">테스트 결과를 불러오는 중입니다...</td></tr>
-                            </tbody>
+                            <tbody id="testsTableBody"><tr><td colspan="11" class="loading">테스트 결과를 불러오는 중입니다...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
-
-            <!-- ========== 원서 독서 현황 탭 ========== -->
             <div id="reading-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'📚'">원서 독서 현황</div>
@@ -447,28 +265,13 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <tr>
-                                    <th>학생 이름</th>
-                                    <th>담당강사</th>
-                                    <th>📖 영어독서</th>
-                                    <th>어휘학습</th>
-                                    <th>📚 책 제목</th>
-                                    <th>시리즈</th>
-                                    <th>AR</th>
-                                    <th>Lexile</th>
-                                    <th>Writing 학습</th>
-                                    <!-- [수정] '리포트' 컬럼 제거 -->
-                                </tr>
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>📖 영어독서</th> <th>어휘학습</th> <th>📚 책 제목</th> <th>시리즈</th> <th>AR</th> <th>Lexile</th> <th>Writing 학습</th> </tr>
                             </thead>
-                            <tbody id="readingTableBody">
-                                <tr><td colspan="9" class="loading">원서 독서 현황을 불러오는 중입니다...</td></tr>
-                            </tbody>
+                            <tbody id="readingTableBody"><tr><td colspan="9" class="loading">원서 독서 현황을 불러오는 중입니다...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
-
-            <!-- ========== 리스닝 현황 탭 ========== -->
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'🎧'">리스닝 현황</div>
@@ -494,23 +297,13 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <tr>
-                                    <th>학생 이름</th>
-                                    <th>담당강사</th>
-                                    <th>듣기 학습</th>
-                                    <th>듣기 워크북</th>
-                                    <!-- [수정] '리포트' 컬럼 제거 -->
-                                </tr>
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>듣기 학습</th> <th>듣기 워크북</th> </tr>
                             </thead>
-                            <tbody id="listeningTableBody">
-                                <tr><td colspan="4" class="loading">리스닝 현황을 불러오는 중입니다...</td></tr>
-                            </tbody>
+                            <tbody id="listeningTableBody"><tr><td colspan="4" class="loading">리스닝 현황을 불러오는 중입니다...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
-
-            <!-- ========== 오늘의 코멘트 탭 ========== -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'💬'">💬 오늘의 코멘트</div>
@@ -532,89 +325,48 @@
                                 <option value="">전체 보기</option>
                             </select>
                         </div>
-                        <button class="refresh-btn batch-save-btn" id="batchSaveBtn" onclick="saveAllComments(this)">
-                            💾 일괄 저장
-                        </button>
+                        <button class="refresh-btn batch-save-btn" id="batchSaveBtn" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <colgroup>
-                                <!-- [수정] 컬럼 너비 재조정 (헤더님 요청 반영) -->
-                                <col style="width: 7%;"> <!-- 학생 이름 -->
-                                <col style="width: 7%;"> <!-- 담당강사 -->
-                                <col style="width: 8%;"> <!-- 문법 클래스 -->
-                                <col style="width: 45%;"> <!-- 코멘트 -->
-                                <col style="width: 33%;"> <!-- 관리 (저장+리포트 버튼) -->
+                                <col style="width: 7%;"> <col style="width: 7%;"> <col style="width: 8%;"> <col style="width: 45%;"> <col style="width: 33%;">
                             </colgroup>
                             <thead>
-                                <tr>
-                                    <th>학생 이름</th>
-                                    <th>담당강사</th>
-                                    <th>문법 클래스</th>
-                                    <th>오늘의 코멘트</th>
-                                    <th>관리</th> <!-- [수정] '저장' -> '관리' -->
-                                </tr>
+                                <tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr>
                             </thead>
-                            <tbody id="commentsTableBody">
-                                <tr><td colspan="5" class="loading">오늘의 코멘트 데이터를 불러오는 중입니다...</td></tr>
-                            </tbody>
+                            <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">오늘의 코멘트 데이터를 불러오는 중입니다...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
             
-            <!-- 관리자 메뉴 탭 (변경 없음) -->
             <div id="admin-view" class="tab-content">
-                <!-- ... (기존 관리자 메뉴 HTML 코드와 동일) ... -->
                 <div class="content-section">
                     <div class="section-title" style="--icon:'⚙️'">관리자 바로가기 (Notion DB)</div>
-                    
                     <h3 class="admin-section-title">&lt;리디튜드 노션&gt;</h3>
                     <p style="margin-bottom: 25px; color: #4b5563;">아래 버튼을 클릭하면 해당 노션 DB를 수정할 수 있는 새 윈도우가 열립니다.</p>
-                    
                     <div class="admin-links-container">
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25e09320bce28039a575c1405c9c0d4f?source=copy_link')">
-                            문법 숙제 관리
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/20009320bce28012b740dc6df5e1303c?source=copy_link')">
-                            교재비 입금 내역
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-26109320bce280b38808dc57f5bd5978?source=copy_link')">
-                            원생 교재 관리
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/18f09320bce280a29d3cc25d117511a7?source=copy_link')">
-                            교재 데이터 베이스
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/9ef2bbaeec19466daa0d0c0677b9eb90?v=064779482df2493699322be11a41dcbf&source=copy_link')">
-                            원서 독서 리스트
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/cf82d56634574d7e83d893fbf1b1a4e3?v=1c903b34bd3746c6be6cfb932cd9fabd&source=copy_link')">
-                            국어 독서 리스트
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25409320bce280819167cae477b16fe6?source=copy_link')">
-                            학생 명부 관리
-                        </button>
-                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/1a109320bce28078a744ff94e98f8792?source=copy_link')">
-                            🧑‍💼 상담 관리 메뉴 (관)
-                        </button>
-                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/25409320bce2807697ede3f1c1b62ada?v=25409320bce2815da94b000c1cc63b2f&source=copy_link')">
-                            🧑‍💼 학생 진도 관리 (관)
-                        </button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25e09320bce28039a575c1405c9c0d4f?source=copy_link')">문법 숙제 관리</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/20009320bce28012b740dc6df5e1303c?source=copy_link')">교재비 입금 내역</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-26109320bce280b38808dc57f5bd5978?source=copy_link')">원생 교재 관리</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/18f09320bce280a29d3cc25d117511a7?source=copy_link')">교재 데이터 베이스</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/9ef2bbaeec19466daa0d0c0677b9eb90?v=064779482df2493699322be11a41dcbf&source=copy_link')">원서 독서 리스트</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/cf82d56634574d7e83d893fbf1b1a4e3?v=1c903b34bd3746c6be6cfb932cd9fabd&source=copy_link')">국어 독서 리스트</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25409320bce280819167cae477b16fe6?source=copy_link')">학생 명부 관리</button>
+                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/1a109320bce28078a744ff94e98f8792?source=copy_link')">🧑‍💼 상담 관리 메뉴 (관)</button>
+                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/25409320bce2807697ede3f1c1b62ada?v=25409320bce2815da94b000c1cc63b2f&source=copy_link')">🧑‍💼 학생 진도 관리 (관)</button>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
-    <!-- ========== 책 검색 모달 (공통 사용) ========== -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalTitle">📚 책 제목 검색</h2>
             <input type="text" id="modalSearchInput" class="modal-search-input" placeholder="검색어를 입력하세요...">
-            <div id="modalSearchResults" class="modal-search-results">
-                <div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>
-            </div>
+            <div id="modalSearchResults" class="modal-search-results"><div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div></div>
             <div class="modal-actions">
                 <button class="modal-btn btn-clear" onclick="selectBook(null, '책 검색...')">🚫 관계 연결 해제</button>
                 <button class="modal-btn btn-cancel" onclick="closeBookSearchModal()">닫기</button>
@@ -622,19 +374,12 @@
         </div>
     </div>
 
-    <!-- ========== 리포트 링크 복사 모달 (데일리/월간 공용) ========== -->
     <div id="reportModal" class="modal-overlay">
         <div class="report-modal-content">
             <h2 class="report-modal-title" id="reportModalTitle">🔗 데일리 리포트 링크</h2>
             <p class="text-gray-600 text-sm mb-3" id="reportModalDescription">학부모에게 전송할 리포트 링크입니다. '복사하기' 버튼을 눌러 사용하세요.</p>
-            
-            <!-- [신규] 월간 리포트용 메시지 영역 (평소엔 숨김) -->
-            <div id="monthlyReportMessage" class="monthly-report-message" style="display: none;">
-                지난 달 리포트 URL을 찾았습니다.
-            </div>
-            
+            <div id="monthlyReportMessage" class="monthly-report-message" style="display: none;">지난 달 리포트 URL을 찾았습니다.</div>
             <input type="text" id="reportLinkInput" class="report-link-input" readonly>
-            
             <div class="report-modal-actions">
                 <button class="report-modal-btn btn-modal-close" onclick="closeReportModal()">닫기</button>
                 <button class="report-modal-btn btn-modal-copy" id="copyReportLinkBtn" onclick="copyReportLink()">복사하기</button>
@@ -643,24 +388,22 @@
     </div>
 
     <script>
-        // --- 전역 변수 및 초기화 ---
-        const API_BASE_URL = window.location.origin; // 'http://localhost:5001' 대신 현재 origin 사용
+        const API_BASE_URL = window.location.origin; 
         let authToken = localStorage.getItem('teacher_auth_token');
-        let allReportData = []; // [수정] 모든 탭의 데이터를 한 곳에 저장
+        let allReportData = []; 
         let currentUserRole = '';
         let currentUserName = '';
         let currentActiveTab = 'homework';
-        let currentModalContext = {}; // { pageId, propertyName, type }
+        let currentModalContext = {}; 
         let bookSearchTimer = null;
 
-        // [수정] 탭 접미사를 반환하는 헬퍼 함수를 공용으로 사용할 수 있도록 전역 스코프로 이동
         function getSuffixForTab(tabName) {
             if (tabName === 'homework') return '_hw';
             if (tabName === 'tests') return '_test';
             if (tabName === 'reading') return '_reading';
             if (tabName === 'listening') return '_listening';
             if (tabName === 'comments') return '_comments';
-            return ''; // admin 탭 등
+            return ''; 
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -672,42 +415,35 @@
             try {
                 await loadUserInfo();
                 setupEventListeners();
-                // [수정] 첫 로드를 '오늘의 코멘트' 탭에서 '숙제 현황' 탭으로 변경
                 showTab('homework'); 
-                
-                // [이전 수정] 
-                // [추가] 312번째 줄 근처: 여기서 'try' 블록을 닫아야 합니다.
             } catch (e) { 
                 console.error("초기화 오류:", e); 
             }
-        } // [추가] initializePage 함수를 닫는 괄호입니다.
+        }
 
         function setupEventListeners() {
             ['hw', 'test', 'reading', 'listening', 'comments'].forEach(suffix => {
                 const s = `_${suffix}`;
                 document.getElementById(`periodFilter${s}`)?.addEventListener('change', () => {
                     toggleSpecificDateInput(s);
-                    loadDataForCurrentTab(); // 기간 변경 시 데이터 새로고침
+                    loadDataForCurrentTab(); 
                 });
-                document.getElementById(`specificDate${s}`)?.addEventListener('change', loadDataForCurrentTab); // 날짜 변경 시 새로고침
+                document.getElementById(`specificDate${s}`)?.addEventListener('change', loadDataForCurrentTab); 
                 document.getElementById(`teacherFilter${s}`)?.addEventListener('change', () => {
-                    // 강사 필터 변경 시, 캐시된 데이터로 즉시 필터링
-                    displayDataForAllTabs(allReportData); // [수정] displayDataForCurrentTab -> displayDataForAllTabs
+                    displayDataForAllTabs(allReportData); 
                 });
             });
             
-            // 책 검색 모달 디바운스 입력
             document.getElementById('modalSearchInput')?.addEventListener('input', (e) => {
                 clearTimeout(bookSearchTimer);
                 const query = e.target.value;
                 bookSearchTimer = setTimeout(() => {
-                    searchEngBooks(query); // 영어 원서 검색만
+                    searchEngBooks(query); 
                 }, 300);
             });
             document.querySelector('.btn-cancel').addEventListener('click', closeBookSearchModal);
         }
 
-        // --- 데이터 로드 함수 ---
         async function loadUserInfo() {
              try {
                 const userInfoResponse = await fetch(`${API_BASE_URL}/api/teacher/user-info`, { headers:{Authorization:'Bearer '+authToken} });
@@ -740,26 +476,16 @@
              }
         }
 
-        // [수정] loadDataForCurrentTab (단일 API 호출)
         async function loadDataForCurrentTab() {
             console.log('🚀 ===== 데이터 로드 시작 =====');
-            
-            // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 필터 값을 읽어옵니다.
             const suffix = getSuffixForTab(currentActiveTab); 
-            const params = getFilterParams(suffix || '_hw'); // (기본값은 _hw)
-            
+            const params = getFilterParams(suffix || '_hw'); 
             console.log(`📊 요청 파라미터 (현재 탭 ${currentActiveTab}):`, params);
-            
             setAllTablesLoading();
-
             try {
                 const url = `${API_BASE_URL}/api/daily-report-data?${params}`;
                 console.log('🔗 전체 요청 URL:', url);
-                
                 const response = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
-                console.log('📡 응답 상태 코드:', response.status);
-                console.log('📡 응답 상태 텍스트:', response.statusText);
-                
                 if (!response.ok) { 
                     if (response.status === 401) { 
                         console.error('❌ 401 인증 오류 - 로그인 만료');
@@ -771,44 +497,26 @@
                     console.error('❌ 응답 에러 내용:', errorText);
                     throw new Error(errorText || "네트워크 오류"); 
                 }
-                
                 const combinedData = await response.json();
-                console.log('✅ 데이터 수신 완료!');
-                console.log('📈 받은 데이터 개수:', combinedData ? combinedData.length : 0);
-                console.log('📦 데이터 샘플 (첫 번째 항목):', combinedData && combinedData.length > 0 ? combinedData[0] : '데이터 없음');
-                
                 allReportData = combinedData;
                 displayDataForAllTabs(combinedData);
-                
                 console.log('✅ ===== 데이터 로드 완료 =====');
-
             } catch(e) {
                 console.error('❌ ===== 데이터 로드 실패 =====');
-                console.error('❌ 에러 타입:', e.name);
-                console.error('❌ 에러 메시지:', e.message);
-                console.error('❌ 에러 스택:', e.stack);
                 setAllTablesError(e.message || '로드 실패');
             }
         }
 
-        // [수정] displayDataForAllTabs (모든 탭을 그림)
         function displayDataForAllTabs(data) {
-             // 매니저인 경우, 강사 필터링 적용
             let filteredData = data;
             if (currentUserRole === 'manager') {
-                // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 강사 필터 값을 읽어옵니다.
                 const suffix = getSuffixForTab(currentActiveTab);
                 const selectedTeacher = document.getElementById(`teacherFilter${suffix || '_hw'}`).value; 
-
                 if (selectedTeacher) {
                     filteredData = data.filter(item => item.teachers.includes(selectedTeacher));
                 }
             }
-            
-            // 통계는 '숙제 현황' 탭에만 표시 (활성 탭이 아니어도 일단 업데이트)
             updateStats(filteredData);
-            
-            // 모든 탭에 데이터 그리기
             displayHomeworkData(filteredData);
             displayTestData(filteredData);
             displayReadingData(filteredData);
@@ -816,21 +524,15 @@
             displayCommentData(filteredData);
         }
 
-        // [수정] displayDataForCurrentTab (탭 클릭 시 캐시된 데이터로 필터링)
         function displayDataForCurrentTab(data) {
-             // 매니저인 경우, 강사 필터링 적용
             let filteredData = data;
             if (currentUserRole === 'manager') {
-                // [수정] '_hw' (숙제) 탭이 아닌 '현재 활성화된 탭'의 강사 필터 값을 읽어옵니다.
                 const suffix = getSuffixForTab(currentActiveTab);
                 const selectedTeacher = document.getElementById(`teacherFilter${suffix || '_hw'}`).value; 
-                
                 if (selectedTeacher) {
                     filteredData = data.filter(item => item.teachers.includes(selectedTeacher));
                 }
             }
-
-            // [수정] 현재 탭에 해당하는 display 함수만 호출
             if (currentActiveTab === 'homework') {
                 updateStats(filteredData);
                 displayHomeworkData(filteredData);
@@ -844,7 +546,6 @@
                 displayCommentData(filteredData);
             }
         }
-
 
         function getFilterParams(suffix) {
             const period = document.getElementById(`periodFilter${suffix}`)?.value || 'today';
@@ -863,7 +564,6 @@
             return params;
         }
 
-        // --- UI 업데이트 함수 ---
         function setAllTablesLoading() {
             document.getElementById('homeworkTableBody').innerHTML = '<tr><td colspan="9" class="loading">로딩중...</td></tr>';
             document.getElementById('testsTableBody').innerHTML = '<tr><td colspan="11" class="loading">로딩중...</td></tr>';
@@ -904,12 +604,9 @@
                     <td>${formatHomeworkDropdown(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                    <!-- [수정] 5번 숙제 값을 하드코딩("해당 없음") 대신 st.homework.dailyReading 에서 읽어오도록 변경 -->
                     <td>${formatHomeworkDropdown(st.pageId, '5️⃣ 매일 독해 숙제', st.homework.dailyReading)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '6️⃣ 영어일기 or 개인 독해서', st.homework.diary)}</td>
-                    <td>
-                        <span class="completion-rate ${rateClass(st.completionRate)}">${st.completionRate || 0}%</span>
-                    </td>
+                    <td><span class="completion-rate ${rateClass(st.completionRate)}">${st.completionRate || 0}%</span></td>
                 </tr>`).join('');
         }
 
@@ -978,16 +675,11 @@
                     <td class="student-name">${st.studentName}</td>
                     <td>${(st.teachers || []).join(', ')}</td>
                     <td>${st.comment.grammarClass || '-'}</td>
-                    <td style="padding: 5px;">
-                        <!-- [수정] oninput에 autoResizeTextarea 추가, rows="1"로 변경 -->
-                        <textarea class="comment-textarea" rows="1" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}" oninput="markCommentAsChanged(this); autoResizeTextarea(this);">${st.comment.teacherComment || ''}</textarea>
-                    </td>
+                    <td style="padding: 5px;"><textarea class="comment-textarea" rows="1" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}" oninput="markCommentAsChanged(this); autoResizeTextarea(this);">${st.comment.teacherComment || ''}</textarea></td>
                     <td style="vertical-align: middle;">
-                        <!-- [수정] 버튼 그룹 5개로 변경 -->
                         <div class="report-btn-group">
                             <button class="comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
                             <button class="report-btn-view" onclick="viewDailyReport('${st.pageId}', '${st.date}')">데일리 보기</button>
-                            <!-- [수정] 'openReportModal' 대신 'copyDailyReportLink' 함수를 호출하도록 변경 -->
                             <button class="report-btn-copy-daily" onclick="copyDailyReportLink(this, '${st.pageId}', '${st.date}')">데일리 복사</button>
                             <button class="report-btn-view" onclick="viewMonthlyReport(this, '${st.studentName}', '${st.date}')">월간 보기</button>
                             <button class="report-btn-copy-monthly" onclick="openMonthlyReportModal(this, '${st.studentName}', '${st.date}')">월간 복사</button>
@@ -995,11 +687,7 @@
                     </td>
                 </tr>`).join('');
             
-            // [추가] 렌더링된 모든 textarea에 대해 초기 높이 설정
-            tbody.querySelectorAll('.comment-textarea').forEach(textarea => {
-                // 비동기로 DOM 렌더링이 끝난 후 높이를 조절해야 정확함
-                setTimeout(() => autoResizeTextarea(textarea), 0);
-            });
+            tbody.querySelectorAll('.comment-textarea').forEach(textarea => { setTimeout(() => autoResizeTextarea(textarea), 0); });
         }
 
         function handleEnterAsTab(event, tableBodyId) {
@@ -1013,7 +701,6 @@
             }
         }
 
-        // --- Helper Functions (Styling & Formatting) ---
         function getReadingResultClass(result) { if (result === 'PASS') return 'result-pass'; if (result === 'FAIL') return 'result-fail'; return 'result-none'; }
         function formatSelectDropdown(pageId, propertyName, currentValue, options, defaultValue = '---') {
             const displayValue = (currentValue && options.includes(currentValue)) ? currentValue : "";
@@ -1029,18 +716,7 @@
         function formatHomeworkDropdown(pageId, propertyName, currentStatus, options = ['숙제 함', '안 해옴', '숙제 없음']) {
             const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
             let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
-            
-            // [삭제] 5번 숙제를 '해당 없음'으로 강제 고정하고 비활성화하던 로직을 제거합니다. (이전 수정사항)
-            /*
-            if (propertyName === '5️⃣ 매일 독해 숙제') {
-                options = ['숙제 함', '안 해옴', '숙제 없음', '해당 없음'];
-                displayStatus = '해당 없음'; 
-            }
-            */
-
             const statusClass = getSelectStatusClass(propertyName, displayStatus);
-
-            // [수정] 5번 숙제에 대한 'disabled' 속성 부여 로직을 제거합니다. (이전 수정사항)
             return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
                         ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
@@ -1108,7 +784,6 @@
 
             try {
                 const updateUrl = `${API_BASE_URL}/api/update-homework`;
-                
                 const response = await fetch(updateUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName, newValue, propertyType }) });
                 if (!response.ok) { if (response.status === 401) { alert('로그인이 만료되었습니다.'); logout(); return; } const errorData = await response.json(); throw new Error(errorData.message || '업데이트 실패'); }
                 
@@ -1132,16 +807,20 @@
                 const row = element?.closest('tr');
                 if (row) { row.classList.remove('needs-save'); } 
                 
-                if (row && (propertyName === '단어 (맞은 개수)' || propertyName === '단어 (전체 개수)')) { const correct = Number(row.querySelector('[data-property-name="단어 (맞은 개수)"]').value); const total = Number(row.querySelector('[data-property-name="단어 (전체 개수)"]').value); const newScore = (total > 0) ? Math.round((correct / total) * 100) : 0; row.querySelector('.vocab-score').innerHTML = formatScoreCircle(newScore); }
-                if (row && (propertyName === '문법 (전체 개수)' || propertyName === '문법 (틀린 개수)')) { const total = Number(row.querySelector('[data-property-name="문법 (전체 개수)"]').value); const wrong = Number(row.querySelector('[data-property-name="문법 (틀린 개수)"]').value); const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0; row.querySelector('.grammar-score').innerHTML = formatScoreCircle(newScore); }
-                 
-                // [💡 수정]
-        // 2025-11-15: 헤더님 요청으로 전체 새로고침(깜빡임) 방지를 위해 주석 처리
-        // if (!isBatch) {
-        //     console.log('단일 업데이트 성공. 데이터 자동 새로고침을 시작합니다...');
-        //     await loadDataForCurrentTab(); // [문제의 원인] 이 줄을 주석 처리하여 전체 새로고침을 방지합니다.
-        //     console.log('데이터 자동 새로고침 완료.');
-        // } 
+                if (row && (propertyName === '단어(맞은 개수)' || propertyName === '단어(전체 개수)')) { const correct = Number(row.querySelector('[data-property-name="단어(맞은 개수)"]').value); const total = Number(row.querySelector('[data-property-name="단어(전체 개수)"]').value); const newScore = (total > 0) ? Math.round((correct / total) * 100) : 0; row.querySelector('.vocab-score').innerHTML = formatScoreCircle(newScore); }
+                if (row && (propertyName === '문법(전체 개수)' || propertyName === '문법(틀린 개수)')) { const total = Number(row.querySelector('[data-property-name="문법(전체 개수)"]').value); const wrong = Number(row.querySelector('[data-property-name="문법(틀린 개수)"]').value); const newScore = (total > 0) ? Math.round(((total - wrong) / total) * 100) : 0; row.querySelector('.grammar-score').innerHTML = formatScoreCircle(newScore); }
+
+                // [신규] 독해 결과 배지 즉시 업데이트 로직 (독해(틀린 개수) 변경 시)
+                if (row && propertyName === '독해(틀린 개수)') {
+                    const wrongCount = Number(newValue);
+                    const badge = row.querySelector('.reading-result-badge');
+                    // 기준: 4개 이하는 PASS, 5개 이상은 FAIL (일반적인 기준)
+                    if (badge) {
+                        const isPass = wrongCount <= 4;
+                        badge.textContent = isPass ? 'PASS' : 'FAIL';
+                        badge.className = `reading-result-badge ${isPass ? 'result-pass' : 'result-fail'}`;
+                    }
+                }
             } catch (error) { 
                 console.error('필드 업데이트 오류:', error); 
                 if (element) { 
@@ -1165,29 +844,22 @@
         }
         setInterval(checkTokenExpiry, 5 * 60 * 1000);
 
-        // --- [신규] 텍스트 영역 자동 크기 조절 ---
         function autoResizeTextarea(textarea) {
             if (textarea) {
-                textarea.style.height = 'auto'; // 높이를 리셋
-                // 1px-2px 정도의 여백을 줘야 스크롤바가 깜빡이지 않음
+                textarea.style.height = 'auto'; 
                 textarea.style.height = (textarea.scrollHeight + 2) + 'px'; 
             }
         }
 
-        // --- 탭 전환 함수 ---
         function showTab(tabName) {
             currentActiveTab = tabName;
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            
             const selectedContent = document.getElementById(tabName + '-view');
             if (selectedContent) selectedContent.classList.add('active');
-            
             const selectedButton = document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`);
             if (selectedButton) selectedButton.classList.add('active');
-            
             syncFilters(tabName);
-            
             if (tabName !== 'admin') {
                 displayDataForCurrentTab(allReportData);
             }
@@ -1196,40 +868,17 @@
         function syncFilters(targetTabName) {
             const sourceTabName = 'homework';
             if (targetTabName === sourceTabName) { toggleSpecificDateInput('_hw'); return; }
-            
-            // [수정] 헬퍼 함수를 (이제 전역에 있는) getSuffixForTab으로 호출합니다.
             const sourceSuffix = getSuffixForTab(sourceTabName);
             const targetSuffix = getSuffixForTab(targetTabName); 
-            
             if (!sourceSuffix || !targetSuffix) return;
             if (targetTabName === 'admin') return; 
-
-            const periodSourceEl = document.getElementById(`periodFilter${sourceSuffix}`);
-            const periodTargetEl = document.getElementById(`periodFilter${targetSuffix}`);
-            const dateSourceEl = document.getElementById(`specificDate${sourceSuffix}`); 
-            const dateTargetEl = document.getElementById(`specificDate${targetSuffix}`); 
-            const teacherSourceEl = document.getElementById(`teacherFilter${sourceSuffix}`);
-            const teacherTargetEl = document.getElementById(`teacherFilter${targetSuffix}`);
-
-            // [버그 수정] 탭을 바꿀 때마다 '숙제 현황' 탭의 값으로 덮어씌우던 아래 3줄을 주석 처리합니다.
-            // if(periodSourceEl && periodTargetEl) periodTargetEl.value = periodSourceEl.value;
-            // if(dateSourceEl && dateTargetEl) dateTargetEl.value = dateSourceEl.value;
-            // if(teacherSourceEl && teacherTargetEl) teacherTargetEl.value = teacherSourceEl.value;
-            
-            // 이 로직은 탭마다 '날짜 지정' input을 보여주거나 숨기기 위해 필요하므로 유지합니다.
             toggleSpecificDateInput(targetSuffix);
         }
 
-        // --- 책 검색 모달 관련 함수 ---
         function openEngBookModal(buttonElement) {
             const pageId = buttonElement.getAttribute('data-page-id');
             const currentTitle = buttonElement.textContent.trim();
-            currentModalContext = {
-                pageId: pageId,
-                propertyName: '오늘 읽은 영어 책',
-                type: 'engBook'
-            };
-            
+            currentModalContext = { pageId: pageId, propertyName: '오늘 읽은 영어 책', type: 'engBook' };
             document.getElementById('modalTitle').textContent = '📚 영어 원서 검색';
             const input = document.getElementById('modalSearchInput');
             if (currentTitle !== '책 검색...') { input.value = currentTitle; } else { input.value = ''; }
@@ -1258,317 +907,130 @@
         
         async function selectBook(bookPageId, bookTitle) {
             if (!currentModalContext.pageId) return;
-            
             const { pageId, propertyName } = currentModalContext;
             const emptyTitle = '책 검색...';
-            
             closeBookSearchModal();
-            
             let buttonElement;
-            if (currentActiveTab === 'reading') {
-                buttonElement = document.querySelector(`#readingTableBody button[data-page-id="${pageId}"]`);
-            }
-
+            if (currentActiveTab === 'reading') { buttonElement = document.querySelector(`#readingTableBody button[data-page-id="${pageId}"]`); }
             if (buttonElement) {
                 buttonElement.textContent = bookTitle || emptyTitle;
-                if (bookPageId) {
-                    buttonElement.classList.remove('empty');
-                    buttonElement.setAttribute('data-relation-id', bookPageId);
-                } else {
-                    buttonElement.classList.add('empty');
-                    buttonElement.setAttribute('data-relation-id', '');
-                }
+                if (bookPageId) { buttonElement.classList.remove('empty'); buttonElement.setAttribute('data-relation-id', bookPageId); } 
+                else { buttonElement.classList.add('empty'); buttonElement.setAttribute('data-relation-id', ''); }
             }
             await submitUpdate(pageId, propertyName, bookPageId, 'relation', null, null, false);
         }
         
-        // --- 코멘트 관련 함수 ---
-        function updateComment(buttonElement, pageId) {
-            const row = buttonElement.closest('tr');
-            const textarea = row.querySelector('.comment-textarea');
-            const newValue = textarea.value;
-            const originalValue = textarea.defaultValue;
-            submitUpdate(pageId, '❤ Today\'s Notice!', newValue, 'rich_text', textarea, originalValue, false);
-        }
         function markCommentAsChanged(textarea) {
             const row = textarea.closest('tr');
             const saveButton = row.querySelector('.comment-save-btn');
-            if (textarea.value !== textarea.defaultValue) {
-                textarea.classList.add('changed');
-                saveButton.textContent = '저장';
-                saveButton.style.background = '#3b82f6'; // 파란색
-                row.classList.add('needs-save');
-            } else {
-                saveButton.textContent = '저장';
-                saveButton.style.background = '#10b981'; // 초록색
-                row.classList.remove('needs-save');
-            }
+            if (textarea.value !== textarea.defaultValue) { textarea.classList.add('changed'); saveButton.textContent = '저장'; saveButton.style.background = '#3b82f6'; row.classList.add('needs-save'); } 
+            else { saveButton.textContent = '저장'; saveButton.style.background = '#10b981'; row.classList.remove('needs-save'); }
         }
         async function saveAllComments(batchButton) {
             const rowsToSave = document.querySelectorAll('#commentsTableBody tr.needs-save');
-            if (rowsToSave.length === 0) {
-                showToast('저장할 변경 사항이 없습니다.', 'success');
-                return;
-            }
-            batchButton.disabled = true;
-            batchButton.textContent = `저장중... (0/${rowsToSave.length})`;
-            batchButton.classList.add('loading');
-            const textareas = [];
-            const saveButtons = [];
+            if (rowsToSave.length === 0) { showToast('저장할 변경 사항이 없습니다.', 'success'); return; }
+            batchButton.disabled = true; batchButton.textContent = `저장중... (0/${rowsToSave.length})`; batchButton.classList.add('loading');
+            const textareas = []; const saveButtons = [];
             try {
                 rowsToSave.forEach(row => {
-                    const textarea = row.querySelector('.comment-textarea');
-                    const saveButton = row.querySelector('.comment-save-btn');
+                    const textarea = row.querySelector('.comment-textarea'); const saveButton = row.querySelector('.comment-save-btn');
                     if (textarea) { textarea.disabled = true; textareas.push(textarea); }
                     if (saveButton) { saveButton.disabled = true; saveButtons.push(saveButton); }
                 });
                 let successCount = 0;
                 for (let i = 0; i < textareas.length; i++) {
-                    const textarea = textareas[i];
-                    const pageId = textarea.getAttribute('data-page-id');
-                    const newValue = textarea.value;
+                    const textarea = textareas[i]; const pageId = textarea.getAttribute('data-page-id'); const newValue = textarea.value;
                     await submitUpdate(pageId, '❤ Today\'s Notice!', newValue, 'rich_text', textarea, textarea.defaultValue, true);
-                    successCount++;
-                    batchButton.textContent = `저장중... (${successCount}/${rowsToSave.length})`;
+                    successCount++; batchButton.textContent = `저장중... (${successCount}/${rowsToSave.length})`;
                 }
                 showToast(`총 ${successCount}개 코멘트 일괄 저장 완료!`, 'success');
-            } catch (error) {
-                console.error('일괄 저장 중 오류:', error);
-                showToast(`일괄 저장 실패: ${error.message}`, 'error');
-            } finally {
-                batchButton.disabled = false;
-                batchButton.textContent = '💾 일괄 저장';
-                batchButton.classList.remove('loading');
-                textareas.forEach(el => el.disabled = false);
-                saveButtons.forEach(el => el.disabled = false);
+            } catch (error) { console.error('일괄 저장 중 오류:', error); showToast(`일괄 저장 실패: ${error.message}`, 'error'); } 
+            finally {
+                batchButton.disabled = false; batchButton.textContent = '💾 일괄 저장'; batchButton.classList.remove('loading');
+                textareas.forEach(el => el.disabled = false); saveButtons.forEach(el => el.disabled = false);
             }
         }
         
-        // --- 노션 관리자 메뉴 ---
         function openNotionWindow(url) {
-            if (!url || url.startsWith('https://www.notion.so/...')) {
-                alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.');
-                return;
-            }
-            const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes';
-            window.open(url, '_blank', windowOptions);
+            if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; }
+            const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions);
         }
 
-        // --- [신규] 리포트 "보기" 함수 ---
         function viewDailyReport(pageId, date) {
-            if (!pageId || !date) {
-                showToast('리포트 정보를 찾을 수 없습니다.', 'error');
-                return;
-            }
+            if (!pageId || !date) { showToast('리포트 정보를 찾을 수 없습니다.', 'error'); return; }
             const reportUrl = `${API_BASE_URL}/report?pageId=${pageId}&date=${date}`;
-            window.open(reportUrl, '_blank'); // 새 탭에서 열기
+            window.open(reportUrl, '_blank'); 
         }
 
         async function viewMonthlyReport(button, studentName, date) {
-            if (!studentName || !date) {
-                showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error');
-                return;
-            }
-            
-            button.disabled = true; // 버튼 비활성화
-            button.textContent = '조회 중...';
-
+            if (!studentName || !date) { showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error'); return; }
+            button.disabled = true; button.textContent = '조회 중...';
             try {
-                const response = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(studentName)}&date=${date}`, {
-                    headers: { 'Authorization': 'Bearer ' + authToken }
-                });
-                
+                const response = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(studentName)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const data = await response.json();
-                
-                if (response.ok && data.success) {
-                    window.open(data.url, '_blank'); // 모달 대신 새 탭에서 열기
-                } else {
-                    throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.');
-                }
-            } catch (error) {
-                console.error('월간 리포트 \'보기\' 조회 오류:', error);
-                showToast(error.message, 'error'); // 에러를 토스트 메시지로
-            } finally {
-                button.disabled = false; // 버튼 다시 활성화
-                button.textContent = '월간 보기';
-            }
+                if (response.ok && data.success) { window.open(data.url, '_blank'); } 
+                else { throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.'); }
+            } catch (error) { console.error('월간 리포트 \'보기\' 조회 오류:', error); showToast(error.message, 'error'); } 
+            finally { button.disabled = false; button.textContent = '월간 보기'; }
         }
 
-
-        // --- [수정] 리포트 "복사" 모달 함수 ---
         function openReportModal(pageId, date) {
-            if (!pageId || !date) {
-                showToast('리포트 정보를 찾을 수 없습니다.', 'error');
-                return;
-            }
+            if (!pageId || !date) { showToast('리포트 정보를 찾을 수 없습니다.', 'error'); return; }
             const reportUrl = `${API_BASE_URL}/report?pageId=${pageId}&date=${date}`;
-            
-            const modal = document.getElementById('reportModal');
-            const title = document.getElementById('reportModalTitle');
-            const desc = document.getElementById('reportModalDescription');
-            const msg = document.getElementById('monthlyReportMessage');
-            const input = document.getElementById('reportLinkInput');
-            const copyBtn = document.getElementById('copyReportLinkBtn');
-
-            // 데일리 모달로 초기화
-            title.textContent = '🔗 데일리 리포트 복사';
-            desc.style.display = 'block';
-            msg.style.display = 'none';
-            input.style.display = 'block';
-            copyBtn.style.display = 'block';
-
-            input.value = reportUrl;
-            copyBtn.disabled = false;
-            copyBtn.textContent = '복사하기';
-            
+            const modal = document.getElementById('reportModal'); const title = document.getElementById('reportModalTitle'); const desc = document.getElementById('reportModalDescription'); const msg = document.getElementById('monthlyReportMessage'); const input = document.getElementById('reportLinkInput'); const copyBtn = document.getElementById('copyReportLinkBtn');
+            title.textContent = '🔗 데일리 리포트 복사'; desc.style.display = 'block'; msg.style.display = 'none'; input.style.display = 'block'; copyBtn.style.display = 'block';
+            input.value = reportUrl; copyBtn.disabled = false; copyBtn.textContent = '복사하기';
             modal.classList.add('show');
         }
 
         async function openMonthlyReportModal(button, studentName, date) {
-            if (!studentName || !date) {
-                showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error');
-                return;
-            }
-            
-            button.disabled = true; // 버튼 비활성화
-            button.textContent = '조회 중...';
-
-            const modal = document.getElementById('reportModal');
-            const title = document.getElementById('reportModalTitle');
-            const desc = document.getElementById('reportModalDescription');
-            const msg = document.getElementById('monthlyReportMessage');
-            const input = document.getElementById('reportLinkInput');
-            const copyBtn = document.getElementById('copyReportLinkBtn');
-
-            // 월간 모달로 초기화
-            title.textContent = '📖 지난 달 리포트 복사';
-            desc.style.display = 'none';
-            msg.style.display = 'block'; // 메시지 창 보이기
-            msg.textContent = '지난 달 리포트를 조회 중입니다...';
-            input.style.display = 'none';
-            copyBtn.style.display = 'none';
-            
+            if (!studentName || !date) { showToast('학생 정보가 없어 월간 리포트를 조회할 수 없습니다.', 'error'); return; }
+            button.disabled = true; button.textContent = '조회 중...';
+            const modal = document.getElementById('reportModal'); const title = document.getElementById('reportModalTitle'); const desc = document.getElementById('reportModalDescription'); const msg = document.getElementById('monthlyReportMessage'); const input = document.getElementById('reportLinkInput'); const copyBtn = document.getElementById('copyReportLinkBtn');
+            title.textContent = '📖 지난 달 리포트 복사'; desc.style.display = 'none'; msg.style.display = 'block'; msg.textContent = '지난 달 리포트를 조회 중입니다...'; input.style.display = 'none'; copyBtn.style.display = 'none';
             modal.classList.add('show');
-
             try {
-                const response = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(studentName)}&date=${date}`, {
-                    headers: { 'Authorization': 'Bearer ' + authToken }
-                });
-                
+                const response = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(studentName)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const data = await response.json();
-                
                 if (response.ok && data.success) {
-                    msg.textContent = '지난 달 리포트 URL을 찾았습니다. 복사 버튼을 눌러주세요.';
-                    input.value = data.url;
-                    input.style.display = 'block';
-                    copyBtn.style.display = 'block'; // 복사 버튼 보이기
-                    copyBtn.disabled = false;
-                    copyBtn.textContent = '복사하기';
-                } else {
-                    throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.');
-                }
-            } catch (error) {
-                console.error('월간 리포트 \'복사\' 조회 오류:', error);
-                msg.innerHTML = `<span style="color: #ef4444;">${error.message}</span>`;
-            } finally {
-                button.disabled = false; // 버튼 다시 활성화
-                button.textContent = '월간 복사';
-            }
+                    msg.textContent = '지난 달 리포트 URL을 찾았습니다. 복사 버튼을 눌러주세요.'; input.value = data.url; input.style.display = 'block'; copyBtn.style.display = 'block'; copyBtn.disabled = false; copyBtn.textContent = '복사하기';
+                } else { throw new Error(data.message || '지난 달 리포트를 찾지 못했습니다.'); }
+            } catch (error) { console.error('월간 리포트 \'복사\' 조회 오류:', error); msg.innerHTML = `<span style="color: #ef4444;">${error.message}</span>`; } 
+            finally { button.disabled = false; button.textContent = '월간 복사'; }
         }
 
-        function closeReportModal() {
-            document.getElementById('reportModal').classList.remove('show');
-        }
+        function closeReportModal() { document.getElementById('reportModal').classList.remove('show'); }
 
         function copyReportLink() {
-            const input = document.getElementById('reportLinkInput');
-            const copyBtn = document.getElementById('copyReportLinkBtn');
-            
-            input.select();
-            input.setSelectionRange(0, 99999); // 모바일 기기 호환성
-
+            const input = document.getElementById('reportLinkInput'); const copyBtn = document.getElementById('copyReportLinkBtn');
+            input.select(); input.setSelectionRange(0, 99999); 
             try {
-                // (참고: navigator.clipboard.writeText는 iframe에서 보안상 막힐 수 있음)
-                // (대안으로 document.execCommand 사용)
                 const successful = document.execCommand('copy');
-                if (successful) {
-                    copyBtn.textContent = '복사 완료!';
-                    copyBtn.disabled = true;
-                    showToast('리포트 링크가 복사되었습니다!', 'success');
-                } else {
-                    throw new Error('복사 실패');
-                }
-            } catch (err) {
-                console.error('클립보드 복사 실패:', err);
-                showToast('링크 복사에 실패했습니다. 직접 복사해주세요.', 'error');
-            }
+                if (successful) { copyBtn.textContent = '복사 완료!'; copyBtn.disabled = true; showToast('리포트 링크가 복사되었습니다!', 'success'); } 
+                else { throw new Error('복사 실패'); }
+            } catch (err) { console.error('클립보드 복사 실패:', err); showToast('링크 복사에 실패했습니다. 직접 복사해주세요.', 'error'); }
         }
 
-        // [신규] '데일리 복사' 버튼을 위한 클립보드 복사 헬퍼 함수
         function copyTextToClipboard(text) {
-            // 1. 임시 textarea 엘리먼트 생성
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';  // 화면에 보이지 않게
-            textarea.style.opacity = 0;
-            textarea.style.left = '-9999px'; // 화면 밖으로
-            document.body.appendChild(textarea);
-            
-            // 2. 텍스트 선택
-            textarea.select();
-            textarea.setSelectionRange(0, 99999); // 모바일 호환성
-
+            const textarea = document.createElement('textarea'); textarea.value = text; textarea.style.position = 'fixed'; textarea.style.opacity = 0; textarea.style.left = '-9999px'; document.body.appendChild(textarea);
+            textarea.select(); textarea.setSelectionRange(0, 99999); 
             let successful = false;
-            try {
-                // 3. 복사 실행
-                successful = document.execCommand('copy');
-            } catch (err) {
-                console.error('클립보드 복사 실패 (execCommand):', err);
-            }
-            
-            // 4. 임시 엘리먼트 제거
+            try { successful = document.execCommand('copy'); } catch (err) { console.error('클립보드 복사 실패 (execCommand):', err); }
             document.body.removeChild(textarea);
-            
             return successful;
         }
 
-        // [신규] '데일리 복사' 버튼 클릭 시 모달 없이 바로 복사하는 함수
         async function copyDailyReportLink(button, pageId, date) {
-            if (!pageId || !date) {
-                showToast('리포트 정보를 찾을 수 없습니다.', 'error');
-                return;
-            }
-            
+            if (!pageId || !date) { showToast('리포트 정보를 찾을 수 없습니다.', 'error'); return; }
             const reportUrl = `${API_BASE_URL}/report?pageId=${pageId}&date=${date}`;
-            
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = '복사 중...';
-
+            const originalText = button.textContent; button.disabled = true; button.textContent = '복사 중...';
             try {
                 const successful = copyTextToClipboard(reportUrl);
-                
-                if (successful) {
-                    showToast('데일리 리포트 링크가 복사되었습니다!', 'success');
-                    button.textContent = '복사 완료!';
-                } else {
-                    throw new Error('복사 실패');
-                }
-            } catch (err) {
-                console.error('클립보드 복사 실패:', err);
-                showToast('링크 복사에 실패했습니다.', 'error');
-                button.textContent = originalText; // 오류 발생 시 원상복구
-            } finally {
-                // 일정 시간 후 버튼 텍스트를 원래대로 되돌림
-                setTimeout(() => {
-                    button.disabled = false;
-                    button.textContent = originalText;
-                }, 2000);
-            }
+                if (successful) { showToast('데일리 리포트 링크가 복사되었습니다!', 'success'); button.textContent = '복사 완료!'; } 
+                else { throw new Error('복사 실패'); }
+            } catch (err) { console.error('클립보드 복사 실패:', err); showToast('링크 복사에 실패했습니다.', 'error'); button.textContent = originalText; } 
+            finally { setTimeout(() => { button.disabled = false; button.textContent = originalText; }, 2000); }
         } 
-
-    
-
     </script>
 </body>
 </html>
