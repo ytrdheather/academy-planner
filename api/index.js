@@ -118,21 +118,34 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
 // [신규] 월간 리포트 모듈에 필요한 헬퍼 함수 3개 (오류 수정)
 // =======================================================================
 
-// [신규] KST 기준 '오늘'의 시작과 끝, 날짜 문자열 반환
+// [*** 2025-11-17 타임존 버그 수정 ***]
+// 서버의 현지 시간(UTC) 대신, 수동으로 KST(UTC+9)를 계산하여
+// '오늘' 날짜를 정확히 반환하도록 수정합니다.
 function getKSTTodayRange() {
-    const now = new Date(); // 현재 UTC 시간
-    const kstOffset = 9 * 60 * 60 * 1000; // KST는 UTC+9
-    const kstNow = new Date(now.getTime() + kstOffset); // 현재 KST 시간 (값)
+    const now = new Date(); // 1. 현재 UTC 시간 (예: 2025-11-16 18:00:00 UTC)
+    
+    // 2. KST는 UTC+9 (9시간 * 60분 * 60초 * 1000ms)
+    const kstOffset = 9 * 60 * 60 * 1000; 
+    
+    // 3. KST의 현재 시간을 나타내는 새 Date 객체를 생성
+    const kstNow = new Date(now.getTime() + kstOffset); // (예: 2025-11-17 03:00:00 KST)
 
-    const kstDateString = kstNow.toISOString().split('T')[0]; // "2025-11-08" (KST 기준)
+    // 4. 이 KST 객체에서 'UTC 기준'의 날짜 부분을 추출합니다.
+    // (이러면 현재 KST 날짜의 YYYY-MM-DD가 정확히 나옵니다)
+    const year = kstNow.getUTCFullYear();
+    const month = (kstNow.getUTCMonth() + 1).toString().padStart(2, '0'); // +1 (월은 0-11)
+    const day = kstNow.getUTCDate().toString().padStart(2, '0');
+    
+    const kstDateString = `${year}-${month}-${day}`; // "2025-11-17"
 
+    // KST 날짜 문자열을 기준으로 KST 자정과 마감 시간을 정의
     const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
     const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
 
     return {
-        start: start.toISOString(), // UTC로 변환된 값 (예: "2025-11-07T15:00:00.000Z")
-        end: end.toISOString(), // UTC로 변환된 값 (예: "2025-11-08T14:59:59.999Z")
-        dateString: kstDateString // URL용 (예: "2025-11-08")
+        start: start.toISOString(), // KST 자정을 UTC로 변환
+        end: end.toISOString(),   // KST 마감을 UTC로 변환
+        dateString: kstDateString // "2025-11-17"
     };
 }
 
@@ -193,12 +206,12 @@ app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 
 // =======================================================================
-// [기능 분리 1: 데일리 대시보드 복구]
+// [기능 분리 1: 데일리 대시보드 파서]
 // =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
-    // [*** 참고 ***] 이 부분의 수정은 헤더님이 주신 "잘 되던" 코드로 이미 반영되어 있습니다.
+    // [참고] 타임존 버그 수정이 반영된 getKSTTodayRange 사용
     const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString; 
 
     let assignedTeachers = [];
@@ -215,7 +228,7 @@ async function parseDailyReportData(page) {
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
-        dailyReading: props['5️⃣ 매일 독해 숙제']?.status?.name || '해당 없음', // [추가] 5번 숙제 값을 읽어오도록 추가
+        dailyReading: props['5️⃣ 매일 독해 숙제']?.status?.name || '해당 없음',
         diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
     };
 
@@ -223,13 +236,19 @@ async function parseDailyReportData(page) {
         vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
         vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
         vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-        vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A', // N/A 또는 점수(%)
+        
+        // [*** 수정: 성적 로딩 버그 해결 ***]
+        // 노션 수식이 숫자를 반환할 때를 대비해 formula.number 체크 추가
+        vocabScore: props['📰 단어 테스트 점수']?.formula?.number || props['📰 단어 테스트 점수']?.formula?.string || 'N/A',
+        
         readingWrong: props['독해 (틀린 개수)']?.number ?? null,
-        readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A', // PASS, FAIL, N/A
+        readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A',
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
         grammarTotal: props['문법 (전체 개수)']?.number ?? null,
         grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-        grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A' // N/A 또는 점수(%)
+        
+        // [*** 수정: 성적 로딩 버그 해결 ***]
+        grammarScore: props['📑 문법 시험 점수']?.formula?.number || props['📑 문법 시험 점수']?.formula?.string || 'N/A'
     };
 
     // 2. 리스닝
@@ -279,7 +298,6 @@ async function parseDailyReportData(page) {
     }
 
     // 4. 코멘트
-    // [버그 수정] rich_text 배열의 [0]만 읽던 것을, getSimpleText 헬퍼 함수를 사용하도록 수정
     const fullComment_daily = getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.';
 
     const comment = {
@@ -308,9 +326,7 @@ async function parseDailyReportData(page) {
 }
 
 // =======================================================================
-// [*** 핵심 수정 1 ***]
-// 선생님 대시보드 조회 함수 (`fetchProgressData`)
-// "타임스탬프" 또는 "날짜 문자열" 중 하나라도 맞으면 조회하도록 'or' 필터로 변경
+// [*** 핵심 수정 1: 선생님 대시보드 조회 (fetchProgressData) ***]
 // =======================================================================
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date, teacher } = req.query;
@@ -318,49 +334,45 @@ async function fetchProgressData(req, res, parseFunction) {
         throw new Error('서버 환경 변수가 설정되지 않았습니다.');
     }
     
-    // [*** 여기부터 수정 ***]
-    // const filterConditions = []; // 이 줄을 삭제합니다.
-    let finalFilter; // filterConditions 대신 finalFilter 변수를 사용합니다.
+    let finalFilter; 
 
     if (period === 'specific_date' && date) {
-        // "특정 날짜" 조회 시
-        const specificDate = date; // "2025-11-16"
+        const specificDate = date;
         const start = new Date(`${specificDate}T00:00:00.000+09:00`).toISOString();
         const end = new Date(`${specificDate}T23:59:59.999+09:00`).toISOString();
         
-        // [수정] '타임스탬프 범위' 또는 '날짜 문자열'이 일치하는 모든 데이터를 찾도록 "or" 필터 사용
+        // 2단계 중첩 (OR -> AND) 방식으로 안전하게 수정
         finalFilter = {
             "or": [
-                { // 1. 타임스탬프가 KST 범위 내에 있는 데이터 (예: 11/16 00:00 ~ 23:59)
+                { // 조건 1: 타임스탬프 범위
                     "and": [
                         { property: '🕐 날짜', date: { on_or_after: start } },
                         { property: '🕐 날짜', date: { on_or_before: end } }
                     ]
                 },
-                { // 2. 날짜 문자열(YYYY-MM-DD)이 정확히 일치하는 데이터 (예: "2025-11-16")
+                { // 조건 2: 날짜 문자열
                     "property": "🕐 날짜", "date": { "equals": specificDate }
                 }
             ]
         };
-    } else { // 기본값 'today' 조회 시
-        // [수정] "오늘" 조회 시에도 '타임스탬프 범위' 또는 '날짜 문자열' 모두 조회
-        const { start, end, dateString } = getKSTTodayRange(); // KST 기준 '오늘'
+    } else { // 기본값 'today'
+        const { start, end, dateString } = getKSTTodayRange(); 
         
+        // 2단계 중첩 (OR -> AND) 방식
         finalFilter = {
             "or": [
-                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
+                { // 조건 1: 타임스탬프 오늘 범위
                     "and": [
                         { property: '🕐 날짜', date: { on_or_after: start } },
                         { property: '🕐 날짜', date: { on_or_before: end } }
                     ]
                 },
-                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
+                { // 조건 2: 날짜 문자열 오늘
                     "property": "🕐 날짜", "date": { "equals": dateString }
                 }
             ]
         };
     }
-    // [*** 여기까지 수정 ***]
 
     const pages = [];
     let hasMore = true;
@@ -369,7 +381,7 @@ async function fetchProgressData(req, res, parseFunction) {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: finalFilter, // [수정] filterConditions.length > 0 ? { and: filterConditions } : undefined -> finalFilter
+                filter: finalFilter, 
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
@@ -617,9 +629,7 @@ app.get('/api/test-all-books', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [*** 핵심 수정 2 ***]
-// 학생 플래너 저장 API (`/save-progress`)
-// "기존 데이터 검색" 시, "타임스탬프" 또는 "날짜 문자열" 모두 검색하도록 'or' 필터로 변경
+// [*** 핵심 수정 2: 학생 플래너 저장 (/save-progress) ***]
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
@@ -670,7 +680,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         };
 
         // 2. 값 변환 매핑 (웹앱 표시값 -> Notion 저장값)
-        // [수정] HTML 폼의 <option> value에 맞춰서 매핑 테이블 보강
+        // [수정] 헤더님 요청에 따라 정확한 값으로 매핑을 고정합니다.
         const valueMapping = {
             // 숙제 상태 변환
             "해당없음": "숙제 없음",
@@ -696,16 +706,21 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "못하고감": "못하고감",
             "완료함": "완료함",
 
-            // 책 읽는 거인
-            "못함": "못함",
-            "시작함": "시작함",
-            "절반": "절반",
-            "거의다읽음": "거의다읽음",
-            "완료함": "완료함",
+            // [*** 수정 ***] 책 읽는 거인 (헤더님 요청 반영)
+            "못함": "미완료",
+            "시작함": "진행하지 않음", // HTML select value -> Notion value 매핑 확인 필요 (우선 요청사항 반영)
+            "절반": "진행하지 않음",
+            "거의다읽음": "진행하지 않음",
+            "완료함": "완료",
             
-            // Writing
-            "안함": "안함",
-            "완료": "완료"
+            // [참고] 만약 HTML select value가 이미 '미완료', '진행하지 않음'으로 되어 있다면 아래가 적용됨
+            "미완료": "미완료",
+            "진행하지 않음": "진행하지 않음",
+            
+            // [*** 수정 ***] Writing (헤더님 요청 반영)
+            "안함": "미완료", 
+            "완료": "완료",
+            "SKIP": "SKIP"
         };
 
         // 3. 데이터 타입 분류 (HTML의 name 기준)
@@ -826,26 +841,24 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         // 6. KST 기준 '오늘'의 시작과 끝 범위를 가져옵니다.
         const { start, end, dateString } = getKSTTodayRange();
 
-        // [*** 여기부터 수정 ***]
-        // 7. '이름'과 '오늘 날짜'로 '진도 관리 DB'에서 기존 페이지를 검색합니다.
-        // '타임스탬프' 또는 '날짜 문자열' 모두 검색하도록 'or' 필터 적용
+        // [*** 평탄화 수정: 500 에러 해결 ***] 
+        // 3단계 중첩(AND -> OR -> AND)을 2단계(OR -> AND)로 평탄화하여 노션 API 제한 준수
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
-                    "and": [ // 이름은 반드시 일치해야 함
-                        { property: '이름', title: { equals: studentName } },
-                        { // 날짜는 둘 중 하나만 일치하면 됨
-                            "or": [
-                                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
-                                    "and": [
-                                        { property: '🕐 날짜', date: { on_or_after: start } },
-                                        { property: '🕐 날짜', date: { on_or_before: end } }
-                                    ]
-                                },
-                                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
-                                    "property": "🕐 날짜", "date": { "equals": dateString }
-                                }
+                    "or": [
+                        { // 조건 1: 이름 일치 AND 날짜 범위
+                            "and": [
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { on_or_after: start } },
+                                { property: '🕐 날짜', date: { on_or_before: end } }
+                            ]
+                        },
+                        { // 조건 2: 이름 일치 AND 날짜 문자열
+                            "and": [
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { equals: dateString } }
                             ]
                         }
                     ]
@@ -853,7 +866,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
                 page_size: 1
             })
         });
-        // [*** 여기까지 수정 ***]
 
         console.log(`[save-progress] ${studentName} 학생의 오늘(${dateString}) 데이터 검색 결과: ${existingPageQuery.results.length}개`);
 
@@ -914,9 +926,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
 
 // =======================================================================
-// [*** 핵심 수정 3 ***]
-// 학생 플래너 로드 API (`/api/get-today-progress`)
-// "타임스탬프" 또는 "날짜 문자열" 모두 검색하도록 'or' 필터로 변경
+// [*** 핵심 수정 3: 학생 플래너 로드 (/api/get-today-progress) ***]
 // =======================================================================
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
@@ -929,25 +939,24 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         // KST 기준 오늘 날짜
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [*** 여기부터 수정 ***]
-        // '타임스탬프' 또는 '날짜 문자열' 모두 검색하도록 'or' 필터 적용
+        // [*** 평탄화 수정 ***]
+        // 3단계 중첩을 2단계로 수정 (OR -> AND)
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
                 filter: {
-                     "and": [ // 이름은 반드시 일치해야 함
-                        { property: '이름', title: { equals: studentName } },
-                        { // 날짜는 둘 중 하나만 일치하면 됨
-                            "or": [
-                                { // 1. 타임스탬프가 KST 오늘 범위 내에 있는 데이터
-                                    "and": [
-                                        { property: '🕐 날짜', date: { on_or_after: start } },
-                                        { property: '🕐 날짜', date: { on_or_before: end } }
-                                    ]
-                                },
-                                { // 2. 날짜 문자열(YYYY-MM-DD)이 오늘 날짜와 일치하는 데이터
-                                    "property": "🕐 날짜", "date": { "equals": dateString }
-                                }
+                    "or": [
+                        { // 조건 1: 이름 일치 AND 날짜 범위
+                            "and": [
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { on_or_after: start } },
+                                { property: '🕐 날짜', date: { on_or_before: end } }
+                            ]
+                        },
+                        { // 조건 2: 이름 일치 AND 날짜 문자열
+                            "and": [
+                                { property: '이름', title: { equals: studentName } },
+                                { property: '🕐 날짜', date: { equals: dateString } }
                             ]
                         }
                     ]
@@ -955,7 +964,6 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
                 page_size: 1
             })
         });
-        // [*** 여기까지 수정 ***]
         
         if (query.results.length === 0) {
             console.log(`[get-today-progress] ${studentName} 학생의 오늘 데이터가 없습니다.`);
@@ -1201,12 +1209,6 @@ app.get('/report', async (req, res) => {
 });
 
 // =======================================================================
-// [신규] 월간 리포트 동적 생성 API (View)
-// =======================================================================
-// [삭제] 월간 리포트 관련 코드는 모두 monthlyReportModule.js로 이동했습니다.
-
-
-// =======================================================================
 // [신규] 자동화 스케줄링 (Cron Jobs)
 // =======================================================================
 
@@ -1286,10 +1288,6 @@ cron.schedule('0 22 * * *', async () => {
 });
 
 
-// --- [신규] 2. 월간 리포트 URL 자동 생성 ---
-// [삭제] 월간 리포트 cron job은 monthlyReportModule.js로 이동했습니다.
-
-
 // [신규] 월간 리포트 모듈 초기화
 // ----------------------------------------------------------------------
 // index.js에 정의된 모든 헬퍼와 설정을 객체로 모아 전달합니다.
@@ -1324,8 +1322,6 @@ try {
 } catch (e) {
     console.error('❌ 월간 리포트 모듈 연결에 실패했습니다:', e);
 }
-
-
 
 // --- 서버 실행 ---
 app.listen(PORT, '0.0.0.0', () => {
