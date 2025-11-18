@@ -234,18 +234,22 @@ async function parseDailyReportData(page) {
 
     const tests = {
         vocabUnit: props['어휘유닛']?.rich_text?.[0]?.plain_text || '',
-        vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
-        vocabTotal: props['단어 (전체 개수)']?.number ?? null,
+        
+        // [*** 수정: 속성명 띄어쓰기 제거 ***]
+        vocabCorrect: props['단어(맞은 개수)']?.number ?? null,  // '단어 (맞은 개수)' -> '단어(맞은 개수)'
+        vocabTotal: props['단어(전체 개수)']?.number ?? null,    // '단어 (전체 개수)' -> '단어(전체 개수)'
         
         // [*** 수정: 성적 로딩 버그 해결 ***]
-        // 노션 수식이 숫자를 반환할 때를 대비해 formula.number 체크 추가
         vocabScore: props['📰 단어 테스트 점수']?.formula?.number || props['📰 단어 테스트 점수']?.formula?.string || 'N/A',
         
-        readingWrong: props['독해 (틀린 개수)']?.number ?? null,
+        // [*** 수정: 속성명 띄어쓰기 제거 ***]
+        readingWrong: props['독해(틀린 개수)']?.number ?? null,  // '독해 (틀린 개수)' -> '독해(틀린 개수)'
         readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A',
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-        grammarTotal: props['문법 (전체 개수)']?.number ?? null,
-        grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
+        
+        // [*** 수정: 속성명 띄어쓰기 제거 ***]
+        grammarTotal: props['문법(전체 개수)']?.number ?? null,  // '문법 (전체 개수)' -> '문법(전체 개수)'
+        grammarWrong: props['문법(틀린 개수)']?.number ?? null,  // '문법 (틀린 개수)' -> '문법(틀린 개수)'
         
         // [*** 수정: 성적 로딩 버그 해결 ***]
         grammarScore: props['📑 문법 시험 점수']?.formula?.number || props['📑 문법 시험 점수']?.formula?.string || 'N/A'
@@ -707,20 +711,14 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "완료함": "완료함",
 
             // [*** 수정 ***] 책 읽는 거인 (헤더님 요청 반영)
-            "못함": "미완료",
-            "시작함": "진행하지 않음", // HTML select value -> Notion value 매핑 확인 필요 (우선 요청사항 반영)
-            "절반": "진행하지 않음",
-            "거의다읽음": "진행하지 않음",
-            "완료함": "완료",
-            
-            // [참고] 만약 HTML select value가 이미 '미완료', '진행하지 않음'으로 되어 있다면 아래가 적용됨
             "미완료": "미완료",
             "진행하지 않음": "진행하지 않음",
+            "완료": "완료",
             
             // [*** 수정 ***] Writing (헤더님 요청 반영)
-            "안함": "미완료", 
             "완료": "완료",
-            "SKIP": "SKIP"
+            "SKIP": "SKIP",
+            "미완료": "미완료"
         };
 
         // 3. 데이터 타입 분류 (HTML의 name 기준)
