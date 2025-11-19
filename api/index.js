@@ -587,10 +587,7 @@ app.get('/api/search-sayu-books', requireAuth, async (req, res) => {
             })
         });
         
-// 아무 곳에나 (예: 550줄 근처)
-app.get('/test', (req, res) => {
-    res.json({ message: '서버 작동 중', time: new Date() });
-});
+
 
         // 데이터 파싱
         const books = data.results.map(page => {

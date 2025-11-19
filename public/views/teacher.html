@@ -605,6 +605,7 @@
         let currentActiveTab = 'homework';
         let currentModalContext = {}; // { pageId, propertyName, type }
         let bookSearchTimer = null;
+        let currentSearchResults = []; 
 
         // [수정] 탭 접미사를 반환하는 헬퍼 함수를 공용으로 사용할 수 있도록 전역 스코프로 이동
         function getSuffixForTab(tabName) {
@@ -1156,22 +1157,49 @@
         
         function closeBookSearchModal() { document.getElementById('bookSearchModal').classList.remove('show'); currentModalContext = {}; }
 
-        async function searchEngBooks(query) {
+       async function searchEngBooks(query) {
             const resultsList = document.getElementById('modalSearchResults');
-            if (!query || query.trim().length < 2) { resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 2자 이상 입력해주세요.</div>'; return; }
+            if (!query || query.trim().length < 2) { 
+                resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 2자 이상 입력해주세요.</div>'; 
+                return; 
+            }
             resultsList.innerHTML = '<div class="loading" style="padding: 30px;">검색 중...</div>';
+            
             try {
                 const response = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                if (!response.ok) throw new Error('검색 API 오류'); const books = await response.json();
-                if (books.length === 0) { resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색 결과가 없습니다.</div>'; return; }
-                resultsList.innerHTML = books.map(book => `
-                    <div class="result-item" onclick="selectBook('${book.id}', '${book.title.replace(/'/g, "\\'")}')">
+                if (!response.ok) throw new Error('검색 API 오류'); 
+                
+                const books = await response.json();
+                
+                currentSearchResults = books; 
+
+                if (books.length === 0) { 
+                    resultsList.innerHTML = '<div class="no-data" style="padding: 30px;">검색 결과가 없습니다.</div>'; 
+                    return; 
+                }
+                
+                // [수정 3] onclick에서 selectBook 대신 selectBookByIndex 호출 (특수문자 오류 방지)
+                resultsList.innerHTML = books.map((book, index) => `
+                    <div class="result-item" onclick="selectBookByIndex(${index})">
                         <div class="result-title">${book.title}</div>
                         <div class="result-meta">저자: ${book.author || 'N/A'} | 레벨: ${book.level || 'N/A'}</div>
                     </div>`).join('');
-            } catch (error) { console.error("영어 원서 검색 오류:", error); resultsList.innerHTML = '<div class="no-data" style="color: red; padding: 30px;">검색 중 오류 발생</div>'; }
+
+            } catch (error) { 
+                console.error("영어 원서 검색 오류:", error); 
+                resultsList.innerHTML = '<div class="no-data" style="color: red; padding: 30px;">검색 중 오류 발생</div>'; 
+            }
         }
-        
+                // [수정 4] 인덱스로 책을 선택하는 헬퍼 함수 추가
+        function selectBookByIndex(index) {
+            const book = currentSearchResults[index];
+            if (book) {
+                selectBook(book.id, book.title);
+            }
+        }
+
+
+
         async function selectBook(bookPageId, bookTitle) {
             if (!currentModalContext.pageId) return;
             const { pageId, propertyName } = currentModalContext;
