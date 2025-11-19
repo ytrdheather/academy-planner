@@ -537,7 +537,6 @@ app.get('/api/search-books', requireAuth, async (req, res) => {
         
         // --- [핵심 수정 4] ---
         // Notion API에서 직접 필터링하도록 수정합니다. (성능 향상)
-        // 'contains'를 사용하여 부분 일치 검색을 지원합니다.
         const filter = query ? { property: 'Title', title: { contains: query } } : undefined;
         
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${ENG_BOOKS_ID}/query`, {
@@ -555,7 +554,11 @@ app.get('/api/search-books', requireAuth, async (req, res) => {
                 id: page.id,
                 title: props.Title?.title?.[0]?.plain_text || 'No Title',
                 author: props.Author?.rich_text?.[0]?.plain_text || '',
-                level: props.Level?.select?.name || ''
+                level: props.Level?.select?.name || '',
+                // [추가] 시리즈, AR, Lexile 정보 추가
+                series: props.Series?.select?.name || props.Series?.rich_text?.[0]?.plain_text || null,
+                ar: props.AR?.number || null,
+                lexile: props.Lexile?.number || null
             };
         });
         

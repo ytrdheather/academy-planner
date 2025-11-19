@@ -904,9 +904,10 @@
                             ${st.reading.bookTitle || '책 검색...'}
                         </button>
                     </td>
-                    <td>${st.reading.bookSeries || '-'}</td>
-                    <td>${st.reading.bookAR ?? '-'}</td>
-                    <td>${st.reading.bookLexile ?? '-'}</td>
+                    <!-- [수정] 즉시 업데이트를 위해 각 셀에 고유 ID 부여 -->
+                    <td id="series-${st.pageId}">${st.reading.bookSeries || '-'}</td>
+                    <td id="ar-${st.pageId}">${st.reading.bookAR ?? '-'}</td>
+                    <td id="lexile-${st.pageId}">${st.reading.bookLexile ?? '-'}</td>
                     <td>${formatSelectDropdown(st.pageId, 'Writing', st.reading.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'], '---')}</td>
                 </tr>`).join('');
         }
@@ -1190,30 +1191,61 @@
                 resultsList.innerHTML = '<div class="no-data" style="color: red; padding: 30px;">검색 중 오류 발생</div>'; 
             }
         }
-                // [수정 4] 인덱스로 책을 선택하는 헬퍼 함수 추가
+       // [수정] selectBookByIndex 함수: 선택한 책의 전체 정보를 넘겨줍니다.
         function selectBookByIndex(index) {
             const book = currentSearchResults[index];
             if (book) {
-                selectBook(book.id, book.title);
+                // book 객체 전체를 세 번째 인자로 전달
+                selectBook(book.id, book.title, book);
             }
         }
 
 
 
-        async function selectBook(bookPageId, bookTitle) {
+        // [수정] selectBook 함수: bookData를 받아서 화면(Series, AR, Lexile)을 즉시 업데이트합니다.
+        async function selectBook(bookPageId, bookTitle, bookData = null) {
             if (!currentModalContext.pageId) return;
             const { pageId, propertyName } = currentModalContext;
             const emptyTitle = '책 검색...';
             closeBookSearchModal();
+            
             let buttonElement;
-            if (currentActiveTab === 'reading') { buttonElement = document.querySelector(`#readingTableBody button[data-page-id="${pageId}"]`); }
+            if (currentActiveTab === 'reading') { 
+                buttonElement = document.querySelector(`#readingTableBody button[data-page-id="${pageId}"]`); 
+            }
+            
             if (buttonElement) {
                 buttonElement.textContent = bookTitle || emptyTitle;
-                if (bookPageId) { buttonElement.classList.remove('empty'); buttonElement.setAttribute('data-relation-id', bookPageId); } 
-                else { buttonElement.classList.add('empty'); buttonElement.setAttribute('data-relation-id', ''); }
+                if (bookPageId) { 
+                    buttonElement.classList.remove('empty'); 
+                    buttonElement.setAttribute('data-relation-id', bookPageId); 
+                    
+                    // [신규] 부가 정보(시리즈, AR, Lexile) 즉시 업데이트
+                    if (bookData) {
+                        const seriesCell = document.getElementById(`series-${pageId}`);
+                        const arCell = document.getElementById(`ar-${pageId}`);
+                        const lexileCell = document.getElementById(`lexile-${pageId}`);
+                        
+                        if (seriesCell) seriesCell.textContent = bookData.series || '-';
+                        if (arCell) arCell.textContent = bookData.ar ?? '-';
+                        if (lexileCell) lexileCell.textContent = bookData.lexile ?? '-';
+                    }
+                } else { 
+                    buttonElement.classList.add('empty'); 
+                    buttonElement.setAttribute('data-relation-id', ''); 
+                    
+                    // 연결 해제 시 부가 정보 초기화
+                    const seriesCell = document.getElementById(`series-${pageId}`);
+                    const arCell = document.getElementById(`ar-${pageId}`);
+                    const lexileCell = document.getElementById(`lexile-${pageId}`);
+                    if (seriesCell) seriesCell.textContent = '-';
+                    if (arCell) arCell.textContent = '-';
+                    if (lexileCell) lexileCell.textContent = '-';
+                }
             }
             await submitUpdate(pageId, propertyName, bookPageId, 'relation', null, null, false);
         }
+
         
         function markCommentAsChanged(textarea) {
             const row = textarea.closest('tr');
