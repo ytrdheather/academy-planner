@@ -327,31 +327,62 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [기능 2] 숙제 업데이트 API
+// [기능 2] 숙제 업데이트 API (단일 및 다중 속성 지원)
 // =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
-    const { pageId, propertyName, newValue, propertyType } = req.body;
-    if (!pageId || !propertyName) return res.status(400).json({ success: false, message: 'Missing fields' });
+    // updates: { "속성명1": {value: "값1", type: "status"}, ... } 형태의 객체 지원
+    const { pageId, propertyName, newValue, propertyType, updates } = req.body;
+    
+    if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
 
     try {
-        let payload;
-        if (propertyType === 'number') payload = { number: Number(newValue) || 0 };
-        else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: newValue || '' } }] };
-        else if (propertyType === 'select') payload = { select: newValue ? { name: newValue } : null };
-        else if (propertyType === 'relation') {
-            if (Array.isArray(newValue)) {
-                payload = { relation: newValue.map(id => ({ id })) };
-            } else {
-                payload = { relation: newValue ? [{ id: newValue }] : [] };
-            }
-        }
-        else if (propertyType === 'status') payload = { status: { name: newValue || '숙제 없음' } };
+        const propertiesToUpdate = {};
 
+        // 1. 다중 업데이트 요청인 경우 (updates 객체 사용)
+        if (updates && typeof updates === 'object') {
+            for (const [propName, valObj] of Object.entries(updates)) {
+                // valObj는 { value: '...', type: '...' } 형태
+                const val = valObj.value;
+                const type = valObj.type || 'status'; // 기본값 status
+
+                let payload;
+                if (type === 'number') payload = { number: Number(val) || 0 };
+                else if (type === 'rich_text') payload = { rich_text: [{ text: { content: val || '' } }] };
+                else if (type === 'select') payload = { select: val ? { name: val } : null };
+                else if (type === 'relation') {
+                    if (Array.isArray(val)) payload = { relation: val.map(id => ({ id })) };
+                    else payload = { relation: val ? [{ id: val }] : [] };
+                }
+                else if (type === 'status') payload = { status: { name: val || '숙제 없음' } };
+
+                propertiesToUpdate[propName] = payload;
+            }
+        } 
+        // 2. 단일 업데이트 요청인 경우 (기존 방식)
+        else if (propertyName) {
+            let payload;
+            if (propertyType === 'number') payload = { number: Number(newValue) || 0 };
+            else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: newValue || '' } }] };
+            else if (propertyType === 'select') payload = { select: newValue ? { name: newValue } : null };
+            else if (propertyType === 'relation') {
+                if (Array.isArray(newValue)) payload = { relation: newValue.map(id => ({ id })) };
+                else payload = { relation: newValue ? [{ id: newValue }] : [] };
+            }
+            else if (propertyType === 'status') payload = { status: { name: newValue || '숙제 없음' } };
+
+            propertiesToUpdate[propertyName] = payload;
+        } else {
+            return res.status(400).json({ success: false, message: 'No update data provided' });
+        }
+
+        // Notion API 호출 (한 번에 업데이트 - 충돌 방지)
         await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
             method: 'PATCH',
-            body: JSON.stringify({ properties: { [propertyName]: payload } })
+            body: JSON.stringify({ properties: propertiesToUpdate })
         });
+
         res.json({ success: true });
+
     } catch (error) {
         console.error('Update Error:', error);
         res.status(500).json({ success: false, message: error.message });

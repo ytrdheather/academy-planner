@@ -506,16 +506,29 @@
             }
 
             try {
-                // 2. 백그라운드 API 업데이트
-                await Promise.all(props.map(prop => fetch(`${API_BASE_URL}/api/update-homework`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ pageId, propertyName: prop, newValue: status, propertyType: 'status' })
-                })));
+                // 2. 업데이트할 데이터 객체 생성
+                const updates = {};
+                props.forEach(prop => {
+                    updates[prop] = { value: status, type: 'status' };
+                });
+
+                // 3. 백엔드에 한 번만 요청 전송
+                await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ 
+                        pageId: pageId, 
+                        updates: updates // 다중 업데이트 객체 전달
+                    })
+                });
+                
                 showToast(`모두 "${status}" 처리되었습니다.`);
-                // loadDataForCurrentTab(); // UI가 이미 업데이트되었으므로 굳이 리로드 안 해도 됨 (필요시 주석 해제)
+                // 성공 시 데이터 리로드 불필요 (UI는 이미 변경됨)
+                
             } catch(e) { 
+                console.error(e);
                 showToast('처리 실패 (새로고침 필요)', 'error'); 
-                loadDataForCurrentTab(); // 실패 시 원상복구 위해 리로드
+                loadDataForCurrentTab(); // 실패 시 원상복구
             }
         }
 
