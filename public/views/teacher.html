@@ -44,7 +44,7 @@
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-        .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; }
+        .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
         
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
@@ -57,67 +57,55 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 드롭다운 및 입력 필드 */
-        .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
+        /* 숙제 상태 버튼 (토글용) */
+        .status-badge {
+            padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none;
+        }
+        .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
+        /* [신규] 3단 일괄 처리 버튼 그룹 */
+        .batch-controls {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .batch-btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            flex: 1;
+        }
+        .batch-btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .batch-ok { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .batch-no { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
+        .batch-reset { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+
+        .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
         .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; }
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* [복구] 코멘트 탭 스타일 (버튼 그룹 및 텍스트 영역) */
-        .comment-textarea { 
-            width: 100%; 
-            padding: 10px; 
-            border: 1px solid #d1d5db; 
-            border-radius: 6px; 
-            font-size: 13px; 
-            min-height: 60px; /* 기본 높이 */
-            resize: none; /* 자동 조절되므로 수동 리사이즈 끔 */
-            overflow-y: hidden; /* 스크롤바 숨김 */
-            line-height: 1.5;
-        }
+        /* 코멘트 탭 */
+        .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
         .comment-textarea:focus { border-color: #8b5cf6; outline: none; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
         
         /* 버튼 그룹 컨테이너 (오른쪽 정렬) */
-        .report-btn-group {
-            display: flex;
-            flex-direction: column; /* 세로로 쌓기 */
-            gap: 5px;
-            align-items: stretch;
-            min-width: 100px;
-        }
-        
-        /* 공통 버튼 스타일 */
-        .action-btn {
-            border: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-        
-        .btn-save { background: #10b981; color: white; }
-        .btn-save:hover { background: #059669; }
-        
-        .btn-daily-view { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
-        .btn-daily-view:hover { background: #bae6fd; }
-        
-        .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
-        .btn-daily-copy:hover { background: #e0e7ff; }
-        
-        .btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-        .btn-monthly-view:hover { background: #d8b4fe; }
-        
-        .btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; }
-        .btn-monthly-copy:hover { background: #fae8ff; }
+        .report-btn-group { display: flex; flex-direction: column; gap: 5px; align-items: stretch; min-width: 100px; }
+        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .btn-save { background: #10b981; color: white; } .btn-save:hover { background: #059669; }
+        .btn-daily-view { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; } .btn-daily-view:hover { background: #bae6fd; }
+        .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; } .btn-daily-copy:hover { background: #e0e7ff; }
+        .btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; } .btn-monthly-view:hover { background: #d8b4fe; }
+        .btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; } .btn-monthly-copy:hover { background: #fae8ff; }
 
-        /* 모달 */
+        /* 모달 & 토스트 */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
@@ -130,8 +118,7 @@
         /* 토스트 메시지 */
         .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; background: #333; color: white; opacity: 0; transform: translateX(100%); transition: all 0.3s; z-index: 3000; }
         .toast-message.show { opacity: 1; transform: translateX(0); }
-        .toast-message.success { background: #10b981; }
-        .toast-message.error { background: #ef4444; }
+        .toast-message.success { background: #10b981; } .toast-message.error { background: #ef4444; }
     </style>
 </head>
 <body>
@@ -163,7 +150,6 @@
                         
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
-                            <!-- [수정] 기본값을 today로 설정하고 변경 시 toggleDateInput 호출 -->
                             <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -283,7 +269,7 @@
                 </div>
             </div>
 
-            <!-- 5. 오늘의 코멘트 탭 (버튼 5개 복구, 자동 크기 조절 적용) -->
+            <!-- 5. 오늘의 코멘트 탭 -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
@@ -306,12 +292,10 @@
                             </select>
                         </div>
                         
-                        <!-- [복구] 일괄 저장 버튼 -->
                         <button class="refresh-btn" style="background:#6b46c1; margin-left:auto;" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <!-- [복구] 컬럼 너비 조정: 관리 버튼 영역 확보 -->
                             <colgroup><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:50%"><col style="width:24%"></colgroup>
                             <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr></thead>
                             <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
@@ -323,7 +307,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달 -->
+    <!-- 책 검색 모달, 리포트 모달 (동일) -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 style="margin-bottom:15px; color:#6b46c1;">📚 책 추가하기</h2>
@@ -332,8 +316,6 @@
             <button onclick="document.getElementById('bookSearchModal').classList.remove('show')" style="width:100%; padding:10px; margin-top:15px; border:none; background:#f3f4f6; border-radius:8px; cursor:pointer;">닫기</button>
         </div>
     </div>
-
-    <!-- [복구] 리포트 링크 복사 모달 -->
     <div id="reportModal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="reportModalTitle" style="margin-bottom:15px; color:#6b46c1;">🔗 리포트 링크</h2>
@@ -358,10 +340,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href='/teacher-login'; return; }
-            
-            // [복구] 기본값을 '오늘'로 설정
             setAllFiltersToToday();
-            
             loadUserInfo();
             showTab('homework');
             
@@ -385,13 +364,10 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/teacher/user-info`, { headers:{Authorization:'Bearer '+authToken} });
                 const data = await res.json();
-                
                 currentUserName = data.userName;
                 currentUserRole = data.userRole;
                 document.getElementById('userName').textContent = `${data.userName} (${data.userRole === 'manager' ? '관리자' : '선생님'})`;
-
                 loadTeachersList();
-
             } catch (e) { logout(); }
         }
 
@@ -399,26 +375,16 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/teachers`, { headers:{Authorization:'Bearer '+authToken} });
                 const teachers = await res.json();
-                
                 ['hw', 'tests', 'reading', 'listening', 'comments'].forEach(tabId => {
                     const container = document.getElementById(`teacherFilterGroup_${tabId}`);
                     const select = document.getElementById(`teacherFilter_${tabId}`);
-                    
                     if (currentUserRole === 'manager') {
                         container.style.display = 'flex';
-                        teachers.forEach(t => {
-                            const opt = document.createElement('option');
-                            opt.value = t.name; opt.textContent = t.name;
-                            select.appendChild(opt);
-                        });
+                        teachers.forEach(t => { const opt = document.createElement('option'); opt.value = t.name; opt.textContent = t.name; select.appendChild(opt); });
                     } else {
                         container.style.display = 'flex';
-                        const myOpt = document.createElement('option');
-                        myOpt.value = currentUserName;
-                        myOpt.textContent = currentUserName + ' (나)';
-                        select.appendChild(myOpt);
-                        select.value = currentUserName;
-                        select.disabled = true; // 일반 선생님은 변경 불가 (본인 것만)
+                        const myOpt = document.createElement('option'); myOpt.value = currentUserName; myOpt.textContent = currentUserName + ' (나)'; select.appendChild(myOpt);
+                        select.value = currentUserName; select.disabled = true;
                     }
                 });
             } catch(e) { console.error(e); }
@@ -428,11 +394,8 @@
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
             const teacherSelect = document.getElementById(`teacherFilter_${tabSuffix}`);
             const selectedTeacher = teacherSelect ? teacherSelect.value : '';
-
             let filteredData = allReportData;
-            if (selectedTeacher) {
-                filteredData = allReportData.filter(item => item.teachers && item.teachers.includes(selectedTeacher));
-            }
+            if (selectedTeacher) { filteredData = allReportData.filter(item => item.teachers && item.teachers.includes(selectedTeacher)); }
             displayDataForAllTabs(filteredData);
         }
 
@@ -440,20 +403,15 @@
             const period = document.getElementById(`periodFilter_${tabId}`).value;
             const dateInput = document.getElementById(`specificDate_${tabId}`);
             dateInput.style.display = period === 'specific_date' ? 'block' : 'none';
-            
-            // '오늘' 선택 시 즉시 로드
             if (period === 'today') loadDataForCurrentTab();
         }
 
         async function loadDataForCurrentTab() {
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
-            
             const periodElem = document.getElementById(`periodFilter_${tabSuffix}`);
             const dateElem = document.getElementById(`specificDate_${tabSuffix}`);
-            
             const period = periodElem ? periodElem.value : 'today';
             const date = dateElem ? dateElem.value : '';
-            
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
 
@@ -473,134 +431,66 @@
             displayCommentData(data);
         }
 
-        // --- [복구] 코멘트 탭 렌더링 (버튼 5개 + 자동 크기 조절) ---
-        function displayCommentData(data) {
-            const tbody = document.getElementById('commentsTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `
-                <tr id="row-comment-${st.pageId}">
-                    <td class="student-name">${st.studentName}</td>
-                    <td>${(st.teachers||[]).join(', ')}</td>
-                    <td>${st.comment.grammarClass || '-'}</td>
-                    <td style="vertical-align:top;">
-                        <textarea class="comment-textarea" 
-                            oninput="autoResizeTextarea(this); markCommentAsChanged(this)"
-                            data-page-id="${st.pageId}"
-                            defaultValue="${st.comment.teacherComment || ''}"
-                        >${st.comment.teacherComment || ''}</textarea>
-                    </td>
-                    <td style="vertical-align:top;">
-                        <div class="report-btn-group">
-                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
-                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
-                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
-                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
-                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
-                        </div>
-                    </td>
-                </tr>`).join('');
+        // [1. 숙제 현황] 3단 일괄 처리 버튼 추가
+        function displayHomeworkData(data) {
+            const tbody = document.getElementById('homeworkTableBody');
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = data.map(st => `<tr>
+                <td class="student-name">
+                    <div>${st.studentName}</div>
+                    <div class="batch-controls">
+                        <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')" title="전체 완료">전체O</button>
+                        <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')" title="전체 미완료">전체X</button>
+                        <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '해당 없음')" title="모두 없음">초기화</button>
+                    </div>
+                </td>
+                <td>${(st.teachers||[]).join(', ')}</td>
+                <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
+                <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
+                <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
+                <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
+                <td>${renderToggleBadge(st.pageId, '5️⃣ 매일 독해 숙제', st.homework.dailyReading)}</td>
+                <td>${renderToggleBadge(st.pageId, '6️⃣ 영어일기 or 개인 독해서', st.homework.diary)}</td>
+                <td style="font-weight:bold; color:${st.completionRate>=80?'#10b981':'#ef4444'}">${st.completionRate}%</td>
+            </tr>`).join('');
+        }
+
+        function renderToggleBadge(pageId, prop, val) {
+            const statusMap = { '숙제 함': 'status-complete', '완료': 'status-complete', '안 해옴': 'status-incomplete', '미완료': 'status-incomplete', '숙제 없음': 'status-none', '해당 없음': 'status-none', '진행하지 않음': 'status-none' };
+            const displayVal = val || '숙제 없음';
+            const cls = statusMap[displayVal] || 'status-none';
+            return `<span class="status-badge ${cls}" onclick="toggleStatus(this, '${pageId}', '${prop}', '${displayVal}')">${displayVal}</span>`;
+        }
+
+        async function toggleStatus(el, pageId, prop, currentVal) {
+            const sequence = ['숙제 함', '안 해옴', '해당 없음'];
+            let nextIndex = sequence.indexOf(currentVal) + 1;
+            if (nextIndex >= sequence.length) nextIndex = 0;
+            const nextVal = sequence[nextIndex];
+            el.textContent = nextVal;
+            el.className = `status-badge ${nextVal === '숙제 함' ? 'status-complete' : (nextVal === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
+            el.onclick = () => toggleStatus(el, pageId, prop, nextVal);
+            await updateField(null, pageId, prop, 'status', nextVal);
+        }
+
+        // [일괄 처리 함수] (status: 숙제 함 / 안 해옴 / 해당 없음)
+        async function markAllHomework(pageId, status) {
+            const msg = status === '숙제 함' ? '완료' : (status === '안 해옴' ? '미완료' : '없음(초기화)');
+            if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
             
-            // 초기 높이 조절
-            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el));
-        }
-
-        function autoResizeTextarea(el) {
-            el.style.height = 'auto';
-            el.style.height = (el.scrollHeight) + 'px';
-        }
-
-        function markCommentAsChanged(el) {
-            const row = el.closest('tr');
-            const btn = row.querySelector('.comment-save-btn');
-            if(el.value !== el.defaultValue) {
-                el.style.backgroundColor = '#fffbeb'; // 변경됨 표시
-                btn.textContent = '저장*';
-                btn.style.background = '#ef4444';
-                row.classList.add('needs-save');
-            } else {
-                el.style.backgroundColor = 'white';
-                btn.textContent = '저장';
-                btn.style.background = '#10b981';
-                row.classList.remove('needs-save');
-            }
-        }
-
-        async function updateComment(btn, pageId) {
-            const row = btn.closest('tr');
-            const ta = row.querySelector('.comment-textarea');
-            const val = ta.value;
+            const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
             
-            btn.disabled = true; btn.textContent = '저장중...';
             try {
-                await fetch(`${API_BASE_URL}/api/update-homework`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' })
-                });
-                showToast('저장되었습니다.');
-                ta.defaultValue = val;
-                markCommentAsChanged(ta);
-            } catch(e) { showToast('저장 실패', 'error'); }
-            finally { btn.disabled = false; }
+                await Promise.all(props.map(prop => fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, propertyName: prop, newValue: status, propertyType: 'status' })
+                })));
+                showToast(`모두 "${status}" 처리되었습니다.`);
+                loadDataForCurrentTab(); // 데이터 갱신으로 UI 업데이트
+            } catch(e) { showToast('처리 실패', 'error'); }
         }
 
-        async function saveAllComments(batchBtn) {
-            const rows = document.querySelectorAll('tr.needs-save');
-            if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; }
-            
-            batchBtn.disabled = true;
-            let count = 0;
-            for(const row of rows) {
-                const btn = row.querySelector('.comment-save-btn');
-                const pageId = row.id.replace('row-comment-', '');
-                await updateComment(btn, pageId);
-                count++;
-                batchBtn.textContent = `저장중... ${count}/${rows.length}`;
-            }
-            batchBtn.disabled = false;
-            batchBtn.textContent = '💾 일괄 저장';
-            showToast(`${count}개 코멘트 저장 완료`);
-        }
-
-        // 리포트 관련 기능
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error'));
-        }
-
-        async function viewMonthlyReport(name, date) {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                const d = await res.json();
-                if(d.success) window.open(d.url, '_blank');
-                else alert(d.message);
-            } catch(e) { alert('오류 발생'); }
-        }
-
-        async function openMonthlyReportModal(name, date) {
-            // 간단히 링크를 가져와서 모달에 띄우거나 바로 복사
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                const d = await res.json();
-                if(d.success) {
-                    const modal = document.getElementById('reportModal');
-                    document.getElementById('reportModalTitle').textContent = '📅 월간 리포트 링크';
-                    document.getElementById('reportModalDesc').textContent = `${name} 학생의 지난달 리포트입니다.`;
-                    const inp = document.getElementById('reportLinkInput');
-                    inp.value = d.url;
-                    modal.classList.add('show');
-                } else alert(d.message);
-            } catch(e) { alert('오류 발생'); }
-        }
-        
-        function copyReportLink() {
-            const inp = document.getElementById('reportLinkInput');
-            inp.select();
-            document.execCommand('copy');
-            showToast('복사되었습니다!');
-            document.getElementById('reportModal').classList.remove('show');
-        }
-
-        // --- 나머지 탭 렌더링 함수들 (기존과 동일, 생략 없이 포함) ---
+        // --- 나머지 기존 함수들 ---
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
@@ -609,9 +499,7 @@
                 const bookTags = books.map(book => {
                     let infoText = '';
                     if (book.ar || book.lexile) {
-                        const parts = [];
-                        if (book.ar) parts.push(`AR ${book.ar}`);
-                        if (book.lexile) parts.push(`Lex ${book.lexile}`);
+                        const parts = []; if (book.ar) parts.push(`AR ${book.ar}`); if (book.lexile) parts.push(`Lex ${book.lexile}`);
                         infoText = ` <span style="opacity:0.7; font-weight:normal; font-size:0.9em;">(${parts.join(' / ')})</span>`;
                     }
                     return `<span class="book-tag">${book.title}${infoText} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}')">×</span></span>`;
@@ -628,137 +516,31 @@
             }).join('');
         }
 
-        // 책 관리 로직
-        function openAddBookModal(pageId) {
-            currentEditingPageId = pageId;
-            const modal = document.getElementById('bookSearchModal');
-            document.getElementById('modalSearchInput').value = '';
-            document.getElementById('modalSearchResults').innerHTML = '';
-            modal.classList.add('show');
-            document.getElementById('modalSearchInput').focus();
-        }
-        async function searchEngBooks(query) {
-            const list = document.getElementById('modalSearchResults');
-            if(query.length < 2) { list.innerHTML = ''; return; }
-            list.innerHTML = '<div class="loading">검색중...</div>';
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                const books = await res.json();
-                if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; }
-                list.innerHTML = books.map(b => `
-                    <div class="result-item" onclick="addBook('${b.id}')">
-                        <div style="font-weight:bold;">${b.title}</div>
-                        <div style="font-size:12px; color:#666;">${b.author || ''}</div>
-                    </div>`).join('');
-            } catch(e) { list.innerHTML = '오류'; }
-        }
-        async function addBook(newId) {
-            if(!currentEditingPageId) return;
-            document.getElementById('bookSearchModal').classList.remove('show');
-            const row = allReportData.find(d => d.pageId === currentEditingPageId);
-            const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
-            if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; }
-            await updateBookRelation(currentEditingPageId, [...currIds, newId]);
-        }
-        async function removeBook(pid, rid) {
-            if(!confirm('삭제하시겠습니까?')) return;
-            const row = allReportData.find(d => d.pageId === pid);
-            const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
-            await updateBookRelation(pid, currIds.filter(id => id !== rid));
-        }
-        async function updateBookRelation(pid, ids) {
-            try {
-                await fetch(`${API_BASE_URL}/api/update-homework`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' })
-                });
-                showToast('업데이트 완료');
-                loadDataForCurrentTab();
-            } catch(e) { showToast('실패', 'error'); }
-        }
+        function openAddBookModal(pageId) { currentEditingPageId = pageId; const modal = document.getElementById('bookSearchModal'); document.getElementById('modalSearchInput').value = ''; document.getElementById('modalSearchResults').innerHTML = ''; modal.classList.add('show'); document.getElementById('modalSearchInput').focus(); }
+        async function searchEngBooks(query) { const list = document.getElementById('modalSearchResults'); if(query.length < 2) { list.innerHTML = ''; return; } list.innerHTML = '<div class="loading">검색중...</div>'; try { const res = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const books = await res.json(); if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; } list.innerHTML = books.map(b => `<div class="result-item" onclick="addBook('${b.id}')"><div style="font-weight:bold;">${b.title}</div><div style="font-size:12px; color:#666;">${b.author || ''}</div></div>`).join(''); } catch(e) { list.innerHTML = '오류'; } }
+        async function addBook(newId) { if(!currentEditingPageId) return; document.getElementById('bookSearchModal').classList.remove('show'); const row = allReportData.find(d => d.pageId === currentEditingPageId); const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; } await updateBookRelation(currentEditingPageId, [...currIds, newId]); }
+        async function removeBook(pid, rid) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); await updateBookRelation(pid, currIds.filter(id => id !== rid)); }
+        async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
-        function displayHomeworkData(data) {
-            const tbody = document.getElementById('homeworkTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">${st.studentName}</td>
-                <td>${(st.teachers||[]).join(', ')}</td>
-                <td>${formatStatus(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
-                <td>${formatStatus(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
-                <td>${formatStatus(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
-                <td>${formatStatus(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                <td>${formatStatus(st.pageId, '5️⃣ 매일 독해 숙제', st.homework.dailyReading)}</td>
-                <td>${formatStatus(st.pageId, '6️⃣ 영어일기 or 개인 독해서', st.homework.diary)}</td>
-                <td style="font-weight:bold; color:${st.completionRate>=80?'#10b981':'#ef4444'}">${st.completionRate}%</td>
-            </tr>`).join('');
-        }
+        function displayTestData(data) { const tbody = document.getElementById('testsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td><td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td><td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td><td>${st.tests.vocabScore}</td><td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td><td>${st.tests.readingResult}</td><td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td><td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td><td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td><td>${st.tests.grammarScore}</td></tr>`).join(''); }
+        function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
+        function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
 
-        function displayTestData(data) {
-            const tbody = document.getElementById('testsTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">${st.studentName}</td>
-                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
-                <td>${st.tests.vocabScore}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td>
-                <td>${st.tests.readingResult}</td>
-                <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td>
-                <td>${st.tests.grammarScore}</td>
-            </tr>`).join('');
-        }
+        function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
+        function markCommentAsChanged(el) { const row = el.closest('tr'); const btn = row.querySelector('.comment-save-btn'); if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); } }
+        async function updateComment(btn, pageId) { const row = btn.closest('tr'); const ta = row.querySelector('.comment-textarea'); const val = ta.value; btn.disabled = true; btn.textContent = '저장중...'; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) }); showToast('저장되었습니다.'); ta.defaultValue = val; markCommentAsChanged(ta); } catch(e) { showToast('저장 실패', 'error'); } finally { btn.disabled = false; } }
+        async function saveAllComments(batchBtn) { const rows = document.querySelectorAll('tr.needs-save'); if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; } batchBtn.disabled = true; let count = 0; for(const row of rows) { const btn = row.querySelector('.comment-save-btn'); const pageId = row.id.replace('row-comment-', ''); await updateComment(btn, pageId); count++; batchBtn.textContent = `저장중... ${count}/${rows.length}`; } batchBtn.disabled = false; batchBtn.textContent = '💾 일괄 저장'; showToast(`${count}개 코멘트 저장 완료`); }
+        function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error')); }
+        async function viewMonthlyReport(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) window.open(d.url, '_blank'); else alert(d.message); } catch(e) { alert('오류 발생'); } }
+        async function openMonthlyReportModal(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) { const modal = document.getElementById('reportModal'); document.getElementById('reportModalTitle').textContent = '📅 월간 리포트 링크'; document.getElementById('reportModalDesc').textContent = `${name} 학생의 지난달 리포트입니다.`; const inp = document.getElementById('reportLinkInput'); inp.value = d.url; modal.classList.add('show'); } else alert(d.message); } catch(e) { alert('오류 발생'); } }
+        function copyReportLink() { const inp = document.getElementById('reportLinkInput'); inp.select(); document.execCommand('copy'); showToast('복사되었습니다!'); document.getElementById('reportModal').classList.remove('show'); }
 
-        function displayListeningData(data) {
-            const tbody = document.getElementById('listeningTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">${st.studentName}</td>
-                <td>${(st.teachers||[]).join(', ')}</td>
-                <td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td>
-                <td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td>
-            </tr>`).join('');
-        }
-
-        function formatSelect(pageId, prop, val, opts) {
-            return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
-        }
-        function formatStatus(pageId, prop, val) {
-            const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음'];
-            const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none');
-            return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
-        }
-
-        async function updateField(el, pageId, prop, type) {
-            const val = el.value;
-            try {
-                await fetch(`${API_BASE_URL}/api/update-homework`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type })
-                });
-                showToast('저장됨');
-            } catch (e) { showToast('실패', 'error'); }
-        }
-
-        function showToast(msg, type='success') {
-            const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg;
-            document.body.appendChild(t);
-            setTimeout(() => t.classList.add('show'), 10);
-            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000);
-        }
+        function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
+        function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
+        async function updateField(el, pageId, prop, type, manualVal) { const val = manualVal || el.value; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) }); showToast('저장됨'); } catch (e) { showToast('실패', 'error'); } }
+        function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
-        function showTab(tab) {
-            currentActiveTab = tab;
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tab+'-view').classList.add('active');
-            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
-            document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active');
-            loadDataForCurrentTab();
-        }
+        function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
     </script>
 </body>
 </html>
