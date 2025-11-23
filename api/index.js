@@ -89,6 +89,18 @@ function getKoreanDate(dateString) {
     return new Intl.DateTimeFormat('ko-KR', options).format(date);
 }
 
+// [수정] 롤업 배열 전체 가져오기 헬퍼 추가
+const getRollupArray = (prop) => {
+    if (!prop?.rollup?.array) return [];
+    return prop.rollup.array.map(item => {
+        if (item.type === 'number') return item.number;
+        if (item.type === 'select') return item.select?.name;
+        if (item.type === 'title') return item.title?.[0]?.plain_text;
+        if (item.type === 'rich_text') return item.rich_text?.[0]?.plain_text;
+        return null;
+    });
+};
+
 const getRollupValue = (prop, isNumber = false) => {
     if (!prop?.rollup) return isNumber ? null : '';
     if (prop.rollup.type === 'number') return prop.rollup.number;
@@ -159,7 +171,7 @@ try {
 
 
 // =======================================================================
-// [기능 1] 선생님 대시보드 로직 (다중 책 목록 추가)
+// [기능 1] 선생님 대시보드 로직 (다중 책 목록 + AR/Lexile 추가)
 // =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
@@ -201,22 +213,26 @@ async function parseDailyReportData(page) {
         workbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음'
     };
 
-    // [수정] 다중 책 목록 파싱
-    const engBookTitles = props['📖 책제목 (롤업)']?.rollup?.array?.map(item => item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text).filter(Boolean) || [];
+    // [핵심 수정] 다중 책 목록 및 AR/Lexile 파싱
+    // 롤업된 배열을 각각 가져옵니다. (Notion에서 순서대로 줍니다)
+    const engBookTitles = getRollupArray(props['📖 책제목 (롤업)']);
+    const engBookARs = getRollupArray(props['AR']); // AR 롤업
+    const engBookLexiles = getRollupArray(props['Lexile']); // Lexile 롤업
     const engBookIds = props['오늘 읽은 영어 책']?.relation?.map(r => r.id) || [];
-    // 프론트엔드에 전달할 책 배열
+    
+    // 프론트엔드에 전달할 책 배열 (AR/Lexile 포함)
     const englishBooks = engBookTitles.map((title, idx) => ({ 
         title: title, 
-        id: engBookIds[idx] || null // ID가 없으면 null
+        id: engBookIds[idx] || null,
+        ar: engBookARs[idx] || null,       // AR 점수 추가
+        lexile: engBookLexiles[idx] || null // Lexile 점수 추가
     }));
 
     const reading = {
         readingStatus: props['📖 영어독서']?.select?.name || '',
         vocabStatus: props['어휘학습']?.select?.name || '',
-        // 기존 bookTitle은 첫 번째 책만 표시 (하위 호환성)
         bookTitle: getRollupValue(props['📖 책제목 (롤업)']) || '읽은 책 없음',
-        // [신규] 다중 책 배열 추가
-        englishBooks: englishBooks, 
+        englishBooks: englishBooks, // [수정됨]
         bookSeries: getRollupValue(props['시리즈이름']),
         bookAR: getRollupValue(props['AR'], true),
         bookLexile: getRollupValue(props['Lexile'], true),
@@ -311,7 +327,7 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [기능 2] 숙제 업데이트 API (다중 Relation 배열 처리 추가)
+// [기능 2] 숙제 업데이트 API
 // =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType } = req.body;
@@ -323,7 +339,6 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: newValue || '' } }] };
         else if (propertyType === 'select') payload = { select: newValue ? { name: newValue } : null };
         else if (propertyType === 'relation') {
-            // [수정] 배열(ID 목록)이 들어오면 그대로 매핑, 단일 값이면 배열로 감싸서 처리
             if (Array.isArray(newValue)) {
                 payload = { relation: newValue.map(id => ({ id })) };
             } else {
@@ -390,7 +405,7 @@ app.post('/login', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// [진도 저장 - 다중 책 처리]
+// [진도 저장]
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -473,7 +488,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     }
 });
 
-// [데이터 로드 - 다중 책 복원]
+// [데이터 로드 - 다중 책 복원 + AR/Lexile]
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
@@ -507,9 +522,18 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
             else if (value.type === 'status') progress[key] = value.status?.name;
         }
 
-        const engBookTitles = props['📖 책제목 (롤업)']?.rollup?.array?.map(item => item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text).filter(Boolean) || [];
+        // [수정] 학생 데이터 로드 시에도 AR/Lexile 정보를 포함하여 복원
+        const engBookTitles = getRollupArray(props['📖 책제목 (롤업)']);
+        const engBookARs = getRollupArray(props['AR']);
+        const engBookLexiles = getRollupArray(props['Lexile']);
         const engBookIds = props['오늘 읽은 영어 책']?.relation?.map(r => r.id) || [];
-        progress.englishBooks = engBookTitles.map((title, idx) => ({ title, id: engBookIds[idx] || null }));
+        
+        progress.englishBooks = engBookTitles.map((title, idx) => ({ 
+            title: title, 
+            id: engBookIds[idx] || null,
+            ar: engBookARs[idx] || null,
+            lexile: engBookLexiles[idx] || null
+        }));
 
         const korBookTitles = props['국어책제목(롤업)']?.rollup?.array?.map(item => item.title?.[0]?.plain_text || item.rich_text?.[0]?.plain_text).filter(Boolean) || [];
         const korBookIds = props['국어 독서 제목']?.relation?.map(r => r.id) || [];
@@ -537,6 +561,11 @@ app.get('/report', async (req, res) => {
         const parsed = await parseDailyReportData(page);
         
         let html = reportTemplate;
+        // 리포트에 여러 권일 경우 콤마로 구분하여 표시
+        const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0
+            ? parsed.reading.englishBooks.map(b => b.title).join(', ')
+            : (parsed.reading.bookTitle || '읽은 책 없음');
+
         const replacements = {
             '{{STUDENT_NAME}}': parsed.studentName,
             '{{REPORT_DATE}}': getKoreanDate(parsed.date),
@@ -550,7 +579,7 @@ app.get('/report', async (req, res) => {
             '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus,
             '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic,
             '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
-            '{{BOOK_TITLE}}': parsed.reading.bookTitle, // 여러 권일 경우 쉼표 등으로 합쳐서 보여주면 좋음
+            '{{BOOK_TITLE}}': bookTitleStr, 
             '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR}/${parsed.reading.bookLexile}` : 'N/A',
             '{{WRITING_STATUS}}': parsed.reading.writingStatus
         };

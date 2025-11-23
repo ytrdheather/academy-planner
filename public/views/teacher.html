@@ -120,7 +120,7 @@
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클가</th> <th>4️⃣ Sum</th> <th>5️⃣ 독해서</th> <th>6️⃣ 일기</th> <th>수행율</th> </tr></thead>
+                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클가</th> <th>4️⃣ Sum</th> <th>5️⃣ 매일 독해</th> <th>6️⃣ 일기</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
@@ -255,7 +255,7 @@
             displayCommentData(data);
         }
 
-        // --- [핵심] 원서 독서 탭 렌더링 (다중 책 태그 + 추가 버튼) ---
+        // --- [핵심] 원서 독서 탭 렌더링 (다중 책 태그 + 추가 버튼 + AR/Lexile 표시) ---
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
@@ -264,7 +264,15 @@
                 // 책 태그 생성
                 const books = st.reading.englishBooks || [];
                 const bookTags = books.map(book => {
-                    return `<span class="book-tag">${book.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}')">×</span></span>`;
+                    // [수정] AR, Lexile 정보가 있으면 태그에 표시
+                    let infoText = '';
+                    if (book.ar || book.lexile) {
+                        const parts = [];
+                        if (book.ar) parts.push(`AR ${book.ar}`);
+                        if (book.lexile) parts.push(`Lex ${book.lexile}`);
+                        infoText = ` <span style="opacity:0.7; font-weight:normal; font-size:0.9em;">(${parts.join(' / ')})</span>`;
+                    }
+                    return `<span class="book-tag">${book.title}${infoText} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}')">×</span></span>`;
                 }).join('');
                 
                 // 추가 버튼
