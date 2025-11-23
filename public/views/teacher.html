@@ -66,7 +66,7 @@
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* [신규] 3단 일괄 처리 버튼 그룹 */
+        /* 3단 일괄 처리 버튼 그룹 */
         .batch-controls {
             display: flex;
             gap: 4px;
@@ -96,7 +96,7 @@
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
         .comment-textarea:focus { border-color: #8b5cf6; outline: none; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
         
-        /* 버튼 그룹 컨테이너 (오른쪽 정렬) */
+        /* 버튼 그룹 컨테이너 */
         .report-btn-group { display: flex; flex-direction: column; gap: 5px; align-items: stretch; min-width: 100px; }
         .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
         .btn-save { background: #10b981; color: white; } .btn-save:hover { background: #059669; }
@@ -431,11 +431,11 @@
             displayCommentData(data);
         }
 
-        // [1. 숙제 현황] 3단 일괄 처리 버튼 추가
+        // [1. 숙제 현황] 3단 일괄 처리 버튼 추가 + 즉시 반영 (Optimistic UI)
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
+            tbody.innerHTML = data.map(st => `<tr id="row-hw-${st.pageId}">
                 <td class="student-name">
                     <div>${st.studentName}</div>
                     <div class="batch-controls">
@@ -459,18 +459,34 @@
             const statusMap = { '숙제 함': 'status-complete', '완료': 'status-complete', '안 해옴': 'status-incomplete', '미완료': 'status-incomplete', '숙제 없음': 'status-none', '해당 없음': 'status-none', '진행하지 않음': 'status-none' };
             const displayVal = val || '숙제 없음';
             const cls = statusMap[displayVal] || 'status-none';
-            return `<span class="status-badge ${cls}" onclick="toggleStatus(this, '${pageId}', '${prop}', '${displayVal}')">${displayVal}</span>`;
+            // data 속성을 사용하여 현재 상태 저장
+            return `<span class="status-badge ${cls}" data-page-id="${pageId}" data-prop="${prop}" data-val="${displayVal}" onclick="handleBadgeClick(this)">${displayVal}</span>`;
         }
 
-        async function toggleStatus(el, pageId, prop, currentVal) {
+        async function handleBadgeClick(el) {
+            const pageId = el.getAttribute('data-page-id');
+            const prop = el.getAttribute('data-prop');
+            const currentVal = el.getAttribute('data-val');
+            
             const sequence = ['숙제 함', '안 해옴', '해당 없음'];
             let nextIndex = sequence.indexOf(currentVal) + 1;
             if (nextIndex >= sequence.length) nextIndex = 0;
             const nextVal = sequence[nextIndex];
-            el.textContent = nextVal;
-            el.className = `status-badge ${nextVal === '숙제 함' ? 'status-complete' : (nextVal === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
-            el.onclick = () => toggleStatus(el, pageId, prop, nextVal);
+            
+            // 즉시 UI 업데이트
+            updateBadgeUI(el, nextVal);
+            
+            // API 호출
             await updateField(null, pageId, prop, 'status', nextVal);
+        }
+
+        function updateBadgeUI(el, val) {
+            el.textContent = val;
+            el.setAttribute('data-val', val);
+            let cls = 'status-none';
+            if (val === '숙제 함' || val === '완료') cls = 'status-complete';
+            else if (val === '안 해옴' || val === '미완료') cls = 'status-incomplete';
+            el.className = `status-badge ${cls}`;
         }
 
         // [일괄 처리 함수] (status: 숙제 함 / 안 해옴 / 해당 없음)
@@ -480,14 +496,27 @@
             
             const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
             
+            // 1. 즉시 UI 업데이트 (Optimistic UI)
+            const row = document.getElementById(`row-hw-${pageId}`);
+            if (row) {
+                const badges = row.querySelectorAll('.status-badge');
+                badges.forEach(badge => {
+                    updateBadgeUI(badge, status);
+                });
+            }
+
             try {
+                // 2. 백그라운드 API 업데이트
                 await Promise.all(props.map(prop => fetch(`${API_BASE_URL}/api/update-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ pageId, propertyName: prop, newValue: status, propertyType: 'status' })
                 })));
                 showToast(`모두 "${status}" 처리되었습니다.`);
-                loadDataForCurrentTab(); // 데이터 갱신으로 UI 업데이트
-            } catch(e) { showToast('처리 실패', 'error'); }
+                // loadDataForCurrentTab(); // UI가 이미 업데이트되었으므로 굳이 리로드 안 해도 됨 (필요시 주석 해제)
+            } catch(e) { 
+                showToast('처리 실패 (새로고침 필요)', 'error'); 
+                loadDataForCurrentTab(); // 실패 시 원상복구 위해 리로드
+            }
         }
 
         // --- 나머지 기존 함수들 ---
