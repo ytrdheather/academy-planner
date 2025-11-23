@@ -36,6 +36,7 @@
         .filters-container { display:flex; gap:15px; margin-bottom:25px; align-items:center; flex-wrap: wrap; }
         .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: 600; }
         .filter-group { display:flex; align-items:center; gap:8px; }
+        .filter-label { font-weight: 600; color: #4a5568; margin-right: 5px; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; font-size: 14px; }
 
         /* 테이블 스타일 */
@@ -48,7 +49,7 @@
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
 
-        /* [신규] 책 태그 및 버튼 스타일 */
+        /* 책 태그 및 버튼 스타일 */
         .book-list-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; min-width: 250px; }
         .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 14px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
@@ -113,9 +114,21 @@
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        
                         <div class="filter-group">
-                            <select id="periodFilter_hw" class="filter-select"><option value="today">오늘</option><option value="specific_date">날짜 지정</option></select>
-                            <input type="date" id="specificDate_hw" class="filter-input" style="display:none;">
+                            <label class="filter-label">기간:</label>
+                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
+                                <option value="today">오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                        </div>
+
+                        <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
+                            <label class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_hw" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 보기</option>
+                            </select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -131,7 +144,25 @@
             <div id="tests-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
-                    <div class="filters-container"><button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button></div>
+                    <div class="filters-container">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">기간:</label>
+                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
+                                <option value="today">오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                        </div>
+
+                        <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
+                            <label class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <thead><tr> <th>학생 이름</th> <th>어휘유닛</th> <th>어휘정답</th> <th>총갯수</th> <th>어휘점수</th> <th>독해오답</th> <th>독해결과</th> <th>하브루타</th> <th>문법문항</th> <th>문법오답</th> <th>문법점수</th> </tr></thead>
@@ -141,11 +172,29 @@
                 </div>
             </div>
 
-            <!-- 3. [핵심] 원서 독서 현황 탭 -->
+            <!-- 3. 원서 독서 현황 탭 -->
             <div id="reading-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
-                    <div class="filters-container"><button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button></div>
+                    <div class="filters-container">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">기간:</label>
+                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
+                                <option value="today">오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                        </div>
+
+                        <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
+                            <label class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_reading" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>📖 영어독서</th> <th>어휘학습</th> <th>📚 읽은 책 목록 (태그)</th> <th>Writing</th> </tr></thead>
@@ -159,7 +208,25 @@
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">🎧 리스닝 현황</div>
-                    <div class="filters-container"><button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button></div>
+                    <div class="filters-container">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">기간:</label>
+                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
+                                <option value="today">오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                        </div>
+
+                        <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
+                            <label class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_listening" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>듣기 학습</th> <th>듣기 워크북</th> </tr></thead>
@@ -173,7 +240,25 @@
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
-                    <div class="filters-container"><button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button></div>
+                    <div class="filters-container">
+                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">기간:</label>
+                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
+                                <option value="today">오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                        </div>
+
+                        <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
+                            <label class="filter-label">담당강사:</label>
+                            <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 보기</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <colgroup><col style="width:10%"><col style="width:10%"><col style="width:15%"><col style="width:65%"></colgroup>
@@ -203,39 +288,120 @@
         let allReportData = [];
         let currentActiveTab = 'homework';
         let bookSearchTimer = null;
-        let currentEditingPageId = null; // 책 추가할 때 사용할 페이지 ID
+        let currentEditingPageId = null;
+        let currentUserRole = '';
+        let currentUserName = '';
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href='/teacher-login'; return; }
             loadUserInfo();
             showTab('homework');
             
-            // 검색 모달 이벤트
             document.getElementById('modalSearchInput').addEventListener('input', (e) => {
                 clearTimeout(bookSearchTimer);
                 bookSearchTimer = setTimeout(() => searchEngBooks(e.target.value), 300);
             });
-
-            // 날짜 필터 이벤트
-            const dateInput = document.getElementById('specificDate_hw');
-            document.getElementById('periodFilter_hw').addEventListener('change', (e) => {
-                dateInput.style.display = e.target.value === 'specific_date' ? 'block' : 'none';
-                if (e.target.value === 'today') loadDataForCurrentTab();
-            });
-            dateInput.addEventListener('change', loadDataForCurrentTab);
         });
 
         async function loadUserInfo() {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/teacher/user-info`, { headers:{Authorization:'Bearer '+authToken} });
                 const data = await res.json();
-                document.getElementById('userName').textContent = data.userName;
+                
+                currentUserName = data.userName;
+                currentUserRole = data.userRole;
+                document.getElementById('userName').textContent = `${data.userName} (${data.userRole === 'manager' ? '관리자' : '선생님'})`;
+
+                // 선생님 목록 로드 (필터용)
+                loadTeachersList();
+
             } catch (e) { logout(); }
         }
 
+        async function loadTeachersList() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/teachers`, { headers:{Authorization:'Bearer '+authToken} });
+                const teachers = await res.json();
+                
+                ['hw', 'tests', 'reading', 'listening', 'comments'].forEach(tabId => {
+                    const container = document.getElementById(`teacherFilterGroup_${tabId}`);
+                    const select = document.getElementById(`teacherFilter_${tabId}`);
+                    
+                    // 매니저: 모든 선생님 선택 가능
+                    // 선생님: 본인만 선택 가능 (혹은 전체 보기가 필요하다면 정책에 따름)
+                    
+                    if (currentUserRole === 'manager') {
+                        container.style.display = 'flex'; // 필터 보임
+                        teachers.forEach(t => {
+                            const opt = document.createElement('option');
+                            opt.value = t.name;
+                            opt.textContent = t.name;
+                            select.appendChild(opt);
+                        });
+                    } else {
+                        // 일반 선생님: 필터 숨김 (자동으로 본인 것만 필터링하거나, 전체 중 본인 학생만 강조 등)
+                        // 여기서는 "본인 학생만 보기"를 기본으로 하되, 전체 보기도 원한다면 아래 로직 수정
+                        container.style.display = 'flex';
+                        // 본인 이름 자동 선택
+                        const myOpt = document.createElement('option');
+                        myOpt.value = currentUserName;
+                        myOpt.textContent = currentUserName + ' (나)';
+                        select.appendChild(myOpt);
+                        select.value = currentUserName;
+                        
+                        // 다른 선생님도 보고 싶다면 아래 주석 해제
+                        /*
+                        teachers.forEach(t => {
+                            if(t.name !== currentUserName) {
+                                const opt = document.createElement('option');
+                                opt.value = t.name;
+                                opt.textContent = t.name;
+                                select.appendChild(opt);
+                            }
+                        });
+                        */
+                    }
+                });
+            } catch(e) { console.error('Teacher list load error', e); }
+        }
+
+        // 필터링 함수
+        function filterDataByTeacher() {
+            const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
+            const teacherSelect = document.getElementById(`teacherFilter_${tabSuffix}`);
+            const selectedTeacher = teacherSelect ? teacherSelect.value : '';
+
+            let filteredData = allReportData;
+            
+            if (selectedTeacher) {
+                filteredData = allReportData.filter(item => {
+                    // item.teachers 배열에 선택된 선생님 이름이 포함되어 있는지 확인
+                    return item.teachers && item.teachers.includes(selectedTeacher);
+                });
+            }
+            
+            displayDataForAllTabs(filteredData);
+        }
+
+        function toggleDateInput(tabId) {
+            const period = document.getElementById(`periodFilter_${tabId}`).value;
+            const dateInput = document.getElementById(`specificDate_${tabId}`);
+            dateInput.style.display = period === 'specific_date' ? 'block' : 'none';
+            
+            if (period === 'today') {
+                loadDataForCurrentTab();
+            }
+        }
+
         async function loadDataForCurrentTab() {
-            const period = document.getElementById('periodFilter_hw').value;
-            const date = document.getElementById('specificDate_hw').value;
+            const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
+            
+            const periodElem = document.getElementById(`periodFilter_${tabSuffix}`);
+            const dateElem = document.getElementById(`specificDate_${tabSuffix}`);
+            
+            const period = periodElem ? periodElem.value : 'today';
+            const date = dateElem ? dateElem.value : '';
+            
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
 
@@ -243,7 +409,10 @@
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
-                displayDataForAllTabs(allReportData);
+                
+                // 데이터 로드 후 필터 적용
+                filterDataByTeacher();
+                
             } catch (e) { console.error(e); alert('데이터 로드 실패'); }
         }
 
@@ -255,16 +424,13 @@
             displayCommentData(data);
         }
 
-        // --- [핵심] 원서 독서 탭 렌더링 (다중 책 태그 + 추가 버튼 + AR/Lexile 표시) ---
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
             
             tbody.innerHTML = data.map(st => {
-                // 책 태그 생성
                 const books = st.reading.englishBooks || [];
                 const bookTags = books.map(book => {
-                    // [수정] AR, Lexile 정보가 있으면 태그에 표시
                     let infoText = '';
                     if (book.ar || book.lexile) {
                         const parts = [];
@@ -275,7 +441,6 @@
                     return `<span class="book-tag">${book.title}${infoText} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}')">×</span></span>`;
                 }).join('');
                 
-                // 추가 버튼
                 const addButton = `<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}')">+ 추가</button>`;
 
                 return `
@@ -293,7 +458,6 @@
             }).join('');
         }
 
-        // --- 책 관리 로직 ---
         function openAddBookModal(pageId) {
             currentEditingPageId = pageId;
             document.getElementById('modalSearchInput').value = '';
@@ -306,12 +470,10 @@
             const resList = document.getElementById('modalSearchResults');
             if (query.length < 2) { resList.innerHTML = ''; return; }
             resList.innerHTML = '<div class="loading">검색중...</div>';
-            
             try {
                 const res = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const books = await res.json();
                 if(books.length === 0) { resList.innerHTML = '<div class="no-data">결과 없음</div>'; return; }
-                
                 resList.innerHTML = books.map(book => `
                     <div class="result-item" onclick="addBook('${book.id}')">
                         <div style="font-weight:bold;">${book.title}</div>
@@ -324,24 +486,18 @@
         async function addBook(newBookId) {
             if (!currentEditingPageId) return;
             document.getElementById('bookSearchModal').classList.remove('show');
-            
-            // 기존 책 목록 + 새 책
             const rowData = allReportData.find(d => d.pageId === currentEditingPageId);
             const currentIds = (rowData.reading.englishBooks || []).map(b => b.id).filter(id => id);
-            
             if (currentIds.includes(newBookId)) { showToast('이미 추가된 책입니다.', 'error'); return; }
-            
             const newIds = [...currentIds, newBookId];
             await updateBookRelation(currentEditingPageId, newIds);
         }
 
         async function removeBook(pageId, removeId) {
             if (!confirm('이 책을 삭제하시겠습니까?')) return;
-            
             const rowData = allReportData.find(d => d.pageId === pageId);
             const currentIds = (rowData.reading.englishBooks || []).map(b => b.id).filter(id => id);
             const newIds = currentIds.filter(id => id !== removeId);
-            
             await updateBookRelation(pageId, newIds);
         }
 
@@ -353,11 +509,10 @@
                     body: JSON.stringify({ pageId, propertyName: '오늘 읽은 영어 책', newValue: newIds, propertyType: 'relation' })
                 });
                 showToast('업데이트 완료');
-                loadDataForCurrentTab(); // 화면 갱신
+                loadDataForCurrentTab(); 
             } catch (e) { showToast('실패', 'error'); }
         }
 
-        // --- 기타 탭 렌더링 ---
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
@@ -417,7 +572,6 @@
             </tr>`).join('');
         }
 
-        // --- 헬퍼 함수 ---
         function formatSelect(pageId, prop, val, opts) {
             return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')">
                 <option value="">---</option>
@@ -457,7 +611,7 @@
             document.getElementById(tab+'-view').classList.add('active');
             document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
             document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active');
-            if(!allReportData.length) loadDataForCurrentTab();
+            loadDataForCurrentTab();
         }
     </script>
 </body>
