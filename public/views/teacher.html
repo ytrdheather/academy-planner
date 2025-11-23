@@ -67,10 +67,56 @@
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* 코멘트 탭 */
-        .comment-textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; resize: vertical; min-height: 40px; }
-        .comment-save-btn { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; margin-left: 5px; }
+        /* [복구] 코멘트 탭 스타일 (버튼 그룹 및 텍스트 영역) */
+        .comment-textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            min-height: 60px; /* 기본 높이 */
+            resize: none; /* 자동 조절되므로 수동 리사이즈 끔 */
+            overflow-y: hidden; /* 스크롤바 숨김 */
+            line-height: 1.5;
+        }
+        .comment-textarea:focus { border-color: #8b5cf6; outline: none; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
         
+        /* 버튼 그룹 컨테이너 (오른쪽 정렬) */
+        .report-btn-group {
+            display: flex;
+            flex-direction: column; /* 세로로 쌓기 */
+            gap: 5px;
+            align-items: stretch;
+            min-width: 100px;
+        }
+        
+        /* 공통 버튼 스타일 */
+        .action-btn {
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .btn-save { background: #10b981; color: white; }
+        .btn-save:hover { background: #059669; }
+        
+        .btn-daily-view { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+        .btn-daily-view:hover { background: #bae6fd; }
+        
+        .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
+        .btn-daily-copy:hover { background: #e0e7ff; }
+        
+        .btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
+        .btn-monthly-view:hover { background: #d8b4fe; }
+        
+        .btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; }
+        .btn-monthly-copy:hover { background: #fae8ff; }
+
         /* 모달 */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
@@ -117,8 +163,9 @@
                         
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
+                            <!-- [수정] 기본값을 today로 설정하고 변경 시 toggleDateInput 호출 -->
                             <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
-                                <option value="today">오늘</option>
+                                <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
                             </select>
                             <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
@@ -150,7 +197,7 @@
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
                             <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
-                                <option value="today">오늘</option>
+                                <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
                             </select>
                             <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
@@ -182,7 +229,7 @@
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
                             <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
-                                <option value="today">오늘</option>
+                                <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
                             </select>
                             <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
@@ -214,7 +261,7 @@
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
                             <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
-                                <option value="today">오늘</option>
+                                <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
                             </select>
                             <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
@@ -236,7 +283,7 @@
                 </div>
             </div>
 
-            <!-- 5. 오늘의 코멘트 탭 -->
+            <!-- 5. 오늘의 코멘트 탭 (버튼 5개 복구, 자동 크기 조절 적용) -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
@@ -246,7 +293,7 @@
                         <div class="filter-group">
                             <label class="filter-label">기간:</label>
                             <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
-                                <option value="today">오늘</option>
+                                <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
                             </select>
                             <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
@@ -258,12 +305,16 @@
                                 <option value="">전체 보기</option>
                             </select>
                         </div>
+                        
+                        <!-- [복구] 일괄 저장 버튼 -->
+                        <button class="refresh-btn" style="background:#6b46c1; margin-left:auto;" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <colgroup><col style="width:10%"><col style="width:10%"><col style="width:15%"><col style="width:65%"></colgroup>
-                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> </tr></thead>
-                            <tbody id="commentsTableBody"><tr><td colspan="4" class="loading">로딩중...</td></tr></tbody>
+                            <!-- [복구] 컬럼 너비 조정: 관리 버튼 영역 확보 -->
+                            <colgroup><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:50%"><col style="width:24%"></colgroup>
+                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr></thead>
+                            <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -282,6 +333,19 @@
         </div>
     </div>
 
+    <!-- [복구] 리포트 링크 복사 모달 -->
+    <div id="reportModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="reportModalTitle" style="margin-bottom:15px; color:#6b46c1;">🔗 리포트 링크</h2>
+            <p id="reportModalDesc" style="margin-bottom:15px; font-size:14px; color:#4b5563;"></p>
+            <input type="text" id="reportLinkInput" class="modal-search-input" readonly>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+                <button onclick="document.getElementById('reportModal').classList.remove('show')" style="padding:8px 16px; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;">닫기</button>
+                <button id="copyReportLinkBtn" onclick="copyReportLink()" style="padding:8px 16px; background:#6b46c1; color:white; border:none; border-radius:6px; cursor:pointer;">복사하기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = window.location.origin;
         let authToken = localStorage.getItem('teacher_auth_token');
@@ -294,6 +358,10 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href='/teacher-login'; return; }
+            
+            // [복구] 기본값을 '오늘'로 설정
+            setAllFiltersToToday();
+            
             loadUserInfo();
             showTab('homework');
             
@@ -302,6 +370,16 @@
                 bookSearchTimer = setTimeout(() => searchEngBooks(e.target.value), 300);
             });
         });
+
+        function setAllFiltersToToday() {
+            const suffixes = ['hw', 'tests', 'reading', 'listening', 'comments'];
+            suffixes.forEach(s => {
+                const sel = document.getElementById(`periodFilter_${s}`);
+                if(sel) sel.value = 'today';
+                const dateInp = document.getElementById(`specificDate_${s}`);
+                if(dateInp) dateInp.style.display = 'none';
+            });
+        }
 
         async function loadUserInfo() {
             try {
@@ -312,7 +390,6 @@
                 currentUserRole = data.userRole;
                 document.getElementById('userName').textContent = `${data.userName} (${data.userRole === 'manager' ? '관리자' : '선생님'})`;
 
-                // 선생님 목록 로드 (필터용)
                 loadTeachersList();
 
             } catch (e) { logout(); }
@@ -327,59 +404,35 @@
                     const container = document.getElementById(`teacherFilterGroup_${tabId}`);
                     const select = document.getElementById(`teacherFilter_${tabId}`);
                     
-                    // 매니저: 모든 선생님 선택 가능
-                    // 선생님: 본인만 선택 가능 (혹은 전체 보기가 필요하다면 정책에 따름)
-                    
                     if (currentUserRole === 'manager') {
-                        container.style.display = 'flex'; // 필터 보임
+                        container.style.display = 'flex';
                         teachers.forEach(t => {
                             const opt = document.createElement('option');
-                            opt.value = t.name;
-                            opt.textContent = t.name;
+                            opt.value = t.name; opt.textContent = t.name;
                             select.appendChild(opt);
                         });
                     } else {
-                        // 일반 선생님: 필터 숨김 (자동으로 본인 것만 필터링하거나, 전체 중 본인 학생만 강조 등)
-                        // 여기서는 "본인 학생만 보기"를 기본으로 하되, 전체 보기도 원한다면 아래 로직 수정
                         container.style.display = 'flex';
-                        // 본인 이름 자동 선택
                         const myOpt = document.createElement('option');
                         myOpt.value = currentUserName;
                         myOpt.textContent = currentUserName + ' (나)';
                         select.appendChild(myOpt);
                         select.value = currentUserName;
-                        
-                        // 다른 선생님도 보고 싶다면 아래 주석 해제
-                        /*
-                        teachers.forEach(t => {
-                            if(t.name !== currentUserName) {
-                                const opt = document.createElement('option');
-                                opt.value = t.name;
-                                opt.textContent = t.name;
-                                select.appendChild(opt);
-                            }
-                        });
-                        */
+                        select.disabled = true; // 일반 선생님은 변경 불가 (본인 것만)
                     }
                 });
-            } catch(e) { console.error('Teacher list load error', e); }
+            } catch(e) { console.error(e); }
         }
 
-        // 필터링 함수
         function filterDataByTeacher() {
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
             const teacherSelect = document.getElementById(`teacherFilter_${tabSuffix}`);
             const selectedTeacher = teacherSelect ? teacherSelect.value : '';
 
             let filteredData = allReportData;
-            
             if (selectedTeacher) {
-                filteredData = allReportData.filter(item => {
-                    // item.teachers 배열에 선택된 선생님 이름이 포함되어 있는지 확인
-                    return item.teachers && item.teachers.includes(selectedTeacher);
-                });
+                filteredData = allReportData.filter(item => item.teachers && item.teachers.includes(selectedTeacher));
             }
-            
             displayDataForAllTabs(filteredData);
         }
 
@@ -388,9 +441,8 @@
             const dateInput = document.getElementById(`specificDate_${tabId}`);
             dateInput.style.display = period === 'specific_date' ? 'block' : 'none';
             
-            if (period === 'today') {
-                loadDataForCurrentTab();
-            }
+            // '오늘' 선택 시 즉시 로드
+            if (period === 'today') loadDataForCurrentTab();
         }
 
         async function loadDataForCurrentTab() {
@@ -409,10 +461,7 @@
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
-                
-                // 데이터 로드 후 필터 적용
                 filterDataByTeacher();
-                
             } catch (e) { console.error(e); alert('데이터 로드 실패'); }
         }
 
@@ -424,10 +473,137 @@
             displayCommentData(data);
         }
 
+        // --- [복구] 코멘트 탭 렌더링 (버튼 5개 + 자동 크기 조절) ---
+        function displayCommentData(data) {
+            const tbody = document.getElementById('commentsTableBody');
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-comment-${st.pageId}">
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${(st.teachers||[]).join(', ')}</td>
+                    <td>${st.comment.grammarClass || '-'}</td>
+                    <td style="vertical-align:top;">
+                        <textarea class="comment-textarea" 
+                            oninput="autoResizeTextarea(this); markCommentAsChanged(this)"
+                            data-page-id="${st.pageId}"
+                            defaultValue="${st.comment.teacherComment || ''}"
+                        >${st.comment.teacherComment || ''}</textarea>
+                    </td>
+                    <td style="vertical-align:top;">
+                        <div class="report-btn-group">
+                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
+                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
+                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
+                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
+                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            
+            // 초기 높이 조절
+            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el));
+        }
+
+        function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight) + 'px';
+        }
+
+        function markCommentAsChanged(el) {
+            const row = el.closest('tr');
+            const btn = row.querySelector('.comment-save-btn');
+            if(el.value !== el.defaultValue) {
+                el.style.backgroundColor = '#fffbeb'; // 변경됨 표시
+                btn.textContent = '저장*';
+                btn.style.background = '#ef4444';
+                row.classList.add('needs-save');
+            } else {
+                el.style.backgroundColor = 'white';
+                btn.textContent = '저장';
+                btn.style.background = '#10b981';
+                row.classList.remove('needs-save');
+            }
+        }
+
+        async function updateComment(btn, pageId) {
+            const row = btn.closest('tr');
+            const ta = row.querySelector('.comment-textarea');
+            const val = ta.value;
+            
+            btn.disabled = true; btn.textContent = '저장중...';
+            try {
+                await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' })
+                });
+                showToast('저장되었습니다.');
+                ta.defaultValue = val;
+                markCommentAsChanged(ta);
+            } catch(e) { showToast('저장 실패', 'error'); }
+            finally { btn.disabled = false; }
+        }
+
+        async function saveAllComments(batchBtn) {
+            const rows = document.querySelectorAll('tr.needs-save');
+            if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; }
+            
+            batchBtn.disabled = true;
+            let count = 0;
+            for(const row of rows) {
+                const btn = row.querySelector('.comment-save-btn');
+                const pageId = row.id.replace('row-comment-', '');
+                await updateComment(btn, pageId);
+                count++;
+                batchBtn.textContent = `저장중... ${count}/${rows.length}`;
+            }
+            batchBtn.disabled = false;
+            batchBtn.textContent = '💾 일괄 저장';
+            showToast(`${count}개 코멘트 저장 완료`);
+        }
+
+        // 리포트 관련 기능
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error'));
+        }
+
+        async function viewMonthlyReport(name, date) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const d = await res.json();
+                if(d.success) window.open(d.url, '_blank');
+                else alert(d.message);
+            } catch(e) { alert('오류 발생'); }
+        }
+
+        async function openMonthlyReportModal(name, date) {
+            // 간단히 링크를 가져와서 모달에 띄우거나 바로 복사
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const d = await res.json();
+                if(d.success) {
+                    const modal = document.getElementById('reportModal');
+                    document.getElementById('reportModalTitle').textContent = '📅 월간 리포트 링크';
+                    document.getElementById('reportModalDesc').textContent = `${name} 학생의 지난달 리포트입니다.`;
+                    const inp = document.getElementById('reportLinkInput');
+                    inp.value = d.url;
+                    modal.classList.add('show');
+                } else alert(d.message);
+            } catch(e) { alert('오류 발생'); }
+        }
+        
+        function copyReportLink() {
+            const inp = document.getElementById('reportLinkInput');
+            inp.select();
+            document.execCommand('copy');
+            showToast('복사되었습니다!');
+            document.getElementById('reportModal').classList.remove('show');
+        }
+
+        // --- 나머지 탭 렌더링 함수들 (기존과 동일, 생략 없이 포함) ---
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
-            
             tbody.innerHTML = data.map(st => {
                 const books = st.reading.englishBooks || [];
                 const bookTags = books.map(book => {
@@ -440,77 +616,66 @@
                     }
                     return `<span class="book-tag">${book.title}${infoText} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}')">×</span></span>`;
                 }).join('');
-                
                 const addButton = `<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}')">+ 추가</button>`;
-
-                return `
-                <tr>
+                return `<tr>
                     <td class="student-name">${st.studentName}</td>
                     <td>${(st.teachers || []).join(', ')}</td>
                     <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함'])}</td>
                     <td>${formatSelect(st.pageId, '어휘학습', st.reading.vocabStatus, ['완료', 'SKIP', '미완료'])}</td>
-                    <td class="book-list-cell">
-                        ${bookTags}
-                        ${addButton}
-                    </td>
+                    <td class="book-list-cell">${bookTags}${addButton}</td>
                     <td>${formatSelect(st.pageId, 'Writing', st.reading.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'])}</td>
                 </tr>`;
             }).join('');
         }
 
+        // 책 관리 로직
         function openAddBookModal(pageId) {
             currentEditingPageId = pageId;
+            const modal = document.getElementById('bookSearchModal');
             document.getElementById('modalSearchInput').value = '';
             document.getElementById('modalSearchResults').innerHTML = '';
-            document.getElementById('bookSearchModal').classList.add('show');
+            modal.classList.add('show');
             document.getElementById('modalSearchInput').focus();
         }
-
         async function searchEngBooks(query) {
-            const resList = document.getElementById('modalSearchResults');
-            if (query.length < 2) { resList.innerHTML = ''; return; }
-            resList.innerHTML = '<div class="loading">검색중...</div>';
+            const list = document.getElementById('modalSearchResults');
+            if(query.length < 2) { list.innerHTML = ''; return; }
+            list.innerHTML = '<div class="loading">검색중...</div>';
             try {
                 const res = await fetch(`${API_BASE_URL}/api/search-books?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const books = await res.json();
-                if(books.length === 0) { resList.innerHTML = '<div class="no-data">결과 없음</div>'; return; }
-                resList.innerHTML = books.map(book => `
-                    <div class="result-item" onclick="addBook('${book.id}')">
-                        <div style="font-weight:bold;">${book.title}</div>
-                        <div style="font-size:12px; color:#666;">${book.author || ''}</div>
-                    </div>
-                `).join('');
-            } catch (e) { resList.innerHTML = '<div class="no-data">오류 발생</div>'; }
+                if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; }
+                list.innerHTML = books.map(b => `
+                    <div class="result-item" onclick="addBook('${b.id}')">
+                        <div style="font-weight:bold;">${b.title}</div>
+                        <div style="font-size:12px; color:#666;">${b.author || ''}</div>
+                    </div>`).join('');
+            } catch(e) { list.innerHTML = '오류'; }
         }
-
-        async function addBook(newBookId) {
-            if (!currentEditingPageId) return;
+        async function addBook(newId) {
+            if(!currentEditingPageId) return;
             document.getElementById('bookSearchModal').classList.remove('show');
-            const rowData = allReportData.find(d => d.pageId === currentEditingPageId);
-            const currentIds = (rowData.reading.englishBooks || []).map(b => b.id).filter(id => id);
-            if (currentIds.includes(newBookId)) { showToast('이미 추가된 책입니다.', 'error'); return; }
-            const newIds = [...currentIds, newBookId];
-            await updateBookRelation(currentEditingPageId, newIds);
+            const row = allReportData.find(d => d.pageId === currentEditingPageId);
+            const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
+            if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; }
+            await updateBookRelation(currentEditingPageId, [...currIds, newId]);
         }
-
-        async function removeBook(pageId, removeId) {
-            if (!confirm('이 책을 삭제하시겠습니까?')) return;
-            const rowData = allReportData.find(d => d.pageId === pageId);
-            const currentIds = (rowData.reading.englishBooks || []).map(b => b.id).filter(id => id);
-            const newIds = currentIds.filter(id => id !== removeId);
-            await updateBookRelation(pageId, newIds);
+        async function removeBook(pid, rid) {
+            if(!confirm('삭제하시겠습니까?')) return;
+            const row = allReportData.find(d => d.pageId === pid);
+            const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
+            await updateBookRelation(pid, currIds.filter(id => id !== rid));
         }
-
-        async function updateBookRelation(pageId, newIds) {
+        async function updateBookRelation(pid, ids) {
             try {
                 await fetch(`${API_BASE_URL}/api/update-homework`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ pageId, propertyName: '오늘 읽은 영어 책', newValue: newIds, propertyType: 'relation' })
+                    body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' })
                 });
                 showToast('업데이트 완료');
-                loadDataForCurrentTab(); 
-            } catch (e) { showToast('실패', 'error'); }
+                loadDataForCurrentTab();
+            } catch(e) { showToast('실패', 'error'); }
         }
 
         function displayHomeworkData(data) {
@@ -558,32 +723,13 @@
             </tr>`).join('');
         }
 
-        function displayCommentData(data) {
-            const tbody = document.getElementById('commentsTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">${st.studentName}</td>
-                <td>${(st.teachers||[]).join(', ')}</td>
-                <td>${st.comment.grammarClass}</td>
-                <td>
-                    <textarea class="comment-textarea" onchange="updateField(this, '${st.pageId}', '❤ Today\\'s Notice!', 'rich_text')">${st.comment.teacherComment}</textarea>
-                    <button class="comment-save-btn" onclick="alert('저장되었습니다 (자동저장)')">저장됨</button>
-                </td>
-            </tr>`).join('');
-        }
-
         function formatSelect(pageId, prop, val, opts) {
-            return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')">
-                <option value="">---</option>
-                ${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}
-            </select>`;
+            return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
         }
         function formatStatus(pageId, prop, val) {
             const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음'];
             const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none');
-            return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">
-                ${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}
-            </select>`;
+            return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
         }
 
         async function updateField(el, pageId, prop, type) {
