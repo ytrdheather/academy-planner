@@ -43,8 +43,8 @@
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
-        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-        .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
+        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } 
+        .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 120px; }
         
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
@@ -57,10 +57,8 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 숙제 상태 버튼 (토글용) */
-        .status-badge {
-            padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none;
-        }
+        /* 숙제 상태 버튼 */
+        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
         .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
@@ -90,21 +88,40 @@
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* 코멘트 탭 스타일 (수정됨) */
-        .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
+        /* [수정] 코멘트 탭 스타일 (넓어진 입력창) */
+        .comment-textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            min-height: 60px; 
+            resize: none; 
+            overflow-y: hidden; 
+            line-height: 1.5; 
+        }
         .comment-textarea:focus { border-color: #8b5cf6; outline: none; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
         
-        /* [수정] 버튼 그룹 컨테이너 (가로 정렬) */
+        /* [수정] 버튼 그룹 (가로 배치 + 넉넉한 공간) */
         .report-btn-group { 
             display: flex; 
-            flex-direction: row; /* 가로 배치 */
+            flex-direction: row; /* 가로 정렬 */
             gap: 5px; 
             align-items: center; 
-            justify-content: flex-start;
-            flex-wrap: wrap; /* 화면 좁으면 줄바꿈 */
-            min-width: 300px; /* 버튼들이 들어갈 최소 너비 확보 */
+            justify-content: flex-start; 
+            flex-wrap: wrap; /* 공간 부족 시 줄바꿈 */
         }
-        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; white-space: nowrap; }
+        .action-btn { 
+            border: none; 
+            padding: 8px 12px; /* 버튼 크기 약간 키움 */
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            text-align: center; 
+            white-space: nowrap; /* 글자 줄바꿈 방지 */
+        }
         .btn-save { background: #10b981; color: white; } .btn-save:hover { background: #059669; }
         .btn-daily-view { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; } .btn-daily-view:hover { background: #bae6fd; }
         .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; } .btn-daily-copy:hover { background: #e0e7ff; }
@@ -155,7 +172,6 @@
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
                             <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -164,7 +180,6 @@
                         </div>
 
                         <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
                             <select id="teacherFilter_hw" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 보기</option>
                             </select>
@@ -187,7 +202,6 @@
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
                             <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -196,7 +210,6 @@
                         </div>
 
                         <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
                             <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 보기</option>
                             </select>
@@ -219,7 +232,6 @@
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
                             <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -228,7 +240,6 @@
                         </div>
 
                         <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
                             <select id="teacherFilter_reading" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 보기</option>
                             </select>
@@ -251,7 +262,6 @@
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
                             <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -260,7 +270,6 @@
                         </div>
 
                         <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
                             <select id="teacherFilter_listening" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 보기</option>
                             </select>
@@ -283,7 +292,6 @@
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
                             <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
                                 <option value="today" selected>오늘</option>
                                 <option value="specific_date">날짜 지정</option>
@@ -292,7 +300,6 @@
                         </div>
 
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
                             <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 보기</option>
                             </select>
@@ -302,13 +309,13 @@
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <!-- [수정] 너비 조정: 앞쪽은 줄이고 코멘트와 관리 영역은 확보 -->
+                            <!-- [수정] 앞부분 칸을 절반으로 줄이고, 코멘트와 관리 칸을 대폭 늘림 -->
                             <colgroup>
-                                <col style="width:6%"> <!-- 학생 이름 -->
-                                <col style="width:6%"> <!-- 담당강사 -->
+                                <col style="width:5%"> <!-- 학생 이름 -->
+                                <col style="width:5%"> <!-- 담당강사 -->
                                 <col style="width:6%"> <!-- 문법 클래스 -->
-                                <col style="width:47%"> <!-- 오늘의 코멘트 -->
-                                <col style="width:35%"> <!-- 관리 (버튼들) -->
+                                <col style="width:44%"> <!-- 오늘의 코멘트 (넓게) -->
+                                <col style="width:40%"> <!-- 관리 (버튼 5개 가로 배열을 위해 넓게) -->
                             </colgroup>
                             <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr></thead>
                             <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
@@ -350,6 +357,9 @@
         let currentEditingPageId = null;
         let currentUserRole = '';
         let currentUserName = '';
+        
+        // [신규] 자동 저장 타이머 관리용 Map
+        const autoSaveMap = new Map();
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href='/teacher-login'; return; }
@@ -489,10 +499,9 @@
             let statusText = status;
             let apiValue = status;
             
-            // 초기화 버튼 처리
             if (status === '초기화') {
                 statusText = '숙제 없음';
-                apiValue = '숙제 없음'; // Notion DB값
+                apiValue = '숙제 없음';
             }
 
             const msg = apiValue === '숙제 함' ? '완료' : (apiValue === '안 해옴' ? '미완료' : '없음(초기화)');
@@ -519,7 +528,6 @@
             } catch(e) { showToast('처리 실패', 'error'); loadDataForCurrentTab(); }
         }
 
-        // [테스트 결과: 띄어쓰기 없는 속성명 적용]
         function displayTestData(data) {
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
@@ -578,11 +586,109 @@
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
         function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
-        function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
+        
+        // [수정됨] 코멘트 데이터 표시: 버튼 가로 배열 및 자동 저장 연결
+        function displayCommentData(data) { 
+            const tbody = document.getElementById('commentsTableBody'); 
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } 
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-comment-${st.pageId}">
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${(st.teachers||[]).join(', ')}</td>
+                    <td>${st.comment.grammarClass||'-'}</td>
+                    <td style="vertical-align:top;">
+                        <textarea class="comment-textarea" 
+                            oninput="autoResizeTextarea(this); markCommentAsChanged(this)" 
+                            data-page-id="${st.pageId}" 
+                            defaultValue="${st.comment.teacherComment || ''}"
+                        >${st.comment.teacherComment || ''}</textarea>
+                    </td>
+                    <td style="vertical-align:top;">
+                        <div class="report-btn-group">
+                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
+                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
+                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
+                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
+                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                        </div>
+                    </td>
+                </tr>`).join(''); 
+            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); 
+        }
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
-        function markCommentAsChanged(el) { const row = el.closest('tr'); const btn = row.querySelector('.comment-save-btn'); if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); } }
-        async function updateComment(btn, pageId) { const row = btn.closest('tr'); const ta = row.querySelector('.comment-textarea'); const val = ta.value; btn.disabled = true; btn.textContent = '저장중...'; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) }); showToast('저장되었습니다.'); ta.defaultValue = val; markCommentAsChanged(ta); } catch(e) { showToast('저장 실패', 'error'); } finally { btn.disabled = false; } }
+        
+        // [신규] 자동 저장 로직 (Debounce 적용)
+        function markCommentAsChanged(el) { 
+            const row = el.closest('tr'); 
+            const btn = row.querySelector('.comment-save-btn'); 
+            const pageId = el.getAttribute('data-page-id');
+            
+            // UI 변경 표시
+            if(el.value !== el.defaultValue) { 
+                el.style.backgroundColor = '#fffbeb'; 
+                btn.textContent = '저장*'; 
+                btn.style.background = '#ef4444'; 
+                row.classList.add('needs-save'); 
+            } else { 
+                el.style.backgroundColor = 'white'; 
+                btn.textContent = '저장'; 
+                btn.style.background = '#10b981'; 
+                row.classList.remove('needs-save'); 
+            }
+
+            // 기존 타이머 취소 후 재설정
+            if (autoSaveMap.has(pageId)) clearTimeout(autoSaveMap.get(pageId));
+            
+            const timerId = setTimeout(() => {
+                // 1.5초간 입력 없으면 자동 저장 트리거 (단, 버튼 클릭과 겹치지 않게 처리 필요)
+                // 여기서는 updateComment에 isAutoSave 플래그를 추가하여 조용히 저장
+                updateComment(btn, pageId, true); 
+            }, 1500);
+            
+            autoSaveMap.set(pageId, timerId);
+        }
+
+        async function updateComment(btn, pageId, isAutoSave = false) { 
+            const row = btn.closest('tr'); 
+            const ta = row.querySelector('.comment-textarea'); 
+            const val = ta.value; 
+            
+            if (!isAutoSave) {
+                btn.disabled = true; 
+                btn.textContent = '저장중...'; 
+            } else {
+                btn.textContent = '저장중..'; // 자동 저장 중 표시
+            }
+            
+            try { 
+                await fetch(`${API_BASE_URL}/api/update-homework`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
+                    body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) 
+                }); 
+                
+                if (!isAutoSave) showToast('저장되었습니다.'); 
+                
+                ta.defaultValue = val; 
+                ta.style.backgroundColor = 'white';
+                btn.textContent = '저장됨'; 
+                btn.style.background = '#10b981'; 
+                row.classList.remove('needs-save');
+                
+                // 자동 저장 완료 후 잠시 뒤에 원래 텍스트로 복귀
+                if (isAutoSave) {
+                    setTimeout(() => { if(btn.textContent === '저장됨') btn.textContent = '저장'; }, 2000);
+                }
+
+            } catch(e) { 
+                if (!isAutoSave) showToast('저장 실패', 'error'); 
+                console.error(e);
+            } finally { 
+                if (!isAutoSave) btn.disabled = false; 
+            } 
+        }
+
         async function saveAllComments(batchBtn) { const rows = document.querySelectorAll('tr.needs-save'); if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; } batchBtn.disabled = true; let count = 0; for(const row of rows) { const btn = row.querySelector('.comment-save-btn'); const pageId = row.id.replace('row-comment-', ''); await updateComment(btn, pageId); count++; batchBtn.textContent = `저장중... ${count}/${rows.length}`; } batchBtn.disabled = false; batchBtn.textContent = '💾 일괄 저장'; showToast(`${count}개 코멘트 저장 완료`); }
         function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error')); }
         async function viewMonthlyReport(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) window.open(d.url, '_blank'); else alert(d.message); } catch(e) { alert('오류 발생'); } }
