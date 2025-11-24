@@ -39,11 +39,11 @@
         .filter-label { font-weight: 600; color: #4a5568; margin-right: 5px; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; font-size: 14px; }
 
-        /* 테이블 스타일 */
+        /* 테이블 스타일 (Compact) */
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
-        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
+        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } /* 패딩 축소 */
         .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
         
         /* 로딩 및 데이터 없음 */
@@ -57,8 +57,10 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 숙제 상태 버튼 */
-        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
+        /* 숙제 상태 버튼 (토글용) */
+        .status-badge {
+            padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none;
+        }
         .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
@@ -257,7 +259,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달 -->
+    <!-- 책 검색 모달, 리포트 모달 (동일) -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 style="margin-bottom:15px; color:#6b46c1;">📚 책 추가하기</h2>
@@ -266,8 +268,6 @@
             <button onclick="document.getElementById('bookSearchModal').classList.remove('show')" style="width:100%; padding:10px; margin-top:15px; border:none; background:#f3f4f6; border-radius:8px; cursor:pointer;">닫기</button>
         </div>
     </div>
-    
-    <!-- 리포트 모달 -->
     <div id="reportModal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="reportModalTitle" style="margin-bottom:15px; color:#6b46c1;">🔗 리포트 링크</h2>
@@ -425,29 +425,33 @@
         }
 
         async function markAllHomework(pageId, status) {
-            const msg = status === '숙제 함' ? '완료' : (status === '안 해옴' ? '미완료' : '없음(초기화)');
+            let statusText = status;
+            let apiValue = status;
+            if (status === '해당 없음') { statusText = '숙제 없음'; apiValue = '숙제 없음'; }
+
+            const msg = apiValue === '숙제 함' ? '완료' : (apiValue === '안 해옴' ? '미완료' : '없음(초기화)');
             if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
             const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
             const row = document.getElementById(`row-hw-${pageId}`);
             if (row) {
                 const badges = row.querySelectorAll('.status-badge');
                 badges.forEach(badge => {
-                    badge.textContent = status;
-                    badge.className = `status-badge ${status === '숙제 함' ? 'status-complete' : (status === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
+                    badge.textContent = apiValue;
+                    badge.className = `status-badge ${apiValue === '숙제 함' ? 'status-complete' : (apiValue === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
                 });
             }
             try {
                 const updates = {};
-                props.forEach(prop => { updates[prop] = { value: status, type: 'status' }; });
+                props.forEach(prop => { updates[prop] = { value: apiValue, type: 'status' }; });
                 await fetch(`${API_BASE_URL}/api/update-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ pageId: pageId, updates: updates })
                 });
-                showToast(`모두 "${status}" 처리되었습니다.`);
+                showToast(`모두 "${msg}" 처리되었습니다.`);
             } catch(e) { showToast('처리 실패', 'error'); loadDataForCurrentTab(); }
         }
 
-        // [수정] 속성명 띄어쓰기 없이 일치시킴 (단어(맞은 개수) 등)
+        // [테스트 결과] 띄어쓰기 없는 속성명 적용 (단어(맞은 개수))
         function displayTestData(data) {
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
