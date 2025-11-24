@@ -8,6 +8,7 @@ import fs from 'fs';
 import cron from 'node-cron';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// [모듈 Import]
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 
@@ -31,6 +32,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
+// Notion API 호출 헬퍼
 async function fetchNotion(url, options) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -38,6 +40,7 @@ async function fetchNotion(url, options) {
         'Notion-Version': '2022-06-28'
     };
     const response = await fetch(url, { ...options, headers });
+
     if (!response.ok) {
         const errorData = await response.json();
         console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
@@ -46,6 +49,7 @@ async function fetchNotion(url, options) {
     return response.json();
 }
 
+// Gemini AI 설정
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -53,6 +57,7 @@ if (GEMINI_API_KEY) {
     console.log('✅ Gemini AI 연결됨');
 }
 
+// --- 선생님 계정 정보 ---
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
@@ -63,6 +68,7 @@ const userAccounts = {
     'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
 };
 
+// --- Helper Functions ---
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
@@ -71,6 +77,7 @@ function getKSTTodayRange() {
     const kstOffset = 9 * 60 * 60 * 1000;
     const kstNow = new Date(now.getTime() + kstOffset);
     const kstDateString = kstNow.toISOString().split('T')[0];
+    // start, end는 더 이상 필터에 쓰지 않지만 다른 로직 호환성을 위해 유지
     const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
     const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
     return { start: start.toISOString(), end: end.toISOString(), dateString: kstDateString };
@@ -159,7 +166,6 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
-// [수정됨] 데이터 파싱 로직: 띄어쓰기 없는 속성명으로 수정
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -182,39 +188,24 @@ async function parseDailyReportData(page) {
         diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
     };
 
-    // [수정] 띄어쓰기 제거된 속성명 사용 (노션 실제 DB와 일치)
-    // [수정] 수식(Formula) 값이 number일 경우 처리 추가
-    const vocabScoreRaw = props['📰 단어 테스트 점수']?.formula;
-    let vocabScoreVal = 'N/A';
-    if (vocabScoreRaw) {
-        if (vocabScoreRaw.type === 'string') vocabScoreVal = vocabScoreRaw.string;
-        else if (vocabScoreRaw.type === 'number') vocabScoreVal = vocabScoreRaw.number;
-    }
-
-    const grammarScoreRaw = props['📑 문법 시험 점수']?.formula;
-    let grammarScoreVal = 'N/A';
-    if (grammarScoreRaw) {
-        if (grammarScoreRaw.type === 'string') grammarScoreVal = grammarScoreRaw.string;
-        else if (grammarScoreRaw.type === 'number') grammarScoreVal = grammarScoreRaw.number;
-    }
-    
-    const readingResultRaw = props['📚 독해 해석 시험 결과']?.formula;
-    let readingResultVal = 'N/A';
-    if(readingResultRaw) {
-        if(readingResultRaw.type === 'string') readingResultVal = readingResultRaw.string;
-    }
+    const getFormulaValue = (prop) => {
+        if (!prop?.formula) return 'N/A';
+        if (prop.formula.type === 'string') return prop.formula.string;
+        if (prop.formula.type === 'number') return prop.formula.number;
+        return 'N/A';
+    };
 
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
-        vocabCorrect: props['단어(맞은 개수)']?.number ?? null, // 띄어쓰기 제거
-        vocabTotal: props['단어(전체 개수)']?.number ?? null,   // 띄어쓰기 제거
-        vocabScore: vocabScoreVal,
-        readingWrong: props['독해(틀린 개수)']?.number ?? null,  // 띄어쓰기 제거
-        readingResult: readingResultVal,
+        vocabCorrect: props['단어(맞은 개수)']?.number ?? null,
+        vocabTotal: props['단어(전체 개수)']?.number ?? null,
+        vocabScore: getFormulaValue(props['📰 단어 테스트 점수']),
+        readingWrong: props['독해(틀린 개수)']?.number ?? null,
+        readingResult: getFormulaValue(props['📚 독해 해석 시험 결과']),
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-        grammarTotal: props['문법(전체 개수)']?.number ?? null, // 띄어쓰기 제거
-        grammarWrong: props['문법(틀린 개수)']?.number ?? null, // 띄어쓰기 제거
-        grammarScore: grammarScoreVal
+        grammarTotal: props['문법(전체 개수)']?.number ?? null,
+        grammarWrong: props['문법(틀린 개수)']?.number ?? null,
+        grammarScore: getFormulaValue(props['📑 문법 시험 점수'])
     };
 
     const listening = {
@@ -283,25 +274,19 @@ async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
     
-    let finalFilter;
+    // [수정] 복잡한 중첩 필터를 단순화 (Validation Error 해결)
+    // 날짜 문자열(YYYY-MM-DD)로만 검색하도록 변경
+    let dateString;
     if (period === 'specific_date' && date) {
-        const start = new Date(`${date}T00:00:00.000+09:00`).toISOString();
-        const end = new Date(`${date}T23:59:59.999+09:00`).toISOString();
-        finalFilter = {
-            "or": [
-                { "and": [{ property: '🕐 날짜', date: { on_or_after: start } }, { property: '🕐 날짜', date: { on_or_before: end } }] },
-                { "property": "🕐 날짜", "date": { "equals": date } }
-            ]
-        };
+        dateString = date;
     } else {
-        const { start, end, dateString } = getKSTTodayRange();
-        finalFilter = {
-            "or": [
-                { "and": [{ property: '🕐 날짜', date: { on_or_after: start } }, { property: '🕐 날짜', date: { on_or_before: end } }] },
-                { "property": "🕐 날짜", "date": { "equals": dateString } }
-            ]
-        };
+        dateString = getKSTTodayRange().dateString;
     }
+
+    const finalFilter = {
+        "property": "🕐 날짜",
+        "date": { "equals": dateString }
+    };
 
     const pages = [];
     let hasMore = true;
@@ -310,7 +295,7 @@ async function fetchProgressData(req, res, parseFunction) {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: finalFilter,
+                filter: finalFilter, // [수정] 단순화된 필터 사용
                 sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
                 page_size: 100, start_cursor: startCursor
             })
@@ -333,16 +318,13 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [기능 2] 숙제 업데이트 API (속성명 매핑 추가)
+// [기능 2] 숙제 업데이트 API
 // =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
 
     try {
-        const propertiesToUpdate = {};
-
-        // [수정] 클라이언트의 '띄어쓰기 있는 이름'을 '노션 DB 이름'으로 변환
         const mapPropName = (name) => {
             const mapping = {
                 "단어 (맞은 개수)": "단어(맞은 개수)",
@@ -351,12 +333,14 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 "문법 (틀린 개수)": "문법(틀린 개수)",
                 "독해 (틀린 개수)": "독해(틀린 개수)"
             };
-            return mapping[name] || name; // 매핑 없으면 원래 이름 사용
+            return mapping[name] || name; 
         };
+
+        const propertiesToUpdate = {};
 
         if (updates && typeof updates === 'object') {
             for (const [propName, valObj] of Object.entries(updates)) {
-                const notionPropName = mapPropName(propName); // 이름 변환
+                const notionPropName = mapPropName(propName);
                 const val = valObj.value;
                 const type = valObj.type || 'status';
                 let payload;
@@ -372,7 +356,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             }
         } 
         else if (propertyName) {
-            const notionPropName = mapPropName(propertyName); // 이름 변환
+            const notionPropName = mapPropName(propertyName);
             let payload;
             if (propertyType === 'number') payload = { number: Number(newValue) || 0 };
             else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: newValue || '' } }] };
@@ -398,7 +382,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     }
 });
 
-// [기타 API 생략 없이 전체 포함]
+// [기타 API]
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
@@ -445,76 +429,48 @@ app.post('/login', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// =======================================================================
-// [기능 4] 진도 저장 (속성 매핑 오류 수정 - 띄어쓰기 제거)
-// =======================================================================
+// [진도 저장]
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     
     try {
-        // 1. 허용된 속성 이름 목록 (Whitelist)
-        // 이 목록에 없는 키가 formData에 있으면 무조건 무시합니다.
-        const ALLOWED_PROPS = {
-            "영어 더빙 학습 완료": "영어 더빙 학습 완료",
-            "더빙 워크북 완료": "더빙 워크북 완료",
-            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
-            "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
-            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
-            "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
-            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-            "단어 (맞은 개수)": "단어(맞은 개수)", // 띄어쓰기 제거 매핑
-            "단어 (전체 개수)": "단어(전체 개수)",
+        const propertyNameMap = {
+            "영어 더빙 학습 완료": "영어 더빙 학습 완료", "더빙 워크북 완료": "더빙 워크북 완료",
+            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
+            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
+            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
+            "단어 (맞은 개수)": "단어(맞은 개수)", 
+            "단어 (전체 개수)": "단어(전체 개수)", 
             "어휘유닛": "어휘유닛",
-            "문법 (전체 개수)": "문법(전체 개수)",
-            "문법 (틀린 개수)": "문법(틀린 개수)",
-            "독해 (틀린 개수)": "독해(틀린 개수)",
-            "독해 하브루타": "독해 하브루타",
-            "📖 영어독서": "📖 영어독서",
-            "어휘학습": "어휘학습",
-            "Writing": "Writing",
-            "📕 책 읽는 거인": "📕 책 읽는 거인",
-            "오늘의 학습 소감": "오늘의 학습 소감"
+            "문법 (전체 개수)": "문법(전체 개수)", 
+            "문법 (틀린 개수)": "문법(틀린 개수)", 
+            "독해 (틀린 개수)": "독해(틀린 개수)", 
+            "독해 하브루타": "독해 하브루타", "📖 영어독서": "📖 영어독서", "어휘학습": "어휘학습", "Writing": "Writing",
+            "📕 책 읽는 거인": "📕 책 읽는 거인", "오늘의 학습 소감": "오늘의 학습 소감"
         };
         
         const properties = {};
 
         for (let key in formData) {
-            // 배열 데이터는 별도 처리하므로 통과
             if (key === 'englishBooks' || key === 'koreanBooks') continue;
-
-            // [핵심] 허용된 키가 아니면 무시 (ID 필드 등 차단)
-            if (!ALLOWED_PROPS.hasOwnProperty(key)) {
-                // console.log(`[Ignored] 알 수 없는 속성: ${key}`);
-                continue;
-            }
-
             let value = formData[key];
             if (value === undefined || value === '') continue;
             
-            const notionPropName = ALLOWED_PROPS[key];
+            const notionPropName = propertyNameMap[key] || key;
             
-            // 숫자형 처리
             if (key.includes('(맞은 개수)') || key.includes('(전체 개수)') || key.includes('(틀린 개수)')) {
                 const numVal = Number(value);
                 properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal };
-            } 
-            // 선택형(Select) 처리
-            else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(key)) {
+            } else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(key)) {
                 properties[notionPropName] = { select: { name: value } };
-            } 
-            // 텍스트형 처리
-            else if (['어휘유닛', '오늘의 학습 소감'].includes(key)) {
+            } else if (['어휘유닛', '오늘의 학습 소감'].includes(key)) {
                 properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
-            } 
-            // 상태(Status) 처리
-            else {
+            } else {
                 properties[notionPropName] = { status: { name: value } };
             }
         }
 
-        // [다중 책 처리] (기존 로직 유지)
         if (formData.englishBooks && Array.isArray(formData.englishBooks)) {
             properties['오늘 읽은 영어 책'] = await processBookRelations(formData.englishBooks, ENG_BOOKS_ID, 'Title');
         }
@@ -522,21 +478,20 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             properties['국어 독서 제목'] = await processBookRelations(formData.koreanBooks, KOR_BOOKS_ID, '책제목');
         }
 
-        // ... (이후 저장 로직은 기존과 동일) ...
         const { start, end, dateString } = getKSTTodayRange();
         
+        // [수정] 저장 시에도 단순화된 필터 사용 (Validation Error 방지)
+        const filter = {
+            "and": [
+                { property: '이름', title: { equals: studentName } },
+                { property: '🕐 날짜', date: { equals: dateString } }
+            ]
+        };
+
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: {
-                    "and": [
-                        { property: '이름', title: { equals: studentName } },
-                        { "or": [
-                            { "and": [{ property: '🕐 날짜', date: { on_or_after: start } }, { property: '🕐 날짜', date: { on_or_before: end } }] },
-                            { "property": "🕐 날짜", "date": { "equals": dateString } }
-                        ]}
-                    ]
-                },
+                filter: filter,
                 page_size: 1
             })
         });
@@ -565,24 +520,24 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     }
 });
 
-
-// [데이터 로드 - 다중 책 복원 + AR/Lexile]
+// [데이터 로드]
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
         const { start, end, dateString } = getKSTTodayRange();
+        
+        // [수정] 로드 시에도 단순화된 필터 사용
+        const filter = {
+            "and": [
+                { property: '이름', title: { equals: studentName } },
+                { property: '🕐 날짜', date: { equals: dateString } }
+            ]
+        };
+
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: {
-                    "and": [
-                        { property: '이름', title: { equals: studentName } },
-                        { "or": [
-                            { "and": [{ property: '🕐 날짜', date: { on_or_after: start } }, { property: '🕐 날짜', date: { on_or_before: end } }] },
-                            { "property": "🕐 날짜", "date": { "equals": dateString } }
-                        ]}
-                    ]
-                },
+                filter: filter,
                 page_size: 1
             })
         });
@@ -593,8 +548,6 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         const progress = {};
 
         for (const [key, value] of Object.entries(props)) {
-            // 띄어쓰기 없는 노션 키를 프론트엔드용(띄어쓰기 포함)으로 변환하여 전송 가능
-            // 하지만 여기서는 값만 추출하고, 프론트엔드(planner.js)에서 nameMap으로 처리함
             if (value.type === 'title') progress[key] = value.title[0]?.plain_text;
             else if (value.type === 'rich_text') progress[key] = value.rich_text[0]?.plain_text;
             else if (value.type === 'number') progress[key] = value.number;
@@ -674,9 +627,17 @@ cron.schedule('0 22 * * *', async () => {
     console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {
         const { start, end, dateString } = getKSTTodayRange();
+        
+        // [수정] 자동화 스케줄에도 단순화된 필터 적용
+        const filter = {
+            "and": [
+                { property: '🕐 날짜', date: { equals: dateString } }
+            ]
+        };
+
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: { "or": [ { "and": [{ property: '🕐 날짜', date: { on_or_after: start } }, { property: '🕐 날짜', date: { on_or_before: end } }] }, { "property": "🕐 날짜", "date": { "equals": dateString } } ] } })
+            body: JSON.stringify({ filter: filter })
         });
         
         for (const page of data.results) {
