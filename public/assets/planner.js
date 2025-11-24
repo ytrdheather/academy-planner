@@ -1,24 +1,26 @@
 /**
- * Readitude 학생 스터디 플래너 모듈 (다중 책 + AR/Lexile 지원)
- * 위치: public/assets/planner.js
+ * Readitude 학생 스터디 플래너 모듈
+ * (오리지널 코드 기반 + 다중 책/AR 기능 통합)
  */
 
 class StudyPlanner {
     constructor() {
         this.api = window.API;
         this.autoSaveInterval = null;
-        this.currentBooks = []; // 검색된 책 목록 (임시)
+        this.currentBooks = [];
         this.searchTimeout = null;
         this.studentInfo = null;
 
         // [신규] 선택된 책 목록 관리 (배열)
-        // 구조: { id, title, ar, lexile, author }
         this.selectedBooks = {
             english: [], 
             korean: []
         };
     }
 
+    /**
+     * 플래너 초기화
+     */
     async initialize() {
         try {
             // 인증 확인
@@ -30,55 +32,110 @@ class StudyPlanner {
             // 학생 정보 로드
             await this.loadStudentInfo();
 
-            // UI 초기화 (날짜 등)
+            // UI 초기화
             this.initializeUI();
 
-            // [중요] 오늘 서버에 저장된 데이터 불러오기 (이게 가장 정확함)
+            // 저장된 데이터 복원 (로컬 스토리지)
+            this.loadSavedData();
+
+            // 오늘 서버에 저장된 데이터 불러오기
             await this.loadTodayData();
 
             // 이벤트 리스너 설정
             this.attachEventListeners();
 
-            // 책 검색 기능 초기화
+            // [복구] 책 검색 자동완성 기능 초기화 (오리지널 코드 반영)
             const engBookInput = document.getElementById('englishBookTitle');
             const korBookInput = document.getElementById('koreanBookTitle');
-            if (engBookInput) this.setupBookSearch(engBookInput, 'english');
-            if (korBookInput) this.setupBookSearch(korBookInput, 'korean');
+            
+            if (engBookInput) {
+                console.log('영어책 검색 기능 초기화');
+                this.setupBookSearch(engBookInput, 'english');
+            }
+            if (korBookInput) {
+                console.log('한국책 검색 기능 초기화');
+                this.setupBookSearch(korBookInput, 'korean');
+            }
 
             // 자동 저장 시작
             this.startAutoSave();
 
         } catch (error) {
-            console.error('Init Error:', error);
-            Utils.ui.showStatus('오류 발생: 초기화 실패', false);
+            console.error('플래너 초기화 실패:', error);
+            Utils.ui.showStatus('초기화 중 오류가 발생했습니다.', false);
         }
     }
 
+    /**
+     * 학생 정보 로드 (오리지널 코드 반영: Fallback 로직)
+     */
     async loadStudentInfo() {
         try {
+            // 1. /api/student-info 시도
             this.studentInfo = await this.api.getStudentInfo();
-            const nameEl = document.getElementById('studentName');
-            if (nameEl) {
-                nameEl.textContent = `${this.studentInfo.studentName}(이)의`;
+            
+            const nameElement = document.getElementById('studentName');
+            if (nameElement) {
+                nameElement.textContent = `${this.studentInfo.studentName}(이)의`;
             }
-        } catch (e) { 
-            console.error('학생 정보 로드 실패:', e);
+            
+            // 로컬 스토리지 저장
+            if(window.CONFIG) {
+                Utils.storage.save(CONFIG.STORAGE_KEYS.USER_ID, this.studentInfo.studentId);
+                Utils.storage.save(CONFIG.STORAGE_KEYS.USER_NAME, this.studentInfo.studentName);
+            }
+
+        } catch (error) {
+            console.error('학생 정보 로드 실패, user-info로 재시도:', error);
+            
+            // 2. /api/user-info로 폴백 (재시도)
+            try {
+                const userInfo = await this.api.getUserInfo(); // api.js에 getUserInfo가 있다고 가정
+                this.studentInfo = {
+                    studentId: userInfo.userId,
+                    studentName: userInfo.userName
+                };
+                
+                const nameElement = document.getElementById('studentName');
+                if (nameElement) {
+                    nameElement.textContent = `${this.studentInfo.studentName}(이)의`;
+                }
+            } catch (fallbackError) {
+                console.error('user-info도 실패:', fallbackError);
+                if (fallbackError.message && (fallbackError.message.includes('401') || fallbackError.message.includes('인증'))) {
+                    window.location.href = '/';
+                }
+            }
         }
     }
 
-    // 오늘 데이터 불러오기
+    /**
+     * 오늘 데이터 불러오기
+     */
     async loadTodayData() {
         try {
+            console.log('오늘 데이터 불러오기 시작...');
+            
             const response = await fetch('/api/get-today-progress', {
-                headers: { 'Authorization': `Bearer ${this.api.token}` }
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.api.token}`,
+                    'Content-Type': 'application/json'
+                }
             });
+
+            if (!response.ok) {
+                console.log('데이터 로드 실패:', response.status);
+                return;
+            }
+
             const data = await response.json();
             
             if (data.success && data.progress) {
-                // 1. 일반 폼 데이터 채우기
+                console.log('불러온 데이터:', data.progress);
                 this.fillFormWithData(data.progress);
-                
-                // 2. [신규] 저장된 책 데이터(배열) 복원
+
+                // [신규] 책 데이터(배열) 복원
                 if (data.progress.englishBooks) {
                     this.selectedBooks.english = data.progress.englishBooks;
                     this.renderSelectedBooks('english');
@@ -88,34 +145,64 @@ class StudyPlanner {
                     this.renderSelectedBooks('korean');
                 }
                 
-                // 상태 표시
                 const statusElement = document.getElementById('autoSaveStatus');
-                if (statusElement) statusElement.textContent = '불러오기 완료';
+                if (statusElement) {
+                    statusElement.textContent = '저장된 데이터를 불러왔습니다';
+                }
             }
-        } catch (error) { 
-            console.log('데이터 로드 중 오류 (신규 작성일 수 있음):', error); 
+        } catch (error) {
+            console.log('오늘 데이터 로드 중 에러 (신규 작성일 수 있음):', error);
         }
     }
 
+    /**
+     * 폼 채우기 (오리지널 매핑 로직 반영)
+     */
     fillFormWithData(progress) {
-        // Notion DB 속성명 -> HTML name 매핑
+        // Notion 속성명 -> HTML name 매핑
         const nameMap = {
-            '단어(맞은 개수)': '단어 (맞은 개수)', 
+            '단어(맞은 개수)': '단어 (맞은 개수)',
             '단어(전체 개수)': '단어 (전체 개수)',
-            '문법(전체 개수)': '문법 (전체 개수)', 
-            '문법(틀린 개수)': '문법 (틀린 개수)', 
+            '문법(전체 개수)': '문법 (전체 개수)',
+            '문법(틀린 개수)': '문법 (틀린 개수)',
             '독해(틀린 개수)': '독해 (틀린 개수)',
-            '📕 책 읽는 거인': '📕 책 읽는 거인'
+            '국어 독서 제목': '오늘 읽은 한국 책', // [복구]
+            '📕 책 읽는 거인': '📕 책 읽는 거인',
+            '📖 책제목 (롤업)': '오늘 읽은 영어 책' // [복구]
         };
-
-        for (const key in progress) {
+        
+        // 값 변환 매핑 (오리지널 반영)
+        const conversionMap = {
+            "숙제 없음": "해당없음",
+            "안 해옴": "안 해옴",
+            "숙제 함": "숙제 함",
+            "진행하지 않음": "진행하지 않음",
+            "완료": "완료",
+            "미완료": "미완료",
+            "못함": "못함",
+            "완료함": "완료함",
+            "SKIP": "SKIP",
+            "안함": "안함",
+            "숙제없음": "숙제없음",
+            "못하고감": "못하고감",
+            "시작함": "시작함",
+            "절반": "절반",
+            "거의다읽음": "거의다읽음"
+        };
+        
+        for (const notionKey in progress) {
             // 책 배열은 별도 처리하므로 건너뜀
-            if (key === 'englishBooks' || key === 'koreanBooks') continue;
+            if (notionKey === 'englishBooks' || notionKey === 'koreanBooks') continue;
 
-            const htmlName = nameMap[key] || key;
+            const value = progress[notionKey];
+            if (value === null || value === undefined) continue;
+
+            const htmlName = nameMap[notionKey] || notionKey;
             const element = document.querySelector(`[name="${htmlName}"]`);
+            
             if (element) {
-                element.value = progress[key];
+                // 변환된 값이 있으면 사용, 없으면 원래 값 사용
+                element.value = conversionMap[value] || value;
             }
         }
     }
@@ -130,20 +217,13 @@ class StudyPlanner {
     attachEventListeners() {
         const form = document.getElementById('plannerForm');
         if (form) {
-            // 저장 버튼 (submit)
             form.addEventListener('submit', (e) => this.handleSubmit(e));
-            
-            // 입력 변경 시 자동 저장 (디바운스 적용)
             form.addEventListener('change', () => this.autoSave());
             form.addEventListener('input', Utils.debounce(() => this.autoSave(), 1000));
         }
-
         const logoutBtn = document.querySelector('.logout-button');
-        if(logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
-        }
+        if(logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
         
-        // 임시 저장 버튼 (수동)
         const manualSaveBtn = document.getElementById('autoSaveBtn');
         if(manualSaveBtn) {
             manualSaveBtn.addEventListener('click', () => {
@@ -153,7 +233,7 @@ class StudyPlanner {
         }
     }
 
-    setupBookSearch(input, type) {
+    setupBookSearch(input, type = 'english') {
         const listId = type === 'english' ? 'bookSuggestions' : 'korBookSuggestions';
         const suggestionsList = document.getElementById(listId);
 
@@ -161,9 +241,9 @@ class StudyPlanner {
 
         input.addEventListener('input', () => {
             const query = input.value.trim();
-            
-            // 입력 시 기존 선택 ID 초기화 (새로 검색하는 것이므로)
-            const idInput = document.getElementById(type === 'english' ? 'englishBookId' : 'koreanBookId');
+            // 입력 시 기존 ID 초기화
+            const idInputId = type === 'english' ? 'englishBookId' : 'koreanBookId';
+            const idInput = document.getElementById(idInputId);
             if(idInput) idInput.value = '';
 
             clearTimeout(this.searchTimeout);
@@ -177,10 +257,11 @@ class StudyPlanner {
             this.searchTimeout = setTimeout(() => this.searchBooks(query, type, suggestionsList), 500);
         });
         
-        // 포커스 잃으면 목록 숨김 (클릭 시간 확보)
         input.addEventListener('blur', () => setTimeout(() => this.hideSuggestions(suggestionsList), 200));
+        
+        // 키보드 네비게이션 등은 생략 (필요시 추가)
     }
-    
+
     showLoadingState(list) {
         list.innerHTML = '<div class="autocomplete-suggestion">🔍 검색 중...</div>';
         list.style.display = 'block';
@@ -192,14 +273,11 @@ class StudyPlanner {
                 ? `/api/search-books?query=${encodeURIComponent(query)}`
                 : `/api/search-sayu-books?query=${encodeURIComponent(query)}`;
             
-            const res = await fetch(endpoint, { 
-                headers: { 'Authorization': `Bearer ${this.api.token}` } 
-            });
-            
+            const res = await fetch(endpoint, { headers: { 'Authorization': `Bearer ${this.api.token}` } });
             if (!res.ok) throw new Error('검색 실패');
 
             const books = await res.json();
-            this.currentBooks = books; // 검색 결과 저장
+            this.currentBooks = books;
             this.showSuggestions(books, suggestionsList, type);
         } catch (e) { 
             console.error(e);
@@ -216,7 +294,6 @@ class StudyPlanner {
         
         list.innerHTML = books.map((book, idx) => {
             let metaInfo = '';
-            // 영어책은 AR/Lexile 표시
             if (type === 'english') {
                 const arText = book.ar ? `AR ${book.ar}` : '';
                 const lexText = book.lexile ? `Lex ${book.lexile}` : '';
@@ -234,10 +311,8 @@ class StudyPlanner {
             </div>
             `;
         }).join('');
-        
         list.style.display = 'block';
 
-        // 클릭 이벤트
         list.querySelectorAll('.autocomplete-suggestion').forEach(item => {
             item.addEventListener('mousedown', (e) => {
                 e.preventDefault();
@@ -246,33 +321,29 @@ class StudyPlanner {
         });
     }
 
-    selectBook(index, type) {
+    selectBook(index, type = 'english') {
         const book = this.currentBooks[index];
         if (!book) return;
 
+        // 1. 다중 책 목록(배열)에 추가
         const list = type === 'english' ? this.selectedBooks.english : this.selectedBooks.korean;
-        
-        // 중복 체크
-        if (list.some(b => b.id === book.id)) {
+        if (!list.some(b => b.id === book.id)) {
+            list.push({ id: book.id, title: book.title, ar: book.ar, lexile: book.lexile });
+        } else {
             Utils.ui.showStatus('이미 추가된 책입니다.', false);
-            return;
         }
 
-        // 목록에 추가
-        list.push({ 
-            id: book.id, 
-            title: book.title,
-            ar: book.ar,
-            lexile: book.lexile
-        });
-        
+        // 2. UI 렌더링 (태그)
         this.renderSelectedBooks(type);
-        
-        // 입력창 초기화
-        const inputId = type === 'english' ? 'englishBookTitle' : 'koreanBookTitle';
-        document.getElementById(inputId).value = '';
+
+        // 3. 입력창 초기화 및 ID 저장 (단일 호환성 유지)
+        const titleId = type === 'english' ? 'englishBookTitle' : 'koreanBookTitle';
+        const idId = type === 'english' ? 'englishBookId' : 'koreanBookId'; // [중요] ID 필드 채워줌
+        document.getElementById(titleId).value = ''; 
+        const idElem = document.getElementById(idId);
+        if(idElem) idElem.value = book.id; // 서버 필터링에서 걸러지겠지만, 일단 값은 넣어둠
+
         this.hideSuggestions(document.getElementById(type === 'english' ? 'bookSuggestions' : 'korBookSuggestions'));
-        
         this.autoSave();
     }
 
@@ -280,84 +351,81 @@ class StudyPlanner {
         const list = type === 'english' ? this.selectedBooks.english : this.selectedBooks.korean;
         const containerId = type === 'english' ? 'selectedEngBooks' : 'selectedKorBooks';
         const container = document.getElementById(containerId);
-        
         if (!container) return;
 
         container.innerHTML = list.map((book, idx) => {
             let badgeText = book.title;
-            // 태그에 점수 표시
             if (type === 'english' && (book.ar || book.lexile)) {
-                const arStr = book.ar ? `AR ${book.ar}` : '';
-                const lexStr = book.lexile ? `Lex ${book.lexile}` : '';
-                const info = [arStr, lexStr].filter(Boolean).join('/');
+                const info = [book.ar ? `AR ${book.ar}` : '', book.lexile ? `Lex ${book.lexile}` : ''].filter(Boolean).join('/');
                 badgeText += ` <span style="font-weight:normal; opacity:0.8; font-size:0.9em;">(${info})</span>`;
             }
-
-            return `
-            <div class="book-tag">
-                <span>${badgeText}</span>
-                <span class="remove-btn" onclick="window.plannerInstance.removeBook('${type}', ${idx})">×</span>
-            </div>
-            `;
+            return `<div class="book-tag"><span>${badgeText}</span><span class="remove-btn" onclick="window.plannerInstance.removeBook('${type}', ${idx})">×</span></div>`;
         }).join('');
     }
 
     removeBook(type, index) {
         const list = type === 'english' ? this.selectedBooks.english : this.selectedBooks.korean;
-        list.splice(index, 1); // 배열에서 삭제
-        this.renderSelectedBooks(type); // 다시 그리기
+        list.splice(index, 1);
+        this.renderSelectedBooks(type);
         this.autoSave();
     }
 
     hideSuggestions(list) { if(list) list.style.display = 'none'; }
 
     autoSave() {
+        const formData = new FormData(document.getElementById('plannerForm'));
+        const data = Object.fromEntries(formData);
+        if(window.CONFIG) Utils.storage.save(CONFIG.STORAGE_KEYS.PLANNER_DATA, data);
         const status = document.getElementById('autoSaveStatus');
-        if(status) status.textContent = '작성 중...';
-        
-        // (선택 사항) 로컬 스토리지 저장 로직을 원하시면 여기에 추가 가능
-        // 현재는 복잡성 방지를 위해 UI 상태만 업데이트
+        if(status) status.textContent = '임시 저장됨 ' + new Date().toLocaleTimeString();
+    }
+
+    loadSavedData() {
+        if(!window.CONFIG) return;
+        const savedData = Utils.storage.load(CONFIG.STORAGE_KEYS.PLANNER_DATA);
+        if (savedData) {
+            Object.keys(savedData).forEach(key => {
+                const element = document.querySelector(`[name="${key}"]`);
+                if (element) element.value = savedData[key];
+            });
+            const status = document.getElementById('autoSaveStatus');
+            if(status) status.textContent = '이전 데이터 복원됨';
+        }
     }
 
     startAutoSave() { 
-        this.autoSaveInterval = setInterval(() => {
-            // 주기적으로 자동 저장 (필요시 구현)
-            // this.handleSubmit(new Event('submit')); // 자동 제출은 위험하므로 생략
-        }, 30000);
+        this.autoSaveInterval = setInterval(() => this.autoSave(), 30000);
     }
 
     async handleSubmit(event) {
-        if (event) event.preventDefault();
-        
-        const formData = new FormData(document.getElementById('plannerForm'));
+        event.preventDefault();
+        const formData = new FormData(event.target);
         const data = Object.fromEntries(formData);
         
         // [핵심] 책 배열 데이터 추가
         data.englishBooks = this.selectedBooks.english;
         data.koreanBooks = this.selectedBooks.korean;
 
-        // 직접 타이핑한 책 제목 처리 (ID 없는 경우)
-        // 현재 로직은 검색된 책만 허용하지만, 필요시 예외 처리 가능
+        // [수정] ID 없는 텍스트 제거 (오리지널 코드 참고)
+        if (data['오늘 읽은 영어 책'] && !data['오늘 읽은 영어 책 ID']) delete data['오늘 읽은 영어 책'];
+        if (data['오늘 읽은 한국 책'] && !data['오늘 읽은 한국 책 ID']) delete data['오늘 읽은 한국 책'];
 
         Utils.ui.showLoading('저장 중...');
         try {
             const response = await fetch('/save-progress', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'Authorization': `Bearer ${this.api.token}` 
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.api.token}` },
                 body: JSON.stringify(data)
             });
             const result = await response.json();
             
             Utils.ui.hideLoading();
-            if(result.success) {
+            if(result.success || response.ok) {
                 Utils.ui.showStatus('저장 완료!', true);
-                const status = document.getElementById('autoSaveStatus');
-                if(status) status.textContent = '저장됨';
+                if(window.CONFIG) Utils.storage.remove(CONFIG.STORAGE_KEYS.PLANNER_DATA);
+                document.getElementById('autoSaveStatus').textContent = '정식 저장 완료';
             } else {
-                throw new Error(result.message);
+                throw new Error(result.message || '저장 실패');
             }
         } catch (error) {
             Utils.ui.hideLoading();
@@ -378,11 +446,8 @@ class StudyPlanner {
     }
 }
 
-// 전역 인스턴스 (HTML에서 접근용)
 window.StudyPlanner = StudyPlanner;
-// DOM 로드 시 자동 실행
 document.addEventListener('DOMContentLoaded', () => {
-    // 전역 변수에 할당하여 onclick 이벤트 등에서 접근 가능하게 함
     window.plannerInstance = new StudyPlanner();
     window.plannerInstance.initialize();
 });

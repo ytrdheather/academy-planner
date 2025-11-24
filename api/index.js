@@ -453,51 +453,68 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     
     try {
-        // [수정] Notion 속성명 정확히 매핑 (띄어쓰기 제거)
-        const propertyNameMap = {
-            "영어 더빙 학습 완료": "영어 더빙 학습 완료", 
+        // 1. 허용된 속성 이름 목록 (Whitelist)
+        // 이 목록에 없는 키가 formData에 있으면 무조건 무시합니다.
+        const ALLOWED_PROPS = {
+            "영어 더빙 학습 완료": "영어 더빙 학습 완료",
             "더빙 워크북 완료": "더빙 워크북 완료",
-            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
+            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
-            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
+            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제", 
+            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-            "단어 (맞은 개수)": "단어(맞은 개수)", // [수정]
-            "단어 (전체 개수)": "단어(전체 개수)", // [수정]
+            "단어 (맞은 개수)": "단어(맞은 개수)", // 띄어쓰기 제거 매핑
+            "단어 (전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛",
-            "문법 (전체 개수)": "문법(전체 개수)", // [수정]
-            "문법 (틀린 개수)": "문법(틀린 개수)", // [수정]
-            "독해 (틀린 개수)": "독해(틀린 개수)", // [수정]
-            "독해 하브루타": "독해 하브루타", 
-            "📖 영어독서": "📖 영어독서", 
-            "어휘학습": "어휘학습", 
+            "문법 (전체 개수)": "문법(전체 개수)",
+            "문법 (틀린 개수)": "문법(틀린 개수)",
+            "독해 (틀린 개수)": "독해(틀린 개수)",
+            "독해 하브루타": "독해 하브루타",
+            "📖 영어독서": "📖 영어독서",
+            "어휘학습": "어휘학습",
             "Writing": "Writing",
-            "📕 책 읽는 거인": "📕 책 읽는 거인", 
+            "📕 책 읽는 거인": "📕 책 읽는 거인",
             "오늘의 학습 소감": "오늘의 학습 소감"
         };
         
         const properties = {};
 
         for (let key in formData) {
+            // 배열 데이터는 별도 처리하므로 통과
             if (key === 'englishBooks' || key === 'koreanBooks') continue;
+
+            // [핵심] 허용된 키가 아니면 무시 (ID 필드 등 차단)
+            if (!ALLOWED_PROPS.hasOwnProperty(key)) {
+                // console.log(`[Ignored] 알 수 없는 속성: ${key}`);
+                continue;
+            }
+
             let value = formData[key];
             if (value === undefined || value === '') continue;
             
-            const notionPropName = propertyNameMap[key] || key;
+            const notionPropName = ALLOWED_PROPS[key];
             
+            // 숫자형 처리
             if (key.includes('(맞은 개수)') || key.includes('(전체 개수)') || key.includes('(틀린 개수)')) {
                 const numVal = Number(value);
                 properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal };
-            } else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(key)) {
+            } 
+            // 선택형(Select) 처리
+            else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(key)) {
                 properties[notionPropName] = { select: { name: value } };
-            } else if (['어휘유닛', '오늘의 학습 소감'].includes(key)) {
+            } 
+            // 텍스트형 처리
+            else if (['어휘유닛', '오늘의 학습 소감'].includes(key)) {
                 properties[notionPropName] = { rich_text: [{ text: { content: value } }] };
-            } else {
+            } 
+            // 상태(Status) 처리
+            else {
                 properties[notionPropName] = { status: { name: value } };
             }
         }
 
+        // [다중 책 처리] (기존 로직 유지)
         if (formData.englishBooks && Array.isArray(formData.englishBooks)) {
             properties['오늘 읽은 영어 책'] = await processBookRelations(formData.englishBooks, ENG_BOOKS_ID, 'Title');
         }
@@ -505,6 +522,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             properties['국어 독서 제목'] = await processBookRelations(formData.koreanBooks, KOR_BOOKS_ID, '책제목');
         }
 
+        // ... (이후 저장 로직은 기존과 동일) ...
         const { start, end, dateString } = getKSTTodayRange();
         
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
@@ -546,6 +564,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+
 
 // [데이터 로드 - 다중 책 복원 + AR/Lexile]
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
