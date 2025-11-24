@@ -77,7 +77,7 @@ function getKSTTodayRange() {
     const kstOffset = 9 * 60 * 60 * 1000;
     const kstNow = new Date(now.getTime() + kstOffset);
     const kstDateString = kstNow.toISOString().split('T')[0];
-    // start, end는 더 이상 필터에 쓰지 않지만 다른 로직 호환성을 위해 유지
+    // start, end는 더 이상 필터에 쓰지 않지만 로직 호환성을 위해 남겨둠
     const start = new Date(`${kstDateString}T00:00:00.000+09:00`);
     const end = new Date(`${kstDateString}T23:59:59.999+09:00`);
     return { start: start.toISOString(), end: end.toISOString(), dateString: kstDateString };
@@ -90,6 +90,7 @@ function getKoreanDate(dateString) {
     return new Intl.DateTimeFormat('ko-KR', options).format(date);
 }
 
+// [롤업 헬퍼]
 const getRollupArray = (prop) => {
     if (!prop?.rollup?.array) return [];
     return prop.rollup.array.map(item => {
@@ -137,6 +138,7 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
     } catch (error) { return null; }
 }
 
+// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -150,12 +152,14 @@ function requireAuth(req, res, next) {
     next();
 }
 
+// --- 페이지 라우트 ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
+// [모듈 초기화]
 initializeBookRoutes(app, fetchNotion, process.env);
 try {
     initializeMonthlyReportRoutes({
@@ -166,6 +170,10 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
+
+// =======================================================================
+// [기능 1] 데이터 파싱 로직
+// =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -274,8 +282,8 @@ async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
     
-    // [수정] 복잡한 중첩 필터를 단순화 (Validation Error 해결)
-    // 날짜 문자열(YYYY-MM-DD)로만 검색하도록 변경
+    // [핵심 수정] 날짜 검색 필터 단순화 (Validation Error 방지)
+    // YYYY-MM-DD 문자열 일치 여부만 확인
     let dateString;
     if (period === 'specific_date' && date) {
         dateString = date;
@@ -283,6 +291,7 @@ async function fetchProgressData(req, res, parseFunction) {
         dateString = getKSTTodayRange().dateString;
     }
 
+    // 단순하고 확실한 필터
     const finalFilter = {
         "property": "🕐 날짜",
         "date": { "equals": dateString }
@@ -429,35 +438,52 @@ app.post('/login', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// [진도 저장]
+// =======================================================================
+// [기능 4] 진도 저장 (엄격한 필터 적용 + 단순화된 날짜 필터)
+// =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     
     try {
-        const propertyNameMap = {
-            "영어 더빙 학습 완료": "영어 더빙 학습 완료", "더빙 워크북 완료": "더빙 워크북 완료",
-            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
-            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-            "단어 (맞은 개수)": "단어(맞은 개수)", 
-            "단어 (전체 개수)": "단어(전체 개수)", 
+        // [핵심] 노션에 저장할 허용된 속성 목록 (Whitelist)
+        const ALLOWED_PROPS = {
+            "영어 더빙 학습 완료": "영어 더빙 학습 완료",
+            "더빙 워크북 완료": "더빙 워크북 완료",
+            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사",
+            "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
+            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
+            "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
+            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
+            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
+            "단어 (맞은 개수)": "단어(맞은 개수)",
+            "단어 (전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛",
-            "문법 (전체 개수)": "문법(전체 개수)", 
-            "문법 (틀린 개수)": "문법(틀린 개수)", 
-            "독해 (틀린 개수)": "독해(틀린 개수)", 
-            "독해 하브루타": "독해 하브루타", "📖 영어독서": "📖 영어독서", "어휘학습": "어휘학습", "Writing": "Writing",
-            "📕 책 읽는 거인": "📕 책 읽는 거인", "오늘의 학습 소감": "오늘의 학습 소감"
+            "문법 (전체 개수)": "문법(전체 개수)",
+            "문법 (틀린 개수)": "문법(틀린 개수)",
+            "독해 (틀린 개수)": "독해(틀린 개수)",
+            "독해 하브루타": "독해 하브루타",
+            "📖 영어독서": "📖 영어독서",
+            "어휘학습": "어휘학습",
+            "Writing": "Writing",
+            "📕 책 읽는 거인": "📕 책 읽는 거인",
+            "오늘의 학습 소감": "오늘의 학습 소감"
         };
         
         const properties = {};
 
         for (let key in formData) {
             if (key === 'englishBooks' || key === 'koreanBooks') continue;
+
+            // [핵심] Whitelist에 없는 속성은 무시 (ID, 임시값 등)
+            if (!ALLOWED_PROPS.hasOwnProperty(key)) {
+                continue;
+            }
+
             let value = formData[key];
             if (value === undefined || value === '') continue;
             
-            const notionPropName = propertyNameMap[key] || key;
+            const notionPropName = ALLOWED_PROPS[key];
             
             if (key.includes('(맞은 개수)') || key.includes('(전체 개수)') || key.includes('(틀린 개수)')) {
                 const numVal = Number(value);
@@ -480,7 +506,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [수정] 저장 시에도 단순화된 필터 사용 (Validation Error 방지)
+        // [핵심 수정] 복잡한 OR/AND 필터 제거하고 단순화
         const filter = {
             "and": [
                 { property: '이름', title: { equals: studentName } },
@@ -526,7 +552,7 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     try {
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [수정] 로드 시에도 단순화된 필터 사용
+        // [핵심 수정] 여기도 필터 단순화
         const filter = {
             "and": [
                 { property: '이름', title: { equals: studentName } },
@@ -628,7 +654,7 @@ cron.schedule('0 22 * * *', async () => {
     try {
         const { start, end, dateString } = getKSTTodayRange();
         
-        // [수정] 자동화 스케줄에도 단순화된 필터 적용
+        // [수정] 자동화 스케줄 필터도 단순화
         const filter = {
             "and": [
                 { property: '🕐 날짜', date: { equals: dateString } }
