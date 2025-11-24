@@ -8,7 +8,6 @@ import fs from 'fs';
 import cron from 'node-cron';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// [모듈 Import]
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 
@@ -32,7 +31,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// Notion API 호출 헬퍼
 async function fetchNotion(url, options) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -40,7 +38,6 @@ async function fetchNotion(url, options) {
         'Notion-Version': '2022-06-28'
     };
     const response = await fetch(url, { ...options, headers });
-
     if (!response.ok) {
         const errorData = await response.json();
         console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
@@ -49,7 +46,6 @@ async function fetchNotion(url, options) {
     return response.json();
 }
 
-// Gemini AI 설정
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -57,7 +53,6 @@ if (GEMINI_API_KEY) {
     console.log('✅ Gemini AI 연결됨');
 }
 
-// --- 선생님 계정 정보 ---
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
@@ -68,7 +63,6 @@ const userAccounts = {
     'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
 };
 
-// --- Helper Functions ---
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
@@ -136,7 +130,6 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
     } catch (error) { return null; }
 }
 
-// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -150,14 +143,12 @@ function requireAuth(req, res, next) {
     next();
 }
 
-// --- 페이지 라우트 ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
-// [모듈 초기화]
 initializeBookRoutes(app, fetchNotion, process.env);
 try {
     initializeMonthlyReportRoutes({
@@ -168,7 +159,7 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
-// [데이터 파싱 로직 수정: 띄어쓰기 포함된 속성명 정확히 처리]
+// [수정됨] 데이터 파싱 로직: 띄어쓰기 없는 속성명으로 수정
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -191,18 +182,39 @@ async function parseDailyReportData(page) {
         diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
     };
 
-    // [중요] 띄어쓰기 포함된 속성명 정확히 로드
+    // [수정] 띄어쓰기 제거된 속성명 사용 (노션 실제 DB와 일치)
+    // [수정] 수식(Formula) 값이 number일 경우 처리 추가
+    const vocabScoreRaw = props['📰 단어 테스트 점수']?.formula;
+    let vocabScoreVal = 'N/A';
+    if (vocabScoreRaw) {
+        if (vocabScoreRaw.type === 'string') vocabScoreVal = vocabScoreRaw.string;
+        else if (vocabScoreRaw.type === 'number') vocabScoreVal = vocabScoreRaw.number;
+    }
+
+    const grammarScoreRaw = props['📑 문법 시험 점수']?.formula;
+    let grammarScoreVal = 'N/A';
+    if (grammarScoreRaw) {
+        if (grammarScoreRaw.type === 'string') grammarScoreVal = grammarScoreRaw.string;
+        else if (grammarScoreRaw.type === 'number') grammarScoreVal = grammarScoreRaw.number;
+    }
+    
+    const readingResultRaw = props['📚 독해 해석 시험 결과']?.formula;
+    let readingResultVal = 'N/A';
+    if(readingResultRaw) {
+        if(readingResultRaw.type === 'string') readingResultVal = readingResultRaw.string;
+    }
+
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
-        vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
-        vocabTotal: props['단어 (전체 개수)']?.number ?? null,
-        vocabScore: props['📰 단어 테스트 점수']?.formula?.string || 'N/A',
-        readingWrong: props['독해 (틀린 개수)']?.number ?? null,
-        readingResult: props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A',
+        vocabCorrect: props['단어(맞은 개수)']?.number ?? null, // 띄어쓰기 제거
+        vocabTotal: props['단어(전체 개수)']?.number ?? null,   // 띄어쓰기 제거
+        vocabScore: vocabScoreVal,
+        readingWrong: props['독해(틀린 개수)']?.number ?? null,  // 띄어쓰기 제거
+        readingResult: readingResultVal,
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-        grammarTotal: props['문법 (전체 개수)']?.number ?? null,
-        grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
-        grammarScore: props['📑 문법 시험 점수']?.formula?.string || 'N/A'
+        grammarTotal: props['문법(전체 개수)']?.number ?? null, // 띄어쓰기 제거
+        grammarWrong: props['문법(틀린 개수)']?.number ?? null, // 띄어쓰기 제거
+        grammarScore: grammarScoreVal
     };
 
     const listening = {
@@ -321,21 +333,32 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [기능 2] 숙제 업데이트 API (일괄 처리 지원 + 속성명 자동 매핑 없음)
+// [기능 2] 숙제 업데이트 API (속성명 매핑 추가)
 // =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
-    
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
 
     try {
         const propertiesToUpdate = {};
 
+        // [수정] 클라이언트의 '띄어쓰기 있는 이름'을 '노션 DB 이름'으로 변환
+        const mapPropName = (name) => {
+            const mapping = {
+                "단어 (맞은 개수)": "단어(맞은 개수)",
+                "단어 (전체 개수)": "단어(전체 개수)",
+                "문법 (전체 개수)": "문법(전체 개수)",
+                "문법 (틀린 개수)": "문법(틀린 개수)",
+                "독해 (틀린 개수)": "독해(틀린 개수)"
+            };
+            return mapping[name] || name; // 매핑 없으면 원래 이름 사용
+        };
+
         if (updates && typeof updates === 'object') {
             for (const [propName, valObj] of Object.entries(updates)) {
+                const notionPropName = mapPropName(propName); // 이름 변환
                 const val = valObj.value;
                 const type = valObj.type || 'status';
-
                 let payload;
                 if (type === 'number') payload = { number: Number(val) || 0 };
                 else if (type === 'rich_text') payload = { rich_text: [{ text: { content: val || '' } }] };
@@ -345,11 +368,11 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                     else payload = { relation: val ? [{ id: val }] : [] };
                 }
                 else if (type === 'status') payload = { status: { name: val || '숙제 없음' } };
-
-                propertiesToUpdate[propName] = payload;
+                propertiesToUpdate[notionPropName] = payload;
             }
         } 
         else if (propertyName) {
+            const notionPropName = mapPropName(propertyName); // 이름 변환
             let payload;
             if (propertyType === 'number') payload = { number: Number(newValue) || 0 };
             else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: newValue || '' } }] };
@@ -359,8 +382,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 else payload = { relation: newValue ? [{ id: newValue }] : [] };
             }
             else if (propertyType === 'status') payload = { status: { name: newValue || '숙제 없음' } };
-
-            propertiesToUpdate[propertyName] = payload;
+            propertiesToUpdate[notionPropName] = payload;
         } else {
             return res.status(400).json({ success: false, message: 'No update data provided' });
         }
@@ -369,16 +391,14 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             method: 'PATCH',
             body: JSON.stringify({ properties: propertiesToUpdate })
         });
-
         res.json({ success: true });
-
     } catch (error) {
         console.error('Update Error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
-// [기타 API]
+// [기타 API 생략 없이 전체 포함]
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
@@ -426,28 +446,35 @@ app.post('/login', async (req, res) => {
 });
 
 // =======================================================================
-// [기능 4] 진도 저장 (속성 매핑 오류 수정 - 띄어쓰기 포함)
+// [기능 4] 진도 저장 (속성 매핑 오류 수정 - 띄어쓰기 제거)
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     
     try {
-        // [중요] Notion 속성명 그대로 매핑 (띄어쓰기 주의)
-        // 클라이언트(HTML) name 속성과 Notion 속성명을 1:1로 맞춤
+        // [수정] Notion 속성명 정확히 매핑 (띄어쓰기 제거)
         const propertyNameMap = {
-            "영어 더빙 학습 완료": "영어 더빙 학습 완료", "더빙 워크북 완료": "더빙 워크북 완료",
-            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
-            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
-            "단어 (맞은 개수)": "단어 (맞은 개수)", // [수정] 띄어쓰기 포함
-            "단어 (전체 개수)": "단어 (전체 개수)", // [수정] 띄어쓰기 포함
+            "영어 더빙 학습 완료": "영어 더빙 학습 완료", 
+            "더빙 워크북 완료": "더빙 워크북 완료",
+            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
+            "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
+            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
+            "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
+            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제", 
+            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
+            "단어 (맞은 개수)": "단어(맞은 개수)", // [수정]
+            "단어 (전체 개수)": "단어(전체 개수)", // [수정]
             "어휘유닛": "어휘유닛",
-            "문법 (전체 개수)": "문법 (전체 개수)", // [수정] 띄어쓰기 포함
-            "문법 (틀린 개수)": "문법 (틀린 개수)", // [수정] 띄어쓰기 포함
-            "독해 (틀린 개수)": "독해 (틀린 개수)", // [수정] 띄어쓰기 포함
-            "독해 하브루타": "독해 하브루타", "📖 영어독서": "📖 영어독서", "어휘학습": "어휘학습", "Writing": "Writing",
-            "📕 책 읽는 거인": "📕 책 읽는 거인", "오늘의 학습 소감": "오늘의 학습 소감"
+            "문법 (전체 개수)": "문법(전체 개수)", // [수정]
+            "문법 (틀린 개수)": "문법(틀린 개수)", // [수정]
+            "독해 (틀린 개수)": "독해(틀린 개수)", // [수정]
+            "독해 하브루타": "독해 하브루타", 
+            "📖 영어독서": "📖 영어독서", 
+            "어휘학습": "어휘학습", 
+            "Writing": "Writing",
+            "📕 책 읽는 거인": "📕 책 읽는 거인", 
+            "오늘의 학습 소감": "오늘의 학습 소감"
         };
         
         const properties = {};
@@ -547,6 +574,8 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         const progress = {};
 
         for (const [key, value] of Object.entries(props)) {
+            // 띄어쓰기 없는 노션 키를 프론트엔드용(띄어쓰기 포함)으로 변환하여 전송 가능
+            // 하지만 여기서는 값만 추출하고, 프론트엔드(planner.js)에서 nameMap으로 처리함
             if (value.type === 'title') progress[key] = value.title[0]?.plain_text;
             else if (value.type === 'rich_text') progress[key] = value.rich_text[0]?.plain_text;
             else if (value.type === 'number') progress[key] = value.number;

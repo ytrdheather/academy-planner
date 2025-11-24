@@ -39,11 +39,11 @@
         .filter-label { font-weight: 600; color: #4a5568; margin-right: 5px; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; font-size: 14px; }
 
-        /* 테이블 스타일 (Compact) */
+        /* 테이블 스타일 */
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
-        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } /* 패딩 축소 */
+        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
         
         /* 로딩 및 데이터 없음 */
@@ -57,51 +57,36 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 숙제 상태 버튼 (토글용) */
-        .status-badge {
-            padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none;
-        }
+        /* 숙제 상태 버튼 */
+        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
         .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* 3단 일괄 처리 버튼 그룹 */
-        .batch-controls {
-            display: flex;
-            gap: 4px;
-            margin-top: 8px;
-        }
-        .batch-btn {
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid transparent;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-            flex: 1;
-        }
+        /* 3단 일괄 처리 버튼 */
+        .batch-controls { display: flex; gap: 4px; margin-top: 8px; }
+        .batch-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-weight: 600; transition: all 0.2s; flex: 1; }
         .batch-btn:hover { opacity: 0.8; transform: translateY(-1px); }
         .batch-ok { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .batch-no { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .batch-reset { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
 
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
-        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
-        .editable-input:focus { border-color: #8b5cf6; outline: none; }
-        .editable-text-input { width: 120px; text-align: left; }
-
-        /* 점수 그래프 & 뱃지 스타일 (복구됨) */
+        
+        /* [복구] 점수 그래프 & 뱃지 스타일 */
         .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
         .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); }
         .score-none { font-size: 13px; font-weight: 600; color: #9ca3af; }
-
         .reading-result-badge { padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px; display: inline-block; }
         .result-pass { background-color: #dcfce7; color: #166534; }
         .result-fail { background-color: #fecaca; color: #991b1b; }
         .result-none { background-color: #f3f4f6; color: #6b7280; }
+
+        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
+        .editable-input:focus { border-color: #8b5cf6; outline: none; }
+        .editable-text-input { width: 120px; text-align: left; }
 
         /* 코멘트 탭 */
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
@@ -158,26 +143,16 @@
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                        
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
-                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-
                         <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
-                            <select id="teacherFilter_hw" class="filter-select" onchange="filterDataByTeacher()">
-                                <option value="">전체 보기</option>
-                            </select>
+                            <select id="teacherFilter_hw" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <!-- [요청 반영] 테이블 헤더 이름 변경 -->
                             <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 메인독해책</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">로딩중...</td></tr></tbody>
                         </table>
@@ -191,21 +166,12 @@
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                        
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
-                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-
                         <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
-                            <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()">
-                                <option value="">전체 보기</option>
-                            </select>
+                            <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -223,21 +189,12 @@
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                        
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
-                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-
                         <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
-                            <select id="teacherFilter_reading" class="filter-select" onchange="filterDataByTeacher()">
-                                <option value="">전체 보기</option>
-                            </select>
+                            <select id="teacherFilter_reading" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -255,21 +212,12 @@
                     <div class="section-title">🎧 리스닝 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                        
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
-                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-
                         <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
-                            <select id="teacherFilter_listening" class="filter-select" onchange="filterDataByTeacher()">
-                                <option value="">전체 보기</option>
-                            </select>
+                            <select id="teacherFilter_listening" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -287,23 +235,13 @@
                     <div class="section-title">💬 오늘의 코멘트</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
-                        
                         <div class="filter-group">
-                            <label class="filter-label">기간:</label>
-                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
-                            <label class="filter-label">담당강사:</label>
-                            <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()">
-                                <option value="">전체 보기</option>
-                            </select>
+                            <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
-                        
                         <button class="refresh-btn" style="background:#6b46c1; margin-left:auto;" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
@@ -319,7 +257,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달, 리포트 모달 (동일) -->
+    <!-- 책 검색 모달 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 style="margin-bottom:15px; color:#6b46c1;">📚 책 추가하기</h2>
@@ -328,6 +266,8 @@
             <button onclick="document.getElementById('bookSearchModal').classList.remove('show')" style="width:100%; padding:10px; margin-top:15px; border:none; background:#f3f4f6; border-radius:8px; cursor:pointer;">닫기</button>
         </div>
     </div>
+    
+    <!-- 리포트 모달 -->
     <div id="reportModal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="reportModalTitle" style="margin-bottom:15px; color:#6b46c1;">🔗 리포트 링크</h2>
@@ -426,6 +366,7 @@
             const date = dateElem ? dateElem.value : '';
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
+
             try {
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
@@ -506,21 +447,21 @@
             } catch(e) { showToast('처리 실패', 'error'); loadDataForCurrentTab(); }
         }
 
-        // [테스트 결과: 동그란 그래프 + 뱃지 복구, 띄어쓰기 속성명 수정]
+        // [수정] 속성명 띄어쓰기 없이 일치시킴 (단어(맞은 개수) 등)
         function displayTestData(data) {
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `<tr>
                 <td class="student-name">${st.studentName}</td>
                 <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어 (맞은 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어 (전체 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
                 <td class="vocab-score">${formatScoreCircle(st.tests.vocabScore)}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해 (틀린 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td>
                 <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
                 <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법 (전체 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법 (틀린 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td>
                 <td class="grammar-score">${formatScoreCircle(st.tests.grammarScore)}</td>
             </tr>`).join('');
         }
