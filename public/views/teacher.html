@@ -39,11 +39,11 @@
         .filter-label { font-weight: 600; color: #4a5568; margin-right: 5px; }
         .filter-select, .filter-input { padding:8px 12px; border-radius:8px; border:2px solid #e2e8f0; font-size: 14px; }
 
-        /* 테이블 스타일 */
+        /* 테이블 스타일 (Compact) */
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
-        .styled-table td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
+        .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } /* 패딩 축소 */
         .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
         
         /* 로딩 및 데이터 없음 */
@@ -88,9 +88,20 @@
         .batch-reset { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
 
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
-        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; }
+        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
+
+        /* 점수 그래프 & 뱃지 스타일 (복구됨) */
+        .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+        .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
+        .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); }
+        .score-none { font-size: 13px; font-weight: 600; color: #9ca3af; }
+
+        .reading-result-badge { padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px; display: inline-block; }
+        .result-pass { background-color: #dcfce7; color: #166534; }
+        .result-fail { background-color: #fecaca; color: #991b1b; }
+        .result-none { background-color: #f3f4f6; color: #6b7280; }
 
         /* 코멘트 탭 */
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
@@ -166,7 +177,8 @@
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>⭕ 문법</th> <th>1️⃣ 어휘</th> <th>2️⃣ 독해클가</th> <th>4️⃣ Sum</th> <th>5️⃣ 매일 독해</th> <th>6️⃣ 일기</th> <th>수행율</th> </tr></thead>
+                            <!-- [요청 반영] 테이블 헤더 이름 변경 -->
+                            <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 메인독해책</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
@@ -414,7 +426,6 @@
             const date = dateElem ? dateElem.value : '';
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
-
             try {
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
@@ -431,7 +442,6 @@
             displayCommentData(data);
         }
 
-        // [1. 숙제 현황] 3단 일괄 처리 버튼 추가 + 즉시 반영 (Optimistic UI)
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
@@ -459,80 +469,70 @@
             const statusMap = { '숙제 함': 'status-complete', '완료': 'status-complete', '안 해옴': 'status-incomplete', '미완료': 'status-incomplete', '숙제 없음': 'status-none', '해당 없음': 'status-none', '진행하지 않음': 'status-none' };
             const displayVal = val || '숙제 없음';
             const cls = statusMap[displayVal] || 'status-none';
-            // data 속성을 사용하여 현재 상태 저장
-            return `<span class="status-badge ${cls}" data-page-id="${pageId}" data-prop="${prop}" data-val="${displayVal}" onclick="handleBadgeClick(this)">${displayVal}</span>`;
+            return `<span class="status-badge ${cls}" onclick="toggleStatus(this, '${pageId}', '${prop}', '${displayVal}')">${displayVal}</span>`;
         }
 
-        async function handleBadgeClick(el) {
-            const pageId = el.getAttribute('data-page-id');
-            const prop = el.getAttribute('data-prop');
-            const currentVal = el.getAttribute('data-val');
-            
+        async function toggleStatus(el, pageId, prop, currentVal) {
             const sequence = ['숙제 함', '안 해옴', '해당 없음'];
             let nextIndex = sequence.indexOf(currentVal) + 1;
             if (nextIndex >= sequence.length) nextIndex = 0;
             const nextVal = sequence[nextIndex];
-            
-            // 즉시 UI 업데이트
-            updateBadgeUI(el, nextVal);
-            
-            // API 호출
+            el.textContent = nextVal;
+            el.className = `status-badge ${nextVal === '숙제 함' ? 'status-complete' : (nextVal === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
+            el.onclick = () => toggleStatus(el, pageId, prop, nextVal);
             await updateField(null, pageId, prop, 'status', nextVal);
         }
 
-        function updateBadgeUI(el, val) {
-            el.textContent = val;
-            el.setAttribute('data-val', val);
-            let cls = 'status-none';
-            if (val === '숙제 함' || val === '완료') cls = 'status-complete';
-            else if (val === '안 해옴' || val === '미완료') cls = 'status-incomplete';
-            el.className = `status-badge ${cls}`;
-        }
-
-        // [일괄 처리 함수] (status: 숙제 함 / 안 해옴 / 해당 없음)
         async function markAllHomework(pageId, status) {
             const msg = status === '숙제 함' ? '완료' : (status === '안 해옴' ? '미완료' : '없음(초기화)');
             if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
-            
             const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
-            
-            // 1. 즉시 UI 업데이트 (Optimistic UI)
             const row = document.getElementById(`row-hw-${pageId}`);
             if (row) {
                 const badges = row.querySelectorAll('.status-badge');
                 badges.forEach(badge => {
-                    updateBadgeUI(badge, status);
+                    badge.textContent = status;
+                    badge.className = `status-badge ${status === '숙제 함' ? 'status-complete' : (status === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
                 });
             }
-
             try {
-                // 2. 업데이트할 데이터 객체 생성
                 const updates = {};
-                props.forEach(prop => {
-                    updates[prop] = { value: status, type: 'status' };
-                });
-
-                // 3. 백엔드에 한 번만 요청 전송
+                props.forEach(prop => { updates[prop] = { value: status, type: 'status' }; });
                 await fetch(`${API_BASE_URL}/api/update-homework`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ 
-                        pageId: pageId, 
-                        updates: updates // 다중 업데이트 객체 전달
-                    })
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId: pageId, updates: updates })
                 });
-                
                 showToast(`모두 "${status}" 처리되었습니다.`);
-                // 성공 시 데이터 리로드 불필요 (UI는 이미 변경됨)
-                
-            } catch(e) { 
-                console.error(e);
-                showToast('처리 실패 (새로고침 필요)', 'error'); 
-                loadDataForCurrentTab(); // 실패 시 원상복구
-            }
+            } catch(e) { showToast('처리 실패', 'error'); loadDataForCurrentTab(); }
         }
 
-        // --- 나머지 기존 함수들 ---
+        // [테스트 결과: 동그란 그래프 + 뱃지 복구, 띄어쓰기 속성명 수정]
+        function displayTestData(data) {
+            const tbody = document.getElementById('testsTableBody');
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = data.map(st => `<tr>
+                <td class="student-name">${st.studentName}</td>
+                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어 (맞은 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어 (전체 개수)', 'number')"></td>
+                <td class="vocab-score">${formatScoreCircle(st.tests.vocabScore)}</td>
+                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해 (틀린 개수)', 'number')"></td>
+                <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
+                <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법 (전체 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법 (틀린 개수)', 'number')"></td>
+                <td class="grammar-score">${formatScoreCircle(st.tests.grammarScore)}</td>
+            </tr>`).join('');
+        }
+
+        function getReadingResultClass(result) { if (result === 'PASS') return 'result-pass'; if (result === 'FAIL') return 'result-fail'; return 'result-none'; }
+        function getScoreStyle(score) { let color = '#ef4444'; if (score >= 80) color = '#10b981'; else if (score >= 60) color = '#f59e0b'; else if (score >= 40) color = '#facc15'; return `style="--score-color: ${color}; --score-value: ${score}%"`; }
+        function formatScoreCircle(score) { 
+            if (score === null || isNaN(score) || score === 0 || score === 'N/A') return '<span class="score-none">-</span>'; 
+            const style = getScoreStyle(score); 
+            return `<div class="score-circle" ${style}><span class="score-text">${Math.round(score)}%</span></div>`; 
+        }
+
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
@@ -564,7 +564,6 @@
         async function removeBook(pid, rid) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); await updateBookRelation(pid, currIds.filter(id => id !== rid)); }
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
-        function displayTestData(data) { const tbody = document.getElementById('testsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td><td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td><td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td><td>${st.tests.vocabScore}</td><td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td><td>${st.tests.readingResult}</td><td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td><td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td><td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td><td>${st.tests.grammarScore}</td></tr>`).join(''); }
         function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
         function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
 
