@@ -57,8 +57,10 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 숙제 상태 버튼 */
-        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
+        /* 숙제 상태 버튼 (토글용) */
+        .status-badge {
+            padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none;
+        }
         .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
@@ -88,13 +90,21 @@
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* 코멘트 탭 */
+        /* 코멘트 탭 스타일 (수정됨) */
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
         .comment-textarea:focus { border-color: #8b5cf6; outline: none; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
         
-        /* 버튼 그룹 컨테이너 */
-        .report-btn-group { display: flex; flex-direction: column; gap: 5px; align-items: stretch; min-width: 100px; }
-        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+        /* [수정] 버튼 그룹 컨테이너 (가로 정렬) */
+        .report-btn-group { 
+            display: flex; 
+            flex-direction: row; /* 가로 배치 */
+            gap: 5px; 
+            align-items: center; 
+            justify-content: flex-start;
+            flex-wrap: wrap; /* 화면 좁으면 줄바꿈 */
+            min-width: 300px; /* 버튼들이 들어갈 최소 너비 확보 */
+        }
+        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; white-space: nowrap; }
         .btn-save { background: #10b981; color: white; } .btn-save:hover { background: #059669; }
         .btn-daily-view { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; } .btn-daily-view:hover { background: #bae6fd; }
         .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; } .btn-daily-copy:hover { background: #e0e7ff; }
@@ -292,7 +302,14 @@
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <colgroup><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:50%"><col style="width:24%"></colgroup>
+                            <!-- [수정] 너비 조정: 앞쪽은 줄이고 코멘트와 관리 영역은 확보 -->
+                            <colgroup>
+                                <col style="width:6%"> <!-- 학생 이름 -->
+                                <col style="width:6%"> <!-- 담당강사 -->
+                                <col style="width:6%"> <!-- 문법 클래스 -->
+                                <col style="width:47%"> <!-- 오늘의 코멘트 -->
+                                <col style="width:35%"> <!-- 관리 (버튼들) -->
+                            </colgroup>
                             <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr></thead>
                             <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
                         </table>
@@ -468,39 +485,32 @@
             await updateField(null, pageId, prop, 'status', nextVal);
         }
 
-        // [수정됨] 초기화 버튼 클릭 시 "숙제 없음"으로 업데이트 (Notion 기본값)
         async function markAllHomework(pageId, status) {
             let statusText = status;
             let apiValue = status;
             
-            // 초기화 버튼 클릭 시
+            // 초기화 버튼 처리
             if (status === '초기화') {
                 statusText = '숙제 없음';
-                apiValue = '숙제 없음'; // Notion DB에 존재하는 값이어야 함
+                apiValue = '숙제 없음'; // Notion DB값
             }
 
             const msg = apiValue === '숙제 함' ? '완료' : (apiValue === '안 해옴' ? '미완료' : '없음(초기화)');
-            
             if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
             
             const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
-            
-            // UI 즉시 업데이트
             const row = document.getElementById(`row-hw-${pageId}`);
             if (row) {
                 const badges = row.querySelectorAll('.status-badge');
                 badges.forEach(badge => {
                     badge.textContent = apiValue;
                     badge.className = `status-badge ${apiValue === '숙제 함' ? 'status-complete' : (apiValue === '안 해옴' ? 'status-incomplete' : 'status-none')}`;
-                    // 클릭 이벤트 핸들러도 새 값으로 갱신
                     badge.onclick = () => toggleStatus(badge, pageId, badge.getAttribute('data-prop') || '', apiValue);
                 });
             }
-            
             try {
                 const updates = {};
                 props.forEach(prop => { updates[prop] = { value: apiValue, type: 'status' }; });
-                
                 await fetch(`${API_BASE_URL}/api/update-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ pageId: pageId, updates: updates })
