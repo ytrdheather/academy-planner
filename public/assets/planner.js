@@ -161,21 +161,21 @@ class StudyPlanner {
      * 폼 채우기 (오리지널 매핑 로직 100% 반영)
      */
     fillFormWithData(progress) {
-        // Notion 속성명 -> HTML name 매핑
         const nameMap = {
             '단어(맞은 개수)': '단어 (맞은 개수)',
             '단어(전체 개수)': '단어 (전체 개수)',
             '문법(전체 개수)': '문법 (전체 개수)',
             '문법(틀린 개수)': '문법 (틀린 개수)',
             '독해(틀린 개수)': '독해 (틀린 개수)',
-            '국어 독서 제목': '오늘 읽은 한국 책', // [복구]
+            '국어 독서 제목': '오늘 읽은 한국 책',
             '📕 책 읽는 거인': '📕 책 읽는 거인',
-            '📖 책제목 (롤업)': '오늘 읽은 영어 책' // [복구]
+            '📖 책제목 (롤업)': '오늘 읽은 영어 책',
+            // [수정] 새로운 속성명 매핑 (HTML name과 일치시킴)
+            '5️⃣ 독해서 풀기': '5️⃣ 독해서 풀기',
+            '6️⃣ 부&매&일': '6️⃣ 부&매&일'
         };
         
-        // 값 변환 매핑 (오리지널 반영)
         const conversionMap = {
-            "숙제 없음": "해당없음",
             "안 해옴": "안 해옴",
             "숙제 함": "숙제 함",
             "진행하지 않음": "진행하지 않음",
@@ -189,11 +189,13 @@ class StudyPlanner {
             "못하고감": "못하고감",
             "시작함": "시작함",
             "절반": "절반",
-            "거의다읽음": "거의다읽음"
+            "거의다읽음": "거의다읽음",
+            // [수정] 새로운 리스닝 옵션 추가 (매핑 불필요시 생략 가능하나 명시적으로 추가)
+            "원서독서로 대체": "원서독서로 대체",
+            "듣기평가교재 완료": "듣기평가교재 완료"
         };
         
         for (const notionKey in progress) {
-            // 책 배열은 별도 처리하므로 건너뜀
             if (notionKey === 'englishBooks' || notionKey === 'koreanBooks') continue;
 
             const value = progress[notionKey];
@@ -203,11 +205,11 @@ class StudyPlanner {
             const element = document.querySelector(`[name="${htmlName}"]`);
             
             if (element) {
-                // 변환된 값이 있으면 사용, 없으면 원래 값 사용
                 element.value = conversionMap[value] || value;
             }
         }
     }
+
 
     initializeUI() {
         const dateElement = document.getElementById('currentDate');

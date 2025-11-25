@@ -191,8 +191,9 @@ async function parseDailyReportData(page) {
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
-        dailyReading: props['5️⃣ 매일 독해 숙제']?.status?.name || '해당 없음',
-        diary: props['6️⃣ 영어일기 or 개인 독해서']?.status?.name || '해당 없음'
+        // [수정] 속성명 변경 반영
+        dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음', 
+        diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
 
     const getFormulaValue = (prop) => {
@@ -449,13 +450,14 @@ app.post('/login', async (req, res) => {
 });
 
 // =======================================================================
-// [기능 4] 진도 저장 (엄격한 필터 + 값 매핑 적용)
+// [기능 4] 진도 저장 (속성명 업데이트)
 // =======================================================================
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     
     try {
+        // [수정] 허용된 속성 목록 업데이트
         const ALLOWED_PROPS = {
             "영어 더빙 학습 완료": "영어 더빙 학습 완료",
             "더빙 워크북 완료": "더빙 워크북 완료",
@@ -463,8 +465,9 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            "5️⃣ 매일 독해 숙제": "5️⃣ 매일 독해 숙제",
-            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 영어일기 or 개인 독해서",
+            // [수정] 이름 변경
+            "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기",
+            "6️⃣ 부&매&일": "6️⃣ 부&매&일",
             "단어 (맞은 개수)": "단어(맞은 개수)",
             "단어 (전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛",
@@ -478,27 +481,28 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "📕 책 읽는 거인": "📕 책 읽는 거인",
             "오늘의 학습 소감": "오늘의 학습 소감"
         };
-        
-        // [신규] 플래너 값 -> 노션 값 변환 맵
+
+        // [수정] 값 매핑 추가 (리스닝 옵션)
         const valueMapping = {
-            "해당없음": "숙제 없음", // [핵심] 이것 때문에 500 에러가 났음!
+            "해당없음": "숙제 없음", 
             "안 해옴": "안 해옴",
             "숙제 함": "숙제 함",
             "진행하지 않음": "진행하지 않음",
             "완료": "완료",
             "미완료": "미완료",
+            // [추가]
+            "원서독서로 대체": "원서독서로 대체",
+            "듣기평가교재 완료": "듣기평가교재 완료",
             "못함": "못함",
             "완료함": "완료함",
             "SKIP": "SKIP",
             "안함": "안함",
             "숙제없음": "숙제없음",
             "못하고감": "못하고감",
-            "시작함": "시작함",
-            "절반": "절반",
-            "거의다읽음": "거의다읽음"
+
         };
 
-        const properties = {};
+       const properties = {};
 
         for (let key in formData) {
             if (key === 'englishBooks' || key === 'koreanBooks') continue;
@@ -510,7 +514,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             let rawValue = formData[key];
             if (rawValue === undefined || rawValue === '') continue;
             
-            // [핵심 수정] 값을 변환 (예: 해당없음 -> 숙제 없음)
             let value = valueMapping[rawValue] || rawValue;
             
             const notionPropName = ALLOWED_PROPS[key];
@@ -545,13 +548,10 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({
-                filter: filter,
-                page_size: 1
-            })
+            body: JSON.stringify({ filter: filter, page_size: 1 })
         });
 
-        if (existingPageQuery.results.length > 0) {
+       if (existingPageQuery.results.length > 0) {
             await fetchNotion(`https://api.notion.com/v1/pages/${existingPageQuery.results[0].id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ properties })
