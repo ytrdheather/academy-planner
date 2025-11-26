@@ -45,23 +45,23 @@
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         
-        /* [수정] 학생 이름 셀 스타일 */
+        /* 학생 이름 셀 스타일 (중앙 정렬) */
         .student-name { 
             font-weight: 700; 
             color: #2d3748; 
-            text-align: center; /* 셀 자체는 중앙 정렬 */
+            text-align: center;
             padding: 10px; 
-            min-width: 300px; /* 이름+버튼이 한 줄에 들어갈 넉넉한 너비 */
+            min-width: 300px;
             background-color: #fcf7ff; 
         }
         
-        /* [수정] 학생 이름 래퍼 (가로 + 중앙 정렬) */
+        /* 학생 이름 래퍼 (가로 + 중앙 정렬) */
         .student-name-wrapper {
             display: flex;
-            flex-direction: row; /* 가로 배치 */
+            flex-direction: row;
             align-items: center;
-            justify-content: center; /* 전체 뭉치를 중앙에 */
-            gap: 15px; /* 이름과 버튼 사이 간격 */
+            justify-content: center;
+            gap: 15px;
             width: 100%;
         }
         
@@ -83,25 +83,10 @@
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* [유지] 3단 일괄 처리 버튼 (디자인 강화 버전) */
-        .batch-controls { 
-            display: flex; 
-            gap: 5px; 
-            margin-top: 0;
-        }
-        .batch-btn { 
-            font-size: 11px; 
-            padding: 4px 10px; 
-            border-radius: 6px; 
-            border-width: 1px;
-            border-style: solid;
-            cursor: pointer; 
-            font-weight: 700; 
-            transition: all 0.2s; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
+        /* 3단 일괄 처리 버튼 (디자인 강화) */
+        .batch-controls { display: flex; gap: 5px; margin-top: 0; }
+        .batch-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .batch-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
         .batch-ok { background-color: #f0fdf4; color: #15803d; border-color: #16a34a; }
         .batch-no { background-color: #fef2f2; color: #b91c1c; border-color: #dc2626; }
         .batch-reset { background-color: #f8fafc; color: #475569; border-color: #94a3b8; }
@@ -266,10 +251,11 @@
                 </div>
             </div>
 
-            <!-- 4. 리스닝 현황 탭 -->
+             <!-- 4. 리스닝 현황 탭 -->
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
-                    <div class="section-title">🎧 리스닝 현황</div>
+                    <!-- [수정] 제목 변경 -->
+                    <div class="section-title" style="--icon:'🎧'">리스닝 & 책거 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
@@ -285,8 +271,20 @@
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>듣기 학습</th> <th>듣기 워크북</th> </tr></thead>
-                            <tbody id="listeningTableBody"><tr><td colspan="4" class="loading">로딩중...</td></tr></tbody>
+                            <thead>
+                                <!-- [수정] 컬럼 추가 -->
+                                <tr>
+                                    <th>학생 이름</th>
+                                    <th>담당강사</th>
+                                    <th>듣기 학습</th>
+                                    <th>듣기 워크북</th>
+                                    <th>국어 독서(태그)</th>
+                                    <th>책 읽는 거인</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listeningTableBody">
+                                <tr><td colspan="6" class="loading">로딩중...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -602,7 +600,33 @@
         async function removeBook(pid, rid) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); await updateBookRelation(pid, currIds.filter(id => id !== rid)); }
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
-        function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
+         function displayListeningData(data) {
+            const tbody = document.getElementById('listeningTableBody');
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
+            
+            // [수정] 새로운 옵션 목록
+            const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
+            
+            // [신규] 책 읽는 거인 옵션
+            const giantOptions = ['진행하지 않음', '미완료', '완료', '시작함', '절반', '거의다읽음', '못함', '완료함'];
+
+            tbody.innerHTML = data.map(st => {
+                // 한국어 책 태그 (삭제 가능하게 구현하려면 removeBook 로직 수정 필요하지만, 일단 표시 위주)
+                // 선생님이 여기서 삭제/추가 하려면 별도 로직 필요. 일단 태그 형태로 표시.
+                const kBooks = st.listening.koreanBooks || [];
+                const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title}</span>`).join('');
+                
+                return `
+                <tr>
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${(st.teachers||[]).join(', ')}</td>
+                    <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening.study, listeningOptions)}</td>
+                    <td>${formatHomeworkDropdown(st.pageId, '더빙 워크북 완료', st.listening.workbook, listeningOptions)}</td>
+                    <td class="book-list-cell">${kBookTags || '-'}</td>
+                    <td>${formatSelect(st.pageId, '📕 책 읽는 거인', st.listening.giantStatus, giantOptions)}</td>
+                </tr>`;
+            }).join('');
+        }
         function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }

@@ -32,7 +32,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// Notion API 호출 헬퍼 (재시도 로직 포함)
+// Notion API 호출 헬퍼
 async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -43,7 +43,6 @@ async function fetchNotion(url, options, retries = 3) {
     try {
         const response = await fetch(url, { ...options, headers });
 
-        // [409 Conflict] 에러 발생 시 재시도
         if (response.status === 409 && retries > 0) {
             console.warn(`⚠️ Notion API Conflict (409). 재시도 중... (남은 시도: ${retries})`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
@@ -69,7 +68,6 @@ if (GEMINI_API_KEY) {
     console.log('✅ Gemini AI 연결됨');
 }
 
-// --- 선생님 계정 정보 ---
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
@@ -80,7 +78,6 @@ const userAccounts = {
     'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
 };
 
-// --- Helper Functions ---
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
@@ -195,7 +192,6 @@ async function parseDailyReportData(page) {
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
-        // [확인] 노션 속성명 '5️⃣ 독해서 풀기', '6️⃣ 부&매&일'로 정확히 파싱
         dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음', 
         diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
@@ -220,9 +216,22 @@ async function parseDailyReportData(page) {
         grammarScore: getFormulaValue(props['📑 문법 시험 점수'])
     };
 
+    // [수정] 한국어 책 및 책 읽는 거인 데이터 가져오기
+    const korBookTitles = getRollupArray(props['국어책제목(롤업)']);
+    const korBookIds = props['국어 독서 제목']?.relation?.map(r => r.id) || [];
+    const koreanBooks = korBookTitles.map((title, idx) => ({
+        title,
+        id: korBookIds[idx] || null
+    }));
+
+    const giantStatus = props['📕 책 읽는 거인']?.select?.name || '';
+
     const listening = {
         study: props['영어 더빙 학습 완료']?.status?.name || '진행하지 않음',
-        workbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음'
+        workbook: props['더빙 워크북 완료']?.status?.name || '진행하지 않음',
+        // [추가] 리스닝 탭에 표시할 한국어 책/거인 데이터
+        koreanBooks: koreanBooks,
+        giantStatus: giantStatus
     };
 
     const engBookTitles = getRollupArray(props['📖 책제목 (롤업)']);
@@ -331,16 +340,11 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     }
 });
 
-// =======================================================================
-// [기능 2] 숙제 업데이트 API (매핑 오류 수정 - 태그 제거)
-// =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
-    
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
 
     try {
-        // [수정] 오타()가 들어갔던 부분을 깨끗하게 정리했습니다.
         const mapPropName = (name) => {
             const mapping = {
                 "단어 (맞은 개수)": "단어(맞은 개수)",
@@ -348,14 +352,12 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 "문법 (전체 개수)": "문법(전체 개수)",
                 "문법 (틀린 개수)": "문법(틀린 개수)",
                 "독해 (틀린 개수)": "독해(틀린 개수)",
-                // [확인] 여기를 깨끗하게 수정했습니다.
                 "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기",
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일"
             };
             return mapping[name] || name; 
         };
         
-        // [유지] 값 매핑
         const mapValue = (val) => {
             if (val === "해당 없음" || val === "해당없음") return "숙제 없음";
             return val;
@@ -363,11 +365,10 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
 
         const propertiesToUpdate = {};
 
-        // 1. 다중 업데이트
         if (updates && typeof updates === 'object') {
             for (const [propName, valObj] of Object.entries(updates)) {
-                const notionPropName = mapPropName(propName); // 이름 변환
-                const val = mapValue(valObj.value); // 값 변환
+                const notionPropName = mapPropName(propName);
+                const val = mapValue(valObj.value);
                 const type = valObj.type || 'status';
 
                 let payload;
@@ -383,10 +384,9 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 propertiesToUpdate[notionPropName] = payload;
             }
         } 
-        // 2. 단일 업데이트
         else if (propertyName) {
-            const notionPropName = mapPropName(propertyName); // 이름 변환
-            const val = mapValue(newValue); // 값 변환
+            const notionPropName = mapPropName(propertyName);
+            const val = mapValue(newValue);
             
             let payload;
             if (propertyType === 'number') payload = { number: Number(val) || 0 };
@@ -397,7 +397,6 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 else payload = { relation: val ? [{ id: val }] : [] };
             }
             else if (propertyType === 'status') payload = { status: { name: val || '숙제 없음' } };
-
             propertiesToUpdate[notionPropName] = payload;
         } else {
             return res.status(400).json({ success: false, message: 'No update data provided' });
@@ -407,21 +406,23 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             method: 'PATCH',
             body: JSON.stringify({ properties: propertiesToUpdate })
         });
-
         res.json({ success: true });
-
     } catch (error) {
         console.error('Update Error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
-// [기타 API 생략 - 기존과 동일]
+// ... (기타 API 생략 - teacher-login, user-info, student-info, login 등 기존과 동일) ...
+// (중략)
+// ... (이하 save-progress 등 기존 로직 유지) ...
+
+// [기타 API]
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
 });
-// ... (나머지 라우트: teacher-login, user-info, student-info, login 등은 기존 그대로 유지) ...
+
 app.post('/teacher-login', async (req, res) => {
     const { teacherId, teacherPassword } = req.body;
     const account = userAccounts[teacherId];
@@ -432,16 +433,20 @@ app.post('/teacher-login', async (req, res) => {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 });
+
 app.get('/api/teacher/user-info', requireAuth, (req, res) => {
     res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId });
 });
+
 app.get('/api/user-info', requireAuth, (req, res) => {
     res.json({ userId: req.user.userId, userName: req.user.name, userRole: req.user.role });
 });
+
 app.get('/api/student-info', requireAuth, (req, res) => {
     if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' });
     res.json({ studentId: req.user.userId, studentName: req.user.name });
 });
+
 app.post('/login', async (req, res) => {
     const { studentId, studentPassword } = req.body;
     try {
@@ -459,7 +464,6 @@ app.post('/login', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// [진도 저장]
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -472,7 +476,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            // [수정] 이름 변경 반영
             "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기",
             "6️⃣ 부&매&일": "6️⃣ 부&매&일",
             "단어 (맞은 개수)": "단어(맞은 개수)",
@@ -585,7 +588,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     }
 });
 
-// [데이터 로드]
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
