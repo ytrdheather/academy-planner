@@ -32,21 +32,33 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// Notion API 호출 헬퍼
-async function fetchNotion(url, options) {
+// Notion API 호출 헬퍼 (재시도 로직 포함)
+async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
         'Notion-Version': '2022-06-28'
     };
-    const response = await fetch(url, { ...options, headers });
+    
+    try {
+        const response = await fetch(url, { ...options, headers });
 
-    if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
-        throw new Error(errorData.message || `Notion API Error: ${response.status}`);
+        // [409 Conflict] 에러 발생 시 재시도
+        if (response.status === 409 && retries > 0) {
+            console.warn(`⚠️ Notion API Conflict (409). 재시도 중... (남은 시도: ${retries})`);
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+            return fetchNotion(url, options, retries - 1);
+        }
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
+            throw new Error(errorData.message || `Notion API Error: ${response.status}`);
+        }
+        return response.json();
+    } catch (error) {
+        throw error;
     }
-    return response.json();
 }
 
 // Gemini AI 설정
@@ -89,7 +101,6 @@ function getKoreanDate(dateString) {
     return new Intl.DateTimeFormat('ko-KR', options).format(date);
 }
 
-// [롤업 헬퍼]
 const getRollupArray = (prop) => {
     if (!prop?.rollup?.array) return [];
     return prop.rollup.array.map(item => {
@@ -137,7 +148,6 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
     } catch (error) { return null; }
 }
 
-// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -151,14 +161,12 @@ function requireAuth(req, res, next) {
     next();
 }
 
-// --- 페이지 라우트 ---
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.html')));
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
-// [모듈 초기화]
 initializeBookRoutes(app, fetchNotion, process.env);
 try {
     initializeMonthlyReportRoutes({
@@ -169,10 +177,6 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
-
-// =======================================================================
-// [기능 1] 데이터 파싱 로직
-// =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -191,7 +195,7 @@ async function parseDailyReportData(page) {
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
-        // [수정] 속성명 변경 반영
+        // [확인] 노션 속성명 '5️⃣ 독해서 풀기', '6️⃣ 부&매&일'로 정확히 파싱
         dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음', 
         diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
@@ -252,7 +256,11 @@ async function parseDailyReportData(page) {
         try {
             const gData = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, {
                 method: 'POST',
-                body: JSON.stringify({ filter: { property: '반이름', select: { equals: grammarClassName } }, page_size: 1 })
+                body: JSON.stringify({
+                    filter: { property: '반이름', select: { equals: grammarClassName } },
+                    sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+                    page_size: 1
+                })
             });
             if (gData.results.length > 0) {
                 grammarTopic = getSimpleText(gData.results[0].properties['문법 진도 내용']) || '진도 해당 없음';
@@ -324,39 +332,42 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 });
 
 // =======================================================================
-// [기능 2] 숙제 업데이트 API (일괄 처리 지원 + 속성 매핑)
+// [기능 2] 숙제 업데이트 API (매핑 오류 수정 - 태그 제거)
 // =======================================================================
 app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
+    
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
 
     try {
+        // [수정] 오타()가 들어갔던 부분을 깨끗하게 정리했습니다.
         const mapPropName = (name) => {
             const mapping = {
                 "단어 (맞은 개수)": "단어(맞은 개수)",
                 "단어 (전체 개수)": "단어(전체 개수)",
                 "문법 (전체 개수)": "문법(전체 개수)",
                 "문법 (틀린 개수)": "문법(틀린 개수)",
-                "독해 (틀린 개수)": "독해(틀린 개수)"
+                "독해 (틀린 개수)": "독해(틀린 개수)",
+                // [확인] 여기를 깨끗하게 수정했습니다.
+                "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기",
+                "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일"
             };
             return mapping[name] || name; 
         };
         
-        // [신규] 값 매핑 함수 (클라이언트 UI 값 -> 노션 DB 값)
+        // [유지] 값 매핑
         const mapValue = (val) => {
-            const mapping = {
-                "해당없음": "숙제 없음" // 핵심! UI에서는 '해당없음'이지만 DB는 '숙제 없음'
-            };
-            return mapping[val] || val;
+            if (val === "해당 없음" || val === "해당없음") return "숙제 없음";
+            return val;
         };
 
         const propertiesToUpdate = {};
 
+        // 1. 다중 업데이트
         if (updates && typeof updates === 'object') {
             for (const [propName, valObj] of Object.entries(updates)) {
-                const notionPropName = mapPropName(propName);
-                const rawVal = valObj.value;
-                const val = mapValue(rawVal); // 값 매핑 적용
+                const notionPropName = mapPropName(propName); // 이름 변환
+                const val = mapValue(valObj.value); // 값 변환
                 const type = valObj.type || 'status';
 
                 let payload;
@@ -369,12 +380,13 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 }
                 else if (type === 'status') payload = { status: { name: val || '숙제 없음' } };
 
-                propertiesToUpdate[propName] = payload;
+                propertiesToUpdate[notionPropName] = payload;
             }
         } 
+        // 2. 단일 업데이트
         else if (propertyName) {
-            const notionPropName = mapPropName(propertyName);
-            const val = mapValue(newValue); // 값 매핑 적용
+            const notionPropName = mapPropName(propertyName); // 이름 변환
+            const val = mapValue(newValue); // 값 변환
             
             let payload;
             if (propertyType === 'number') payload = { number: Number(val) || 0 };
@@ -395,19 +407,21 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             method: 'PATCH',
             body: JSON.stringify({ properties: propertiesToUpdate })
         });
+
         res.json({ success: true });
+
     } catch (error) {
         console.error('Update Error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
-// [기타 API]
+// [기타 API 생략 - 기존과 동일]
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
 });
-
+// ... (나머지 라우트: teacher-login, user-info, student-info, login 등은 기존 그대로 유지) ...
 app.post('/teacher-login', async (req, res) => {
     const { teacherId, teacherPassword } = req.body;
     const account = userAccounts[teacherId];
@@ -418,20 +432,16 @@ app.post('/teacher-login', async (req, res) => {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 });
-
 app.get('/api/teacher/user-info', requireAuth, (req, res) => {
     res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId });
 });
-
 app.get('/api/user-info', requireAuth, (req, res) => {
     res.json({ userId: req.user.userId, userName: req.user.name, userRole: req.user.role });
 });
-
 app.get('/api/student-info', requireAuth, (req, res) => {
     if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' });
     res.json({ studentId: req.user.userId, studentName: req.user.name });
 });
-
 app.post('/login', async (req, res) => {
     const { studentId, studentPassword } = req.body;
     try {
@@ -449,15 +459,12 @@ app.post('/login', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
 });
 
-// =======================================================================
-// [기능 4] 진도 저장 (속성명 업데이트)
-// =======================================================================
+// [진도 저장]
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     
     try {
-        // [수정] 허용된 속성 목록 업데이트
         const ALLOWED_PROPS = {
             "영어 더빙 학습 완료": "영어 더빙 학습 완료",
             "더빙 워크북 완료": "더빙 워크북 완료",
@@ -465,7 +472,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제",
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제",
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제",
-            // [수정] 이름 변경
+            // [수정] 이름 변경 반영
             "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기",
             "6️⃣ 부&매&일": "6️⃣ 부&매&일",
             "단어 (맞은 개수)": "단어(맞은 개수)",
@@ -481,8 +488,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "📕 책 읽는 거인": "📕 책 읽는 거인",
             "오늘의 학습 소감": "오늘의 학습 소감"
         };
-
-        // [수정] 값 매핑 추가 (리스닝 옵션)
+        
         const valueMapping = {
             "해당없음": "숙제 없음", 
             "안 해옴": "안 해옴",
@@ -490,7 +496,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "진행하지 않음": "진행하지 않음",
             "완료": "완료",
             "미완료": "미완료",
-            // [추가]
             "원서독서로 대체": "원서독서로 대체",
             "듣기평가교재 완료": "듣기평가교재 완료",
             "못함": "못함",
@@ -499,10 +504,12 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "안함": "안함",
             "숙제없음": "숙제없음",
             "못하고감": "못하고감",
-
+            "시작함": "시작함",
+            "절반": "절반",
+            "거의다읽음": "거의다읽음"
         };
 
-       const properties = {};
+        const properties = {};
 
         for (let key in formData) {
             if (key === 'englishBooks' || key === 'koreanBooks') continue;
@@ -548,10 +555,13 @@ app.post('/save-progress', requireAuth, async (req, res) => {
 
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: filter, page_size: 1 })
+            body: JSON.stringify({
+                filter: filter,
+                page_size: 1
+            })
         });
 
-       if (existingPageQuery.results.length > 0) {
+        if (existingPageQuery.results.length > 0) {
             await fetchNotion(`https://api.notion.com/v1/pages/${existingPageQuery.results[0].id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ properties })
@@ -632,7 +642,6 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     }
 });
 
-// [리포트 생성]
 let reportTemplate = '';
 try {
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
@@ -676,7 +685,6 @@ app.get('/report', async (req, res) => {
     } catch (e) { res.status(500).send('Report Error'); }
 });
 
-// [자동화 스케줄]
 cron.schedule('0 22 * * *', async () => {
     console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {

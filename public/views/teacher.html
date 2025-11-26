@@ -449,7 +449,7 @@
                     <div class="batch-controls">
                         <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')" title="전체 완료">전체O</button>
                         <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')" title="전체 미완료">전체X</button>
-                        <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '초기화')" title="숙제없음">숙제없음</button>
+                        <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '숙제 없음')" title="숙제 없음">숙제없음</button>
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
@@ -457,8 +457,9 @@
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
                 <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
                 <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                <td>${renderToggleBadge(st.pageId, '5️⃣ 매일 독해 숙제', st.homework.dailyReading)}</td>
-                <td>${renderToggleBadge(st.pageId, '6️⃣ 영어일기 or 개인 독해서', st.homework.diary)}</td>
+                <!-- [중요] 새 이름으로 수정 -->
+                <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
+                <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
                 <td style="font-weight:bold; color:${st.completionRate>=80?'#10b981':'#ef4444'}">${st.completionRate}%</td>
             </tr>`).join('');
         }
@@ -484,11 +485,18 @@
         async function markAllHomework(pageId, status) {
             let statusText = status;
             let apiValue = status;
-            if (status === '초기화') { statusText = '숙제 없음'; apiValue = '숙제 없음'; }
+            
+            if (status === '초기화') {
+                statusText = '숙제 없음';
+                apiValue = '숙제 없음';
+            }
+
             const msg = apiValue === '숙제 함' ? '완료' : (apiValue === '안 해옴' ? '미완료' : '없음(초기화)');
             if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
-            const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 매일 독해 숙제', '6️⃣ 영어일기 or 개인 독해서'];
-            const row = document.getElementById(`row-hw-${pageId}`);
+            
+            // [중요] 일괄 처리 대상 목록에도 새 이름 적용
+            const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 독해서 풀기', '6️⃣ 부&매&일'];
+             const row = document.getElementById(`row-hw-${pageId}`);
             if (row) {
                 const badges = row.querySelectorAll('.status-badge');
                 badges.forEach(badge => {
