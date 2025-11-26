@@ -45,23 +45,24 @@
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         
-        /* [수정] 학생 이름 셀 스타일 (중앙 정렬) */
+        /* [수정] 학생 이름 셀 스타일 */
         .student-name { 
             font-weight: 700; 
             color: #2d3748; 
-            text-align: center; /* [변경] 왼쪽 정렬 -> 중앙 정렬 */
+            text-align: center; /* 셀 자체는 중앙 정렬 */
             padding: 10px; 
-            min-width: 240px;
-            background-color: #fcf7ff; /* 살짝 눈에 띄게 배경색 추가 */
+            min-width: 300px; /* 이름+버튼이 한 줄에 들어갈 넉넉한 너비 */
+            background-color: #fcf7ff; 
         }
         
-        /* [수정] 학생 이름 래퍼 (중앙 정렬) */
+        /* [수정] 학생 이름 래퍼 (가로 + 중앙 정렬) */
         .student-name-wrapper {
             display: flex;
-            flex-direction: column; /* 이름 위, 버튼 아래 */
-            align-items: center;    /* 가로 중앙 정렬 */
-            justify-content: center; /* 세로 중앙 정렬 */
-            gap: 8px;
+            flex-direction: row; /* 가로 배치 */
+            align-items: center;
+            justify-content: center; /* 전체 뭉치를 중앙에 */
+            gap: 15px; /* 이름과 버튼 사이 간격 */
+            width: 100%;
         }
         
         /* 로딩 및 데이터 없음 */
@@ -82,7 +83,7 @@
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* [수정] 3단 일괄 처리 버튼 (디자인 강화) */
+        /* [유지] 3단 일괄 처리 버튼 (디자인 강화 버전) */
         .batch-controls { 
             display: flex; 
             gap: 5px; 
@@ -93,32 +94,17 @@
             padding: 4px 10px; 
             border-radius: 6px; 
             border-width: 1px;
-            border-style: solid; /* 테두리 실선 */
+            border-style: solid;
             cursor: pointer; 
             font-weight: 700; 
             transition: all 0.2s; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* 그림자 추가 */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         .batch-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
-        /* 전체 O 버튼: 진한 초록 테두리 */
-        .batch-ok { 
-            background-color: #f0fdf4; 
-            color: #15803d; 
-            border-color: #16a34a; 
-        }
-        /* 전체 X 버튼: 진한 빨강 테두리 */
-        .batch-no { 
-            background-color: #fef2f2; 
-            color: #b91c1c; 
-            border-color: #dc2626; 
-        }
-        /* 초기화 버튼: 진한 회색 테두리 */
-        .batch-reset { 
-            background-color: #f8fafc; 
-            color: #475569; 
-            border-color: #94a3b8; 
-        }
+        .batch-ok { background-color: #f0fdf4; color: #15803d; border-color: #16a34a; }
+        .batch-no { background-color: #fef2f2; color: #b91c1c; border-color: #dc2626; }
+        .batch-reset { background-color: #f8fafc; color: #475569; border-color: #94a3b8; }
 
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
         .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
@@ -204,7 +190,10 @@
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
@@ -232,7 +221,10 @@
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
@@ -255,7 +247,10 @@
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
@@ -278,7 +273,10 @@
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
@@ -301,7 +299,10 @@
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
@@ -342,7 +343,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달 -->
+    <!-- 책 검색 모달, 리포트 모달 (동일) -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 style="margin-bottom:15px; color:#6b46c1;">📚 책 추가하기</h2>
@@ -467,7 +468,6 @@
             displayCommentData(data);
         }
 
-        // [수정] displayHomeworkData: 학생 이름과 버튼 그룹을 한 줄로 배치 (가로 정렬)
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
