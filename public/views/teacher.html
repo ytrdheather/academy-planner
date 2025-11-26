@@ -45,21 +45,23 @@
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         
-        /* [수정] 학생 이름 셀 스타일 (가로 정렬을 위해 min-width 증가) */
+        /* [수정] 학생 이름 셀 스타일 (중앙 정렬) */
         .student-name { 
-            font-weight: 600; 
+            font-weight: 700; 
             color: #2d3748; 
-            text-align: left; 
-            padding-left: 15px; 
-            min-width: 240px; /* 버튼들이 들어갈 공간 확보 */
+            text-align: center; /* [변경] 왼쪽 정렬 -> 중앙 정렬 */
+            padding: 10px; 
+            min-width: 240px;
+            background-color: #fcf7ff; /* 살짝 눈에 띄게 배경색 추가 */
         }
         
-        /* [신규] 학생 이름과 버튼을 감싸는 래퍼 (가로 정렬용) */
+        /* [수정] 학생 이름 래퍼 (중앙 정렬) */
         .student-name-wrapper {
             display: flex;
-            align-items: center;
-            gap: 10px;
-            justify-content: space-between; /* 이름은 왼쪽, 버튼은 오른쪽 */
+            flex-direction: column; /* 이름 위, 버튼 아래 */
+            align-items: center;    /* 가로 중앙 정렬 */
+            justify-content: center; /* 세로 중앙 정렬 */
+            gap: 8px;
         }
         
         /* 로딩 및 데이터 없음 */
@@ -80,20 +82,49 @@
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* [수정] 3단 일괄 처리 버튼 (가로 배치에 맞게 조정) */
+        /* [수정] 3단 일괄 처리 버튼 (디자인 강화) */
         .batch-controls { 
             display: flex; 
-            gap: 4px; 
-            margin-top: 0; /* [수정] 상단 여백 제거 */
+            gap: 5px; 
+            margin-top: 0;
         }
-        .batch-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-weight: 600; transition: all 0.2s; }
-        .batch-btn:hover { opacity: 0.8; transform: translateY(-1px); }
-        .batch-ok { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
-        .batch-no { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
-        .batch-reset { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+        .batch-btn { 
+            font-size: 11px; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            border-width: 1px;
+            border-style: solid; /* 테두리 실선 */
+            cursor: pointer; 
+            font-weight: 700; 
+            transition: all 0.2s; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* 그림자 추가 */
+        }
+        .batch-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* 전체 O 버튼: 진한 초록 테두리 */
+        .batch-ok { 
+            background-color: #f0fdf4; 
+            color: #15803d; 
+            border-color: #16a34a; 
+        }
+        /* 전체 X 버튼: 진한 빨강 테두리 */
+        .batch-no { 
+            background-color: #fef2f2; 
+            color: #b91c1c; 
+            border-color: #dc2626; 
+        }
+        /* 초기화 버튼: 진한 회색 테두리 */
+        .batch-reset { 
+            background-color: #f8fafc; 
+            color: #475569; 
+            border-color: #94a3b8; 
+        }
 
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
-        
+        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
+        .editable-input:focus { border-color: #8b5cf6; outline: none; }
+        .editable-text-input { width: 120px; text-align: left; }
+
         /* 점수 그래프 & 뱃지 스타일 */
         .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
@@ -103,10 +134,6 @@
         .result-pass { background-color: #dcfce7; color: #166534; }
         .result-fail { background-color: #fecaca; color: #991b1b; }
         .result-none { background-color: #f3f4f6; color: #6b7280; }
-
-        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
-        .editable-input:focus { border-color: #8b5cf6; outline: none; }
-        .editable-text-input { width: 120px; text-align: left; }
 
         /* 코멘트 탭 */
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-height: 60px; resize: none; overflow-y: hidden; line-height: 1.5; }
@@ -576,107 +603,11 @@
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
         function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
-        
-        function displayCommentData(data) { 
-            const tbody = document.getElementById('commentsTableBody'); 
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } 
-            tbody.innerHTML = data.map(st => `
-                <tr id="row-comment-${st.pageId}">
-                    <td class="student-name">${st.studentName}</td>
-                    <td>${(st.teachers||[]).join(', ')}</td>
-                    <td>${st.comment.grammarClass||'-'}</td>
-                    <td style="vertical-align:top;">
-                        <textarea class="comment-textarea" 
-                            oninput="autoResizeTextarea(this); markCommentAsChanged(this)" 
-                            data-page-id="${st.pageId}" 
-                            defaultValue="${st.comment.teacherComment || ''}"
-                        >${st.comment.teacherComment || ''}</textarea>
-                    </td>
-                    <td style="vertical-align:top;">
-                        <div class="report-btn-group">
-                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
-                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
-                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
-                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
-                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
-                        </div>
-                    </td>
-                </tr>`).join(''); 
-            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); 
-        }
+        function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
-        // [신규] 자동 저장 로직 (Debounce 적용)
-        function markCommentAsChanged(el) { 
-            const row = el.closest('tr'); 
-            const btn = row.querySelector('.comment-save-btn'); 
-            const pageId = el.getAttribute('data-page-id');
-            
-            // UI 변경 표시
-            if(el.value !== el.defaultValue) { 
-                el.style.backgroundColor = '#fffbeb'; 
-                btn.textContent = '저장*'; 
-                btn.style.background = '#ef4444'; 
-                row.classList.add('needs-save'); 
-            } else { 
-                el.style.backgroundColor = 'white'; 
-                btn.textContent = '저장'; 
-                btn.style.background = '#10b981'; 
-                row.classList.remove('needs-save'); 
-            }
-
-            // 기존 타이머 취소 후 재설정
-            if (autoSaveMap.has(pageId)) clearTimeout(autoSaveMap.get(pageId));
-            
-            const timerId = setTimeout(() => {
-                // 1.5초간 입력 없으면 자동 저장 트리거 (단, 버튼 클릭과 겹치지 않게 처리 필요)
-                // 여기서는 updateComment에 isAutoSave 플래그를 추가하여 조용히 저장
-                updateComment(btn, pageId, true); 
-            }, 1500);
-            
-            autoSaveMap.set(pageId, timerId);
-        }
-
-        async function updateComment(btn, pageId, isAutoSave = false) { 
-            const row = btn.closest('tr'); 
-            const ta = row.querySelector('.comment-textarea'); 
-            const val = ta.value; 
-            
-            if (!isAutoSave) {
-                btn.disabled = true; 
-                btn.textContent = '저장중...'; 
-            } else {
-                btn.textContent = '저장중..'; // 자동 저장 중 표시
-            }
-            
-            try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
-                    body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) 
-                }); 
-                
-                if (!isAutoSave) showToast('저장되었습니다.'); 
-                
-                ta.defaultValue = val; 
-                ta.style.backgroundColor = 'white';
-                btn.textContent = '저장됨'; 
-                btn.style.background = '#10b981'; 
-                row.classList.remove('needs-save');
-                
-                // 자동 저장 완료 후 잠시 뒤에 원래 텍스트로 복귀
-                if (isAutoSave) {
-                    setTimeout(() => { if(btn.textContent === '저장됨') btn.textContent = '저장'; }, 2000);
-                }
-
-            } catch(e) { 
-                if (!isAutoSave) showToast('저장 실패', 'error'); 
-                console.error(e);
-            } finally { 
-                if (!isAutoSave) btn.disabled = false; 
-            } 
-        }
-
+        function markCommentAsChanged(el) { const row = el.closest('tr'); const btn = row.querySelector('.comment-save-btn'); if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); } }
+        async function updateComment(btn, pageId) { const row = btn.closest('tr'); const ta = row.querySelector('.comment-textarea'); const val = ta.value; btn.disabled = true; btn.textContent = '저장중...'; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) }); showToast('저장되었습니다.'); ta.defaultValue = val; markCommentAsChanged(ta); } catch(e) { showToast('저장 실패', 'error'); } finally { btn.disabled = false; } }
         async function saveAllComments(batchBtn) { const rows = document.querySelectorAll('tr.needs-save'); if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; } batchBtn.disabled = true; let count = 0; for(const row of rows) { const btn = row.querySelector('.comment-save-btn'); const pageId = row.id.replace('row-comment-', ''); await updateComment(btn, pageId); count++; batchBtn.textContent = `저장중... ${count}/${rows.length}`; } batchBtn.disabled = false; batchBtn.textContent = '💾 일괄 저장'; showToast(`${count}개 코멘트 저장 완료`); }
         function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error')); }
         async function viewMonthlyReport(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) window.open(d.url, '_blank'); else alert(d.message); } catch(e) { alert('오류 발생'); } }
