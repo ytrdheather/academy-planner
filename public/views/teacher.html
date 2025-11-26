@@ -24,8 +24,6 @@
         .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
-        /* [복구] 관리자 탭 스타일 */
-        #tab-admin { color: #d946ef; font-weight: 700; }
 
         /* 메인 컨텐츠 */
         .main-content { padding: 30px 0; }
@@ -46,7 +44,23 @@
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-        .student-name { font-weight: 600; color: #2d3748; text-align: left; padding-left: 15px; min-width: 160px; }
+        
+        /* [수정] 학생 이름 셀 스타일 (가로 정렬을 위해 min-width 증가) */
+        .student-name { 
+            font-weight: 600; 
+            color: #2d3748; 
+            text-align: left; 
+            padding-left: 15px; 
+            min-width: 240px; /* 버튼들이 들어갈 공간 확보 */
+        }
+        
+        /* [신규] 학생 이름과 버튼을 감싸는 래퍼 (가로 정렬용) */
+        .student-name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: space-between; /* 이름은 왼쪽, 버튼은 오른쪽 */
+        }
         
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
@@ -59,16 +73,20 @@
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
 
-        /* 숙제 상태 버튼 (토글용) */
+        /* 숙제 상태 버튼 */
         .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 60px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
         .status-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* 3단 일괄 처리 버튼 */
-        .batch-controls { display: flex; gap: 4px; margin-top: 8px; }
-        .batch-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-weight: 600; transition: all 0.2s; flex: 1; }
+        /* [수정] 3단 일괄 처리 버튼 (가로 배치에 맞게 조정) */
+        .batch-controls { 
+            display: flex; 
+            gap: 4px; 
+            margin-top: 0; /* [수정] 상단 여백 제거 */
+        }
+        .batch-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-weight: 600; transition: all 0.2s; }
         .batch-btn:hover { opacity: 0.8; transform: translateY(-1px); }
         .batch-ok { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .batch-no { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
@@ -103,7 +121,7 @@
         .btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; } .btn-monthly-view:hover { background: #d8b4fe; }
         .btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; } .btn-monthly-copy:hover { background: #fae8ff; }
 
-        /* [복구] 관리자 메뉴 스타일 */
+        /* 관리자 메뉴 스타일 */
         .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
         .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: left; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
         .admin-link-button:hover { border-color: #c0b3e2; background-color: #fcfbfe; box-shadow: 0 6px 15px rgba(0,0,0,0.05); transform: translateY(-2px); }
@@ -145,8 +163,9 @@
             <button class="tab-button" onclick="showTab('reading')">원서 독서 현황</button>
             <button class="tab-button" onclick="showTab('listening')">리스닝 현황</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
-            <!-- [복구] 관리자 메뉴 탭 버튼 -->
-            <button class="tab-button" id="tab-admin" onclick="showTab('admin')">⚙️ 관리자 메뉴</button>
+            <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">
+                ⚙️ 관리자 메뉴
+            </button>
         </div>
 
         <div class="main-content">
@@ -165,14 +184,14 @@
                             <select id="teacherFilter_hw" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
-                     <div class="notice-text">
+                    <div class="notice-text">
                         📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
                         <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
                         매일의 성실함을 지킬 수 있도록 해주세요!
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
-                            <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 메인독해책</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
+                            <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
@@ -273,41 +292,22 @@
                 </div>
             </div>
             
-            <!-- [복구] 관리자 메뉴 탭 -->
+            <!-- 관리자 메뉴 탭 -->
             <div id="admin-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
                     <h3 class="admin-section-title">&lt;리디튜드 노션&gt;</h3>
                     <p style="margin-bottom: 25px; color: #4b5563;">아래 버튼을 클릭하면 해당 노션 DB를 수정할 수 있는 새 윈도우가 열립니다.</p>
-                    
                     <div class="admin-links-container">
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25e09320bce28039a575c1405c9c0d4f?source=copy_link')">
-                            문법 숙제 관리
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/20009320bce28012b740dc6df5e1303c?source=copy_link')">
-                            교재비 입금 내역
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-26109320bce280b38808dc57f5bd5978?source=copy_link')">
-                            원생 교재 관리
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/18f09320bce280a29d3cc25d117511a7?source=copy_link')">
-                            교재 데이터 베이스
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/9ef2bbaeec19466daa0d0c0677b9eb90?v=064779482df2493699322be11a41dcbf&source=copy_link')">
-                            원서 독서 리스트
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/cf82d56634574d7e83d893fbf1b1a4e3?v=1c903b34bd3746c6be6cfb932cd9fabd&source=copy_link')">
-                            국어 독서 리스트
-                        </button>
-                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25409320bce280819167cae477b16fe6?source=copy_link')">
-                            학생 명부 관리
-                        </button>
-                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/1a109320bce28078a744ff94e98f8792?source=copy_link')">
-                            🧑‍💼 상담 관리 메뉴 (관)
-                        </button>
-                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/25409320bce2807697ede3f1c1b62ada?v=25409320bce2815da94b000c1cc63b2f&source=copy_link')">
-                            🧑‍💼 학생 진도 관리 (관)
-                        </button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25e09320bce28039a575c1405c9c0d4f?source=copy_link')">문법 숙제 관리</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/20009320bce28012b740dc6df5e1303c?source=copy_link')">교재비 입금 내역</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-26109320bce280b38808dc57f5bd5978?source=copy_link')">원생 교재 관리</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/18f09320bce280a29d3cc25d117511a7?source=copy_link')">교재 데이터 베이스</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/9ef2bbaeec19466daa0d0c0677b9eb90?v=064779482df2493699322be11a41dcbf&source=copy_link')">원서 독서 리스트</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/cf82d56634574d7e83d893fbf1b1a4e3?v=1c903b34bd3746c6be6cfb932cd9fabd&source=copy_link')">국어 독서 리스트</button>
+                        <button class="admin-link-button" onclick="openNotionWindow('https://www.notion.so/readitude/NEW-25409320bce280819167cae477b16fe6?source=copy_link')">학생 명부 관리</button>
+                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/1a109320bce28078a744ff94e98f8792?source=copy_link')">🧑‍💼 상담 관리 메뉴 (관)</button>
+                        <button class="admin-link-button manager-only-link" onclick="openNotionWindow('https://www.notion.so/readitude/25409320bce2807697ede3f1c1b62ada?v=25409320bce2815da94b000c1cc63b2f&source=copy_link')">🧑‍💼 학생 진도 관리 (관)</button>
                     </div>
                 </div>
             </div>
@@ -315,7 +315,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달, 리포트 모달 (동일) -->
+    <!-- 책 검색 모달 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 style="margin-bottom:15px; color:#6b46c1;">📚 책 추가하기</h2>
@@ -440,16 +440,19 @@
             displayCommentData(data);
         }
 
+        // [수정] displayHomeworkData: 학생 이름과 버튼 그룹을 한 줄로 배치 (가로 정렬)
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `<tr id="row-hw-${st.pageId}">
                 <td class="student-name">
-                    <div>${st.studentName}</div>
-                    <div class="batch-controls">
-                        <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')" title="전체 완료">전체O</button>
-                        <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')" title="전체 미완료">전체X</button>
-                        <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '숙제 없음')" title="숙제 없음">숙제없음</button>
+                    <div class="student-name-wrapper">
+                        <span>${st.studentName}</span>
+                        <div class="batch-controls">
+                            <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')" title="전체 완료">전체O</button>
+                            <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')" title="전체 미완료">전체X</button>
+                            <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '숙제 없음')" title="숙제 없음">숙제없음</button>
+                        </div>
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
@@ -457,7 +460,6 @@
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
                 <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
                 <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                <!-- [중요] 새 이름으로 수정 -->
                 <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
                 <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
                 <td style="font-weight:bold; color:${st.completionRate>=80?'#10b981':'#ef4444'}">${st.completionRate}%</td>
@@ -472,7 +474,7 @@
         }
 
         async function toggleStatus(el, pageId, prop, currentVal) {
-            const sequence = ['숙제 함', '안 해옴', '해당 없음'];
+            const sequence = ['숙제 함', '안 해옴', '숙제 없음'];
             let nextIndex = sequence.indexOf(currentVal) + 1;
             if (nextIndex >= sequence.length) nextIndex = 0;
             const nextVal = sequence[nextIndex];
@@ -494,9 +496,9 @@
             const msg = apiValue === '숙제 함' ? '완료' : (apiValue === '안 해옴' ? '미완료' : '없음(초기화)');
             if (!confirm(`이 학생의 모든 숙제를 "${msg}" 상태로 변경하시겠습니까?`)) return;
             
-            // [중요] 일괄 처리 대상 목록에도 새 이름 적용
             const props = ['⭕ 지난 문법 숙제 검사', '1️⃣ 어휘 클카 암기 숙제', '2️⃣ 독해 단어 클카 숙제', '4️⃣ Summary 숙제', '5️⃣ 독해서 풀기', '6️⃣ 부&매&일'];
-             const row = document.getElementById(`row-hw-${pageId}`);
+            
+            const row = document.getElementById(`row-hw-${pageId}`);
             if (row) {
                 const badges = row.querySelectorAll('.status-badge');
                 badges.forEach(badge => {
@@ -574,7 +576,34 @@
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
         function displayListeningData(data) { const tbody = document.getElementById('listeningTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${formatStatus(st.pageId, '영어 더빙 학습 완료', st.listening.study)}</td><td>${formatStatus(st.pageId, '더빙 워크북 완료', st.listening.workbook)}</td></tr>`).join(''); }
-        function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
+        
+        function displayCommentData(data) { 
+            const tbody = document.getElementById('commentsTableBody'); 
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } 
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-comment-${st.pageId}">
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${(st.teachers||[]).join(', ')}</td>
+                    <td>${st.comment.grammarClass||'-'}</td>
+                    <td style="vertical-align:top;">
+                        <textarea class="comment-textarea" 
+                            oninput="autoResizeTextarea(this); markCommentAsChanged(this)" 
+                            data-page-id="${st.pageId}" 
+                            defaultValue="${st.comment.teacherComment || ''}"
+                        >${st.comment.teacherComment || ''}</textarea>
+                    </td>
+                    <td style="vertical-align:top;">
+                        <div class="report-btn-group">
+                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
+                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
+                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
+                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
+                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                        </div>
+                    </td>
+                </tr>`).join(''); 
+            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); 
+        }
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
         // [신규] 자동 저장 로직 (Debounce 적용)
@@ -582,29 +611,78 @@
             const row = el.closest('tr'); 
             const btn = row.querySelector('.comment-save-btn'); 
             const pageId = el.getAttribute('data-page-id');
-            if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } 
-            else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); }
             
+            // UI 변경 표시
+            if(el.value !== el.defaultValue) { 
+                el.style.backgroundColor = '#fffbeb'; 
+                btn.textContent = '저장*'; 
+                btn.style.background = '#ef4444'; 
+                row.classList.add('needs-save'); 
+            } else { 
+                el.style.backgroundColor = 'white'; 
+                btn.textContent = '저장'; 
+                btn.style.background = '#10b981'; 
+                row.classList.remove('needs-save'); 
+            }
+
+            // 기존 타이머 취소 후 재설정
             if (autoSaveMap.has(pageId)) clearTimeout(autoSaveMap.get(pageId));
-            const timerId = setTimeout(() => { updateComment(btn, pageId, true); }, 1500);
+            
+            const timerId = setTimeout(() => {
+                // 1.5초간 입력 없으면 자동 저장 트리거 (단, 버튼 클릭과 겹치지 않게 처리 필요)
+                // 여기서는 updateComment에 isAutoSave 플래그를 추가하여 조용히 저장
+                updateComment(btn, pageId, true); 
+            }, 1500);
+            
             autoSaveMap.set(pageId, timerId);
         }
+
         async function updateComment(btn, pageId, isAutoSave = false) { 
-            const row = btn.closest('tr'); const ta = row.querySelector('.comment-textarea'); const val = ta.value; 
-            if (!isAutoSave) { btn.disabled = true; btn.textContent = '저장중...'; } else { btn.textContent = '저장중..'; }
+            const row = btn.closest('tr'); 
+            const ta = row.querySelector('.comment-textarea'); 
+            const val = ta.value; 
+            
+            if (!isAutoSave) {
+                btn.disabled = true; 
+                btn.textContent = '저장중...'; 
+            } else {
+                btn.textContent = '저장중..'; // 자동 저장 중 표시
+            }
+            
             try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) }); 
+                await fetch(`${API_BASE_URL}/api/update-homework`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
+                    body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) 
+                }); 
+                
                 if (!isAutoSave) showToast('저장되었습니다.'); 
-                ta.defaultValue = val; ta.style.backgroundColor = 'white'; btn.textContent = '저장됨'; btn.style.background = '#10b981'; row.classList.remove('needs-save');
-                if (isAutoSave) { setTimeout(() => { if(btn.textContent === '저장됨') btn.textContent = '저장'; }, 2000); }
-            } catch(e) { if (!isAutoSave) showToast('저장 실패', 'error'); console.error(e); } 
-            finally { if (!isAutoSave) btn.disabled = false; } 
+                
+                ta.defaultValue = val; 
+                ta.style.backgroundColor = 'white';
+                btn.textContent = '저장됨'; 
+                btn.style.background = '#10b981'; 
+                row.classList.remove('needs-save');
+                
+                // 자동 저장 완료 후 잠시 뒤에 원래 텍스트로 복귀
+                if (isAutoSave) {
+                    setTimeout(() => { if(btn.textContent === '저장됨') btn.textContent = '저장'; }, 2000);
+                }
+
+            } catch(e) { 
+                if (!isAutoSave) showToast('저장 실패', 'error'); 
+                console.error(e);
+            } finally { 
+                if (!isAutoSave) btn.disabled = false; 
+            } 
         }
+
         async function saveAllComments(batchBtn) { const rows = document.querySelectorAll('tr.needs-save'); if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; } batchBtn.disabled = true; let count = 0; for(const row of rows) { const btn = row.querySelector('.comment-save-btn'); const pageId = row.id.replace('row-comment-', ''); await updateComment(btn, pageId); count++; batchBtn.textContent = `저장중... ${count}/${rows.length}`; } batchBtn.disabled = false; batchBtn.textContent = '💾 일괄 저장'; showToast(`${count}개 코멘트 저장 완료`); }
         function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error')); }
         async function viewMonthlyReport(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) window.open(d.url, '_blank'); else alert(d.message); } catch(e) { alert('오류 발생'); } }
         async function openMonthlyReportModal(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) { const modal = document.getElementById('reportModal'); document.getElementById('reportModalTitle').textContent = '📅 월간 리포트 링크'; document.getElementById('reportModalDesc').textContent = `${name} 학생의 지난달 리포트입니다.`; const inp = document.getElementById('reportLinkInput'); inp.value = d.url; modal.classList.add('show'); } else alert(d.message); } catch(e) { alert('오류 발생'); } }
         function copyReportLink() { const inp = document.getElementById('reportLinkInput'); inp.select(); document.execCommand('copy'); showToast('복사되었습니다!'); document.getElementById('reportModal').classList.remove('show'); }
+        function openNotionWindow(url) { if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; } const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions); }
 
         function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
         function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
@@ -612,16 +690,6 @@
         function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
-        
-        // [복구] 관리자 탭: 노션 윈도우 열기
-        function openNotionWindow(url) {
-            if (!url || url.startsWith('https://www.notion.so/...')) { 
-                alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); 
-                return; 
-            }
-            const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; 
-            window.open(url, '_blank', windowOptions);
-        }
     </script>
 </body>
 </html>
