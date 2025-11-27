@@ -32,7 +32,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// Notion API 호출 헬퍼
+// Notion API 호출 헬퍼 (재시도 로직 포함)
 async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -176,10 +176,6 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
-
-// =======================================================================
-// [기능 1] 데이터 파싱 로직 (최적화됨)
-// =======================================================================
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -257,22 +253,13 @@ async function parseDailyReportData(page) {
     };
 
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
-    
-    // [최적화] 문법 DB 조회(API Call) 삭제. 학생 페이지의 속성을 직접 사용
-    // 수동 업데이트 기능과 일관성을 유지하고 성능을 대폭 향상시킴 (N+1 문제 해결)
     let grammarTopic = getSimpleText(props['오늘 문법 진도']);
     let grammarHomework = getSimpleText(props['문법 과제 내용']);
-
-    if (!grammarTopic && !grammarHomework) {
-        grammarTopic = '진도 해당 없음';
-        grammarHomework = '숙제 내용 없음';
-    }
 
     const comment = {
         teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
         grammarClass: grammarClassName || '진도 해당 없음',
-        grammarTopic, 
-        grammarHomework
+        grammarTopic, grammarHomework
     };
 
     return {
@@ -331,15 +318,22 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     }
 });
 
-// [문법 반별 일괄 업데이트]
+// =======================================================================
+// [수정] 문법 반별 일괄 업데이트 (로그 추가 및 안전한 비교)
+// =======================================================================
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, date } = req.body; 
 
     if (!className || !date) {
         return res.status(400).json({ success: false, message: '반 이름과 날짜는 필수입니다.' });
     }
+    
+    const targetClass = className.trim(); // [수정] 공백 제거
 
     try {
+        console.log(`[Grammar Update] 시작: 반=${targetClass}, 날짜=${date}`);
+        
+        // 1. 날짜로 필터링하여 학생 목록 가져오기
         const filter = { "property": "🕐 날짜", "date": { "equals": date } };
         
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
@@ -348,11 +342,16 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         });
 
         const students = query.results;
+        console.log(`[Grammar Update] 날짜(${date}) 검색 결과: ${students.length}명 발견`);
+        
         let updatedCount = 0;
 
+        // 2. 각 학생의 '문법클래스' 확인 후 업데이트
         const updatePromises = students.map(async (page) => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
-            if (studentClass === className) {
+            
+            // [수정] 안전한 문자열 비교
+            if (studentClass && studentClass.trim() === targetClass) {
                 await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
                     method: 'PATCH',
                     body: JSON.stringify({
@@ -367,7 +366,9 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         });
 
         await Promise.all(updatePromises);
-        res.json({ success: true, message: `${updatedCount}명의 학생(${className})에게 문법 숙제를 배포했습니다.` });
+        console.log(`[Grammar Update] 완료: ${updatedCount}명 업데이트`);
+
+        res.json({ success: true, message: `${updatedCount}명의 학생(${targetClass})에게 문법 숙제를 배포했습니다.` });
 
     } catch (error) {
         console.error('Grammar batch update error:', error);
@@ -449,7 +450,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     }
 });
 
-// [기타 API]
+// ... (기타 API 생략) ...
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
@@ -739,9 +740,64 @@ cron.schedule('0 22 * * *', async () => {
 
 // [신규] 문법 숙제 동기화 (매일 21:50) - 최적화된 버전
 cron.schedule('50 21 * * *', async () => {
-    // ... (기존 코드와 동일, 단 위에서 fetchNotion 재시도 로직이 강화됨) ...
     console.log('--- [문법 숙제 동기화] 자동화 스케줄 실행 (21:50) ---');
-    // ... (동일 로직 유지)
+    try {
+        const { dateString } = getKSTTodayRange();
+        
+        const grammarQuery = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+                page_size: 100
+            })
+        });
+
+        const classAssignments = {};
+        for (const page of grammarQuery.results) {
+            const className = page.properties['반이름']?.select?.name;
+            if (className && !classAssignments[className]) {
+                classAssignments[className] = {
+                    topic: getSimpleText(page.properties['오늘 문법 진도']),
+                    hw: getSimpleText(page.properties['문법 과제 내용'])
+                };
+            }
+        }
+        
+        const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    "property": "🕐 날짜",
+                    "date": { "equals": dateString }
+                }
+            })
+        });
+
+        const studentPages = progressQuery.results;
+
+        for (const page of studentPages) {
+            const pageId = page.id;
+            const grammarClass = getRollupValue(page.properties['문법클래스']);
+
+            if (grammarClass && classAssignments[grammarClass]) {
+                const assignment = classAssignments[grammarClass];
+                
+                await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        properties: {
+                            '오늘 문법 진도': { rich_text: [{ text: { content: assignment.topic || '' } }] },
+                            '문법 과제 내용': { rich_text: [{ text: { content: assignment.hw || '' } }] }
+                        }
+                    })
+                });
+            }
+        }
+        console.log('--- [문법 숙제 동기화] 완료 ---');
+
+    } catch (error) {
+        console.error('--- [문법 숙제 동기화] 오류 발생 ---', error);
+    }
 }, { timezone: "Asia/Seoul" });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`✅ Final Server running on ${PORT}`));
