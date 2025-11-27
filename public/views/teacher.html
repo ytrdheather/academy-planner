@@ -6,12 +6,11 @@
     <title>선생님 대시보드 - 리디튜드</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        /* --- 기본 스타일 --- */
+        /* ... (스타일 생략, 기존과 동일) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
         .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
         
-        /* 헤더 */
         .header { background: #ffffff; color: #6b46c1; padding: 20px 30px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 1.8em; margin: 0; }
         .user-info { display: flex; align-items: center; gap: 15px; }
@@ -19,13 +18,11 @@
         .logout-btn { background: #6b46c1; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: background 0.2s; }
         .logout-btn:hover { background: #5a3eaa; }
 
-        /* 탭 메뉴 */
         .tab-menu { display: flex; background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 0 40px; margin-top: 20px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
 
-        /* 메인 컨텐츠 */
         .main-content { padding: 30px 0; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -44,42 +41,16 @@
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-        
-        /* 학생 이름 셀 스타일 (중앙 정렬) */
-        .student-name { 
-            font-weight: 700; 
-            color: #2d3748; 
-            text-align: center;
-            padding: 10px; 
-            min-width: 300px;
-            background-color: #fcf7ff; 
-        }
-        
-        /* 학생 이름 래퍼 (가로 + 중앙 정렬) */
-        .student-name-wrapper {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            width: 100%;
-        }
+        .student-name { font-weight: 700; color: #2d3748; text-align: center; padding: 10px; min-width: 300px; background-color: #fcf7ff; }
+        .student-name-wrapper { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 15px; width: 100%; }
         
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
 
         /* 책 태그 및 버튼 스타일 */
-        .book-list-cell { 
-            display: flex; 
-            flex-wrap: wrap; 
-            gap: 6px; 
-            align-items: center; 
-            justify-content: center; 
-            min-width: 250px; 
-            padding: 8px !important; /* 내부 여백 확보 */
-        }
+        .book-list-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; min-width: 250px; padding: 8px !important; }
         .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 14px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 14px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-left: 4px; }
         .book-tag .remove-btn:hover { background: #e9d5ff; }
         .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .book-add-btn:hover { background: #d8b4fe; transform: translateY(-1px); }
@@ -99,8 +70,8 @@
         .batch-no { background-color: #fef2f2; color: #b91c1c; border-color: #dc2626; }
         .batch-reset { background-color: #f8fafc; color: #475569; border-color: #94a3b8; }
 
+        /* 드롭다운 스타일 */
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
-        /* 리스닝 상태 색상 */
         .homework-dropdown.status-listening-replace { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
         .homework-dropdown.status-listening-textbook { background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
         .homework-dropdown.status-default { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
@@ -111,7 +82,7 @@
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* 점수 그래프 & 뱃지 스타일 */
+        /* 점수 그래프 */
         .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
         .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); }
@@ -140,6 +111,49 @@
         .admin-link-button:hover { border-color: #c0b3e2; background-color: #fcfbfe; box-shadow: 0 6px 15px rgba(0,0,0,0.05); transform: translateY(-2px); }
         .admin-section-title { font-size: 1.3em; font-weight: 700; color: #333; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
         .manager-only-link { display: none; background-color: #fcfbfe; border-color: #c0b3e2; }
+
+        /* 문법 일괄 입력 스타일 */
+        .grammar-input-container {
+            background-color: #f3e8ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #d8b4fe;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .grammar-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .grammar-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b46c1;
+        }
+        .grammar-input {
+            padding: 8px 12px;
+            border: 1px solid #d8b4fe;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        .grammar-btn {
+            padding: 10px 20px;
+            background-color: #8b5cf6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .grammar-btn:hover {
+            background-color: #7c3aed;
+        }
 
         .notice-text { background-color: #f8f9ff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; font-size: 14px; color: #4b5563; line-height: 1.6; }
         .notice-text strong { color: #ef4444; font-weight: 700; }
@@ -175,6 +189,7 @@
             <button class="tab-button" onclick="showTab('tests')">테스트 결과</button>
             <button class="tab-button" onclick="showTab('reading')">원서 독서 현황</button>
             <button class="tab-button" onclick="showTab('listening')">리스닝 현황</button>
+            <button class="tab-button" onclick="showTab('grammar')">📚 문법 관리</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
             <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">
                 ⚙️ 관리자 메뉴
@@ -182,18 +197,16 @@
         </div>
 
         <div class="main-content">
-            
-            <!-- 1. 숙제 현황 탭 -->
+            <!-- (기존 탭 내용 생략: homework, tests, reading, listening) -->
+            <!-- ... 기존 탭들은 그대로 둡니다 ... -->
             <div id="homework-view" class="tab-content active">
+                <!-- ... 숙제 탭 내용 ... -->
                 <div class="content-section">
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
@@ -213,22 +226,19 @@
                     </div>
                 </div>
             </div>
-
-            <!-- 2. 테스트 결과 탭 -->
             <div id="tests-view" class="tab-content">
+                <!-- ... 테스트 탭 내용 (생략) ... -->
                 <div class="content-section">
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
-                    <div class="filters-container">
+                    <!-- ... 필터 등 ... -->
+                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
-                            <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                            <select id="periodFilter_test" class="filter-select" onchange="toggleDateInput('test')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <input type="date" id="specificDate_test" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-                        <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
-                            <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
+                        <div class="filter-group" id="teacherFilterGroup_test" style="display:none;">
+                            <select id="teacherFilter_test" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -239,18 +249,14 @@
                     </div>
                 </div>
             </div>
-
-            <!-- 3. 원서 독서 현황 탭 -->
             <div id="reading-view" class="tab-content">
-                <div class="content-section">
+                <!-- ... 독서 탭 내용 (생략) ... -->
+                 <div class="content-section">
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
@@ -265,18 +271,14 @@
                     </div>
                 </div>
             </div>
-
-            <!-- 4. 리스닝 & 책거 현황 탭 (국어 독서 추가) -->
             <div id="listening-view" class="tab-content">
-                <div class="content-section">
+                <!-- ... 리스닝 탭 내용 (생략) ... -->
+                 <div class="content-section">
                     <div class="section-title">🎧 리스닝 & 책거 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
@@ -301,23 +303,60 @@
                 </div>
             </div>
 
-            <!-- 5. 오늘의 코멘트 탭 -->
+            <!-- [신규] 문법 관리 탭 -->
+            <div id="grammar-view" class="tab-content">
+                <div class="content-section">
+                    <div class="section-title" style="--icon:'📚'">문법 숙제 관리</div>
+                    
+                    <!-- 상단: 문법 숙제 입력란 -->
+                    <div class="grammar-input-container">
+                        <div class="grammar-group">
+                            <label class="grammar-label">대상 반 선택</label>
+                            <select id="grammarClassSelect" class="grammar-input">
+                                <option value="">반을 선택하세요</option>
+                                <!-- JS로 로드된 반 목록이 들어감 -->
+                            </select>
+                        </div>
+                        <div class="grammar-group">
+                            <label class="grammar-label">오늘 문법 진도</label>
+                            <input type="text" id="grammarTopicInput" class="grammar-input" placeholder="예: to부정사">
+                        </div>
+                        <div class="grammar-group" style="flex-grow: 1;">
+                            <label class="grammar-label">문법 과제 내용</label>
+                            <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예: P.20~24 풀기">
+                        </div>
+                        <button class="grammar-btn" onclick="updateGrammarByClass()">반 전체 적용</button>
+                    </div>
+
+                    <!-- 하단: 학생 리스트 -->
+                    <div class="filters-container">
+                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                         <!-- 필터 생략 (자동 로드) -->
+                    </div>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <colgroup><col style="width:10%"><col style="width:10%"><col style="width:40%"><col style="width:40%"></colgroup>
+                            <thead><tr> <th>학생 이름</th> <th>문법 반</th> <th>오늘 문법 진도</th> <th>문법 과제 내용</th> </tr></thead>
+                            <tbody id="grammarTableBody"><tr><td colspan="4" class="loading">로딩중...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 오늘의 코멘트 탭 -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
-                    <div class="filters-container">
+                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
-                                <option value="today" selected>오늘</option>
-                                <option value="specific_date">날짜 지정</option>
-                            </select>
+                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
                             <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
                             <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
-                        <button class="refresh-btn" style="background:#6b46c1; margin-left:auto;" onclick="saveAllComments(this)">💾 일괄 저장</button>
+                        <button class="refresh-btn batch-save-btn" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
@@ -328,9 +367,9 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- 관리자 메뉴 탭 -->
-            <div id="admin-view" class="tab-content">
+
+            <!-- 관리자 메뉴 탭 (생략 - 기존과 동일) -->
+             <div id="admin-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
                     <h3 class="admin-section-title">&lt;리디튜드 노션&gt;</h3>
@@ -352,7 +391,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달 -->
+    <!-- 책 검색 모달, 리포트 모달 (동일) -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -382,7 +421,7 @@
         let currentActiveTab = 'homework';
         let bookSearchTimer = null;
         let currentEditingPageId = null;
-        let currentBookType = 'english'; // [신규] 현재 책 검색 타입
+        let currentBookType = 'english'; 
         let currentUserRole = '';
         let currentUserName = '';
         const autoSaveMap = new Map();
@@ -393,6 +432,7 @@
             if (tabName === 'tests') return '_test';
             if (tabName === 'reading') return '_reading';
             if (tabName === 'listening') return '_listening';
+            if (tabName === 'grammar') return '_grammar'; // [신규]
             if (tabName === 'comments') return '_comments';
             return '';
         }
@@ -407,11 +447,12 @@
                 clearTimeout(bookSearchTimer);
                 const query = e.target.value;
                 bookSearchTimer = setTimeout(() => {
-                     searchBooks(query); // [수정] 통합 검색 함수 호출
+                     searchBooks(query); 
                 }, 300);
             });
         });
 
+        // ... (기존 헬퍼 함수들 유지: setAllFiltersToToday, loadUserInfo, loadTeachersList, filterDataByTeacher, toggleDateInput) ...
         function setAllFiltersToToday() {
             const suffixes = ['hw', 'tests', 'reading', 'listening', 'comments'];
             suffixes.forEach(s => {
@@ -440,13 +481,15 @@
                 ['hw', 'tests', 'reading', 'listening', 'comments'].forEach(tabId => {
                     const container = document.getElementById(`teacherFilterGroup_${tabId}`);
                     const select = document.getElementById(`teacherFilter_${tabId}`);
-                    if (currentUserRole === 'manager') {
-                        container.style.display = 'flex';
-                        teachers.forEach(t => { const opt = document.createElement('option'); opt.value = t.name; opt.textContent = t.name; select.appendChild(opt); });
-                    } else {
-                        container.style.display = 'flex';
-                        const myOpt = document.createElement('option'); myOpt.value = currentUserName; myOpt.textContent = currentUserName + ' (나)'; select.appendChild(myOpt);
-                        select.value = currentUserName; select.disabled = true;
+                    if (container && select) { // admin 탭 등 예외 처리
+                        if (currentUserRole === 'manager') {
+                            container.style.display = 'flex';
+                            teachers.forEach(t => { const opt = document.createElement('option'); opt.value = t.name; opt.textContent = t.name; select.appendChild(opt); });
+                        } else {
+                            container.style.display = 'flex';
+                            const myOpt = document.createElement('option'); myOpt.value = currentUserName; myOpt.textContent = currentUserName + ' (나)'; select.appendChild(myOpt);
+                            select.value = currentUserName; select.disabled = true;
+                        }
                     }
                 });
             } catch(e) { console.error(e); }
@@ -455,7 +498,10 @@
         function filterDataByTeacher() {
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
             const teacherSelect = document.getElementById(`teacherFilter_${tabSuffix}`);
-            const selectedTeacher = teacherSelect ? teacherSelect.value : '';
+            // 문법 탭은 강사 필터가 없을 수도 있음
+            if (!teacherSelect) { displayDataForAllTabs(allReportData); return; }
+
+            const selectedTeacher = teacherSelect.value;
             let filteredData = allReportData;
             if (selectedTeacher) { filteredData = allReportData.filter(item => item.teachers && item.teachers.includes(selectedTeacher)); }
             displayDataForAllTabs(filteredData);
@@ -470,10 +516,12 @@
 
         async function loadDataForCurrentTab() {
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
-            const periodElem = document.getElementById(`periodFilter_${tabSuffix}`);
-            const dateElem = document.getElementById(`specificDate_${tabSuffix}`);
-            const period = periodElem ? periodElem.value : 'today';
-            const date = dateElem ? dateElem.value : '';
+            // 문법 탭은 별도 필터가 없으므로 기본값 사용
+            const periodElem = document.getElementById(`periodFilter_${tabSuffix}`) || { value: 'today' };
+            const dateElem = document.getElementById(`specificDate_${tabSuffix}`) || { value: '' };
+            
+            const period = periodElem.value;
+            const date = dateElem.value;
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
 
@@ -481,6 +529,12 @@
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
+                
+                // [신규] 문법 탭일 경우 반 목록 업데이트
+                if (currentActiveTab === 'grammar') {
+                    updateGrammarClassList(allReportData);
+                }
+                
                 filterDataByTeacher();
             } catch (e) { console.error(e); alert('데이터 로드 실패'); }
         }
@@ -491,8 +545,85 @@
             displayReadingData(data);
             displayListeningData(data);
             displayCommentData(data);
+            displayGrammarData(data); // [신규]
         }
 
+        // [신규] 문법 데이터 렌더링
+        function displayGrammarData(data) {
+             const tbody = document.getElementById('grammarTableBody');
+             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
+             tbody.innerHTML = data.map(st => `
+                <tr>
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${st.comment.grammarClass || '-'}</td>
+                    <td><input type="text" class="editable-input editable-text-input" value="${st.comment.grammarTopic||''}" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
+                    <td><input type="text" class="editable-input editable-text-input" style="width:100%;" value="${st.comment.grammarHomework||''}" data-page-id="${st.pageId}" data-property-name="문법 과제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
+                </tr>
+             `).join('');
+        }
+
+        // [신규] 문법 반 목록 업데이트 (중복 제거)
+        function updateGrammarClassList(data) {
+            const select = document.getElementById('grammarClassSelect');
+            const classes = new Set(data.map(st => st.comment.grammarClass).filter(c => c && c !== '진도 해당 없음'));
+            
+            // 기존 옵션 유지 (첫 번째 '반을 선택하세요')
+            select.innerHTML = '<option value="">반을 선택하세요</option>';
+            
+            classes.forEach(cls => {
+                const opt = document.createElement('option');
+                opt.value = cls;
+                opt.textContent = cls;
+                select.appendChild(opt);
+            });
+        }
+
+        // [신규] 문법 일괄 업데이트
+        async function updateGrammarByClass() {
+            const className = document.getElementById('grammarClassSelect').value;
+            const topic = document.getElementById('grammarTopicInput').value;
+            const homework = document.getElementById('grammarHomeworkInput').value;
+            
+            if (!className) { alert('반을 선택해주세요.'); return; }
+            if (!confirm(`${className}반 학생들의 문법 진도와 숙제를 일괄 적용하시겠습니까?`)) return;
+            
+            // 현재 보고 있는 날짜 (필터 기준)
+            const periodElem = document.getElementById('periodFilter_hw'); // 메인 필터 참조
+            const dateElem = document.getElementById('specificDate_hw');
+            let targetDate = new Date().toISOString().split('T')[0]; // 기본값 오늘
+            
+            if (periodElem && periodElem.value === 'specific_date' && dateElem.value) {
+                targetDate = dateElem.value;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ 
+                        className, 
+                        topic, 
+                        homework,
+                        date: targetDate
+                    })
+                });
+                
+                const result = await res.json();
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    loadDataForCurrentTab(); // 화면 갱신
+                    // 입력창 초기화
+                    document.getElementById('grammarTopicInput').value = '';
+                    document.getElementById('grammarHomeworkInput').value = '';
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (e) {
+                showToast(`업데이트 실패: ${e.message}`, 'error');
+            }
+        }
+
+        // ... (나머지 display 함수들, 헬퍼 함수들 기존과 동일) ...
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
@@ -621,107 +752,12 @@
             }).join('');
         }
 
-        // [수정] 모달 열기 (type 추가)
-        function openAddBookModal(pageId, type) { 
-            currentEditingPageId = pageId; 
-            currentBookType = type; // 타입 저장
-            const modal = document.getElementById('bookSearchModal'); 
-            document.getElementById('modalSearchInput').value = ''; 
-            document.getElementById('modalSearchResults').innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>'; 
-            document.getElementById('modalTitle').textContent = type === 'english' ? '📚 영어 원서 검색' : '📕 국어 도서 검색';
-            modal.classList.add('show'); 
-            document.getElementById('modalSearchInput').focus(); 
-        }
-
-        // [수정] 통합 검색 함수
-        async function searchBooks(query) { 
-            const list = document.getElementById('modalSearchResults'); 
-            if(query.length < 2) { list.innerHTML = ''; return; } 
-            list.innerHTML = '<div class="loading">검색중...</div>'; 
-            
-            // 타입에 따른 엔드포인트 선택
-            const endpoint = currentBookType === 'english' ? '/api/search-books' : '/api/search-sayu-books';
-
-            try { 
-                const res = await fetch(`${API_BASE_URL}${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); 
-                const books = await res.json(); 
-                if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; } 
-                
-                // [수정] 결과 아이템 클릭 시 selectBookByIndex 호출
-                list.innerHTML = books.map((b, i) => {
-                    let meta = '';
-                    if (currentBookType === 'english') {
-                        meta = `저자: ${b.author || ''}`;
-                    } else {
-                        meta = `저자: ${b.author || ''} | 출판: ${b.publisher || ''}`;
-                    }
-                    return `<div class="result-item" onclick="selectBookByIndex(${i})">
-                        <div style="font-weight:bold;">${b.title}</div>
-                        <div style="font-size:12px; color:#666;">${meta}</div>
-                    </div>`;
-                }).join(''); 
-                currentSearchResults = books; // 결과 저장
-            } catch(e) { list.innerHTML = '오류'; } 
-        }
-
-        function selectBookByIndex(index) {
-            const book = currentSearchResults[index];
-            if (book) addBook(book.id);
-        }
-
-        async function addBook(newId) { 
-            if(!currentEditingPageId) return; 
-            document.getElementById('bookSearchModal').classList.remove('show'); 
-            const row = allReportData.find(d => d.pageId === currentEditingPageId); 
-            
-            // [수정] 타입에 따른 데이터 접근 및 속성명 설정
-            let currIds = [];
-            let propertyName = '';
-            
-            if (currentBookType === 'english') {
-                currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
-                propertyName = '오늘 읽은 영어 책';
-            } else {
-                currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id);
-                propertyName = '국어 독서 제목'; // Notion 속성명
-            }
-
-            if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; } 
-            
-            await updateBookRelation(currentEditingPageId, [...currIds, newId], propertyName); 
-        }
-
-        async function removeBook(pid, rid, type) { 
-            if(!confirm('삭제하시겠습니까?')) return; 
-            const row = allReportData.find(d => d.pageId === pid); 
-            
-            // [수정] 타입에 따른 데이터 접근 및 속성명 설정
-            let currIds = [];
-            let propertyName = '';
-            
-            if (type === 'english') {
-                currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id);
-                propertyName = '오늘 읽은 영어 책';
-            } else {
-                currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id);
-                propertyName = '국어 독서 제목';
-            }
-
-            await updateBookRelation(pid, currIds.filter(id => id !== rid), propertyName); 
-        }
-
-        // [수정] propertyName 인자 추가
-        async function updateBookRelation(pid, ids, propertyName) { 
-            try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
-                    body: JSON.stringify({ pageId: pid, propertyName: propertyName, newValue: ids, propertyType: 'relation' }) 
-                }); 
-                showToast('업데이트 완료'); 
-                loadDataForCurrentTab(); 
-            } catch(e) { showToast('실패', 'error'); } 
-        }
+        function openAddBookModal(pageId, type) { currentEditingPageId = pageId; currentBookType = type; const modal = document.getElementById('bookSearchModal'); document.getElementById('modalSearchInput').value = ''; document.getElementById('modalSearchResults').innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>'; document.getElementById('modalTitle').textContent = type === 'english' ? '📚 영어 원서 검색' : '📕 국어 도서 검색'; modal.classList.add('show'); document.getElementById('modalSearchInput').focus(); }
+        async function searchEngBooks(query) { const list = document.getElementById('modalSearchResults'); if(query.length < 2) { list.innerHTML = ''; return; } list.innerHTML = '<div class="loading">검색중...</div>'; const endpoint = currentBookType === 'english' ? '/api/search-books' : '/api/search-sayu-books'; try { const res = await fetch(`${API_BASE_URL}${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const books = await res.json(); if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; } list.innerHTML = books.map((b, i) => { let meta = ''; if (currentBookType === 'english') { meta = `저자: ${b.author || ''}`; } else { meta = `저자: ${b.author || ''} | 출판: ${b.publisher || ''}`; } return `<div class="result-item" onclick="selectBookByIndex(${i})"><div style="font-weight:bold;">${b.title}</div><div style="font-size:12px; color:#666;">${meta}</div></div>`; }).join(''); currentSearchResults = books; } catch(e) { list.innerHTML = '오류'; } }
+        function selectBookByIndex(index) { const book = currentSearchResults[index]; if (book) addBook(book.id); }
+        async function addBook(newId) { if(!currentEditingPageId) return; document.getElementById('bookSearchModal').classList.remove('show'); const row = allReportData.find(d => d.pageId === currentEditingPageId); let currIds = []; let propertyName = ''; if (currentBookType === 'english') { currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); propertyName = '오늘 읽은 영어 책'; } else { currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id); propertyName = '국어 독서 제목'; } if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; } await updateBookRelation(currentEditingPageId, [...currIds, newId], propertyName); }
+        async function removeBook(pid, rid, type) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); let currIds = []; let propertyName = ''; if (type === 'english') { currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); propertyName = '오늘 읽은 영어 책'; } else { currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id); propertyName = '국어 독서 제목'; } await updateBookRelation(pid, currIds.filter(id => id !== rid), propertyName); }
+        async function updateBookRelation(pid, ids, propertyName) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: propertyName, newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
         function displayListeningData(data) { 
             const tbody = document.getElementById('listeningTableBody'); 
@@ -732,7 +768,6 @@
 
             tbody.innerHTML = data.map(st => {
                 const kBooks = st.listening.koreanBooks || [];
-                // [수정] 국어 독서 태그 및 추가 버튼 구현
                 const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${b.id}', 'korean')">×</span></span>`).join('');
                 const addButton = `<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'korean')">+ 추가</button>`;
                 
