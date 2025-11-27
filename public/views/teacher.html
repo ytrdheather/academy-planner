@@ -6,11 +6,12 @@
     <title>선생님 대시보드 - 리디튜드</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        /* ... (스타일 생략, 기존과 동일) ... */
+        /* --- 기본 스타일 --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         body { background: #f8f9fa; color: #2d3748; min-height: 100vh; padding: 0; }
         .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
         
+        /* 헤더 */
         .header { background: #ffffff; color: #6b46c1; padding: 20px 30px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 1.8em; margin: 0; }
         .user-info { display: flex; align-items: center; gap: 15px; }
@@ -18,11 +19,13 @@
         .logout-btn { background: #6b46c1; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: background 0.2s; }
         .logout-btn:hover { background: #5a3eaa; }
 
+        /* 탭 메뉴 */
         .tab-menu { display: flex; background-color: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 0 40px; margin-top: 20px; border-radius: 12px 12px 0 0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .tab-button { padding: 15px 25px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
 
+        /* 메인 컨텐츠 */
         .main-content { padding: 30px 0; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -41,8 +44,26 @@
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
-        .student-name { font-weight: 700; color: #2d3748; text-align: center; padding: 10px; min-width: 300px; background-color: #fcf7ff; }
-        .student-name-wrapper { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 15px; width: 100%; }
+        
+        /* 학생 이름 셀 스타일 (중앙 정렬) */
+        .student-name { 
+            font-weight: 700; 
+            color: #2d3748; 
+            text-align: center;
+            padding: 10px; 
+            min-width: 300px;
+            background-color: #fcf7ff; 
+        }
+        
+        /* 학생 이름 래퍼 (가로 + 중앙 정렬) */
+        .student-name-wrapper {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+        }
         
         /* 로딩 및 데이터 없음 */
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
@@ -82,7 +103,7 @@
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
 
-        /* 점수 그래프 */
+        /* 점수 그래프 & 뱃지 스타일 */
         .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
         .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); }
@@ -421,7 +442,7 @@
         let currentActiveTab = 'homework';
         let bookSearchTimer = null;
         let currentEditingPageId = null;
-        let currentBookType = 'english'; 
+        let currentBookType = 'english'; // [신규] 현재 책 검색 타입
         let currentUserRole = '';
         let currentUserName = '';
         const autoSaveMap = new Map();
@@ -447,7 +468,7 @@
                 clearTimeout(bookSearchTimer);
                 const query = e.target.value;
                 bookSearchTimer = setTimeout(() => {
-                     searchBooks(query); 
+                     searchBooks(query); // [수정] 통합 검색 함수 호출
                 }, 300);
             });
         });
@@ -548,7 +569,7 @@
             displayGrammarData(data); // [신규]
         }
 
-        // [신규] 문법 데이터 렌더링
+        // [신규] 문법 데이터 렌더링 (스마트 updateField 적용)
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
@@ -805,11 +826,6 @@
         function openNotionWindow(url) { if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; } const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions); }
 
         function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
-        function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
-        async function updateField(el, pageId, prop, type, manualVal) { const val = manualVal || el.value; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) }); showToast('저장됨'); } catch (e) { showToast('실패', 'error'); } }
-        function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
-        function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
-        function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
         
         // [신규] 누락된 formatHomeworkDropdown 복구
         function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
@@ -837,6 +853,42 @@
             return 'status-none';
         }
 
+        function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
+        
+        // [수정] updateField: 인자가 부족할 경우 data 속성에서 읽어오도록 보강
+        async function updateField(el, pageId, prop, type, manualVal) { 
+            // [추가] 1. 인자가 부족하면 el의 data 속성 사용
+            if (!pageId && el && el.dataset) {
+                pageId = el.dataset.pageId;
+                prop = el.dataset.propertyName;
+                type = el.dataset.propertyType;
+            }
+
+            // [추가] 2. 값 결정 (manualVal이 있으면 우선 사용, 없으면 el.value)
+            const val = (manualVal !== undefined) ? manualVal : (el ? el.value : '');
+
+            // [추가] 3. 필수 정보 확인
+            if (!pageId || !prop) {
+                console.error("업데이트 정보 누락:", { el, pageId, prop, type, val });
+                showToast('업데이트 정보를 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            try { 
+                await fetch(`${API_BASE_URL}/api/update-homework`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
+                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) 
+                }); 
+                showToast('저장되었습니다.'); 
+            } catch (e) { 
+                showToast('실패', 'error'); 
+            } 
+        }
+        
+        function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
+        function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
+        function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
     </script>
 </body>
 </html>
