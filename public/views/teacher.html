@@ -83,15 +83,23 @@
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
-        /* 3단 일괄 처리 버튼 (디자인 강화) */
-        .batch-controls { display: flex; gap: 5px; margin-top: 0; }
+        /* 3단 일괄 처리 버튼 */
+        .batch-controls { display: flex; gap: 4px; margin-top: 0; }
         .batch-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .batch-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .batch-ok { background-color: #f0fdf4; color: #15803d; border-color: #16a34a; }
         .batch-no { background-color: #fef2f2; color: #b91c1c; border-color: #dc2626; }
         .batch-reset { background-color: #f8fafc; color: #475569; border-color: #94a3b8; }
 
+        /* 드롭다운 스타일 (리스닝 등) */
         .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: white; }
+        /* 리스닝 상태 색상 */
+        .homework-dropdown.status-listening-replace { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+        .homework-dropdown.status-listening-textbook { background-color: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+        .homework-dropdown.status-default { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+        .homework-dropdown.status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
+        
         .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
         .editable-text-input { width: 120px; text-align: left; }
@@ -251,11 +259,10 @@
                 </div>
             </div>
 
-             <!-- 4. 리스닝 현황 탭 -->
+            <!-- 4. 리스닝 & 책거 현황 탭 -->
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
-                    <!-- [수정] 제목 변경 -->
-                    <div class="section-title" style="--icon:'🎧'">리스닝 & 책거 현황</div>
+                    <div class="section-title">🎧 리스닝 & 책거 현황</div>
                     <div class="filters-container">
                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
                         <div class="filter-group">
@@ -272,7 +279,6 @@
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
-                                <!-- [수정] 컬럼 추가 -->
                                 <tr>
                                     <th>학생 이름</th>
                                     <th>담당강사</th>
@@ -282,9 +288,7 @@
                                     <th>책 읽는 거인</th>
                                 </tr>
                             </thead>
-                            <tbody id="listeningTableBody">
-                                <tr><td colspan="6" class="loading">로딩중...</td></tr>
-                            </tbody>
+                            <tbody id="listeningTableBody"><tr><td colspan="6" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -600,19 +604,15 @@
         async function removeBook(pid, rid) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); const currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); await updateBookRelation(pid, currIds.filter(id => id !== rid)); }
         async function updateBookRelation(pid, ids) { try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId: pid, propertyName: '오늘 읽은 영어 책', newValue: ids, propertyType: 'relation' }) }); showToast('업데이트 완료'); loadDataForCurrentTab(); } catch(e) { showToast('실패', 'error'); } }
 
-         function displayListeningData(data) {
-            const tbody = document.getElementById('listeningTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
+        function displayListeningData(data) { 
+            const tbody = document.getElementById('listeningTableBody'); 
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; } 
             
-            // [수정] 새로운 옵션 목록
+            // [수정] 리스닝 옵션 (공백 주의)
             const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
-            
-            // [신규] 책 읽는 거인 옵션
             const giantOptions = ['진행하지 않음', '미완료', '완료', '시작함', '절반', '거의다읽음', '못함', '완료함'];
 
             tbody.innerHTML = data.map(st => {
-                // 한국어 책 태그 (삭제 가능하게 구현하려면 removeBook 로직 수정 필요하지만, 일단 표시 위주)
-                // 선생님이 여기서 삭제/추가 하려면 별도 로직 필요. 일단 태그 형태로 표시.
                 const kBooks = st.listening.koreanBooks || [];
                 const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title}</span>`).join('');
                 
@@ -640,6 +640,33 @@
         function openNotionWindow(url) { if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; } const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions); }
 
         function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
+        
+        // [신규] 누락된 formatHomeworkDropdown 복구
+        function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
+            const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
+            let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
+            const statusClass = getSelectStatusClass(propertyName, displayStatus);
+            
+            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
+                        ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
+                    </select>`;
+        }
+
+        // [신규] 누락된 getSelectStatusClass 복구 (리스닝 옵션 추가)
+        function getSelectStatusClass(propertyName, value) {
+            if (propertyName === '영어 더빙 학습 완료' || propertyName === '더빙 워크북 완료') {
+                if (value === '완료') return 'status-listening-complete';
+                if (value === '미완료') return 'status-listening-incomplete';
+                if (value === '원서독서로 대체') return 'status-listening-replace';
+                if (value === '듣기평가교재 완료') return 'status-listening-textbook';
+                return 'status-listening-none';
+            }
+            // 기존 로직 통합
+            if (value === '숙제 함' || value === '완료함' || value === '완료') return 'status-complete';
+            if (value === '안 해옴' || value === '못함' || value === '미완료' || value === '못하고감') return 'status-incomplete';
+            return 'status-none';
+        }
+
         function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
         async function updateField(el, pageId, prop, type, manualVal) { const val = manualVal || el.value; try { await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) }); showToast('저장됨'); } catch (e) { showToast('실패', 'error'); } }
         function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
