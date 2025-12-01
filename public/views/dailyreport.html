@@ -6,43 +6,35 @@
     <title>데일리 리포트</title>
     <!-- Tailwind CSS CDN --><script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- ▼ [수정] Pretendard 폰트 (기본) ▼ -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
     <style>
         body {
-            /* ▼ [수정] Pretendard 폰트 (기본) ▼ */
             font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
         }
         .bg-custom-gray {
-            background-color: #dbe7e6; /* 헤더 님이 지정해주신 색상 */
+            background-color: #dbe7e6;
         }
     </style>
 </head>
 <body class="bg-custom-gray p-4 sm:p-8">
 
-    <!-- 1. 헤더 (학원 로고 및 리포트 제목 - 이미지) --><header class="bg-custom-gray">
-        <!-- 
-            [개발자 참고]
-            헤더 이미지가 '/assets/daily-report-header.png' 경로에
-            저장되어 있다고 가정합니다.
-        -->
+    <header class="bg-custom-gray">
         <img src="/assets/daily-report-header.png" alt="리디튜드 데일리 리포트 헤더" class="w-full h-auto max-w-2xl mx-auto" onerror="this.alt='헤더 이미지 로딩 실패'; this.style.display='none';">
     </header>
     
-    <!-- 리포트 메인 콘텐츠 컨테이너 (흰색 배경) --><div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 mt-6">
+    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 mt-6">
         
         <main class="bg-white p-6 sm:p-8 space-y-8">
             
-            <!-- 3. 리포트 제목 (흰색 박스 안) -->
+            <!-- 1. 제목 -->
             <section class="text-center border-b border-gray-100 pb-6">
-                <!-- 텍스트 제목 -->
                 <h1 class="text-3xl font-extrabold text-gray-800 mb-1">리디튜드 {{STUDENT_NAME}}(이)의 데일리 학습 리포트</h1>
-                <!-- 날짜 -->
                 <p class="text-base text-gray-500">{{REPORT_DATE}}</p>
             </section>
             
-            <!-- 4. 오늘의 총평 (가장 중요) --><section>
+            <!-- 2. 총평 -->
+            <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-3 flex items-center">
                     <span class="text-3xl mr-2">💬</span> Today's Daily comments!
                 </h2>
@@ -53,7 +45,8 @@
                 </div>
             </section>
         
-            <!-- 5. 오늘의 학습 한눈에 보기 (핵심 요약) --><section>
+            <!-- 3. 오늘의 학습 한눈에 보기 -->
+            <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
                     <span class="text-3xl mr-2">📊</span> 오늘의 학습 한눈에 보기
                 </h2>
@@ -79,8 +72,11 @@
                         <div class="text-sm font-bold text-gray-600 mt-1">독해 테스트</div>
                     </div>
                     
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200">
-                        <div class="text-4xl font-extrabold" style="color: {{LISTENING_COLOR}};">{{LISTENING_STATUS}}</div>
+                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center">
+                        <!-- [폰트 크기 조절] -->
+                        <div class="{{LISTENING_FONT_CLASS}} font-extrabold flex items-center justify-center h-12 w-full overflow-hidden leading-tight break-keep" style="color: {{LISTENING_COLOR}};">
+                            {{LISTENING_STATUS}}
+                        </div>
                         <div class="text-sm font-bold text-gray-600 mt-1">리스닝/더빙</div>
                     </div>
                     
@@ -90,19 +86,9 @@
                     </div>
                 </div>
             </section>
-            
-            <!-- 6. RT-Check Point 공지 (헤더 님 요청 사항) --><section>
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm">
-                    <h3 class="font-bold text-yellow-900 mb-1">📢 RT-Check Point 안내</h3>
-                    <p class="text-sm text-yellow-800 leading-relaxed">
-                        매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
-                        <strong class="font-bold text-red-600">RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
-                        매일의 성실함을 지킬 수 있도록 지도 부탁드립니다!
-                    </p>
-                </div>
-            </section>
 
-            <!-- 7. 문법 숙제 칸 --><section>
+            <!-- 4. 문법 숙제 (위치 이동됨) -->
+            <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
                     <span class="text-3xl mr-2">📑</span> 문법 숙제
                 </h2>
@@ -120,13 +106,39 @@
                 </div>
             </section>
             
-            <!-- 8. 학습 상세 내역 --><section>
+            <!-- 5. RD-Check Point 점수 (신규) -->
+            <section>
+                <div class="bg-indigo-50 border-l-4 border-indigo-400 p-5 rounded-r-lg shadow-sm text-center">
+                    <h3 class="text-xl font-bold text-indigo-900 mb-2">🎯 오늘의 RD - Check Point!</h3>
+                    <div class="text-5xl font-extrabold text-indigo-600">
+                        {{RD_CHECK_POINT_SCORE}}<span class="text-3xl text-gray-400">점</span>
+                    </div>
+                    <p class="text-sm text-indigo-700 mt-2">
+                        오늘의 숙제 수행 점수입니다. (100점 만점)
+                    </p>
+                </div>
+            </section>
+            
+            <!-- 6. RT-Check Point 안내 -->
+            <section>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm">
+                    <h3 class="font-bold text-yellow-900 mb-1">📢 RT-Check Point 안내</h3>
+                    <p class="text-sm text-yellow-800 leading-relaxed">
+                        매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
+                        <strong class="font-bold text-red-600">RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
+                        매일의 성실함을 지킬 수 있도록 지도 부탁드립니다!
+                    </p>
+                </div>
+            </section>
+            
+            <!-- 7. Today's RD - Check! (상세 내역) -->
+            <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
                     <span class="text-3xl mr-2">📝</span> Today's RD - Check!
                 </h2>
                 <div class="space-y-6">
                     
-                    <!-- 숙제 상세 --><div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
                         <h3 class="font-bold text-lg text-gray-700 mb-4">1. 숙제 수행 현황</h3>
                         <div class="space-y-3">
                             <div class="flex justify-between items-center">
@@ -152,7 +164,7 @@
                         </div>
                     </div>
                     
-                    <!-- 독서 상세 --><div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                    <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
                         <h3 class="font-bold text-lg text-gray-700 mb-3">2. 원서 독서 현황</h3>
                         <dl class="space-y-2 text-gray-600">
                             <div class="flex">
@@ -174,7 +186,7 @@
 
         </main>
         
-        <!-- 9. 푸터 (학원 정보) --><footer class="p-6 text-center bg-gray-50 border-t border-gray-100">
+        <footer class="p-6 text-center bg-gray-50 border-t border-gray-100">
             <p class="text-sm text-gray-500">
                 © 2025 Readitude. All rights reserved.<br>
                 궁금한 점은 언제든 학원 카카오 채널로 문의해 주세요.
@@ -185,4 +197,3 @@
 
 </body>
 </html>
-
