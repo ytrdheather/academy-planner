@@ -97,17 +97,36 @@
             margin-bottom: 8px; 
             color: #4a5568; 
         }
-        .input-group input[type="text"], .input-group input[type="number"], .input-group select, .input-group textarea {
+        
+        /* [수정] 입력창 스타일 통일 (테두리 추가) */
+        .input-group input[type="text"], 
+        .input-group input[type="number"], 
+        .input-group select, 
+        .input-group textarea {
             width: 100%; 
             padding: 12px 16px; 
             border-radius: 10px; 
+            border: 2px solid #e2e8f0; /* [추가] 일정한 회색 테두리 */
             font-size: 14px; 
             transition: all 0.3s;
             background: #f8fafc;
+            -webkit-appearance: none; /* 모바일 사파리 기본 스타일 제거 */
+            -moz-appearance: none;
+            appearance: none;
         }
+        
+        /* Select 화살표 추가 (appearance: none으로 사라진 화살표 복구) */
+        .input-group select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+
         .input-group input:focus, .input-group select:focus, .input-group textarea:focus { 
             outline: none; 
-            border-color: #8b5cf6; 
+            border-color: #8b5cf6; /* 포커스 시 보라색 테두리 */
             background: #fff;
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); 
         }
@@ -190,7 +209,7 @@
             left: 0; 
             right: 0; 
             background: white; 
-            border: 2px solid #e2e8f0;
+            border: 2px solid #8b5cf6; 
             border-top: none; 
             border-radius: 0 0 12px 12px; 
             max-height: 200px; 
@@ -353,7 +372,7 @@
             planner.initialize();
             window.addEventListener('beforeunload', () => planner.destroy());
             
-            // 로그아웃 버튼 (HTML에 직접 onclick이 없으므로 스크립트로 연결)
+            // 로그아웃 버튼
             document.querySelector('.logout-button').addEventListener('click', () => planner.logout());
         });
     </script>
