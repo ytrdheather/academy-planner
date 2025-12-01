@@ -1,65 +1,37 @@
 /**
  * Readitude 학생 스터디 플래너 모듈
- * (오리지널 코드의 안정성 + 다중 책 기능 통합)
+ * (모바일 터치 지원 추가 + Writing 옵션 대응)
  */
 
 class StudyPlanner {
     constructor() {
         this.api = window.API;
         this.autoSaveInterval = null;
-        this.currentBooks = []; // 검색된 책 목록 (임시)
+        this.currentBooks = [];
         this.searchTimeout = null;
         this.studentInfo = null;
-
-        // [신규] 선택된 책 목록 관리 (배열)
         this.selectedBooks = {
             english: [], 
             korean: []
         };
     }
 
-    /**
-     * 플래너 초기화
-     */
     async initialize() {
         try {
-            // 인증 확인
-            if (!this.api.token) {
-                window.location.href = '/';
-                return;
-            }
-
-            // 학생 정보 로드
+            if (!this.api.token) { window.location.href = '/'; return; }
             await this.loadStudentInfo();
-
-            // UI 초기화
             this.initializeUI();
-
-            // 저장된 데이터 복원 (로컬 스토리지)
             this.loadSavedData();
-
-            // 오늘 서버에 저장된 데이터 불러오기
             await this.loadTodayData();
-
-            // 이벤트 리스너 설정
             this.attachEventListeners();
 
-            // [복구] 책 검색 자동완성 기능 초기화
             const engBookInput = document.getElementById('englishBookTitle');
             const korBookInput = document.getElementById('koreanBookTitle');
             
-            if (engBookInput) {
-                // console.log('영어책 검색 기능 초기화');
-                this.setupBookSearch(engBookInput, 'english');
-            }
-            if (korBookInput) {
-                // console.log('한국책 검색 기능 초기화');
-                this.setupBookSearch(korBookInput, 'korean');
-            }
+            if (engBookInput) this.setupBookSearch(engBookInput, 'english');
+            if (korBookInput) this.setupBookSearch(korBookInput, 'korean');
 
-            // 자동 저장 시작
             this.startAutoSave();
-
         } catch (error) {
             console.error('플래너 초기화 실패:', error);
             if(window.Utils && window.Utils.ui) {
@@ -68,36 +40,25 @@ class StudyPlanner {
         }
     }
 
-    /**
-     * 학생 정보 로드 (오리지널 로직 복구)
-     */
     async loadStudentInfo() {
         try {
-            // 1. /api/student-info 시도
             this.studentInfo = await this.api.getStudentInfo();
-            
             const nameElement = document.getElementById('studentName');
             if (nameElement) {
                 nameElement.textContent = `${this.studentInfo.studentName}(이)의`;
             }
-            
-            // 로컬 스토리지 저장 (CONFIG가 있을 경우)
             if(window.CONFIG && window.Utils) {
                 Utils.storage.save(CONFIG.STORAGE_KEYS.USER_ID, this.studentInfo.studentId);
                 Utils.storage.save(CONFIG.STORAGE_KEYS.USER_NAME, this.studentInfo.studentName);
             }
-
         } catch (error) {
             console.error('학생 정보 로드 실패, user-info로 재시도:', error);
-            
-            // 2. /api/user-info로 폴백 (재시도)
             try {
                 const userInfo = await this.api.getUserInfo();
                 this.studentInfo = {
                     studentId: userInfo.userId,
                     studentName: userInfo.userName
                 };
-                
                 const nameElement = document.getElementById('studentName');
                 if (nameElement) {
                     nameElement.textContent = `${this.studentInfo.studentName}(이)의`;
@@ -111,13 +72,8 @@ class StudyPlanner {
         }
     }
 
-    /**
-     * 오늘 데이터 불러오기
-     */
     async loadTodayData() {
         try {
-            // console.log('오늘 데이터 불러오기 시작...');
-            
             const response = await fetch('/api/get-today-progress', {
                 method: 'GET',
                 headers: {
@@ -126,18 +82,13 @@ class StudyPlanner {
                 }
             });
 
-            if (!response.ok) {
-                // console.log('데이터 로드 실패:', response.status);
-                return;
-            }
+            if (!response.ok) return;
 
             const data = await response.json();
             
             if (data.success && data.progress) {
-                // console.log('불러온 데이터:', data.progress);
                 this.fillFormWithData(data.progress);
 
-                // [신규] 다중 책 데이터 복원
                 if (data.progress.englishBooks) {
                     this.selectedBooks.english = data.progress.englishBooks;
                     this.renderSelectedBooks('english');
@@ -153,13 +104,10 @@ class StudyPlanner {
                 }
             }
         } catch (error) {
-            console.log('오늘 데이터 로드 중 에러 (신규 작성일 수 있음):', error);
+            console.log('오늘 데이터 로드 중 에러:', error);
         }
     }
 
-    /**
-     * 폼 채우기 (오리지널 매핑 로직 100% 반영)
-     */
     fillFormWithData(progress) {
         const nameMap = {
             '단어(맞은 개수)': '단어 (맞은 개수)',
@@ -169,13 +117,11 @@ class StudyPlanner {
             '독해(틀린 개수)': '독해 (틀린 개수)',
             '국어 독서 제목': '오늘 읽은 한국 책',
             '📕 책 읽는 거인': '📕 책 읽는 거인',
-            '📖 책제목 (롤업)': '오늘 읽은 영어 책',
-            // [수정] 새로운 속성명 매핑 (HTML name과 일치시킴)
-            '5️⃣ 독해서 풀기': '5️⃣ 독해서 풀기',
-            '6️⃣ 부&매&일': '6️⃣ 부&매&일'
+            '📖 책제목 (롤업)': '오늘 읽은 영어 책'
         };
         
         const conversionMap = {
+            "숙제 없음": "해당없음",
             "안 해옴": "안 해옴",
             "숙제 함": "숙제 함",
             "진행하지 않음": "진행하지 않음",
@@ -189,10 +135,7 @@ class StudyPlanner {
             "못하고감": "못하고감",
             "시작함": "시작함",
             "절반": "절반",
-            "거의다읽음": "거의다읽음",
-            // [수정] 새로운 리스닝 옵션 추가 (매핑 불필요시 생략 가능하나 명시적으로 추가)
-            "원서독서로 대체": "원서독서로 대체",
-            "듣기평가교재 완료": "듣기평가교재 완료"
+            "거의다읽음": "거의다읽음"
         };
         
         for (const notionKey in progress) {
@@ -209,7 +152,6 @@ class StudyPlanner {
             }
         }
     }
-
 
     initializeUI() {
         const dateElement = document.getElementById('currentDate');
@@ -249,11 +191,11 @@ class StudyPlanner {
             const query = input.value.trim();
             const idInputId = type === 'english' ? 'englishBookId' : 'koreanBookId';
             const idInput = document.getElementById(idInputId);
-            if(idInput) idInput.value = ''; // 기존 ID 초기화
+            if(idInput) idInput.value = '';
 
             clearTimeout(this.searchTimeout);
             
-            if (query.length < 2) { // 2글자 미만이면 검색 안 함
+            if (query.length < 2) {
                 this.hideSuggestions(suggestionsList);
                 return;
             }
@@ -262,7 +204,8 @@ class StudyPlanner {
             this.searchTimeout = setTimeout(() => this.searchBooks(query, type, suggestionsList), 500);
         });
         
-        input.addEventListener('blur', () => setTimeout(() => this.hideSuggestions(suggestionsList), 200));
+        // [모바일 수정] blur 지연 시간을 조금 더 늘려 터치 이벤트 확보
+        input.addEventListener('blur', () => setTimeout(() => this.hideSuggestions(suggestionsList), 300));
     }
 
     showLoadingState(list) {
@@ -316,11 +259,15 @@ class StudyPlanner {
         }).join('');
         list.style.display = 'block';
 
+        // [모바일 수정] mousedown 뿐만 아니라 touchstart도 지원하여 모바일 터치 인식
         list.querySelectorAll('.autocomplete-suggestion').forEach(item => {
-            item.addEventListener('mousedown', (e) => {
-                e.preventDefault();
+            const selectHandler = (e) => {
+                e.preventDefault(); // blur 이벤트 발생 방지
                 this.selectBook(parseInt(item.dataset.index), type);
-            });
+            };
+            
+            item.addEventListener('mousedown', selectHandler);
+            item.addEventListener('touchstart', selectHandler); // 모바일용
         });
     }
 
@@ -328,7 +275,6 @@ class StudyPlanner {
         const book = this.currentBooks[index];
         if (!book) return;
 
-        // 1. 다중 책 목록(배열)에 추가
         const list = type === 'english' ? this.selectedBooks.english : this.selectedBooks.korean;
         if (!list.some(b => b.id === book.id)) {
             list.push({ id: book.id, title: book.title, ar: book.ar, lexile: book.lexile });
@@ -336,10 +282,8 @@ class StudyPlanner {
             if(window.Utils) Utils.ui.showStatus('이미 추가된 책입니다.', false);
         }
 
-        // 2. UI 렌더링 (태그)
         this.renderSelectedBooks(type);
 
-        // 3. 입력창 초기화 및 ID 저장 (단일 호환성 유지)
         const titleId = type === 'english' ? 'englishBookTitle' : 'koreanBookTitle';
         const idId = type === 'english' ? 'englishBookId' : 'koreanBookId';
         document.getElementById(titleId).value = ''; 
@@ -405,11 +349,9 @@ class StudyPlanner {
         const formData = new FormData(event.target);
         const data = Object.fromEntries(formData);
         
-        // [핵심] 책 배열 데이터 추가
         data.englishBooks = this.selectedBooks.english;
         data.koreanBooks = this.selectedBooks.korean;
 
-        // [수정] ID 없는 텍스트 제거 (500 에러 방지)
         if (data['오늘 읽은 영어 책'] && !data['오늘 읽은 영어 책 ID']) delete data['오늘 읽은 영어 책'];
         if (data['오늘 읽은 한국 책'] && !data['오늘 읽은 한국 책 ID']) delete data['오늘 읽은 한국 책'];
 

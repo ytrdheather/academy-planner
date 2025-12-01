@@ -218,16 +218,18 @@
         </div>
 
         <div class="main-content">
-            <!-- (기존 탭 내용 생략: homework, tests, reading, listening) -->
-            <!-- ... 기존 탭들은 그대로 둡니다 ... -->
+            
+            <!-- 1. 숙제 현황 탭 -->
             <div id="homework-view" class="tab-content active">
-                <!-- ... 숙제 탭 내용 ... -->
                 <div class="content-section">
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
                     <div class="filters-container">
-                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <button class="refresh-btn">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_hw" class="filter-select" onchange="toggleDateInput('hw')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_hw" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_hw" style="display:none;">
@@ -247,19 +249,22 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 2. 테스트 결과 탭 -->
             <div id="tests-view" class="tab-content">
-                <!-- ... 테스트 탭 내용 (생략) ... -->
                 <div class="content-section">
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
-                    <!-- ... 필터 등 ... -->
-                     <div class="filters-container">
-                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                    <div class="filters-container">
+                        <button class="refresh-btn">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_test" class="filter-select" onchange="toggleDateInput('test')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
-                            <input type="date" id="specificDate_test" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
+                            <select id="periodFilter_tests" class="filter-select" onchange="toggleDateInput('tests')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
+                            <input type="date" id="specificDate_tests" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
-                        <div class="filter-group" id="teacherFilterGroup_test" style="display:none;">
-                            <select id="teacherFilter_test" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
+                        <div class="filter-group" id="teacherFilterGroup_tests" style="display:none;">
+                            <select id="teacherFilter_tests" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
                     </div>
                     <div class="table-container">
@@ -270,14 +275,18 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 3. 원서 독서 현황 탭 -->
             <div id="reading-view" class="tab-content">
-                <!-- ... 독서 탭 내용 (생략) ... -->
-                 <div class="content-section">
+                <div class="content-section">
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
                     <div class="filters-container">
-                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <button class="refresh-btn">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_reading" class="filter-select" onchange="toggleDateInput('reading')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_reading" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_reading" style="display:none;">
@@ -292,14 +301,18 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 4. 리스닝 & 책거 현황 탭 -->
             <div id="listening-view" class="tab-content">
-                <!-- ... 리스닝 탭 내용 (생략) ... -->
-                 <div class="content-section">
+                <div class="content-section">
                     <div class="section-title">🎧 리스닝 & 책거 현황</div>
                     <div class="filters-container">
-                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <button class="refresh-btn">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_listening" class="filter-select" onchange="toggleDateInput('listening')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_listening" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_listening" style="display:none;">
@@ -351,7 +364,7 @@
 
                     <!-- 하단: 학생 리스트 -->
                     <div class="filters-container">
-                         <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                         <button class="refresh-btn">🔄 새로고침</button>
                          <!-- 필터 생략 (자동 로드) -->
                     </div>
                     <div class="table-container">
@@ -369,9 +382,12 @@
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
                      <div class="filters-container">
-                        <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+                        <button class="refresh-btn">🔄 새로고침</button>
                         <div class="filter-group">
-                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')"><option value="today" selected>오늘</option><option value="specific_date">날짜 지정</option></select>
+                            <select id="periodFilter_comments" class="filter-select" onchange="toggleDateInput('comments')">
+                                <option value="today" selected>오늘</option>
+                                <option value="specific_date">날짜 지정</option>
+                            </select>
                             <input type="date" id="specificDate_comments" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
                         </div>
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
@@ -388,9 +404,9 @@
                     </div>
                 </div>
             </div>
-
-            <!-- 관리자 메뉴 탭 (생략 - 기존과 동일) -->
-             <div id="admin-view" class="tab-content">
+            
+            <!-- 관리자 메뉴 탭 -->
+            <div id="admin-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
                     <h3 class="admin-section-title">&lt;리디튜드 노션&gt;</h3>
@@ -412,7 +428,7 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달, 리포트 모달 (동일) -->
+    <!-- 책 검색 모달 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -471,9 +487,14 @@
                      searchBooks(query); // [수정] 통합 검색 함수 호출
                 }, 300);
             });
+            
+            // [중요] 새로고침 버튼 이벤트 리스너 등록
+            const refreshButtons = document.querySelectorAll('.refresh-btn');
+            refreshButtons.forEach(btn => {
+                btn.addEventListener('click', loadDataForCurrentTab);
+            });
         });
 
-        // ... (기존 헬퍼 함수들 유지: setAllFiltersToToday, loadUserInfo, loadTeachersList, filterDataByTeacher, toggleDateInput) ...
         function setAllFiltersToToday() {
             const suffixes = ['hw', 'tests', 'reading', 'listening', 'comments'];
             suffixes.forEach(s => {
@@ -569,7 +590,7 @@
             displayGrammarData(data); // [신규]
         }
 
-        // [신규] 문법 데이터 렌더링 (스마트 updateField 적용)
+        // [신규] 문법 데이터 렌더링
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
@@ -577,8 +598,8 @@
                 <tr>
                     <td class="student-name">${st.studentName}</td>
                     <td>${st.comment.grammarClass || '-'}</td>
-                    <td><input type="text" class="editable-input editable-text-input" value="${st.comment.grammarTopic||''}" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width:100%;" value="${st.comment.grammarHomework||''}" data-page-id="${st.pageId}" data-property-name="문법 과제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment.grammarTopic === '진도 해당 없음' ? '' : st.comment.grammarTopic}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'grammarTableBody')"></td>
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment.grammarHomework === '숙제 내용 없음' ? '' : st.comment.grammarHomework}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)" onkeydown="handleEnterAsTab(event, 'grammarTableBody')"></td>
                 </tr>
              `).join('');
         }
@@ -599,23 +620,56 @@
             });
         }
 
-        // [신규] 문법 일괄 업데이트
+        // [수정] 문법 일괄 업데이트 (입력값 검증 강화)
         async function updateGrammarByClass() {
-            const className = document.getElementById('grammarClassSelect').value;
-            const topic = document.getElementById('grammarTopicInput').value;
-            const homework = document.getElementById('grammarHomeworkInput').value;
+            const classSelect = document.getElementById('grammarClassSelect');
+            const topicInput = document.getElementById('grammarTopicInput');
+            const homeworkInput = document.getElementById('grammarHomeworkInput');
+
+            if (!classSelect || !topicInput || !homeworkInput) {
+                showToast('입력창을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            const className = classSelect.value;
+            const topic = topicInput.value.trim();
+            const homework = homeworkInput.value.trim();
             
-            if (!className) { alert('반을 선택해주세요.'); return; }
+            if (!className) { 
+                alert('반을 선택해주세요.'); 
+                classSelect.focus();
+                return; 
+            }
+
+            // 내용이 둘 다 비어있으면 경고 (실수 방지)
+            if (!topic && !homework) {
+                if (!confirm('진도와 숙제 내용이 모두 비어있습니다. 그래도 적용하시겠습니까? (내용 삭제됨)')) return;
+            }
+
             if (!confirm(`${className}반 학생들의 문법 진도와 숙제를 일괄 적용하시겠습니까?`)) return;
             
             // 현재 보고 있는 날짜 (필터 기준)
-            const periodElem = document.getElementById('periodFilter_hw'); // 메인 필터 참조
+            const periodElem = document.getElementById('periodFilter_hw'); // 메인 필터 참조 (숙제 탭 필터 기준)
             const dateElem = document.getElementById('specificDate_hw');
             let targetDate = new Date().toISOString().split('T')[0]; // 기본값 오늘
             
-            if (periodElem && periodElem.value === 'specific_date' && dateElem.value) {
+            // 만약 다른 탭(예: 문법 탭)에 있다면 해당 탭의 필터가 없으므로 기본값(오늘)을 사용하거나
+            // 공통 변수에서 가져와야 합니다. 여기서는 '숙제 현황' 탭의 날짜를 기준으로 합니다.
+            if (periodElem && periodElem.value === 'specific_date' && dateElem && dateElem.value) {
                 targetDate = dateElem.value;
+            } else {
+                // 필터가 없는 경우(초기 상태 등) 오늘 날짜 사용
+                 // [수정] KST 날짜 구하기
+                 const now = new Date();
+                 const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+                 targetDate = kstNow.toISOString().split('T')[0];
             }
+            
+            // 버튼 비활성화 (중복 클릭 방지)
+            const btn = document.querySelector('.grammar-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '저장 중...';
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
@@ -630,17 +684,23 @@
                 });
                 
                 const result = await res.json();
-                if (result.success) {
+                
+                if (res.ok && result.success) {
                     showToast(result.message, 'success');
-                    loadDataForCurrentTab(); // 화면 갱신
-                    // 입력창 초기화
-                    document.getElementById('grammarTopicInput').value = '';
-                    document.getElementById('grammarHomeworkInput').value = '';
+                    loadDataForCurrentTab(); // 화면 갱신 (리스트에 반영)
+                    
+                    // 입력창 초기화 (선택 사항 - 연속 입력을 위해 남겨둘 수도 있음)
+                    // topicInput.value = '';
+                    // homeworkInput.value = '';
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(result.message || '업데이트 실패');
                 }
             } catch (e) {
+                console.error(e);
                 showToast(`업데이트 실패: ${e.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 
@@ -727,17 +787,28 @@
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `<tr>
                 <td class="student-name">${st.studentName}</td>
-                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
+                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td class="vocab-score">${formatScoreCircle(st.tests.vocabScore)}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
                 <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td class="grammar-score">${formatScoreCircle(st.tests.grammarScore)}</td>
             </tr>`).join('');
+        }
+
+        function handleEnterAsTab(event, tableBodyId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const formElements = Array.from(document.querySelectorAll(`#${tableBodyId} input, #${tableBodyId} select`));
+                const currentIndex = formElements.indexOf(event.target);
+                const nextElement = formElements[currentIndex + 1];
+                if (nextElement) { nextElement.focus(); if (nextElement.select) nextElement.select(); } 
+                else { event.target.blur(); }
+            }
         }
 
         function getReadingResultClass(result) { if (result === 'PASS') return 'result-pass'; if (result === 'FAIL') return 'result-fail'; return 'result-none'; }
@@ -826,33 +897,6 @@
         function openNotionWindow(url) { if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; } const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions); }
 
         function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
-        
-        // [신규] 누락된 formatHomeworkDropdown 복구
-        function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
-            const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
-            let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
-            const statusClass = getSelectStatusClass(propertyName, displayStatus);
-            
-            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
-                        ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
-                    </select>`;
-        }
-
-        // [신규] 누락된 getSelectStatusClass 복구 (리스닝 옵션 추가)
-        function getSelectStatusClass(propertyName, value) {
-            if (propertyName === '영어 더빙 학습 완료' || propertyName === '더빙 워크북 완료') {
-                if (value === '완료') return 'status-listening-complete';
-                if (value === '미완료') return 'status-listening-incomplete';
-                if (value === '원서독서로 대체') return 'status-listening-replace';
-                if (value === '듣기평가교재 완료') return 'status-listening-textbook';
-                return 'status-listening-none';
-            }
-            // 기존 로직 통합
-            if (value === '숙제 함' || value === '완료함' || value === '완료') return 'status-complete';
-            if (value === '안 해옴' || value === '못함' || value === '미완료' || value === '못하고감') return 'status-incomplete';
-            return 'status-none';
-        }
-
         function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
         
         // [수정] updateField: 인자가 부족할 경우 data 속성에서 읽어오도록 보강
@@ -889,6 +933,33 @@
         function showToast(msg, type='success') { const t = document.createElement('div'); t.className = `toast-message ${type==='error'?'toast-error':'toast-success'}`; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.classList.add('show'), 10); setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2000); }
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
+        
+        // [신규] 누락된 formatHomeworkDropdown 복구
+        function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
+            const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
+            let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
+            const statusClass = getSelectStatusClass(propertyName, displayStatus);
+            
+            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
+                        ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
+                    </select>`;
+        }
+
+        // [신규] 누락된 getSelectStatusClass 복구 (리스닝 옵션 추가)
+        function getSelectStatusClass(propertyName, value) {
+            if (propertyName === '영어 더빙 학습 완료' || propertyName === '더빙 워크북 완료') {
+                if (value === '완료') return 'status-listening-complete';
+                if (value === '미완료') return 'status-listening-incomplete';
+                if (value === '원서독서로 대체') return 'status-listening-replace';
+                if (value === '듣기평가교재 완료') return 'status-listening-textbook';
+                return 'status-listening-none';
+            }
+            // 기존 로직 통합
+            if (value === '숙제 함' || value === '완료함' || value === '완료') return 'status-complete';
+            if (value === '안 해옴' || value === '못함' || value === '미완료' || value === '못하고감') return 'status-incomplete';
+            return 'status-none';
+        }
+
     </script>
 </body>
 </html>
