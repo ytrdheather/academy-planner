@@ -176,7 +176,6 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
-// [데이터 파싱]
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -254,8 +253,6 @@ async function parseDailyReportData(page) {
     };
 
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
-    
-    // [수정] '문법 숙제 내용'을 우선 읽도록 수정
     let grammarTopic = getSimpleText(props['오늘 문법 진도']);
     let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
 
@@ -322,7 +319,6 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     }
 });
 
-// [문법 반별 일괄 업데이트 - 속성명 수정]
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, date } = req.body; 
 
@@ -333,31 +329,25 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const targetClass = className.trim();
 
     try {
-        console.log(`[Grammar Update] 시작: 반=${targetClass}, 날짜=${date}`);
-        
         const filter = { "property": "🕐 날짜", "date": { "equals": date } };
-        
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({ filter })
         });
 
         const students = query.results;
-        console.log(`[Grammar Update] 날짜(${date}) 검색 결과: ${students.length}명 발견`);
-        
         let updatedCount = 0;
 
         const updatePromises = students.map(async (page) => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
             
             if (studentClass && studentClass.trim() === targetClass) {
-                // [핵심 수정] '문법 숙제 내용'으로 정확히 저장
                 await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         properties: {
                             '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
-                            '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] } // [수정]
+                            '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] } 
                         }
                     })
                 });
@@ -366,8 +356,6 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         });
 
         await Promise.all(updatePromises);
-        console.log(`[Grammar Update] 완료: ${updatedCount}명 업데이트`);
-
         res.json({ success: true, message: `${updatedCount}명의 학생(${targetClass})에게 문법 숙제를 배포했습니다.` });
 
     } catch (error) {
@@ -391,8 +379,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기",
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
                 "오늘 읽은 한국 책": "국어 독서 제목",
-                // [핵심 수정] '문법 과제 내용'을 '문법 숙제 내용'으로 매핑
-                "문법 과제 내용": "문법 숙제 내용"
+                "문법 과제 내용": "문법 숙제 내용" 
             };
             return mapping[name] || name; 
         };
@@ -452,7 +439,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     }
 });
 
-// ... (기타 API 생략) ...
+// ... (기타 API) ...
 app.get('/api/teachers', requireAuth, async (req, res) => {
     const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name }));
     res.json(list);
@@ -675,6 +662,37 @@ try {
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
 } catch (e) { console.error('Template load error', e); }
 
+// [신규] 리포트 색상 결정 함수 (getReportColor)
+function getReportColor(value, type) {
+    // 색상 코드 (Tailwind CSS와 일치)
+    const GREEN = '#10b981'; // 초록 (Good/Pass)
+    const RED = '#ef4444';   // 빨강 (Bad/Fail)
+    const GRAY = '#9ca3af';  // 회색 (N/A)
+    // const BLUE = '#3b82f6';  // 파랑 (사용 안함)
+
+    if (type === 'score') { // 점수 (80점 이상 초록, 미만 빨강)
+        if (value === 'N/A' || value === null) return GRAY;
+        const num = parseInt(value);
+        return (!isNaN(num) && num >= 80) ? GREEN : RED;
+    }
+    if (type === 'result') { // 결과 (PASS/FAIL)
+        if (value === 'PASS') return GREEN;
+        if (value === 'FAIL') return RED;
+        return GRAY;
+    }
+    if (type === 'status') { // 상태 (완료/완료함 -> 초록, 그외 빨강/회색)
+        if (value === '완료' || value === '완료함') return GREEN;
+        if (value === '미완료' || value === '못함' || value === '안 해옴') return RED;
+        return GRAY;
+    }
+    if (type === 'hw_detail') { // 숙제 상세 (숙제 함 -> 초록)
+        if (value === '숙제 함') return GREEN;
+        if (value === '안 해옴') return RED;
+        return GRAY;
+    }
+    return GRAY;
+}
+
 app.get('/report', async (req, res) => {
     const { pageId, date } = req.query;
     if (!pageId) return res.status(400).send('Missing info');
@@ -688,17 +706,49 @@ app.get('/report', async (req, res) => {
             ? parsed.reading.englishBooks.map(b => b.title).join(', ')
             : (parsed.reading.bookTitle || '읽은 책 없음');
 
+        // [핵심 수정] 색상 및 상태 텍스트 생성
+        // [중요] HTML 템플릿의 {{...}} 괄호를 포함한 문자열을 교체하기 위해
+        // split().join()을 사용하여 정규식 오류를 방지합니다.
         const replacements = {
             '{{STUDENT_NAME}}': parsed.studentName,
             '{{REPORT_DATE}}': getKoreanDate(parsed.date),
             '{{TEACHER_COMMENT}}': parsed.comment.teacherComment.replace(/\n/g, '<br>'),
+            
+            // [점수 및 색상]
             '{{HW_SCORE}}': parsed.completionRate + '%',
-            '{{HW_SCORE_COLOR}}': parsed.completionRate >= 80 ? '#10b981' : '#ef4444',
+            '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
+            
             '{{GRAMMAR_SCORE}}': parsed.tests.grammarScore,
+            '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'score'),
+            
             '{{VOCAB_SCORE}}': parsed.tests.vocabScore,
+            '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'score'),
+            
             '{{READING_TEST_STATUS}}': parsed.tests.readingResult,
+            '{{READING_TEST_COLOR}}': getReportColor(parsed.tests.readingResult, 'result'),
+            
             '{{LISTENING_STATUS}}': parsed.listening.study,
+            '{{LISTENING_COLOR}}': getReportColor(parsed.listening.study, 'status'),
+            
             '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus,
+            '{{READING_BOOK_COLOR}}': getReportColor(parsed.reading.readingStatus, 'status'),
+
+            // [숙제 상세 상태 및 색상] - dailyreport.html의 연결 고리 복구
+            '{{HW_GRAMMAR_STATUS}}': parsed.homework.grammar,
+            '{{HW_GRAMMAR_COLOR}}': getReportColor(parsed.homework.grammar, 'hw_detail'),
+            
+            '{{HW_VOCAB_STATUS}}': parsed.homework.vocabCards,
+            '{{HW_VOCAB_COLOR}}': getReportColor(parsed.homework.vocabCards, 'hw_detail'),
+            
+            '{{HW_READING_CARD_STATUS}}': parsed.homework.readingCards,
+            '{{HW_READING_CARD_COLOR}}': getReportColor(parsed.homework.readingCards, 'hw_detail'),
+            
+            '{{HW_SUMMARY_STATUS}}': parsed.homework.summary,
+            '{{HW_SUMMARY_COLOR}}': getReportColor(parsed.homework.summary, 'hw_detail'),
+            
+            '{{HW_DIARY_STATUS}}': parsed.homework.diary,
+            '{{HW_DIARY_COLOR}}': getReportColor(parsed.homework.diary, 'hw_detail'),
+
             '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic,
             '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
             '{{BOOK_TITLE}}': bookTitleStr, 
@@ -707,10 +757,15 @@ app.get('/report', async (req, res) => {
         };
         
         for (const [key, val] of Object.entries(replacements)) {
-            html = html.replace(new RegExp(key, 'g'), val || 'N/A');
+            // [중요 수정] replace() 정규식 사용 시 {{ }} 괄호 문제로 실패할 수 있음.
+            // split().join()으로 안전하게 교체
+            html = html.split(key).join(val || 'N/A');
         }
         res.send(html);
-    } catch (e) { res.status(500).send('Report Error'); }
+    } catch (e) { 
+        console.error('리포트 생성 중 오류:', e);
+        res.status(500).send('Report Error'); 
+    }
 });
 
 cron.schedule('0 22 * * *', async () => {
@@ -740,10 +795,9 @@ cron.schedule('0 22 * * *', async () => {
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
 
-// [신규] 문법 숙제 동기화 (매일 21:50) - 최적화된 버전
 cron.schedule('50 21 * * *', async () => {
     console.log('--- [문법 숙제 동기화] 자동화 스케줄 실행 (21:50) ---');
-    // ... (생략, 위 코드와 동일)
+    // ... (동일)
 }, { timezone: "Asia/Seoul" });
 
 app.listen(PORT, '0.0.0.0', () => console.log(`✅ Final Server running on ${PORT}`));
