@@ -193,6 +193,55 @@
         .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; background: #333; color: white; opacity: 0; transform: translateX(100%); transition: all 0.3s; z-index: 3000; }
         .toast-message.show { opacity: 1; transform: translateX(0); }
         .toast-message.success { background: #10b981; } .toast-message.error { background: #ef4444; }
+
+        /* [신규] AI 키워드 입력 필드 스타일 */
+        .keyword-input-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .keyword-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d8b4fe;
+            border-radius: 8px;
+            font-size: 13px;
+            background: #fcf7ff;
+            transition: all 0.2s;
+        }
+        .keyword-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+        }
+        .btn-ai-generate {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 5px rgba(139, 92, 246, 0.3);
+            transition: all 0.2s;
+        }
+        .btn-ai-generate:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+        }
+        .btn-ai-generate:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
@@ -874,7 +923,90 @@
                 </tr>`;
             }).join('');
         }
-        function displayCommentData(data) { const tbody = document.getElementById('commentsTableBody'); if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } tbody.innerHTML = data.map(st => `<tr id="row-comment-${st.pageId}"><td class="student-name">${st.studentName}</td><td>${(st.teachers||[]).join(', ')}</td><td>${st.comment.grammarClass||'-'}</td><td style="vertical-align:top;"><textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea></td><td style="vertical-align:top;"><div class="report-btn-group"><button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button><button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button><button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button><button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button><button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button></div></td></tr>`).join(''); document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); }
+        
+        // [수정] displayCommentData 함수: 키워드 입력창과 AI 버튼 추가
+        function displayCommentData(data) { 
+            const tbody = document.getElementById('commentsTableBody'); 
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; } 
+            
+            tbody.innerHTML = data.map(st => `
+                <tr id="row-comment-${st.pageId}">
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${(st.teachers||[]).join(', ')}</td>
+                    <td>${st.comment.grammarClass||'-'}</td>
+                    <td style="vertical-align:top;">
+                        <!-- [신규] 키워드 입력 및 AI 버튼 -->
+                        <div class="keyword-input-container">
+                            <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력 (예: 집중 굿, 단어 통과, 조금 졸았음)" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
+                            <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
+                        </div>
+                        <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}" defaultValue="${st.comment.teacherComment || ''}">${st.comment.teacherComment || ''}</textarea>
+                    </td>
+                    <td style="vertical-align:top;">
+                        <div class="report-btn-group">
+                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
+                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
+                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
+                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
+                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                        </div>
+                    </td>
+                </tr>`).join(''); 
+            
+            document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el)); 
+        }
+    
+        // [신규] AI 코멘트 생성 요청 함수
+        async function generateAIComment(pageId, studentName) {
+            const keywordInput = document.getElementById(`keywords-${pageId}`);
+            const textArea = document.getElementById(`comment-area-${pageId}`);
+            const keywords = keywordInput.value.trim();
+    
+            if (!keywords) {
+                showToast('키워드를 먼저 입력해주세요!', 'error');
+                keywordInput.focus();
+                return;
+            }
+    
+            // 로딩 표시
+            const originalText = textArea.value;
+            textArea.value = "🤖 AI 선생님이 코멘트를 작성 중입니다...\n(잠시만 기다려주세요!)";
+            textArea.disabled = true;
+    
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-daily-comment`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken 
+                    },
+                    body: JSON.stringify({ 
+                        pageId: pageId,
+                        studentName: studentName, // 이름도 전달
+                        keywords: keywords
+                    })
+                });
+    
+                const result = await response.json();
+    
+                if (result.success) {
+                    textArea.value = result.comment;
+                    showToast('AI 코멘트가 생성되었습니다! ✨');
+                    
+                    // 변경 감지 트리거 (저장 버튼 활성화)
+                    markCommentAsChanged(textArea);
+                    autoResizeTextarea(textArea);
+                } else {
+                    throw new Error(result.message || '생성 실패');
+                }
+            } catch (error) {
+                console.error(error);
+                showToast('AI 코멘트 생성 중 오류가 발생했습니다.', 'error');
+                textArea.value = originalText; // 원복
+            } finally {
+                textArea.disabled = false;
+            }
+        }
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
         function markCommentAsChanged(el) { const row = el.closest('tr'); const btn = row.querySelector('.comment-save-btn'); if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); } }
