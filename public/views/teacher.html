@@ -442,6 +442,12 @@
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
                             <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
+                        <!-- [신규] 문법 반 필터 추가 -->
+                        <div class="filter-group">
+                            <select id="grammarClassFilter_comments" class="filter-select" onchange="filterDataByTeacher()">
+                                <option value="">전체 문법반</option>
+                            </select>
+                        </div>
                         <button class="refresh-btn batch-save-btn" onclick="saveAllComments(this)">💾 일괄 저장</button>
                     </div>
                     <div class="table-container">
@@ -586,15 +592,30 @@
             } catch(e) { console.error(e); }
         }
 
+        // [수정] 통합 필터링 함수 (선생님 + 문법 반)
         function filterDataByTeacher() {
             const tabSuffix = currentActiveTab === 'homework' ? 'hw' : currentActiveTab;
             const teacherSelect = document.getElementById(`teacherFilter_${tabSuffix}`);
-            // 문법 탭은 강사 필터가 없을 수도 있음
-            if (!teacherSelect) { displayDataForAllTabs(allReportData); return; }
-
-            const selectedTeacher = teacherSelect.value;
+            
+            // 1. 기본 데이터에서 시작
             let filteredData = allReportData;
-            if (selectedTeacher) { filteredData = allReportData.filter(item => item.teachers && item.teachers.includes(selectedTeacher)); }
+
+            // 2. 선생님 필터 적용
+            if (teacherSelect && teacherSelect.value) { 
+                const selectedTeacher = teacherSelect.value;
+                filteredData = filteredData.filter(item => item.teachers && item.teachers.includes(selectedTeacher));
+            }
+
+            // 3. [신규] 문법 반 필터 적용 (코멘트 탭일 경우만)
+            if (currentActiveTab === 'comments') {
+                const grammarSelect = document.getElementById('grammarClassFilter_comments');
+                if (grammarSelect && grammarSelect.value) {
+                    const selectedClass = grammarSelect.value;
+                    filteredData = filteredData.filter(item => item.comment && item.comment.grammarClass === selectedClass);
+                }
+            }
+
+            // 4. 결과 표시
             displayDataForAllTabs(filteredData);
         }
 
@@ -621,9 +642,14 @@
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
                 
-                // [신규] 문법 탭일 경우 반 목록 업데이트
+                // [신규] 문법 탭일 경우 반 목록 업데이트 (관리용)
                 if (currentActiveTab === 'grammar') {
                     updateGrammarClassList(allReportData);
+                }
+                
+                // [신규] 코멘트 탭일 경우 문법 반 필터 목록 업데이트 (필터용)
+                if (currentActiveTab === 'comments') {
+                    updateCommentGrammarFilterList(allReportData);
                 }
                 
                 filterDataByTeacher();
@@ -637,6 +663,28 @@
             displayListeningData(data);
             displayCommentData(data);
             displayGrammarData(data); // [신규]
+        }
+
+        // [신규] 코멘트 탭용 문법 반 필터 목록 업데이트
+        function updateCommentGrammarFilterList(data) {
+            const select = document.getElementById('grammarClassFilter_comments');
+            if(!select) return;
+            const savedValue = select.value;
+            // 데이터에서 문법 반 목록 추출 (중복 제거)
+            const classes = new Set(data.map(st => st.comment?.grammarClass).filter(c => c && c !== '진도 해당 없음'));
+            
+            select.innerHTML = '<option value="">전체 문법반</option>';
+            
+            // 가나다순 정렬하여 옵션 추가
+            [...classes].sort().forEach(cls => {
+                const opt = document.createElement('option');
+                opt.value = cls;
+                opt.textContent = cls;
+                select.appendChild(opt);
+            });
+            
+            // 기존 선택값 유지 시도
+            if(savedValue && classes.has(savedValue)) select.value = savedValue;
         }
 
         // [신규] 문법 데이터 렌더링
