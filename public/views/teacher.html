@@ -942,7 +942,24 @@
         }
 
         function openAddBookModal(pageId, type) { currentEditingPageId = pageId; currentBookType = type; const modal = document.getElementById('bookSearchModal'); document.getElementById('modalSearchInput').value = ''; document.getElementById('modalSearchResults').innerHTML = '<div class="no-data" style="padding: 30px;">검색어를 입력하세요...</div>'; document.getElementById('modalTitle').textContent = type === 'english' ? '📚 영어 원서 검색' : '📕 국어 도서 검색'; modal.classList.add('show'); document.getElementById('modalSearchInput').focus(); }
-        async function searchEngBooks(query) { const list = document.getElementById('modalSearchResults'); if(query.length < 2) { list.innerHTML = ''; return; } list.innerHTML = '<div class="loading">검색중...</div>'; const endpoint = currentBookType === 'english' ? '/api/search-books' : '/api/search-sayu-books'; try { const res = await fetch(`${API_BASE_URL}${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const books = await res.json(); if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; } list.innerHTML = books.map((b, i) => { let meta = ''; if (currentBookType === 'english') { meta = `저자: ${b.author || ''}`; } else { meta = `저자: ${b.author || ''} | 출판: ${b.publisher || ''}`; } return `<div class="result-item" onclick="selectBookByIndex(${i})"><div style="font-weight:bold;">${b.title}</div><div style="font-size:12px; color:#666;">${meta}</div></div>`; }).join(''); currentSearchResults = books; } catch(e) { list.innerHTML = '오류'; } }
+        // [수정] 함수 이름 변경: searchEngBooks -> searchBooks (이벤트 리스너에서 호출하는 이름과 일치시킴)
+        async function searchBooks(query) { 
+            const list = document.getElementById('modalSearchResults'); 
+            if(query.length < 2) { list.innerHTML = ''; return; } 
+            list.innerHTML = '<div class="loading">검색중...</div>'; 
+            const endpoint = currentBookType === 'english' ? '/api/search-books' : '/api/search-sayu-books'; 
+            try { 
+                const res = await fetch(`${API_BASE_URL}${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); 
+                const books = await res.json(); 
+                if(!books.length) { list.innerHTML = '<div class="no-data">결과 없음</div>'; return; } 
+                list.innerHTML = books.map((b, i) => { 
+                    let meta = ''; 
+                    if (currentBookType === 'english') { meta = `저자: ${b.author || ''}`; } else { meta = `저자: ${b.author || ''} | 출판: ${b.publisher || ''}`; } 
+                    return `<div class="result-item" onclick="selectBookByIndex(${i})"><div style="font-weight:bold;">${b.title}</div><div style="font-size:12px; color:#666;">${meta}</div></div>`; 
+                }).join(''); 
+                currentSearchResults = books; 
+            } catch(e) { list.innerHTML = '오류'; } 
+        }
         function selectBookByIndex(index) { const book = currentSearchResults[index]; if (book) addBook(book.id); }
         async function addBook(newId) { if(!currentEditingPageId) return; document.getElementById('bookSearchModal').classList.remove('show'); const row = allReportData.find(d => d.pageId === currentEditingPageId); let currIds = []; let propertyName = ''; if (currentBookType === 'english') { currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); propertyName = '오늘 읽은 영어 책'; } else { currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id); propertyName = '국어 독서 제목'; } if(currIds.includes(newId)) { showToast('이미 있음', 'error'); return; } await updateBookRelation(currentEditingPageId, [...currIds, newId], propertyName); }
         async function removeBook(pid, rid, type) { if(!confirm('삭제하시겠습니까?')) return; const row = allReportData.find(d => d.pageId === pid); let currIds = []; let propertyName = ''; if (type === 'english') { currIds = (row.reading.englishBooks || []).map(b => b.id).filter(id => id); propertyName = '오늘 읽은 영어 책'; } else { currIds = (row.listening.koreanBooks || []).map(b => b.id).filter(id => id); propertyName = '국어 독서 제목'; } await updateBookRelation(pid, currIds.filter(id => id !== rid), propertyName); }
