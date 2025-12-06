@@ -177,6 +177,79 @@ try {
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
+// AI 일일 코멘트 생성 API
+app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
+    const { pageId, studentName, keywords } = req.body;
+
+    if (!pageId || !keywords) {
+        return res.status(400).json({ success: false, message: '필수 정보가 누락되었습니다.' });
+    }
+
+    if (!GEMINI_API_KEY) {
+        return res.status(500).json({ success: false, message: 'AI 기능이 서버에 설정되지 않았습니다.' });
+    }
+
+    try {
+        const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
+        const parsedData = await parseDailyReportData(page);
+
+        const prompt = `
+        너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해.
+        
+        [역할]
+        - 초중고 학생을 가르치는 영어 전문가이자, 따뜻하고 유쾌한 선생님.
+        - 학생의 발전을 진심으로 응원하는 말투 사용 (존댓말, 이모지 적절히 사용).
+        
+        [입력 정보]
+        - 학생 이름: ${studentName}
+        - 오늘의 키워드: ${keywords}
+        - 숙제 수행율: ${parsedData.completionRate}%
+        - 테스트 결과: 
+          * 문법: ${parsedData.tests.grammarScore}점 (오답 ${parsedData.tests.grammarWrong}개)
+          * 어휘: ${parsedData.tests.vocabScore}점 (오답 ${parsedData.tests.vocabTotal - parsedData.tests.vocabCorrect}개)
+          * 독해: ${parsedData.tests.readingResult} (오답 ${parsedData.tests.readingWrong}개)
+          * 리스닝/더빙: ${parsedData.listening.study}
+          * 원서 독서: ${parsedData.reading.readingStatus}
+        
+        [작성 규칙]
+        
+        1. 첫 번째 문단 (키워드 중심 스토리텔링):
+           - 입력된 키워드(${keywords})를 사용하여 학생의 오늘 수업 태도나 에피소드를 자연스럽게 서술해줘.
+           - 예시처럼 키워드를 문장에 자연스럽게 녹여내야 해.
+        
+        2. 두 번째 문단 (학습 현황 피드백):
+           - 숙제 수행율이 ${parsedData.completionRate}%임.
+             * 100%: "완벽합니다!" 칭찬
+             * 80% 이상: "아주 훌륭해요" 칭찬
+             * 70% 이상: "조금 더 노력하면 좋겠어요" 격려
+             * 69% 이하: "숙제 미흡으로 보강이 필요합니다. 보강 스케줄 참고해서 1회 보내주세요"라고 안내.
+           
+           - 학습 성취 코멘트:
+             * '없음'이나 '해당 없음'인 항목은 언급하지 마.
+             * PASS 하거나 점수가 좋은 항목(80점 이상)은 칭찬해줘.
+             * 미완료되거나 점수가 낮은 항목, FAIL한 항목은 "다음 시간에 보강하여 꼼꼼히 채우겠습니다"라는 긍정적인 멘트로 마무리해줘.
+        
+        3. 마무리 인사:
+           - 오늘의 긍정적 성취 1가지를 콕 집어 칭찬.
+           - 부족했던 점이나 아쉬운 점 1가지에 대한 대안 제시.
+           - 따뜻한 끝인사. (예: 댁에서도 격려 부탁드립니다 ^^)
+        
+        [출력 형식]
+        - 바로 복사해서 보낼 수 있도록 코멘트 본문만 작성해줘.
+        - 문단 사이에는 줄바꿈을 넣어줘.
+        `;
+
+        const result = await geminiModel.generateContent(prompt);
+        const generatedComment = result.response.text();
+
+        res.json({ success: true, comment: generatedComment });
+
+    } catch (error) {
+        console.error('AI Comment Generation Error:', error);
+        res.status(500).json({ success: false, message: 'AI 코멘트 생성 중 오류가 발생했습니다.' });
+    }
+});
+
 async function parseDailyReportData(page) {
     const props = page.properties;
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
@@ -196,7 +269,7 @@ async function parseDailyReportData(page) {
         diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
 
-    // [점수 계산 로직] 100점 만점 환산 (숙제 없음 제외)
+    // [점수 계산 로직]
     const checkList = [
         homework.grammar,
         homework.vocabCards,
@@ -215,27 +288,24 @@ async function parseDailyReportData(page) {
 
     checkList.forEach(status => {
         if (!status) return;
-        // 100점 그룹: 숙제 함, 완료, 완료함, 대체 등
         if (['숙제 함', '완료', '완료함', '원서독서로 대체', '듣기평가교재 완료'].includes(status)) {
             totalScore += 100;
             count++;
         } 
-        // 0점 그룹: 안 해옴, 미완료, 못함 등
         else if (['안 해옴', '미완료', '못함', '못하고감'].includes(status)) {
             totalScore += 0;
             count++;
         }
-        // 제외 그룹: 숙제 없음, 해당 없음, 진행하지 않음, SKIP 등 -> count 증가 안 함
     });
 
-    // 항목이 하나도 없으면(모두 숙제 없음) N/A, 아니면 평균 점수
-    const performanceRate = count > 0 ? Math.round(totalScore / count) : 'N/A';
+    const performanceRate = count > 0 ? Math.round(totalScore / count) : null;
 
+    // getFormulaValue: 값이 없으면 null 반환
     const getFormulaValue = (prop) => {
-        if (!prop?.formula) return 'N/A';
-        if (prop.formula.type === 'string') return prop.formula.string;
-        if (prop.formula.type === 'number') return prop.formula.number;
-        return 'N/A';
+        if (!prop?.formula) return null;
+        if (prop.formula.type === 'string') return prop.formula.string || null; 
+        if (prop.formula.type === 'number') return prop.formula.number; // 0은 0으로 반환
+        return null;
     };
 
     const tests = {
@@ -302,7 +372,7 @@ async function parseDailyReportData(page) {
         studentRelationId: props['학생']?.relation?.[0]?.id || null,
         date: pageDate,
         teachers: assignedTeachers,
-        completionRate: performanceRate, // 계산된 점수
+        completionRate: performanceRate, 
         homework, tests, listening, reading, comment
     };
 }
@@ -446,17 +516,29 @@ try {
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
 } catch (e) { console.error('Template load error', e); }
 
-// [신규] 리포트 색상 결정 함수
+// [수정] 리포트 색상 결정 함수 (0점 처리 분리)
 function getReportColor(value, type) {
     const GREEN = '#10b981';
     const RED = '#ef4444';
     const GRAY = '#9ca3af';
 
-    if (type === 'score') {
-        if (value === 'N/A' || value === null) return GRAY;
+    // 값이 없으면 무조건 회색
+    if (value === 'N/A' || value === '없음' || value === null || value === undefined || value === '') return GRAY;
+
+    if (type === 'score') { // 숙제 수행율: 0점은 빨간색(안함)
         const num = parseInt(value);
-        return (!isNaN(num) && num >= 80) ? GREEN : RED;
+        if (isNaN(num)) return GRAY;
+        return (num >= 80) ? GREEN : RED;
     }
+    
+    if (type === 'test_score') { // 시험 점수: 0점은 회색(미응시/없음)
+        const num = parseInt(value);
+        if (isNaN(num)) return GRAY;
+        if (num === 0) return GRAY; // [핵심] 0점 -> 회색
+        return (num >= 80) ? GREEN : RED;
+    }
+    
+    // ... 나머지 기존 로직
     if (type === 'result') {
         if (value === 'PASS') return GREEN;
         if (value === 'FAIL') return RED;
@@ -474,89 +556,6 @@ function getReportColor(value, type) {
     }
     return GRAY;
 }
-// [신규] AI 일일 코멘트 생성 API
-app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
-    const { pageId, studentName, keywords } = req.body;
-
-    if (!pageId || !keywords) {
-        return res.status(400).json({ success: false, message: '필수 정보가 누락되었습니다.' });
-    }
-
-    if (!GEMINI_API_KEY) {
-        return res.status(500).json({ success: false, message: 'AI 기능이 서버에 설정되지 않았습니다.' });
-    }
-
-    try {
-        // 1. 해당 학생의 오늘 학습 데이터(페이지 정보)를 가져옵니다.
-        const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-        const parsedData = await parseDailyReportData(page); // 기존 파싱 함수 재사용
-
-        // 2. 프롬프트 작성 (헤더님 요청 사항 반영)
-        const prompt = `
-        너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해.
-        
-        [역할]
-        - 초중고 학생을 가르치는 영어 전문가이자, 따뜻하고 유쾌한 선생님.
-        - 학생의 발전을 진심으로 응원하는 말투 사용 (존댓말, 이모지 적절히 사용).
-        
-        [입력 정보]
-        - 학생 이름: ${studentName}
-        - 오늘의 키워드: ${keywords}
-        - 숙제 수행율: ${parsedData.completionRate}%
-        - 테스트 결과: 
-          * 문법: ${parsedData.tests.grammarScore}점 (오답 ${parsedData.tests.grammarWrong}개)
-          * 어휘: ${parsedData.tests.vocabScore}점 (오답 ${parsedData.tests.vocabTotal - parsedData.tests.vocabCorrect}개)
-          * 독해: ${parsedData.tests.readingResult} (오답 ${parsedData.tests.readingWrong}개)
-          * 리스닝/더빙: ${parsedData.listening.study}
-          * 원서 독서: ${parsedData.reading.readingStatus}
-        
-        [작성 규칙]
-        
-        1. 첫 번째 문단 (키워드 중심 스토리텔링):
-           - 첫번째 문장은 항상 "오늘의 리디튜더 xxx의 일일 학습 리포트📑를 보내드립니다." 로 시작해.
-           - 입력된 키워드(${keywords})를 사용하여 학생의 오늘 수업 태도나 에피소드를 자연스럽게 서술해줘.
-           - 예시처럼 키워드를 문장에 자연스럽게 녹여내야 해.
-           - 예시 :  오늘 우리 예준이가 수업 시간에 집중을 정말 잘해줬습니다. 특히 독해 시간에 시간을 아주 효율적으로 알차게 쓰고 갔어요. 😁 
-           시험 볼 때는 잠깐 피곤했는지 살짝 졸기도 했는데요 😴 그래도 금방 잠 깨고 다시 마음 다잡고 집중하더니 결과까지 좋게 나와서 폭풍 칭찬 해주었습니다 👏
-           피곤할 텐데도 스스로 이겨내고 끝까지 잘해낸 모습이 참 기특하네요. 댁에서도 오늘 정말 수고했다고 따뜻한 말 한마디 건네주세요! ^_^
-        
-        2. 두 번째 문단 (학습 현황 피드백):
-           - 두번째 문단은 <📢 오늘의 숙제 수행율>
-           - 숙제 수행율이 ${parsedData.completionRate}%임.
-             * 100%: "완벽합니다! 계속 이렇게만 해 주세요! >_<" 칭찬
-             * 80% 이상: "아주 훌륭해요! 그래도 완벽한 숙제 수행을 노려봅시다." 칭찬
-             * 70% 이상: "조금 더 숙제 수행율을 높이도록 노력하면 좋겠어요" 격려
-             * 69% 이하: "숙제 미흡으로 보강이 필요합니다. ㅠㅠ 보강 스케줄 참고하셔서(카톡채널 소식 확인해 주세요!) 패널티 보강 보내주세요!"라고 안내.
-           
-           - 학습 성취 코멘트:
-             * 'N/A'나 '해당 없음'인 항목은 언급하지 마.
-             * PASS 하거나 점수가 좋은 항목(80점 이상)은 칭찬해줘.
-             * 미완료되거나 점수가 낮은 항목, FAIL한 항목은 "다음 시간에 더 나은 결과로 꼼꼼히 채우겠습니다."라는 긍정적인 멘트로 마무리해줘.
-        
-        3. 마무리 인사:
-           - 오늘의 긍정적 성취 1가지를 콕 집어 칭찬.
-           - 부족했던 점이나 아쉬운 점 1가지에 대한 대안 제시.
-           - 따뜻한 끝인사. (예: 댁에서도 격려 부탁드립니다 ^^)
-        
-        [출력 형식 및 중요 포인트]
-        - 조금의 이모지 사용은 괜찮아! 환기성으로 문단 앞에 써줘.
-        - 중요!!! 절대로 강조표시 *xx*, 'xx' 이런거 하지 말아줘.
-        - xxx 학생 이라는 표현 절대 쓰지마. 
-        - 한국어 조사를 학생의 이름 xx이 xx는 xx이가 등으로 맞추어서 자연스럽게 쓸 것
-        - 
-        `;
-
-        // 3. AI에게 요청
-        const result = await geminiModel.generateContent(prompt);
-        const generatedComment = result.response.text();
-
-        res.json({ success: true, comment: generatedComment });
-
-    } catch (error) {
-        console.error('AI Comment Generation Error:', error);
-        res.status(500).json({ success: false, message: 'AI 코멘트 생성 중 오류가 발생했습니다.' });
-    }
-});
 
 app.get('/report', async (req, res) => {
     const { pageId, date } = req.query;
@@ -571,33 +570,35 @@ app.get('/report', async (req, res) => {
             ? parsed.reading.englishBooks.map(b => b.title).join(', ')
             : (parsed.reading.bookTitle || '읽은 책 없음');
 
-        // [핵심 수정] 데이터 연결 복구 및 색상 적용
+        // [신규] 시험 점수 0점을 '없음'으로 변환하는 헬퍼
+        const formatTestScore = (val) => (val === 0 || val === null) ? '없음' : val + '점';
+
         const replacements = {
             '{{STUDENT_NAME}}': parsed.studentName,
             '{{REPORT_DATE}}': getKoreanDate(parsed.date),
             '{{TEACHER_COMMENT}}': parsed.comment.teacherComment.replace(/\n/g, '<br>'),
             
-            '{{HW_SCORE}}': parsed.completionRate === 'N/A' ? 'N/A' : parsed.completionRate + '%',
-            '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate === 'N/A' ? null : parsed.completionRate, 'score'),
+            // [숙제] 0%는 그대로 표시
+            '{{HW_SCORE}}': parsed.completionRate === null ? '없음' : parsed.completionRate + '%',
+            '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
             
-            '{{GRAMMAR_SCORE}}': parsed.tests.grammarScore,
-            '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'score'),
+            // [시험] 0점은 '없음'으로 표시
+            '{{GRAMMAR_SCORE}}': formatTestScore(parsed.tests.grammarScore),
+            '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'test_score'),
             
-            '{{VOCAB_SCORE}}': parsed.tests.vocabScore,
-            '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'score'),
+            '{{VOCAB_SCORE}}': formatTestScore(parsed.tests.vocabScore),
+            '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'test_score'),
             
             '{{READING_TEST_STATUS}}': parsed.tests.readingResult,
             '{{READING_TEST_COLOR}}': getReportColor(parsed.tests.readingResult, 'result'),
             
             '{{LISTENING_STATUS}}': parsed.listening.study,
             '{{LISTENING_COLOR}}': getReportColor(parsed.listening.study, 'status'),
-            // [폰트 크기 조절]
             '{{LISTENING_FONT_CLASS}}': (parsed.listening.study && parsed.listening.study.length > 5) ? 'text-lg' : 'text-4xl',
             
             '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus,
             '{{READING_BOOK_COLOR}}': getReportColor(parsed.reading.readingStatus, 'status'),
 
-            // [숙제 상세 연결]
             '{{HW_GRAMMAR_STATUS}}': parsed.homework.grammar,
             '{{HW_GRAMMAR_COLOR}}': getReportColor(parsed.homework.grammar, 'hw_detail'),
             
@@ -619,11 +620,14 @@ app.get('/report', async (req, res) => {
             '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR || 'N/A'} / ${parsed.reading.bookLexile || 'N/A'}` : 'N/A',
             '{{WRITING_STATUS}}': parsed.reading.writingStatus,
 
-            '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate // 100점 만점 환산 점수
+            '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate !== null ? parsed.completionRate : '없음'
         };
         
         for (const [key, val] of Object.entries(replacements)) {
-            html = html.split(key).join(val || 'N/A');
+            // [수정] 0점, 0% 등 숫자 0은 그대로 표시하고, 진짜 없는 값만 '없음'으로 처리
+            // 단, 위에서 이미 '없음'으로 바꾼 값(시험 점수 0점)은 그대로 둠
+            const displayVal = (val === null || val === undefined || val === '') ? '없음' : val;
+            html = html.split(key).join(displayVal);
         }
         res.send(html);
     } catch (e) { 
