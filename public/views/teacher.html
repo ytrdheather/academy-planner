@@ -43,7 +43,7 @@
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         
-        /* [수정] 테이블 헤더 고정 (Sticky Header) - 높이를 60px로 수정 */
+        /* [수정] 테이블 헤더 고정 (Sticky Header) - 높이를 120px로 수정하여 메인 헤더 아래에 위치시킴 */
         .styled-table th { 
             background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
             color: white; 
@@ -53,7 +53,7 @@
             white-space: nowrap; 
             /* Sticky 속성 */
             position: sticky;
-            top: 60px; /* [수정] 120px -> 60px로 변경 */
+            top: 120px; /* [수정] 60px -> 120px로 변경 (메인 헤더 높이 반영) */
             z-index: 10; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
         }
@@ -283,7 +283,6 @@
 
         <div class="main-content">
             
-            <!-- 1. 숙제 현황 탭 -->
             <div id="homework-view" class="tab-content active">
                 <div class="content-section">
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
@@ -306,7 +305,6 @@
                         매일의 성실함을 지킬 수 있도록 해주세요!
                     </div>
                     <div class="table-container">
-                        <!-- [수정] 출석 열 추가 -->
                         <table class="styled-table">
                             <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="10" class="loading">로딩중...</td></tr></tbody>
@@ -315,7 +313,6 @@
                 </div>
             </div>
 
-            <!-- 2. 테스트 결과 탭 -->
             <div id="tests-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
@@ -341,7 +338,6 @@
                 </div>
             </div>
 
-            <!-- 3. 원서 독서 현황 탭 -->
             <div id="reading-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
@@ -367,7 +363,6 @@
                 </div>
             </div>
 
-            <!-- 4. 리스닝 & 책거 현황 탭 -->
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">🎧 리스닝 & 책거 현황</div>
@@ -402,19 +397,16 @@
                 </div>
             </div>
 
-            <!-- [신규] 문법 관리 탭 -->
             <div id="grammar-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'📚'">문법 숙제 관리</div>
                     
-                    <!-- 상단: 문법 숙제 입력란 -->
                     <div class="grammar-input-container">
                         <div class="grammar-group">
                             <label class="grammar-label">대상 반 선택</label>
                             <select id="grammarClassSelect" class="grammar-input">
                                 <option value="">반을 선택하세요</option>
-                                <!-- JS로 로드된 반 목록이 들어감 -->
-                            </select>
+                                </select>
                         </div>
                         <div class="grammar-group">
                             <label class="grammar-label">오늘 문법 진도</label>
@@ -427,11 +419,9 @@
                         <button class="grammar-btn" onclick="updateGrammarByClass()">반 전체 적용</button>
                     </div>
 
-                    <!-- 하단: 학생 리스트 -->
                     <div class="filters-container">
                          <button class="refresh-btn">🔄 새로고침</button>
-                         <!-- 필터 생략 (자동 로드) -->
-                    </div>
+                         </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <colgroup><col style="width:10%"><col style="width:10%"><col style="width:40%"><col style="width:40%"></colgroup>
@@ -442,7 +432,6 @@
                 </div>
             </div>
 
-            <!-- 오늘의 코멘트 탭 -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
@@ -458,7 +447,6 @@
                         <div class="filter-group" id="teacherFilterGroup_comments" style="display:none;">
                             <select id="teacherFilter_comments" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
                         </div>
-                        <!-- [신규] 문법 반 필터 추가 -->
                         <div class="filter-group">
                             <select id="grammarClassFilter_comments" class="filter-select" onchange="filterDataByTeacher()">
                                 <option value="">전체 문법반</option>
@@ -476,7 +464,6 @@
                 </div>
             </div>
             
-            <!-- 관리자 메뉴 탭 -->
             <div id="admin-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
@@ -499,7 +486,6 @@
         </div>
     </div>
 
-    <!-- 책 검색 모달 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -833,7 +819,6 @@
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
-                <!-- [수정] 출석 체크박스 추가 -->
                 <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
                 <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
@@ -841,7 +826,7 @@
                 <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
                 <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
                 <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
-                <td style="font-weight:bold; color:${st.completionRate>=80?'#10b981':'#ef4444'}">${st.completionRate}%</td>
+                <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
             </tr>`).join('');
         }
 
@@ -1018,7 +1003,6 @@
                     <td>${(st.teachers||[]).join(', ')}</td>
                     <td>${st.comment.grammarClass||'-'}</td>
                     <td style="vertical-align:top;">
-                        <!-- [신규] 키워드 입력 및 AI 버튼 -->
                         <div class="keyword-input-container">
                             <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력 (예: 집중 굿, 단어 통과, 조금 졸았음)" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
                             <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
@@ -1135,6 +1119,18 @@
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
         
+        // [신규] 누락된 formatSelect 함수 복구 (이 함수가 없어서 에러 발생)
+        function formatSelect(pageId, propertyName, currentValue, options) {
+            return `<select class="homework-dropdown status-default" 
+                        data-page-id="${pageId}" 
+                        data-property-name="${propertyName}" 
+                        data-property-type="select" 
+                        onchange="updateField(this)">
+                        <option value="">선택</option>
+                        ${options.map(option => `<option value="${option}" ${option === currentValue ? 'selected' : ''}>${option}</option>`).join('')}
+                    </select>`;
+        }
+
         // [신규] 누락된 formatHomeworkDropdown 복구
         function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
             const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
