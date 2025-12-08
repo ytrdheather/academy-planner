@@ -12,7 +12,7 @@
         .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
         
         /* 헤더 */
-        .header { background: #ffffff; color: #6b46c1; padding: 20px 30px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .header { background: #ffffff; color: #6b46c1; padding: 20px 30px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; min-height: 120px; }
         .header h1 { font-size: 1.8em; margin: 0; }
         .user-info { display: flex; align-items: center; gap: 15px; }
         .user-name { font-weight: 600; }
@@ -43,7 +43,7 @@
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         
-        /* [수정] 테이블 헤더 고정 (Sticky Header) */
+        /* [수정] 테이블 헤더 고정 (Sticky Header) - 높이를 120px로 수정하여 가려지지 않게 함 */
         .styled-table th { 
             background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
             color: white; 
@@ -51,11 +51,11 @@
             text-align: center; 
             font-weight: 600; 
             white-space: nowrap; 
-            /* Sticky 속성 추가 */
+            /* Sticky 속성 */
             position: sticky;
-            top: 75px; /* 상단 메뉴바(약 80px) 아래에 붙도록 설정 */
-            z-index: 10; /* 다른 내용물보다 위에 오도록 */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 헤더 아래 그림자 */
+            top: 120px; /* 상단 메뉴바 높이만큼 띄움 */
+            z-index: 10; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
         }
         
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }

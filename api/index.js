@@ -22,8 +22,11 @@ const {
     GEMINI_API_KEY,
     MONTHLY_REPORT_DB_ID,
     GRAMMAR_DB_ID,
-    DOMAIN_URL = 'https://readitude.onrender.com'
+    // DOMAIN_URL은 아래에서 강제로 정의합니다.
 } = process.env;
+
+// [핵심] 무조건 HTTPS 주소를 사용하도록 강제 고정
+const DOMAIN_URL = 'https://readitude.onrender.com';
 
 const PORT = process.env.PORT || 5001;
 
@@ -32,7 +35,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// [핵심 수정] Notion API 호출 헬퍼 (JSON.stringify 누락 수정)
+// Notion API 호출 헬퍼
 async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -43,17 +46,19 @@ async function fetchNotion(url, options, retries = 3) {
     try {
         const response = await fetch(url, { ...options, headers });
 
-        // [409 Conflict] 에러 발생 시 재시도
         if (response.status === 409 && retries > 0) {
-            console.warn(`⚠️ Notion API Conflict (409). 재시도 중... (남은 시도: ${retries})`);
+            console.warn(`⚠️ Notion API Conflict (409). Retrying...`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
             return fetchNotion(url, options, retries - 1);
         }
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
-            throw new Error(errorData.message || `Notion API Error: ${response.status}`);
+            const errorMessage = errorData.message || `Notion API Error: ${response.status}`;
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            error.data = errorData;
+            throw error;
         }
         return response.json();
     } catch (error) {
@@ -261,17 +266,15 @@ async function parseDailyReportData(page) {
     }
 
     const homework = {
+        attendance: props['출석']?.checkbox || false, // [신규] 출석 체크박스 추가
         grammar: props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당 없음',
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
         dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음', 
-        diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음',
-        // [수정] 출석 체크박스 데이터 추가
-        attendance: props['출석']?.checkbox || false
+        diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
 
-    // [점수 계산 로직]
     const checkList = [
         homework.grammar,
         homework.vocabCards,
@@ -302,11 +305,10 @@ async function parseDailyReportData(page) {
 
     const performanceRate = count > 0 ? Math.round(totalScore / count) : null;
 
-    // getFormulaValue: 값이 없으면 null 반환
     const getFormulaValue = (prop) => {
         if (!prop?.formula) return null;
         if (prop.formula.type === 'string') return prop.formula.string || null; 
-        if (prop.formula.type === 'number') return prop.formula.number; // 0은 0으로 반환
+        if (prop.formula.type === 'number') return prop.formula.number;
         return null;
     };
 
@@ -379,6 +381,7 @@ async function parseDailyReportData(page) {
     };
 }
 
+// [핵심] 쿼리 타입 자동 감지 및 Fallback (Date -> Select)
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
@@ -390,23 +393,51 @@ async function fetchProgressData(req, res, parseFunction) {
         dateString = getKSTTodayRange().dateString;
     }
 
-    const finalFilter = {
-        "property": "🕐 날짜",
-        "date": { "equals": dateString }
-    };
-
     const pages = [];
     let hasMore = true;
     let startCursor = undefined;
+    
+    // [중요] 필터 생성기: 타입을 인자로 받아 필터를 만듦
+    const createFilter = (type) => {
+        if (type === 'select') {
+            return { "property": "🕐 날짜", "select": { "equals": dateString } };
+        }
+        return { "property": "🕐 날짜", "date": { "equals": dateString } };
+    };
+
+    // DB 타입 감지: 기본적으로 'date'로 시작하나, 에러 발생 시 'select'로 전환됨
+    let currentDbType = 'date'; 
+
     while (hasMore) {
-        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-            method: 'POST',
-            body: JSON.stringify({
-                filter: finalFilter,
-                sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
-                page_size: 100, start_cursor: startCursor
-            })
-        });
+        let data;
+        try {
+            const filter = createFilter(currentDbType);
+            data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: filter,
+                    sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
+                    page_size: 100, start_cursor: startCursor
+                })
+            });
+        } catch (error) {
+            if (currentDbType === 'date' && error.data && error.data.message && error.data.message.includes('does not match')) {
+                console.warn('⚠️ Notion Date mismatch detected. Retrying with SELECT type...');
+                currentDbType = 'select'; // 타입을 영구적으로 변경하여 다음 루프부터는 바로 Select 사용
+                const filter = createFilter(currentDbType);
+                data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        filter: filter,
+                        sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
+                        page_size: 100, start_cursor: startCursor
+                    })
+                });
+            } else {
+                throw error;
+            }
+        }
+
         pages.push(...data.results);
         hasMore = data.has_more;
         startCursor = data.next_cursor;
@@ -427,15 +458,22 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: '반 이름과 날짜는 필수입니다.' }); }
-    const targetClass = className.trim();
     try {
-        const filter = { "property": "🕐 날짜", "date": { "equals": date } };
-        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
+        const createFilter = (type) => (type === 'select' ? { "property": "🕐 날짜", "select": { "equals": date } } : { "property": "🕐 날짜", "date": { "equals": date } });
+        let query;
+        try {
+            query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date') }) });
+        } catch (e) {
+            if (e.data && e.data.message && e.data.message.includes('does not match')) {
+                 query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select') }) });
+            } else throw e;
+        }
+
         const students = query.results;
         let updatedCount = 0;
         const updatePromises = students.map(async (page) => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
-            if (studentClass && studentClass.trim() === targetClass) {
+            if (studentClass && studentClass.trim() === className.trim()) {
                 await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
                     method: 'PATCH',
                     body: JSON.stringify({ properties: { '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] }, '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] } } })
@@ -444,7 +482,7 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
             }
         });
         await Promise.all(updatePromises);
-        res.json({ success: true, message: `${updatedCount}명의 학생(${targetClass})에게 문법 숙제를 배포했습니다.` });
+        res.json({ success: true, message: `${updatedCount}명의 학생(${className})에게 문법 숙제를 배포했습니다.` });
     } catch (error) { console.error('Grammar batch update error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
 
@@ -462,17 +500,13 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             for (const [propName, valObj] of Object.entries(updates)) {
                 const notionPropName = mapPropName(propName); const val = mapValue(valObj.value); const type = valObj.type || 'status'; let payload;
                 if (type === 'number') payload = { number: Number(val) || 0 }; else if (type === 'rich_text') payload = { rich_text: [{ text: { content: val || '' } }] }; else if (type === 'select') payload = { select: val ? { name: val } : null }; else if (type === 'relation') { if (Array.isArray(val)) payload = { relation: val.map(id => ({ id })) }; else payload = { relation: val ? [{ id: val }] : [] }; } else if (type === 'status') payload = { status: { name: val || '숙제 없음' } };
-                // [수정] 체크박스 업데이트 로직 추가
-                else if (type === 'checkbox') payload = { checkbox: val };
-                
+                else if (type === 'checkbox') payload = { checkbox: val }; // [신규] 체크박스 처리 추가
                 propertiesToUpdate[notionPropName] = payload;
             }
         } else if (propertyName) {
             const notionPropName = mapPropName(propertyName); const val = mapValue(newValue); let payload;
             if (propertyType === 'number') payload = { number: Number(val) || 0 }; else if (propertyType === 'rich_text') payload = { rich_text: [{ text: { content: val || '' } }] }; else if (propertyType === 'select') payload = { select: val ? { name: val } : null }; else if (propertyType === 'relation') { if (Array.isArray(val)) payload = { relation: val.map(id => ({ id })) }; else payload = { relation: val ? [{ id: val }] : [] }; } else if (propertyType === 'status') payload = { status: { name: val || '숙제 없음' } };
-            // [수정] 체크박스 업데이트 로직 추가
-            else if (propertyType === 'checkbox') payload = { checkbox: val };
-
+            else if (propertyType === 'checkbox') payload = { checkbox: val }; // [신규] 체크박스 처리 추가
             propertiesToUpdate[notionPropName] = payload;
         } else { return res.status(400).json({ success: false, message: 'No update data provided' }); }
         await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: propertiesToUpdate }) });
@@ -486,6 +520,8 @@ app.get('/api/teacher/user-info', requireAuth, (req, res) => { res.json({ userNa
 app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.user.userId, userName: req.user.name, userRole: req.user.role }); });
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
+
+// [수정] save-progress도 스마트하게 (날짜 타입 자동 대응)
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -499,11 +535,8 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
             "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기",
             "6️⃣ 부&매&일": "6️⃣ 부&매&일", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
-            
-            // [중요] 띄어쓰기 있는 HTML name -> 띄어쓰기 없는 Notion 속성
             "단어(맞은 개수)": "단어(맞은 개수)", "단어 (맞은 개수)": "단어(맞은 개수)",
             "단어(전체 개수)": "단어(전체 개수)", "단어 (전체 개수)": "단어(전체 개수)",
-            
             "어휘유닛": "어휘유닛", 
             "문법(전체 개수)": "문법(전체 개수)", "문법 (전체 개수)": "문법(전체 개수)",
             "문법(틀린 개수)": "문법(틀린 개수)", "문법 (틀린 개수)": "문법(틀린 개수)", "문법숙제오답": "문법(틀린 개수)",
@@ -511,8 +544,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "독해 하브루타": "독해 하브루타", "독해하브루타": "독해 하브루타",
             "📖 영어독서": "📖 영어독서", "어휘학습": "어휘학습", "Writing": "Writing", 
             "📕 책 읽는 거인": "📕 책 읽는 거인", "완료 여부": "📕 책 읽는 거인",
-            
-            // [중요] 소감 매핑
             "오늘의 학습 소감": "오늘의 학습 소감", "오늘의 소감": "오늘의 학습 소감"
         };
         const valueMapping = { "해당없음": "숙제 없음", "안 해옴": "안 해옴", "숙제 함": "숙제 함", "진행하지 않음": "진행하지 않음", "완료": "완료", "미완료": "미완료", "원서독서로 대체": "원서독서로 대체", "듣기평가교재 완료": "듣기평가교재 완료", "못함": "못함", "완료함": "완료함", "SKIP": "SKIP", "안함": "안함", "숙제없음": "숙제없음", "못하고감": "못하고감", "시작함": "시작함", "절반": "절반", "거의다읽음": "거의다읽음" };
@@ -521,14 +552,11 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         for (let key in formData) { 
             if (key === 'englishBooks' || key === 'koreanBooks') continue; 
             if (!ALLOWED_PROPS.hasOwnProperty(key)) continue; 
-            
             let rawValue = formData[key]; 
             if (rawValue === undefined || rawValue === '') continue; 
-            
             let value = valueMapping[rawValue] || rawValue; 
             const notionPropName = ALLOWED_PROPS[key]; 
             
-            // 타입 자동 판별 및 변환
             if (['단어(맞은 개수)', '단어(전체 개수)', '문법(전체 개수)', '문법(틀린 개수)', '독해(틀린 개수)'].includes(notionPropName)) { 
                 const numVal = Number(value); 
                 properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal }; 
@@ -545,14 +573,31 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         if (formData.koreanBooks && Array.isArray(formData.koreanBooks)) { properties['국어 독서 제목'] = await processBookRelations(formData.koreanBooks, KOR_BOOKS_ID, '책제목'); }
         
         const { start, end, dateString } = getKSTTodayRange();
-        const filter = { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] };
-        const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter, page_size: 1 }) });
+
+        // [스마트 로직] 저장할 때도 Date로 먼저 찾고, 실패하면 Select로 찾음
+        const createFilter = (type) => (type === 'select' ? { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', select: { equals: dateString } } ] } : { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] });
+        let existingPageQuery;
+        let isSelectType = false;
+
+        try {
+            existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date'), page_size: 1 }) });
+        } catch (e) {
+            if (e.data && e.data.message && e.data.message.includes('does not match')) {
+                 existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select'), page_size: 1 }) });
+                 isSelectType = true;
+            } else throw e;
+        }
         
         if (existingPageQuery.results.length > 0) { 
             await fetchNotion(`https://api.notion.com/v1/pages/${existingPageQuery.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties }) }); 
         } else { 
             properties['이름'] = { title: [{ text: { content: studentName } }] }; 
-            properties['🕐 날짜'] = { date: { start: dateString } }; 
+            // [중요] 생성 시에도 감지된 타입에 맞춰 날짜 속성 설정
+            if (isSelectType) {
+                properties['🕐 날짜'] = { select: { name: dateString } }; 
+            } else {
+                properties['🕐 날짜'] = { date: { start: dateString } }; 
+            }
             const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름'); 
             if (studentPageId) properties['학생'] = { relation: [{ id: studentPageId }] }; 
             await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
@@ -560,12 +605,22 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         res.json({ success: true, message: '저장 완료' });
     } catch (error) { console.error('Save Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
+
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
         const { start, end, dateString } = getKSTTodayRange();
-        const filter = { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] };
-        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter, page_size: 1 }) });
+        // [스마트 로직] 조회 시에도 동일하게 적용
+        const createFilter = (type) => (type === 'select' ? { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', select: { equals: dateString } } ] } : { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] });
+        let query;
+        try {
+            query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date'), page_size: 1 }) });
+        } catch (e) {
+            if (e.data && e.data.message && e.data.message.includes('does not match')) {
+                 query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select'), page_size: 1 }) });
+            } else throw e;
+        }
+
         if (query.results.length === 0) return res.json({ success: true, progress: null });
         const props = query.results[0].properties;
         const progress = {};
@@ -576,121 +631,72 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     } catch (error) { console.error('Load Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
 
+// ... (리포트 생성 및 스케줄러 코드는 기존과 동일 유지)
 let reportTemplate = '';
 try {
     reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
 } catch (e) { console.error('Template load error', e); }
 
-// [수정] 리포트 색상 결정 함수 (0점 처리 분리)
 function getReportColor(value, type) {
-    const GREEN = '#10b981';
-    const RED = '#ef4444';
-    const GRAY = '#9ca3af';
-
-    // 값이 없으면 무조건 회색
+    const GREEN = '#10b981'; const RED = '#ef4444'; const GRAY = '#9ca3af';
     if (value === 'N/A' || value === '없음' || value === null || value === undefined || value === '') return GRAY;
-
-    if (type === 'score') { // 숙제 수행율: 0점은 빨간색(안함)
-        const num = parseInt(value);
-        if (isNaN(num)) return GRAY;
-        return (num >= 80) ? GREEN : RED;
-    }
-    
-    if (type === 'test_score') { // 시험 점수: 0점은 회색(미응시/없음)
-        const num = parseInt(value);
-        if (isNaN(num)) return GRAY;
-        if (num === 0) return GRAY; // [핵심] 0점 -> 회색
-        return (num >= 80) ? GREEN : RED;
-    }
-    
-    // ... 나머지 기존 로직
-    if (type === 'result') {
-        if (value === 'PASS') return GREEN;
-        if (value === 'FAIL') return RED;
-        return GRAY;
-    }
-    if (type === 'status') {
-        if (value === '완료' || value === '완료함') return GREEN;
-        if (value === '미완료' || value === '못함' || value === '안 해옴') return RED;
-        return GRAY;
-    }
-    if (type === 'hw_detail') {
-        if (value === '숙제 함') return GREEN;
-        if (value === '안 해옴') return RED;
-        return GRAY;
-    }
+    if (type === 'score') { const num = parseInt(value); if (isNaN(num)) return GRAY; return (num >= 80) ? GREEN : RED; }
+    if (type === 'test_score') { const num = parseInt(value); if (isNaN(num)) return GRAY; if (num === 0) return GRAY; return (num >= 80) ? GREEN : RED; }
+    if (type === 'result') { if (value === 'PASS') return GREEN; if (value === 'FAIL') return RED; return GRAY; }
+    if (type === 'status') { if (value === '완료' || value === '완료함') return GREEN; if (value === '미완료' || value === '못함' || value === '안 해옴') return RED; return GRAY; }
+    if (type === 'hw_detail') { if (value === '숙제 함') return GREEN; if (value === '안 해옴') return RED; return GRAY; }
     return GRAY;
 }
 
 app.get('/report', async (req, res) => {
     const { pageId, date } = req.query;
     if (!pageId) return res.status(400).send('Missing info');
-    
     try {
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsed = await parseDailyReportData(page);
-        
         let html = reportTemplate;
         const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0
             ? parsed.reading.englishBooks.map(b => b.title).join(', ')
             : (parsed.reading.bookTitle || '읽은 책 없음');
 
-        // [신규] 시험 점수 0점을 '없음'으로 변환하는 헬퍼
         const formatTestScore = (val) => (val === 0 || val === null) ? '없음' : val + '점';
 
         const replacements = {
             '{{STUDENT_NAME}}': parsed.studentName,
             '{{REPORT_DATE}}': getKoreanDate(parsed.date),
             '{{TEACHER_COMMENT}}': parsed.comment.teacherComment.replace(/\n/g, '<br>'),
-            
-            // [숙제] 0%는 그대로 표시
             '{{HW_SCORE}}': parsed.completionRate === null ? '없음' : parsed.completionRate + '%',
             '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
-            
-            // [시험] 0점은 '없음'으로 표시
             '{{GRAMMAR_SCORE}}': formatTestScore(parsed.tests.grammarScore),
             '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'test_score'),
-            
             '{{VOCAB_SCORE}}': formatTestScore(parsed.tests.vocabScore),
             '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'test_score'),
-            
             '{{READING_TEST_STATUS}}': parsed.tests.readingResult,
             '{{READING_TEST_COLOR}}': getReportColor(parsed.tests.readingResult, 'result'),
-            
             '{{LISTENING_STATUS}}': parsed.listening.study,
             '{{LISTENING_COLOR}}': getReportColor(parsed.listening.study, 'status'),
             '{{LISTENING_FONT_CLASS}}': (parsed.listening.study && parsed.listening.study.length > 5) ? 'text-lg' : 'text-4xl',
-            
             '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus,
             '{{READING_BOOK_COLOR}}': getReportColor(parsed.reading.readingStatus, 'status'),
-
             '{{HW_GRAMMAR_STATUS}}': parsed.homework.grammar,
             '{{HW_GRAMMAR_COLOR}}': getReportColor(parsed.homework.grammar, 'hw_detail'),
-            
             '{{HW_VOCAB_STATUS}}': parsed.homework.vocabCards,
             '{{HW_VOCAB_COLOR}}': getReportColor(parsed.homework.vocabCards, 'hw_detail'),
-            
             '{{HW_READING_CARD_STATUS}}': parsed.homework.readingCards,
             '{{HW_READING_CARD_COLOR}}': getReportColor(parsed.homework.readingCards, 'hw_detail'),
-            
             '{{HW_SUMMARY_STATUS}}': parsed.homework.summary,
             '{{HW_SUMMARY_COLOR}}': getReportColor(parsed.homework.summary, 'hw_detail'),
-            
             '{{HW_DIARY_STATUS}}': parsed.homework.diary,
             '{{HW_DIARY_COLOR}}': getReportColor(parsed.homework.diary, 'hw_detail'),
-
             '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic,
             '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
             '{{BOOK_TITLE}}': bookTitleStr, 
             '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR || 'N/A'} / ${parsed.reading.bookLexile || 'N/A'}` : 'N/A',
             '{{WRITING_STATUS}}': parsed.reading.writingStatus,
-
             '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate !== null ? parsed.completionRate : '없음'
         };
         
         for (const [key, val] of Object.entries(replacements)) {
-            // [수정] 0점, 0% 등 숫자 0은 그대로 표시하고, 진짜 없는 값만 '없음'으로 처리
-            // 단, 위에서 이미 '없음'으로 바꾼 값(시험 점수 0점)은 그대로 둠
             const displayVal = (val === null || val === undefined || val === '') ? '없음' : val;
             html = html.split(key).join(displayVal);
         }
@@ -702,11 +708,20 @@ app.get('/report', async (req, res) => {
 });
 
 cron.schedule('0 22 * * *', async () => {
-    console.log('--- 데일리 리포트 URL 자동 생성 ---');
+    // ... (기존과 동일)
     try {
         const { start, end, dateString } = getKSTTodayRange();
-        const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
-        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter }) });
+        // 크론잡도 스마트하게... 하지만 일단 Date로 시도
+        let filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
+        let data;
+        try {
+            data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
+        } catch(e) {
+            if (e.data && e.data.message.includes('does not match')) {
+                 data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { "and": [ { property: '🕐 날짜', select: { equals: dateString } } ] } }) });
+            } else throw e;
+        }
+
         for (const page of data.results) {
             const url = `${DOMAIN_URL}/report?pageId=${page.id}&date=${dateString}`;
             if (page.properties['데일리리포트URL']?.url === url) continue;
