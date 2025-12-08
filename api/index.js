@@ -650,6 +650,38 @@ cron.schedule('0 22 * * *', async () => {
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
 
+app.get('/api/force-daily-report-gen', async (req, res) => {
+    try {
+        console.log('--- [수동 실행] 데일리 리포트 URL 생성 시작 ---');
+        const { start, end, dateString } = getKSTTodayRange();
+        const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
+        
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { 
+            method: 'POST', 
+            body: JSON.stringify({ filter: filter }) 
+        });
+
+        let count = 0;
+        for (const page of data.results) {
+            const url = `${DOMAIN_URL}/report?pageId=${page.id}&date=${dateString}`;
+            
+            // 이미 URL이 있어도 덮어쓰기 (확실하게 하기 위해)
+            await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { 
+                method: 'PATCH', 
+                body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) 
+            });
+            count++;
+        }
+        
+        console.log(`--- [수동 실행] ${count}건 생성 완료 ---`);
+        res.json({ success: true, message: `${dateString} 리포트 ${count}건 생성 완료!` });
+
+    } catch (e) {
+        console.error('Manual Gen Error:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 cron.schedule('50 21 * * *', async () => {
     console.log('--- [문법 숙제 동기화] 자동화 스케줄 실행 (21:50) ---');
     // ... (동일)
