@@ -190,45 +190,11 @@
         .book-author { font-size: 12px; color: #718096; margin-top: 3px; }
         .book-level { font-size: 11px; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%); color: #4a5568; padding: 3px 8px; border-radius: 6px; margin-top: 4px; display: inline-block; font-weight: 500; }
         
-        /* [신규] 책 태그 스타일 추가 */
-        .book-tags-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .book-tag {
-            background: #f3e8ff;
-            color: #6b46c1;
-            border: 1px solid #d8b4fe;
-            border-radius: 12px;
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .book-tag:hover {
-            background: #e9d5ff;
-        }
-        .book-tag .remove-btn {
-            cursor: pointer;
-            font-weight: bold;
-            color: #9333ea;
-            font-size: 16px;
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-        }
-        .book-tag .remove-btn:hover {
-            background: rgba(147, 51, 234, 0.1);
-        }
+        .book-tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 6px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+        .book-tag:hover { background: #e9d5ff; }
+        .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; }
+        .book-tag .remove-btn:hover { background: rgba(147, 51, 234, 0.1); }
     </style>
 </head>
 <body>
@@ -268,24 +234,25 @@
             <div class="section-card">
                 <h2>📝 시험 결과</h2>
                 <div class="input-group input-row">
-                    <div><label for="vocabCorrect">단어 (맞은 개수)</label><input type="number" id="vocabCorrect" name="어휘정답" min="0"></div>
-                    <div><label for="vocabTotal">단어 (전체 개수)</label><input type="number" id="vocabTotal" name="어휘총문제" min="0"></div>
+                    <!-- [원상복구] 헤더님 요청대로 띄어쓰기 있는 이름표로 수정! -->
+                    <div><label for="vocabCorrect">단어 (맞은 개수)</label><input type="number" id="vocabCorrect" name="단어 (맞은 개수)" min="0"></div>
+                    <div><label for="vocabTotal">단어 (전체 개수)</label><input type="number" id="vocabTotal" name="단어 (전체 개수)" min="0"></div>
                 </div>
                 <div class="input-group"><label for="vocabUnit">어휘유닛 <small style="color: #666;">(오늘 시험 본 유닛을 쓰세요.)</small></label><input type="text" id="vocabUnit" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div>
                 <div class="input-group input-row">
-                    <div><label for="grammarTotal">문법 (전체 개수)</label><input type="number" id="grammarTotal" name="문법 전체 개수" min="0"></div>
-                    <div><label for="grammarWrong">문법 (틀린 개수)</label><input type="number" id="grammarWrong" name="문법숙제오답" min="0"></div>
+                    <div><label for="grammarTotal">문법 (전체 개수)</label><input type="number" id="grammarTotal" name="문법 (전체 개수)" min="0"></div>
+                    <div><label for="grammarWrong">문법 (틀린 개수)</label><input type="number" id="grammarWrong" name="문법 (틀린 개수)" min="0"></div>
                 </div>
                 <div class="input-group input-row">
-                    <div><label for="readingWrong">독해 (틀린 개수)</label><input type="number" id="readingWrong" name="독해오답갯수" min="0"></div>
-                    <div><label for="readingHavruta">독해 하브루타</label><select id="readingHavruta" name="독해하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
+                    <div><label for="readingWrong">독해 (틀린 개수)</label><input type="number" id="readingWrong" name="독해 (틀린 개수)" min="0"></div>
+                    <div><label for="readingHavruta">독해 하브루타</label><select id="readingHavruta" name="독해 하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
                 </div>
             </div>
             <div class="section-card">
                 <h2>🎧 리스닝 학습</h2>
                 <div class="input-group input-row">
-                    <div><label for="dubbing">영어 더빙 학습</label><select id="dubbing" name="영어 더빙 학습"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
-                    <div><label for="dubbingWorkbook">더빙 워크북</label><select id="dubbingWorkbook" name="더빙 워크북"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
+                    <div><label for="dubbing">영어 더빙 학습</label><select id="dubbing" name="영어 더빙 학습 완료"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
+                    <div><label for="dubbingWorkbook">더빙 워크북</label><select id="dubbingWorkbook" name="더빙 워크북 완료"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
                 </div>
             </div>
             <div class="section-card">
@@ -296,7 +263,6 @@
                         <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
                         <div id="bookSuggestions" class="autocomplete-suggestions"></div>
                     </div>
-                    <!-- [수정] 태그 컨테이너 추가 -->
                     <div id="englishBookTags" class="book-tags-container"></div>
                 </div>
                 <div class="input-group input-row">
@@ -310,17 +276,16 @@
                 <div class="input-group">
                     <label for="giantBookTitle">3독 독서 제목</label>
                     <div class="autocomplete-container">
-                        <input type="text" id="giantBookTitle" name="3독 독서 제목" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
+                        <input type="text" id="giantBookTitle" name="오늘 읽은 한국 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
                         <div id="sayuBookSuggestions" class="autocomplete-suggestions"></div>
                     </div>
-                    <!-- [수정] 태그 컨테이너 추가 -->
                     <div id="giantBookTags" class="book-tags-container"></div>
                 </div>
-                <div class="input-group"><label for="readingGiantStatus">완료 여부</label><select id="readingGiantStatus" name="완료 여부"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
+                <div class="input-group"><label for="readingGiantStatus">완료 여부</label><select id="readingGiantStatus" name="📕 책 읽는 거인"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
             </div>
             <div class="section-card">
                 <h2>💬 오늘의 소감</h2>
-                <div class="input-group"><label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label><textarea id="feedback" name="오늘의 소감" rows="4"></textarea></div>
+                <div class="input-group"><label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label><textarea id="feedback" name="오늘의 학습 소감" rows="4"></textarea></div>
             </div>
             <button type="submit" class="submit-button">오늘의 학습 저장하기</button>
         </form>
@@ -372,7 +337,7 @@
             setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
         }
 
-        // [수정] 선택된 책 목록을 관리하는 변수
+        // 선택된 책 목록을 관리하는 변수
         let selectedEnglishBooks = [];
         let selectedKoreanBooks = [];
 
@@ -383,7 +348,7 @@
             const data = Object.fromEntries(formData);
             const token = localStorage.getItem('authToken');
 
-            // [수정] 태그로 선택된 책 목록을 데이터에 포함시킴
+            // 태그로 선택된 책 목록을 데이터에 포함시킴
             data.englishBooks = selectedEnglishBooks;
             data.koreanBooks = selectedKoreanBooks;
 
@@ -479,7 +444,7 @@
             if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
             let html = '';
             books.forEach((book, index) => {
-                // [수정] 모바일 스크롤 시 선택 방지 (onmousedown -> onclick + preventDefault)
+                // 모바일 스크롤 시 선택 방지 (onmousedown -> onclick + preventDefault)
                 html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.level ? `<div class="book-level">${book.level}</div>` : ''}</div>`;
             });
             suggestionsList.innerHTML = html;
@@ -497,7 +462,7 @@
              if(suggestionsList) suggestionsList.style.display = 'none';
         }
         
-        // [수정] 책 선택 시 태그 추가 및 중복 방지
+        // 책 선택 시 태그 추가 및 중복 방지
         function selectBook(index) {
             const book = currentBooks[index];
             if (!selectedEnglishBooks.some(b => b.id === book.id && b.title === book.title)) {
@@ -510,7 +475,7 @@
             saveFormData(); // 변경 사항 저장 (임시 저장)
         }
 
-        // [신규] 태그 렌더링 함수
+        // 태그 렌더링 함수
         function renderBookTags(type) {
             const containerId = type === 'english' ? 'englishBookTags' : 'giantBookTags';
             const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
@@ -524,14 +489,14 @@
             `).join('');
         }
 
-        // [신규] 태그 삭제 함수
+        // 태그 삭제 함수
         function removeBookTag(type, index) {
             if (type === 'english') {
                 selectedEnglishBooks.splice(index, 1);
                 renderBookTags('english');
             } else {
                 selectedKoreanBooks.splice(index, 1);
-                renderBookTags('giant'); // type mismatch fix: 'korean' -> 'giant' in next function
+                renderBookTags('giant');
             }
             saveFormData();
         }
@@ -585,7 +550,7 @@
             if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
             let html = '';
             books.forEach((book, index) => {
-                 // [수정] 모바일 스크롤 시 선택 방지
+                 // 모바일 스크롤 시 선택 방지
                  html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectSayuBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.publisher ? `<div class="book-level">출판사: ${book.publisher}</div>` : ''}</div>`;
             });
             suggestionsList.innerHTML = html;
@@ -603,7 +568,7 @@
              if(suggestionsList) suggestionsList.style.display = 'none';
         }
         
-        // [수정] 국어 책 선택 시 태그 추가
+        // 국어 책 선택 시 태그 추가
         function selectSayuBook(index) {
             const book = currentSayuBooks[index];
             if (!selectedKoreanBooks.some(b => b.id === book.id && b.title === book.title)) {
@@ -623,7 +588,7 @@
                 try {
                     const data = JSON.parse(savedData);
                     Object.keys(data).forEach(key => {
-                        // [수정] 책 목록 데이터 복원
+                        // 책 목록 데이터 복원
                         if (key === 'englishBooks') {
                             selectedEnglishBooks = data[key] || [];
                             renderBookTags('english');
@@ -631,6 +596,8 @@
                             selectedKoreanBooks = data[key] || [];
                             renderBookTags('giant');
                         } else {
+                            // 일반 필드 값 복원 (name 속성 기준)
+                            // [수정] 스페이스가 있는 name 속성도 쿼리 셀렉터로 잘 잡히도록 따옴표 처리
                             const element = document.querySelector(`[name="${key}"]`);
                             if (element) { element.value = data[key]; }
                         }
@@ -646,7 +613,7 @@
             const formData = new FormData(document.getElementById('plannerForm'));
             const data = Object.fromEntries(formData.entries());
             
-            // [수정] 책 목록도 임시 저장 데이터에 포함
+            // 책 목록도 임시 저장 데이터에 포함
             data.englishBooks = selectedEnglishBooks;
             data.koreanBooks = selectedKoreanBooks;
 
