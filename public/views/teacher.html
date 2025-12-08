@@ -42,7 +42,22 @@
         /* 테이블 스타일 (Compact) */
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
-        .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 12px 10px; text-align: center; font-weight: 600; white-space: nowrap; }
+        
+        /* [수정] 테이블 헤더 고정 (Sticky Header) */
+        .styled-table th { 
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
+            color: white; 
+            padding: 12px 10px; 
+            text-align: center; 
+            font-weight: 600; 
+            white-space: nowrap; 
+            /* Sticky 속성 추가 */
+            position: sticky;
+            top: 75px; /* 상단 메뉴바(약 80px) 아래에 붙도록 설정 */
+            z-index: 10; /* 다른 내용물보다 위에 오도록 */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* 헤더 아래 그림자 */
+        }
+        
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         
         /* 학생 이름 셀 스타일 (중앙 정렬) */
@@ -291,9 +306,10 @@
                         매일의 성실함을 지킬 수 있도록 해주세요!
                     </div>
                     <div class="table-container">
+                        <!-- [수정] 출석 열 추가 -->
                         <table class="styled-table">
-                            <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
-                            <tbody id="homeworkTableBody"><tr><td colspan="9" class="loading">로딩중...</td></tr></tbody>
+                            <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
+                            <tbody id="homeworkTableBody"><tr><td colspan="10" class="loading">로딩중...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -804,7 +820,7 @@
         // ... (나머지 display 함수들, 헬퍼 함수들 기존과 동일) ...
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
-            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="9" class="no-data">데이터 없음</td></tr>'; return; }
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="10" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `<tr id="row-hw-${st.pageId}">
                 <td class="student-name">
                     <div class="student-name-wrapper">
@@ -817,6 +833,7 @@
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
+                <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
                 <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
                 <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
@@ -1075,28 +1092,6 @@
 
         function autoResizeTextarea(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
         function markCommentAsChanged(el) { const row = el.closest('tr'); const btn = row.querySelector('.comment-save-btn'); if(el.value !== el.defaultValue) { el.style.backgroundColor = '#fffbeb'; btn.textContent = '저장*'; btn.style.background = '#ef4444'; row.classList.add('needs-save'); } else { el.style.backgroundColor = 'white'; btn.textContent = '저장'; btn.style.background = '#10b981'; row.classList.remove('needs-save'); } }
-        async function updateComment(btn, pageId, isAutoSave = false) { 
-            const row = btn.closest('tr'); const ta = row.querySelector('.comment-textarea'); const val = ta.value; 
-            if (!isAutoSave) { btn.disabled = true; btn.textContent = '저장중...'; } else { btn.textContent = '저장중..'; }
-            try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ pageId, propertyName: "❤ Today's Notice!", newValue: val, propertyType: 'rich_text' }) }); 
-                if (!isAutoSave) showToast('저장되었습니다.'); 
-                ta.defaultValue = val; ta.style.backgroundColor = 'white'; btn.textContent = '저장됨'; btn.style.background = '#10b981'; row.classList.remove('needs-save');
-                if (isAutoSave) { setTimeout(() => { if(btn.textContent === '저장됨') btn.textContent = '저장'; }, 2000); }
-            } catch(e) { if (!isAutoSave) showToast('저장 실패', 'error'); console.error(e); } 
-            finally { if (!isAutoSave) btn.disabled = false; } 
-        }
-        async function saveAllComments(batchBtn) { const rows = document.querySelectorAll('tr.needs-save'); if(!rows.length) { showToast('저장할 변경사항이 없습니다.'); return; } batchBtn.disabled = true; let count = 0; for(const row of rows) { const btn = row.querySelector('.comment-save-btn'); const pageId = row.id.replace('row-comment-', ''); await updateComment(btn, pageId); count++; batchBtn.textContent = `저장중... ${count}/${rows.length}`; } batchBtn.disabled = false; batchBtn.textContent = '💾 일괄 저장'; showToast(`${count}개 코멘트 저장 완료`); }
-        function copyText(text) { navigator.clipboard.writeText(text).then(() => showToast('링크 복사 완료!')).catch(() => showToast('복사 실패', 'error')); }
-        async function viewMonthlyReport(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) window.open(d.url, '_blank'); else alert(d.message); } catch(e) { alert('오류 발생'); } }
-        async function openMonthlyReportModal(name, date) { try { const res = await fetch(`${API_BASE_URL}/api/monthly-report-url?studentName=${encodeURIComponent(name)}&date=${date}`, { headers: { 'Authorization': 'Bearer ' + authToken } }); const d = await res.json(); if(d.success) { const modal = document.getElementById('reportModal'); document.getElementById('reportModalTitle').textContent = '📅 월간 리포트 링크'; document.getElementById('reportModalDesc').textContent = `${name} 학생의 지난달 리포트입니다.`; const inp = document.getElementById('reportLinkInput'); inp.value = d.url; modal.classList.add('show'); } else alert(d.message); } catch(e) { alert('오류 발생'); } }
-        function copyReportLink() { const inp = document.getElementById('reportLinkInput'); inp.select(); document.execCommand('copy'); showToast('복사되었습니다!'); document.getElementById('reportModal').classList.remove('show'); }
-        function openNotionWindow(url) { if (!url || url.startsWith('https://www.notion.so/...')) { alert('연결된 노션 URL이 없습니다. 관리자에게 문의하세요.'); return; } const windowOptions = 'width=1200,height=800,resizable=yes,scrollbars=yes'; window.open(url, '_blank', windowOptions); }
-
-        function formatSelect(pageId, prop, val, opts) { return `<select class="homework-dropdown" onchange="updateField(this, '${pageId}', '${prop}', 'select')"><option value="">---</option>${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
-        function formatStatus(pageId, prop, val) { const opts = ['숙제 함', '안 해옴', '해당 없음', '완료', '미완료', '진행하지 않음']; const cls = val==='숙제 함'||val==='완료'?'status-complete':(val==='안 해옴'||val==='미완료'?'status-incomplete':'status-none'); return `<select class="homework-dropdown ${cls}" onchange="updateField(this, '${pageId}', '${prop}', 'status'); this.className='homework-dropdown '+ (this.value==='숙제 함'||this.value==='완료'?'status-complete':(this.value==='안 해옴'||this.value==='미완료'?'status-incomplete':'status-none'))">${opts.map(o => `<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}</select>`; }
-        
-        // [수정] updateField: 인자가 부족할 경우 data 속성에서 읽어오도록 보강
         async function updateField(el, pageId, prop, type, manualVal) { 
             // [추가] 1. 인자가 부족하면 el의 data 속성 사용
             if (!pageId && el && el.dataset) {
