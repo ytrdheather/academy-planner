@@ -381,7 +381,7 @@ async function parseDailyReportData(page) {
     };
 }
 
-// [핵심] 쿼리 타입 자동 감지 및 Fallback (Date -> Select)
+// [핵심] "🕐 날짜"는 무조건 Date 속성입니다. Select 시도 로직 삭제.
 async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
@@ -397,46 +397,18 @@ async function fetchProgressData(req, res, parseFunction) {
     let hasMore = true;
     let startCursor = undefined;
     
-    // [중요] 필터 생성기: 타입을 인자로 받아 필터를 만듦
-    const createFilter = (type) => {
-        if (type === 'select') {
-            return { "property": "🕐 날짜", "select": { "equals": dateString } };
-        }
-        return { "property": "🕐 날짜", "date": { "equals": dateString } };
-    };
-
-    // DB 타입 감지: 기본적으로 'date'로 시작하나, 에러 발생 시 'select'로 전환됨
-    let currentDbType = 'date'; 
+    // [수정] 무조건 Date 타입 필터만 사용
+    const filter = { "property": "🕐 날짜", "date": { "equals": dateString } };
 
     while (hasMore) {
-        let data;
-        try {
-            const filter = createFilter(currentDbType);
-            data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filter: filter,
-                    sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
-                    page_size: 100, start_cursor: startCursor
-                })
-            });
-        } catch (error) {
-            if (currentDbType === 'date' && error.data && error.data.message && error.data.message.includes('does not match')) {
-                console.warn('⚠️ Notion Date mismatch detected. Retrying with SELECT type...');
-                currentDbType = 'select'; // 타입을 영구적으로 변경하여 다음 루프부터는 바로 Select 사용
-                const filter = createFilter(currentDbType);
-                data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        filter: filter,
-                        sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
-                        page_size: 100, start_cursor: startCursor
-                    })
-                });
-            } else {
-                throw error;
-            }
-        }
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: filter,
+                sorts: [{ property: '🕐 날짜', direction: 'descending' }, { property: '이름', direction: 'ascending' }],
+                page_size: 100, start_cursor: startCursor
+            })
+        });
 
         pages.push(...data.results);
         hasMore = data.has_more;
@@ -459,15 +431,10 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: '반 이름과 날짜는 필수입니다.' }); }
     try {
-        const createFilter = (type) => (type === 'select' ? { "property": "🕐 날짜", "select": { "equals": date } } : { "property": "🕐 날짜", "date": { "equals": date } });
-        let query;
-        try {
-            query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date') }) });
-        } catch (e) {
-            if (e.data && e.data.message && e.data.message.includes('does not match')) {
-                 query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select') }) });
-            } else throw e;
-        }
+        // [수정] 무조건 Date 필터 사용
+        const filter = { "property": "🕐 날짜", "date": { "equals": date } };
+        
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
 
         const students = query.results;
         let updatedCount = 0;
@@ -521,7 +488,7 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
 
-// [수정] save-progress도 스마트하게 (날짜 타입 자동 대응)
+// [수정] save-progress: 스마트 로직 제거 -> 무조건 Date 타입 저장
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -574,30 +541,18 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         
         const { start, end, dateString } = getKSTTodayRange();
 
-        // [스마트 로직] 저장할 때도 Date로 먼저 찾고, 실패하면 Select로 찾음
-        const createFilter = (type) => (type === 'select' ? { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', select: { equals: dateString } } ] } : { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] });
-        let existingPageQuery;
-        let isSelectType = false;
-
-        try {
-            existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date'), page_size: 1 }) });
-        } catch (e) {
-            if (e.data && e.data.message && e.data.message.includes('does not match')) {
-                 existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select'), page_size: 1 }) });
-                 isSelectType = true;
-            } else throw e;
-        }
+        // [수정] 무조건 Date 타입 필터 및 생성 사용
+        const filter = { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] };
+        
+        const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter, page_size: 1 }) });
         
         if (existingPageQuery.results.length > 0) { 
             await fetchNotion(`https://api.notion.com/v1/pages/${existingPageQuery.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties }) }); 
         } else { 
             properties['이름'] = { title: [{ text: { content: studentName } }] }; 
-            // [중요] 생성 시에도 감지된 타입에 맞춰 날짜 속성 설정
-            if (isSelectType) {
-                properties['🕐 날짜'] = { select: { name: dateString } }; 
-            } else {
-                properties['🕐 날짜'] = { date: { start: dateString } }; 
-            }
+            // [중요] 무조건 Date 타입 생성
+            properties['🕐 날짜'] = { date: { start: dateString } }; 
+            
             const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름'); 
             if (studentPageId) properties['학생'] = { relation: [{ id: studentPageId }] }; 
             await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
@@ -610,16 +565,10 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
         const { start, end, dateString } = getKSTTodayRange();
-        // [스마트 로직] 조회 시에도 동일하게 적용
-        const createFilter = (type) => (type === 'select' ? { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', select: { equals: dateString } } ] } : { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] });
-        let query;
-        try {
-            query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('date'), page_size: 1 }) });
-        } catch (e) {
-            if (e.data && e.data.message && e.data.message.includes('does not match')) {
-                 query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: createFilter('select'), page_size: 1 }) });
-            } else throw e;
-        }
+        // [수정] 무조건 Date 필터
+        const filter = { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] };
+        
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter, page_size: 1 }) });
 
         if (query.results.length === 0) return res.json({ success: true, progress: null });
         const props = query.results[0].properties;
@@ -711,16 +660,9 @@ cron.schedule('0 22 * * *', async () => {
     // ... (기존과 동일)
     try {
         const { start, end, dateString } = getKSTTodayRange();
-        // 크론잡도 스마트하게... 하지만 일단 Date로 시도
+        // [수정] 크론잡도 무조건 Date 타입
         let filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
-        let data;
-        try {
-            data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
-        } catch(e) {
-            if (e.data && e.data.message.includes('does not match')) {
-                 data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { "and": [ { property: '🕐 날짜', select: { equals: dateString } } ] } }) });
-            } else throw e;
-        }
+        let data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
 
         for (const page of data.results) {
             const url = `${DOMAIN_URL}/report?pageId=${page.id}&date=${dateString}`;

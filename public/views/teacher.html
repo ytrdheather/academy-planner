@@ -43,7 +43,7 @@
         .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
         
-        /* [수정] 테이블 헤더 고정 (Sticky Header) - 높이를 120px로 수정하여 가려지지 않게 함 */
+        /* [수정] 테이블 헤더 고정 (Sticky Header) - 높이를 60px로 수정 */
         .styled-table th { 
             background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
             color: white; 
@@ -53,7 +53,7 @@
             white-space: nowrap; 
             /* Sticky 속성 */
             position: sticky;
-            top: 120px; /* 상단 메뉴바 높이만큼 띄움 */
+            top: 60px; /* [수정] 120px -> 60px로 변경 */
             z-index: 10; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
         }
@@ -833,6 +833,7 @@
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
+                <!-- [수정] 출석 체크박스 추가 -->
                 <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
                 <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
@@ -1101,7 +1102,15 @@
             }
 
             // [추가] 2. 값 결정 (manualVal이 있으면 우선 사용, 없으면 el.value)
-            const val = (manualVal !== undefined) ? manualVal : (el ? el.value : '');
+            // 체크박스일 경우 el.checked를 사용해야 함
+            let val;
+            if (manualVal !== undefined) {
+                val = manualVal;
+            } else if (el) {
+                val = (type === 'checkbox') ? el.checked : el.value;
+            } else {
+                val = '';
+            }
 
             // [추가] 3. 필수 정보 확인
             if (!pageId || !prop) {
