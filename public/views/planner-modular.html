@@ -9,186 +9,36 @@
     <meta http-equiv="Expires" content="0">
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        * {
-            font-family: "NanumSquareRound", "나눔스퀴어라운드", "Nanum Gothic", "나눔고딕", "맑은 고딕", "Malgun Gothic", sans-serif !important;
-        }
-        body {
-            background: #f7fafc;
-            min-height: 100vh;
-            color: #2d3748;
-            margin: 0;
-            padding: 20px;
-        }
-        .planner-container {
-            max-width: 700px;
-            margin: auto;
-            background: #ffffff;
-            padding: 0;
-            border-radius: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-        }
-        .header {
-            position: relative;
-            background: #ffffff;
-            color: #6b46c1;
-            padding: 25px 30px;
-            min-height: 120px;
-            border-bottom: 2px solid #e2e8f0;
-            display: grid;
-            grid-template-columns: 1fr auto 1fr;
-            align-items: center;
-        }
-        .header-buttons {
-            justify-self: end;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            white-space: nowrap;
-        }
-        .welcome-title {
-            font-size: 24px;
-            line-height: 1.3;
-            margin: 0;
-            font-weight: 700;
-            text-align: left;
-            color: #6b46c1;
-        }
-        .header-logo {
-            width: 300px;
-            height: auto;
-            justify-self: center;
-            margin-right: -75px;
-        }
-        .header-content {
-            text-align: left;
-            justify-self: start;
-        }
-        .section-card {
-            background: white;
-            margin: 25px;
-            padding: 25px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            border: 1px solid rgba(139, 92, 246, 0.1);
-        }
-        h2 {
-            color: #6b46c1;
-            border: none;
-            padding: 0;
-            margin: 0 0 20px 0;
-            font-size: 20px;
-            font-weight: 700;
-            position: relative;
-        }
+        * { font-family: "NanumSquareRound", sans-serif !important; }
+        body { background: #f7fafc; min-height: 100vh; color: #2d3748; margin: 0; padding: 20px; }
+        .planner-container { max-width: 700px; margin: auto; background: #ffffff; padding: 0; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; }
+        .header { position: relative; background: #ffffff; color: #6b46c1; padding: 25px 30px; min-height: 120px; border-bottom: 2px solid #e2e8f0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+        .header-buttons { justify-self: end; display: flex; flex-direction: column; gap: 8px; white-space: nowrap; }
+        .welcome-title { font-size: 24px; line-height: 1.3; margin: 0; font-weight: 700; text-align: left; color: #6b46c1; }
+        .header-logo { width: 300px; height: auto; justify-self: center; margin-right: -75px; }
+        .section-card { background: white; margin: 25px; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid rgba(139, 92, 246, 0.1); }
+        h2 { color: #6b46c1; border: none; padding: 0; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; position: relative; }
         .input-group { margin-bottom: 20px; }
-        .input-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #4a5568;
-        }
-        .input-group input[type="text"], .input-group input[type="number"], .input-group select, .input-group textarea {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: 2px solid #e2e8f0;
-            box-sizing: border-box;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f8fafc;
-        }
-        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
-            outline: none;
-            border-color: #8b5cf6;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-            background: white;
-        }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #4a5568; }
+        .input-group input[type="text"], .input-group input[type="number"], .input-group select, .input-group textarea { width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; box-sizing: border-box; font-size: 16px; transition: all 0.3s ease; background: #f8fafc; }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); background: white; }
         .input-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
         textarea { resize: vertical; min-height: 80px; }
-        .submit-button {
-            width: 300px;
-            padding: 12px;
-            border: none;
-            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-            color: white;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            margin: 25px auto;
-            display: block;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
-        }
-        .submit-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
-        }
-        .auto-save-button {
-            padding: 10px 18px;
-            border: none;
-            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-            color: white;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3);
-        }
-        .auto-save-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
-        }
-        .logout-button {
-            padding: 10px 18px;
-            border: none;
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
-        }
-        .logout-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-        }
-        .status-message {
-            padding: 12px 20px;
-            border-radius: 12px;
-            margin: 15px 25px;
-            text-align: center;
-            display: none;
-            font-weight: 500;
-        }
-        .success {
-            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-            color: #065f46;
-            border: 1px solid #6ee7b7;
-        }
-        .error {
-            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-            color: #991b1b;
-            border: 1px solid #f87171;
-        }
+        .submit-button { width: 300px; padding: 12px; border: none; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600; margin: 25px auto; display: block; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
+        .submit-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4); }
+        .auto-save-button { padding: 10px 18px; border: none; background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3); }
+        .auto-save-button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4); }
+        .logout-button { padding: 10px 18px; border: none; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3); }
+        .logout-button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .status-message { padding: 12px 20px; border-radius: 12px; margin: 15px 25px; text-align: center; display: none; font-weight: 500; }
+        .success { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color: #065f46; border: 1px solid #6ee7b7; }
+        .error { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #991b1b; border: 1px solid #f87171; }
         .auto-save-status { font-size: 12px; color: #6c757d; margin-left: 10px; }
+        
         .autocomplete-container { position: relative; }
-        .autocomplete-suggestions {
-            position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #8b5cf6; border-top: none;
-            border-radius: 0 0 12px 12px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none;
-            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
-        }
+        .autocomplete-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #8b5cf6; border-top: none; border-radius: 0 0 12px 12px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15); }
         .autocomplete-suggestion { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f3f9; transition: all 0.2s ease; }
-        .autocomplete-suggestion:hover, .autocomplete-suggestion.active { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); color: #6b46c1; }
-        .autocomplete-suggestion:last-child { border-bottom: none; }
-        .book-title { font-weight: 600; color: #2d3748; }
-        .book-author { font-size: 12px; color: #718096; margin-top: 3px; }
-        .book-level { font-size: 11px; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%); color: #4a5568; padding: 3px 8px; border-radius: 6px; margin-top: 4px; display: inline-block; font-weight: 500; }
+        .autocomplete-suggestion:hover { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); color: #6b46c1; }
         
         .book-tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 6px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
@@ -216,45 +66,55 @@
         </div>
         
         <form id="plannerForm">
+            <!-- 숙제 확인 -->
             <div class="section-card homework-section">
                 <h2>📋 숙제 확인 <small style="color: #a0a0a0; font-weight: normal; font-size: 12px;">(오늘 숙제가 없는 것은 빈칸으로 두세요.)</small></h2>
                 <div class="input-group input-row">
-                    <div><label for="grammarHomework">⭕ 지난 문법 숙제 검사</label><select id="grammarHomework" name="⭕ 지난 문법 숙제 검사"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label for="vocabHomework">1️⃣ 어휘 클카 암기 숙제</label><select id="vocabHomework" name="1️⃣ 어휘 클카 암기 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>⭕ 지난 문법 숙제 검사</label><select name="⭕ 지난 문법 숙제 검사"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>1️⃣ 어휘 클카 암기 숙제</label><select name="1️⃣ 어휘 클카 암기 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
                 </div>
                 <div class="input-group input-row">
-                    <div><label for="readingVocabHomework">2️⃣ 독해 단어 클카 숙제</label><select id="readingVocabHomework" name="2️⃣ 독해 단어 클카 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label for="summaryHomework">4️⃣ Summary 숙제</label><select id="summaryHomework" name="4️⃣ Summary 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>2️⃣ 독해 단어 클카 숙제</label><select name="2️⃣ 독해 단어 클카 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>4️⃣ Summary 숙제</label><select name="4️⃣ Summary 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
                 </div>
                 <div class="input-group input-row">
-                    <div><label for="dailyReadingHomework">5️⃣ 매일 독해 숙제</label><select id="dailyReadingHomework" name="5️⃣ 매일 독해 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label for="diaryOrReadingHomework">6️⃣ 영어일기 or 개인 독해서</label><select id="diaryOrReadingHomework" name="6️⃣ 영어 일기(초등) / 개인 독해서 (중고등)"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>5️⃣ 매일 독해 숙제</label><select name="5️⃣ 매일 독해 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    <div><label>6️⃣ 영어일기 or 개인 독해서</label><select name="6️⃣ 영어일기 or 개인 독해서"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
                 </div>
             </div>
+
+            <!-- 시험 결과 (복구: Old 파일의 name 속성으로 원상복구) -->
             <div class="section-card">
                 <h2>📝 시험 결과</h2>
                 <div class="input-group input-row">
-                    <!-- [원상복구] 헤더님 요청대로 띄어쓰기 있는 이름표로 수정! -->
-                    <div><label for="vocabCorrect">단어 (맞은 개수)</label><input type="number" id="vocabCorrect" name="단어 (맞은 개수)" min="0"></div>
-                    <div><label for="vocabTotal">단어 (전체 개수)</label><input type="number" id="vocabTotal" name="단어 (전체 개수)" min="0"></div>
+                    <!-- [수정] Old 파일 기준 name 사용 (어휘정답, 어휘총문제) -->
+                    <div><label>단어 (맞은 개수)</label><input type="number" name="어휘정답" min="0"></div>
+                    <div><label>단어 (전체 개수)</label><input type="number" name="어휘총문제" min="0"></div>
                 </div>
-                <div class="input-group"><label for="vocabUnit">어휘유닛 <small style="color: #666;">(오늘 시험 본 유닛을 쓰세요.)</small></label><input type="text" id="vocabUnit" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div>
+                <div class="input-group"><label>어휘유닛 <small style="color: #666;">(오늘 시험 본 유닛을 쓰세요.)</small></label><input type="text" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div>
                 <div class="input-group input-row">
-                    <div><label for="grammarTotal">문법 (전체 개수)</label><input type="number" id="grammarTotal" name="문법 (전체 개수)" min="0"></div>
-                    <div><label for="grammarWrong">문법 (틀린 개수)</label><input type="number" id="grammarWrong" name="문법 (틀린 개수)" min="0"></div>
+                    <!-- [수정] Old 파일 기준 name 사용 (문법 전체 개수, 문법숙제오답) -->
+                    <div><label>문법 (전체 개수)</label><input type="number" name="문법 전체 개수" min="0"></div>
+                    <div><label>문법 (틀린 개수)</label><input type="number" name="문법숙제오답" min="0"></div>
                 </div>
                 <div class="input-group input-row">
-                    <div><label for="readingWrong">독해 (틀린 개수)</label><input type="number" id="readingWrong" name="독해 (틀린 개수)" min="0"></div>
-                    <div><label for="readingHavruta">독해 하브루타</label><select id="readingHavruta" name="독해 하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
+                    <!-- [수정] Old 파일 기준 name 사용 (독해오답갯수, 독해하브루타-띄어쓰기없음) -->
+                    <div><label>독해 (틀린 개수)</label><input type="number" name="독해오답갯수" min="0"></div>
+                    <div><label>독해 하브루타</label><select name="독해하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
                 </div>
             </div>
+
+            <!-- 리스닝 -->
             <div class="section-card">
                 <h2>🎧 리스닝 학습</h2>
                 <div class="input-group input-row">
-                    <div><label for="dubbing">영어 더빙 학습</label><select id="dubbing" name="영어 더빙 학습 완료"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
-                    <div><label for="dubbingWorkbook">더빙 워크북</label><select id="dubbingWorkbook" name="더빙 워크북 완료"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
+                    <!-- [수정] Old 파일 기준 name 사용 (영어 더빙 학습, 더빙 워크북) -->
+                    <div><label>영어 더빙 학습</label><select name="영어 더빙 학습"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
+                    <div><label>더빙 워크북</label><select name="더빙 워크북"><option value="진행하지 않음">진행하지 않음</option><option value="완료">완료</option><option value="미완료">미완료</option></select></div>
                 </div>
             </div>
+
+            <!-- 원서 독서 -->
             <div class="section-card">
                 <h2>📚 원서 독서</h2>
                 <div class="input-group">
@@ -266,11 +126,14 @@
                     <div id="englishBookTags" class="book-tags-container"></div>
                 </div>
                 <div class="input-group input-row">
-                    <div><label for="englishReading">영어독서</label><select id="englishReading" name="📖 영어독서"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
-                    <div><label for="readingVocab">어휘학습</label><select id="readingVocab" name="어휘학습"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
-                    <div><label for="writing">Writing</label><select id="writing" name="Writing"><option value="SKIP">SKIP</option><option value="3 SENTENCE">3 SENTENCE</option><option value="북 리포트">북 리포트</option></select></div>
+                    <!-- [수정] Old 파일과 동일한 name 유지 -->
+                    <div><label>영어독서</label><select name="📖 영어독서"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
+                    <div><label>어휘학습</label><select name="어휘학습"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
+                    <div><label>Writing</label><select name="Writing"><option value="SKIP">SKIP</option><option value="3 SENTENCE">3 SENTENCE</option><option value="북 리포트">북 리포트</option></select></div>
                 </div>
             </div>
+
+            <!-- 책 읽는 거인 -->
             <div class="section-card">
                 <h2>📕 책 읽는 거인</h2>
                 <div class="input-group">
@@ -281,11 +144,15 @@
                     </div>
                     <div id="giantBookTags" class="book-tags-container"></div>
                 </div>
-                <div class="input-group"><label for="readingGiantStatus">완료 여부</label><select id="readingGiantStatus" name="📕 책 읽는 거인"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
+                <!-- [수정] Old 파일 기준 name 사용 (완료 여부) -->
+                <div class="input-group"><label>완료 여부</label><select name="완료 여부"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
             </div>
+
+            <!-- 소감 -->
             <div class="section-card">
                 <h2>💬 오늘의 소감</h2>
-                <div class="input-group"><label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label><textarea id="feedback" name="오늘의 학습 소감" rows="4"></textarea></div>
+                <!-- [수정] Old 파일 기준 name 사용 (오늘의 소감) -->
+                <div class="input-group"><label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label><textarea id="feedback" name="오늘의 소감" rows="4"></textarea></div>
             </div>
             <button type="submit" class="submit-button">오늘의 학습 저장하기</button>
         </form>
@@ -293,7 +160,6 @@
     </div>
 
     <script>
-        // 페이지 로드 시 학생 이름과 날짜 표시
         async function loadStudentInfo() {
             try {
                 const token = localStorage.getItem('authToken');
@@ -328,7 +194,6 @@
             }
         }
 
-        // 상태 메시지 표시 함수
         function showStatus(message, isSuccess = true) {
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.textContent = message;
@@ -337,18 +202,15 @@
             setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
         }
 
-        // 선택된 책 목록을 관리하는 변수
         let selectedEnglishBooks = [];
         let selectedKoreanBooks = [];
 
-        // 폼 제출 이벤트
         document.getElementById('plannerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData);
+            const data = Object.fromEntries(formData.entries());
             const token = localStorage.getItem('authToken');
 
-            // 태그로 선택된 책 목록을 데이터에 포함시킴
             data.englishBooks = selectedEnglishBooks;
             data.koreanBooks = selectedKoreanBooks;
 
@@ -372,10 +234,8 @@
                 
                 if (response.ok) {
                     showStatus(result.message, true);
-                    localStorage.removeItem('plannerData'); // 성공 시 임시 데이터 삭제
-                    document.getElementById('autoSaveStatus').textContent = '저장 완료'; // 임시 저장 상태 업데이트
-                    // 폼 초기화 (선택 사항)
-                    // e.target.reset(); 
+                    localStorage.removeItem('plannerData');
+                    document.getElementById('autoSaveStatus').textContent = '저장 완료'; 
                 } else {
                     showStatus(result.message || result.error || '저장에 실패했습니다.', false);
                 }
@@ -384,22 +244,19 @@
             }
         });
 
-        // 로그아웃 함수
         function logout() {
             if (confirm('로그아웃 하시겠습니까?')) {
                 localStorage.removeItem('authToken');
-                localStorage.removeItem('plannerData'); // 임시 저장 데이터도 삭제
+                localStorage.removeItem('plannerData');
                 window.location.href = '/';
             }
         }
 
-        // --- 아래는 원본 파일에 있던 자동완성 및 기타 함수들입니다 ---
         let searchTimeout;
         let currentBooks = [];
         
         function initializeBookAutocomplete() {
             const bookInput = document.getElementById('englishBookTitle');
-            const suggestionsList = document.getElementById('bookSuggestions');
             
             bookInput.addEventListener('input', function() {
                 const query = this.value.trim();
@@ -444,7 +301,6 @@
             if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
             let html = '';
             books.forEach((book, index) => {
-                // 모바일 스크롤 시 선택 방지 (onmousedown -> onclick + preventDefault)
                 html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.level ? `<div class="book-level">${book.level}</div>` : ''}</div>`;
             });
             suggestionsList.innerHTML = html;
@@ -462,7 +318,6 @@
              if(suggestionsList) suggestionsList.style.display = 'none';
         }
         
-        // 책 선택 시 태그 추가 및 중복 방지
         function selectBook(index) {
             const book = currentBooks[index];
             if (!selectedEnglishBooks.some(b => b.id === book.id && b.title === book.title)) {
@@ -470,12 +325,11 @@
                 renderBookTags('english');
             }
             const bookInput = document.getElementById('englishBookTitle');
-            bookInput.value = ''; // 입력창 초기화
+            bookInput.value = ''; 
             hideSuggestions();
-            saveFormData(); // 변경 사항 저장 (임시 저장)
+            saveFormData(); 
         }
 
-        // 태그 렌더링 함수
         function renderBookTags(type) {
             const containerId = type === 'english' ? 'englishBookTags' : 'giantBookTags';
             const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
@@ -489,7 +343,6 @@
             `).join('');
         }
 
-        // 태그 삭제 함수
         function removeBookTag(type, index) {
             if (type === 'english') {
                 selectedEnglishBooks.splice(index, 1);
@@ -506,7 +359,7 @@
         
         function initializeSayuBookAutocomplete() {
             const bookInput = document.getElementById('giantBookTitle');
-            const suggestionsList = document.getElementById('sayuBookSuggestions');
+            
             bookInput.addEventListener('input', function() {
                 const query = this.value.trim();
                 clearTimeout(sayuSearchTimeout);
@@ -523,7 +376,7 @@
                 else if (event.key === 'ArrowUp') { event.preventDefault(); const prevIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1; setSayuActiveSuggestion(prevIndex); } 
                 else if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); selectSayuBook(activeIndex); }
             });
-            document.addEventListener('click', function(event) { if (!event.target.closest('.autocomplete-container') || event.target.id === 'giantBookTitle') { /* Do nothing? */ } else { hideSayuSuggestions(); } }); // 수정: 본인 클릭 시 안 닫히게
+            document.addEventListener('click', function(event) { if (!event.target.closest('.autocomplete-container') || event.target.id === 'giantBookTitle') { /* Do nothing? */ } else { hideSayuSuggestions(); } });
         }
         
         async function searchSayuBooks(query) {
@@ -550,7 +403,6 @@
             if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
             let html = '';
             books.forEach((book, index) => {
-                 // 모바일 스크롤 시 선택 방지
                  html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectSayuBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.publisher ? `<div class="book-level">출판사: ${book.publisher}</div>` : ''}</div>`;
             });
             suggestionsList.innerHTML = html;
@@ -568,7 +420,6 @@
              if(suggestionsList) suggestionsList.style.display = 'none';
         }
         
-        // 국어 책 선택 시 태그 추가
         function selectSayuBook(index) {
             const book = currentSayuBooks[index];
             if (!selectedKoreanBooks.some(b => b.id === book.id && b.title === book.title)) {
@@ -576,19 +427,17 @@
                 renderBookTags('giant');
             }
             const bookInput = document.getElementById('giantBookTitle');
-            bookInput.value = ''; // 입력창 초기화
+            bookInput.value = ''; 
             hideSayuSuggestions();
-            saveFormData(); // 변경 사항 저장
+            saveFormData(); 
         }
 
-        // 자동 저장 관련 함수들
         function loadSavedData() {
             const savedData = localStorage.getItem('plannerData');
             if (savedData) {
                 try {
                     const data = JSON.parse(savedData);
                     Object.keys(data).forEach(key => {
-                        // 책 목록 데이터 복원
                         if (key === 'englishBooks') {
                             selectedEnglishBooks = data[key] || [];
                             renderBookTags('english');
@@ -596,8 +445,6 @@
                             selectedKoreanBooks = data[key] || [];
                             renderBookTags('giant');
                         } else {
-                            // 일반 필드 값 복원 (name 속성 기준)
-                            // [수정] 스페이스가 있는 name 속성도 쿼리 셀렉터로 잘 잡히도록 따옴표 처리
                             const element = document.querySelector(`[name="${key}"]`);
                             if (element) { element.value = data[key]; }
                         }
@@ -605,7 +452,7 @@
                     document.getElementById('autoSaveStatus').textContent = '임시 데이터 복원됨';
                 } catch (e) {
                     console.error("저장된 데이터 로딩 오류:", e);
-                    localStorage.removeItem('plannerData'); // 잘못된 데이터 삭제
+                    localStorage.removeItem('plannerData'); 
                 }
             }
         }
@@ -613,7 +460,6 @@
             const formData = new FormData(document.getElementById('plannerForm'));
             const data = Object.fromEntries(formData.entries());
             
-            // 책 목록도 임시 저장 데이터에 포함
             data.englishBooks = selectedEnglishBooks;
             data.koreanBooks = selectedKoreanBooks;
 
@@ -625,19 +471,16 @@
                 showStatus("데이터 임시 저장에 실패했습니다.", false);
             }
         }
-        // 이벤트 리스너 추가 (input 대신 change 사용 + select 요소도 포함)
         document.querySelectorAll('#plannerForm input, #plannerForm select, #plannerForm textarea').forEach(element => {
             element.addEventListener('change', saveFormData);
         });
         document.getElementById('autoSaveBtn').addEventListener('click', saveFormData);
 
-
-        // 페이지 로드시 실행
         document.addEventListener('DOMContentLoaded', function() {
             loadStudentInfo();
             initializeBookAutocomplete();
             initializeSayuBookAutocomplete();
-            loadSavedData(); // 임시 저장 데이터 로드 추가
+            loadSavedData(); 
         });
     </script>
 </body>
