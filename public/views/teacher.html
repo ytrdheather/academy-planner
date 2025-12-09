@@ -18,7 +18,7 @@
             padding: 15px 30px; 
             position: sticky; 
             top: 0; 
-            z-index: 3000; /* 최상위 레벨 */
+            z-index: 4000; /* 최상위 */
             box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
             display: flex; 
             justify-content: space-between; 
@@ -31,15 +31,17 @@
         .logout-btn { background: #6b46c1; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: background 0.2s; }
         .logout-btn:hover { background: #5a3eaa; }
 
-        /* [2단 고정] 탭 메뉴 + 필터 바 컨테이너 */
+        /* [2단~3단 고정 컨테이너] 탭 + 필터 + 공지사항 */
+        /* 메인 헤더 바로 아래에 붙어서 같이 고정됨 */
         .sticky-controls-wrapper {
             position: sticky;
             top: 80px; /* 헤더 높이만큼 띄움 */
-            z-index: 2000; /* 헤더보단 낮고 내용보단 높음 */
-            background: #f8f9fa; /* 배경색 필수 (뒤 내용 가림) */
+            z-index: 3000; 
+            background: #f8f9fa; /* 배경색 필수 (스크롤되는 데이터 가림) */
             padding-top: 10px;
-            padding-bottom: 10px;
+            padding-bottom: 5px;
             box-shadow: 0 4px 5px -2px rgba(0,0,0,0.05);
+            transition: height 0.2s ease; /* 높이 변경 시 부드럽게 */
         }
 
         /* 탭 메뉴 */
@@ -52,13 +54,13 @@
             gap: 10px;
             max-width: 1400px;
             margin: 0 auto;
-            flex-wrap: wrap; /* 모바일 대응 */
+            flex-wrap: wrap; 
         }
         .tab-button { padding: 12px 15px; cursor: pointer; border: none; background: none; font-size: 15px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; white-space: nowrap; }
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
 
-        /* [신규] 공통 필터 바 스타일 (탭 아래에 위치) */
+        /* 공통 필터 바 */
         .filter-bar {
             background: white;
             border-radius: 12px;
@@ -72,8 +74,26 @@
             gap: 15px;
         }
 
+        /* [3단] 공지사항 (고정 영역 안으로 이동됨) */
+        .notice-wrapper {
+            max-width: 1400px;
+            margin: 10px auto 0;
+            display: none; /* 기본 숨김, 숙제 탭에서만 보임 */
+        }
+        .notice-text { 
+            background-color: #f8f9ff; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
+            padding: 12px 20px; 
+            font-size: 13px; 
+            color: #4b5563; 
+            line-height: 1.5; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .notice-text strong { color: #ef4444; font-weight: 700; }
+
         /* 메인 컨텐츠 */
-        .main-content { padding: 20px 0; max-width: 1400px; margin: 0 auto; }
+        .main-content { padding: 10px 0; max-width: 1400px; margin: 0 auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .content-section { background: white; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); border: 1px solid #e9ecef; padding: 20px; margin-bottom: 30px; }
@@ -86,10 +106,10 @@
         .filter-select, .filter-input { padding:8px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size: 13px; }
 
         /* 테이블 스타일 */
-        .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; margin-top: 10px; }
+        .table-container { overflow-x: auto; border: 1px solid #e9ecef; border-radius: 12px; margin-top: 0; }
         .styled-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px; }
         
-        /* [3단 고정] 테이블 헤더 (JavaScript로 top 값 자동 계산) */
+        /* [4단 고정] 테이블 헤더 (JavaScript로 top 값 자동 계산) */
         .styled-table th { 
             background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
             color: white; 
@@ -98,21 +118,21 @@
             font-weight: 600; 
             white-space: nowrap; 
             position: sticky;
-            /* JS가 계산해서 넣을 변수 (기본값 180px) */
-            top: var(--table-header-top, 180px); 
-            z-index: 1000; 
+            /* JS가 계산해서 넣을 변수 (헤더+컨트롤+공지사항 높이 합계) */
+            top: var(--table-header-top, 220px); 
+            z-index: 2000; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
         }
         
         .styled-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
         
         /* 학생 이름 고정 (가로 스크롤 시) */
-        .student-name { font-weight: 700; color: #2d3748; text-align: center; padding: 10px; min-width: 200px; background-color: #fcf7ff; position: sticky; left: 0; z-index: 900; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
+        .student-name { font-weight: 700; color: #2d3748; text-align: center; padding: 10px; min-width: 200px; background-color: #fcf7ff; position: sticky; left: 0; z-index: 1000; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
         .student-name-wrapper { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 15px; width: 100%; }
         
         .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; }
 
-        /* 기존 스타일 유지 */
+        /* 책 태그 등 유틸리티 스타일 (기존 유지) */
         .book-list-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; min-width: 250px; padding: 8px !important; }
         .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 14px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-left: 4px; }
@@ -140,9 +160,9 @@
         .homework-dropdown.status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         
-        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 50px; font-size: 12px; }
+        .editable-input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 60px; font-size: 13px; }
         .editable-input:focus { border-color: #8b5cf6; outline: none; }
-        .editable-text-input { width: 100px; text-align: left; }
+        .editable-text-input { width: 120px; text-align: left; }
 
         .score-circle { position: relative; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
@@ -177,10 +197,7 @@
         .grammar-btn { padding: 10px 20px; background-color: #8b5cf6; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
         .grammar-btn:hover { background-color: #7c3aed; }
 
-        .notice-text { background-color: #f8f9ff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 20px; margin-bottom: 25px; font-size: 14px; color: #4b5563; line-height: 1.6; }
-        .notice-text strong { color: #ef4444; font-weight: 700; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 4000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-search-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; font-size: 16px; }
@@ -189,7 +206,7 @@
         .result-item:hover { background: #f8f9ff; }
         .result-item:last-child { border-bottom: none; }
         
-        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; background: #333; color: white; opacity: 0; transform: translateX(100%); transition: all 0.3s; z-index: 5000; }
+        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; background: #333; color: white; opacity: 0; transform: translateX(100%); transition: all 0.3s; z-index: 6000; }
         .toast-message.show { opacity: 1; transform: translateX(0); }
         .toast-message.success { background: #10b981; } .toast-message.error { background: #ef4444; }
 
@@ -205,6 +222,7 @@
     </style>
 </head>
 <body>
+    <!-- [1단 고정] 메인 헤더 -->
     <div class="header" id="mainHeader">
         <h1>📚 리디튜드 선생님</h1>
         <div class="user-info">
@@ -213,6 +231,7 @@
         </div>
     </div>
 
+    <!-- [2단~3단 고정] 탭 메뉴 + 필터 바 + 공지사항 -->
     <div class="sticky-controls-wrapper" id="stickyControls">
         <div class="tab-menu">
             <button class="tab-button active" onclick="showTab('homework')">숙제 현황</button>
@@ -226,9 +245,11 @@
             </button>
         </div>
 
+        <!-- [신규] 공통 필터 바 (탭 아래에 위치) -->
         <div class="filter-bar" id="commonFilterBar">
             <button class="refresh-btn">🔄 새로고침</button>
             
+            <!-- 공통 날짜 필터 -->
             <div class="filter-group">
                 <span class="filter-label">날짜:</span>
                 <select id="commonPeriodFilter" class="filter-select" onchange="toggleCommonDateInput()">
@@ -238,32 +259,42 @@
                 <input type="date" id="commonSpecificDate" class="filter-input" style="display:none;" onchange="loadDataForCurrentTab()">
             </div>
             
+            <!-- 선생님 필터 -->
             <div class="filter-group" id="commonTeacherFilterGroup" style="display:none;">
                 <span class="filter-label">담당:</span>
                 <select id="commonTeacherFilter" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
             </div>
 
+            <!-- [문법반 필터] 코멘트 탭일 때만 보임 -->
             <div class="filter-group hidden" id="grammarClassFilterGroup">
                 <span class="filter-label">문법반:</span>
                 <select id="grammarClassFilter" class="filter-select" onchange="filterDataByTeacher()">
                     <option value="">전체 문법반</option>
                 </select>
             </div>
-             <button class="refresh-btn batch-save-btn hidden" id="batchSaveBtn" onclick="saveAllComments(this)">💾 일괄 저장</button>
+             <!-- [일괄 저장 버튼] 코멘트 탭일 때만 보임 -->
+            <button class="refresh-btn batch-save-btn hidden" id="batchSaveBtn" onclick="saveAllComments(this)">💾 일괄 저장</button>
+        </div>
+
+        <!-- [3단 고정] 공지사항 (여기로 이동됨, 숙제 탭에서만 보임) -->
+        <div id="stickyNoticeWrapper" class="notice-wrapper">
+            <div class="notice-text">
+                📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
+                <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
+                매일의 성실함을 지킬 수 있도록 해주세요!
+            </div>
         </div>
     </div>
 
     <div class="container">
         <div class="main-content">
+            <!-- 1. 숙제 현황 -->
             <div id="homework-view" class="tab-content active">
                 <div class="content-section">
                     <div class="section-title">📋 담당 학생 숙제 현황</div>
-                    <div class="notice-text">
-                        📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
-                        <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
-                        매일의 성실함을 지킬 수 있도록 해주세요!
-                    </div>
+                    <!-- 공지사항은 위쪽 고정 영역으로 이동됨 -->
                     <div class="table-container">
+                        <!-- [4단 고정] 테이블 헤더는 JS로 위치 계산됨 -->
                         <table class="styled-table">
                             <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
                             <tbody id="homeworkTableBody"><tr><td colspan="10" class="loading">로딩중...</td></tr></tbody>
@@ -272,6 +303,7 @@
                 </div>
             </div>
 
+            <!-- 2. 테스트 결과 -->
             <div id="tests-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📝 담당 학생 테스트 결과</div>
@@ -284,6 +316,7 @@
                 </div>
             </div>
 
+            <!-- 3. 원서 독서 현황 -->
             <div id="reading-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">📚 원서 독서 현황 (다중 입력)</div>
@@ -296,6 +329,7 @@
                 </div>
             </div>
 
+            <!-- 4. 리스닝 현황 -->
             <div id="listening-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">🎧 리스닝 & 책거 현황</div>
@@ -317,6 +351,7 @@
                 </div>
             </div>
 
+            <!-- 5. 문법 관리 -->
             <div id="grammar-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title" style="--icon:'📚'">문법 숙제 관리</div>
@@ -349,6 +384,7 @@
                 </div>
             </div>
 
+            <!-- 6. 오늘의 코멘트 -->
             <div id="comments-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">💬 오늘의 코멘트</div>
@@ -362,6 +398,7 @@
                 </div>
             </div>
             
+            <!-- 7. 관리자 메뉴 -->
             <div id="admin-view" class="tab-content">
                 <div class="content-section">
                     <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
@@ -384,6 +421,7 @@
         </div>
     </div>
 
+    <!-- 모달 등 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -419,7 +457,7 @@
         const autoSaveMap = new Map();
         let currentSearchResults = [];
 
-        // [중요] 헤더 높이 자동 계산 스크립트 (3단 고정용)
+        // [중요] 헤더 높이 자동 계산 스크립트 (공지사항 포함)
         function adjustStickyHeader() {
             const header = document.getElementById('mainHeader');
             const controls = document.getElementById('stickyControls');
@@ -431,7 +469,7 @@
                 // 2단 컨트롤 바 위치 설정 (헤더 바로 아래)
                 controls.style.top = headerHeight + 'px';
                 
-                // 3단 테이블 헤더 위치 설정 (헤더 + 컨트롤바 높이만큼 띄움)
+                // 4단 테이블 헤더 위치 설정 (헤더 + 컨트롤바 전체 높이만큼 띄움)
                 const totalTop = headerHeight + controlsHeight;
                 document.documentElement.style.setProperty('--table-header-top', totalTop + 'px');
             }
@@ -536,14 +574,6 @@
             setTimeout(adjustStickyHeader, 50);
         }
 
-        function toggleDateInput(tabId) {
-            // 구형 함수 유지 (혹시 몰라서)
-            const period = document.getElementById(`periodFilter_${tabId}`).value;
-            const dateInput = document.getElementById(`specificDate_${tabId}`);
-            dateInput.style.display = period === 'specific_date' ? 'block' : 'none';
-            if (period === 'today') loadDataForCurrentTab();
-        }
-
         async function loadDataForCurrentTab() {
             // 공통 필터 사용
             const periodElem = document.getElementById(`commonPeriodFilter`);
@@ -580,10 +610,12 @@
             document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); 
             document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); 
             
-            // 탭별 필터 표시/숨김 처리
+            // [중요] 탭별 필터 및 공지사항 표시 제어
             const grammarFilter = document.getElementById('grammarClassFilterGroup');
             const batchSaveBtn = document.getElementById('batchSaveBtn');
+            const stickyNoticeWrapper = document.getElementById('stickyNoticeWrapper');
             
+            // 문법 필터 제어
             if (tab === 'comments') {
                 grammarFilter.classList.remove('hidden');
                 batchSaveBtn.classList.remove('hidden');
@@ -591,9 +623,16 @@
                 grammarFilter.classList.add('hidden');
                 batchSaveBtn.classList.add('hidden');
             }
+
+            // [NEW] 공지사항 제어 (숙제 현황 탭에서만 표시)
+            if (tab === 'homework') {
+                stickyNoticeWrapper.style.display = 'block';
+            } else {
+                stickyNoticeWrapper.style.display = 'none';
+            }
             
             loadDataForCurrentTab();
-            setTimeout(adjustStickyHeader, 50);
+            setTimeout(adjustStickyHeader, 50); // 레이아웃 재계산
         }
 
         function displayDataForAllTabs(data) {
@@ -747,6 +786,7 @@
                     </div>
                 </td>
                 <td>${(st.teachers||[]).join(', ')}</td>
+                <!-- [수정] 출석 체크박스 추가 -->
                 <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
                 <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
                 <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
@@ -754,6 +794,7 @@
                 <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
                 <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
                 <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
+                <!-- [수정] N/A 색상 수정 (회색) -->
                 <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
             </tr>`).join('');
         }
@@ -931,6 +972,7 @@
                     <td>${(st.teachers||[]).join(', ')}</td>
                     <td>${st.comment.grammarClass||'-'}</td>
                     <td style="vertical-align:top;">
+                        <!-- [신규] 키워드 입력 및 AI 버튼 -->
                         <div class="keyword-input-container">
                             <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력 (예: 집중 굿, 단어 통과, 조금 졸았음)" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
                             <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
@@ -1047,6 +1089,44 @@
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function showTab(tab) { currentActiveTab = tab; document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.getElementById(tab+'-view').classList.add('active'); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.querySelector(`button[onclick="showTab('${tab}')"]`).classList.add('active'); loadDataForCurrentTab(); }
         
+        // [신규] 누락된 formatSelect 함수 복구 (이 함수가 없어서 에러 발생)
+        function formatSelect(pageId, propertyName, currentValue, options) {
+            return `<select class="homework-dropdown status-default" 
+                        data-page-id="${pageId}" 
+                        data-property-name="${propertyName}" 
+                        data-property-type="select" 
+                        onchange="updateField(this)">
+                        <option value="">선택</option>
+                        ${options.map(option => `<option value="${option}" ${option === currentValue ? 'selected' : ''}>${option}</option>`).join('')}
+                    </select>`;
+        }
+
+        // [신규] 누락된 formatHomeworkDropdown 복구
+        function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
+            const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
+            let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
+            const statusClass = getSelectStatusClass(propertyName, displayStatus);
+            
+            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
+                        ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
+                    </select>`;
+        }
+
+        // [신규] 누락된 getSelectStatusClass 복구 (리스닝 옵션 추가)
+        function getSelectStatusClass(propertyName, value) {
+            if (propertyName === '영어 더빙 학습 완료' || propertyName === '더빙 워크북 완료') {
+                if (value === '완료') return 'status-listening-complete';
+                if (value === '미완료') return 'status-listening-incomplete';
+                if (value === '원서독서로 대체') return 'status-listening-replace';
+                if (value === '듣기평가교재 완료') return 'status-listening-textbook';
+                return 'status-listening-none';
+            }
+            // 기존 로직 통합
+            if (value === '숙제 함' || value === '완료함' || value === '완료') return 'status-complete';
+            if (value === '안 해옴' || value === '못함' || value === '미완료' || value === '못하고감') return 'status-incomplete';
+            return 'status-none';
+        }
+        
         // [누락 복구] 리포트/월간리포트 관련 함수들
         function copyText(text) {
             if (navigator.clipboard && window.isSecureContext) {
@@ -1147,44 +1227,6 @@
             const comment = document.getElementById(`comment-area-${pageId}`).value;
             await updateField(null, pageId, "Today's Notice!", "rich_text", comment);
             btn.textContent = '저장'; btn.style.background = '#10b981';
-        }
-
-        // [신규] 누락된 formatSelect 함수 복구 (이 함수가 없어서 에러 발생)
-        function formatSelect(pageId, propertyName, currentValue, options) {
-            return `<select class="homework-dropdown status-default" 
-                        data-page-id="${pageId}" 
-                        data-property-name="${propertyName}" 
-                        data-property-type="select" 
-                        onchange="updateField(this)">
-                        <option value="">선택</option>
-                        ${options.map(option => `<option value="${option}" ${option === currentValue ? 'selected' : ''}>${option}</option>`).join('')}
-                    </select>`;
-        }
-
-        // [신규] 누락된 formatHomeworkDropdown 복구
-        function formatHomeworkDropdown(pageId, propertyName, currentStatus, options) {
-            const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
-            let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
-            const statusClass = getSelectStatusClass(propertyName, displayStatus);
-            
-            return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
-                        ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
-                    </select>`;
-        }
-
-        // [신규] 누락된 getSelectStatusClass 복구 (리스닝 옵션 추가)
-        function getSelectStatusClass(propertyName, value) {
-            if (propertyName === '영어 더빙 학습 완료' || propertyName === '더빙 워크북 완료') {
-                if (value === '완료') return 'status-listening-complete';
-                if (value === '미완료') return 'status-listening-incomplete';
-                if (value === '원서독서로 대체') return 'status-listening-replace';
-                if (value === '듣기평가교재 완료') return 'status-listening-textbook';
-                return 'status-listening-none';
-            }
-            // 기존 로직 통합
-            if (value === '숙제 함' || value === '완료함' || value === '완료') return 'status-complete';
-            if (value === '안 해옴' || value === '못함' || value === '미완료' || value === '못하고감') return 'status-incomplete';
-            return 'status-none';
         }
         
         function openNotionWindow(url) { window.open(url, '_blank', 'width=1200,height=800'); }
