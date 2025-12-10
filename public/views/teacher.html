@@ -857,14 +857,14 @@
             tbody.innerHTML = data.map(st => `<tr>
                 <td class="student-name">${st.studentName}</td>
                 <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어 (맞은 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어 (전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td class="vocab-score">${formatScoreCircle(st.tests.vocabScore)}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해 (틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
                 <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법 (전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법 (틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')" onkeydown="handleEnterAsTab(event, 'testsTableBody')"></td>
                 <td class="grammar-score">${formatScoreCircle(st.tests.grammarScore)}</td>
             </tr>`).join('');
         }
