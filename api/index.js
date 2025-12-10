@@ -394,14 +394,15 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
     try {
-        // [핵심 수정] 코멘트 저장 시 정확한 노션 속성 이름 매핑
+        // [핵심 수정] 선생님 대시보드 저장용 매핑 (띄어쓰기 포함)
         const mapPropName = (name) => {
             const mapping = { 
-                "단어 (맞은 개수)": "단어 (맞은 개수)", 
-                "단어 (전체 개수)": "단어 (전체 개수)", 
-                "문법 (전체 개수)": "문법 (전체 개수)", 
-                "문법 (틀린 개수)": "문법 (틀린 개수)", 
-                "독해 (틀린 개수)": "독해 (틀린 개수)", 
+                // DB 속성 이름 그대로 매핑
+                "단어 (맞은 개수)": "단어 (맞은 개수)",
+                "단어 (전체 개수)": "단어 (전체 개수)",
+                "문법 (전체 개수)": "문법 (전체 개수)",
+                "문법 (틀린 개수)": "문법 (틀린 개수)",
+                "독해 (틀린 개수)": "독해 (틀린 개수)",
                 "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
                 "오늘 읽은 한국 책": "국어 독서 제목", 
@@ -448,7 +449,7 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
 
-// [수정] save-progress: 플래너(HTML)의 name과 노션 DB 속성을 정확히 1:1 매핑
+// [수정] save-progress: 플래너(HTML)의 name과 노션 DB 속성을 정확히 1:1 매핑 (띄어쓰기 포함)
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -462,7 +463,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
 
-            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 맞춤)
+            // 2. 시험 결과 (띄어쓰기 정확히 포함)
             "단어 (맞은 개수)": "단어 (맞은 개수)",
             "단어 (전체 개수)": "단어 (전체 개수)",
             "어휘유닛": "어휘유닛", 
