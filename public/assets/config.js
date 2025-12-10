@@ -17,7 +17,7 @@ const CONFIG = {
     },
     
     // 숙제 상태 옵션
-    HOMEWORK_STATUS: ['해당없음', '안 해옴', '숙제 함'],
+    HOMEWORK_STATUS: ['해당없음', '안 해옴', '숙제 함','원서독서로 대체','듣기평가교재 완료'],
     
     // 리스닝 학습 상태
     LISTENING_STATUS: ['진행하지 않음', '완료', '미완료'],
@@ -29,7 +29,7 @@ const CONFIG = {
     HAVRUTA_STATUS: ['숙제없음', '완료함', '못하고감'],
     
     // 책 읽는 거인 상태
-    GIANT_STATUS: ['못함', '시작함', '절반', '거의다읽음', '완료함'],
+    GIANT_STATUS: ['진행하지 않음', '미완료', '완료'],
     
     // 쓰기 상태
     WRITING_STATUS: ['안함', '완료'],

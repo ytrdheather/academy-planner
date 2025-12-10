@@ -225,17 +225,15 @@ async function parseDailyReportData(page) {
         diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
     };
 
+    // [핵심 수정] 수행율 계산 대상을 오직 '숙제 6종'으로 한정
     const checkList = [
         homework.grammar,
         homework.vocabCards,
         homework.readingCards,
         homework.summary,
         homework.dailyReading,
-        homework.diary,
-        props['영어 더빙 학습 완료']?.status?.name,
-        props['더빙 워크북 완료']?.status?.name,
-        props['📖 영어독서']?.select?.name,
-        props['어휘학습']?.select?.name
+        homework.diary
+        // 리스닝(더빙, 워크북), 독서, 어휘학습 등은 제외함
     ];
 
     let totalScore = 0;
@@ -243,14 +241,17 @@ async function parseDailyReportData(page) {
 
     checkList.forEach(status => {
         if (!status) return;
-        if (['숙제 함', '완료', '완료함', '원서독서로 대체', '듣기평가교재 완료'].includes(status)) {
+        // '숙제 함' 등 긍정적 상태만 점수 부여
+        if (['숙제 함', '완료', '완료함'].includes(status)) {
             totalScore += 100;
             count++;
         } 
+        // '안 해옴' 등 부정적 상태는 분모(count)만 증가시켜 점수 깎음
         else if (['안 해옴', '미완료', '못함', '못하고감'].includes(status)) {
             totalScore += 0;
             count++;
         }
+        // '해당 없음', '숙제 없음', '진행하지 않음' 등은 count도 안 올라가므로 수행율에 영향 없음 (N/A)
     });
 
     const performanceRate = count > 0 ? Math.round(totalScore / count) : null;
@@ -394,7 +395,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
     try {
-        // [핵심 수정] 선생님 대시보드 저장용 매핑 (띄어쓰기 포함)
+        // [핵심 수정] 코멘트 저장 시 정확한 노션 속성 이름 매핑 (띄어쓰기 포함)
         const mapPropName = (name) => {
             const mapping = { 
                 // DB 속성 이름 그대로 매핑
@@ -461,9 +462,9 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
             "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
-            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
+            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
 
-            // 2. 시험 결과 (띄어쓰기 정확히 포함)
+            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 띄어쓰기 포함)
             "단어 (맞은 개수)": "단어 (맞은 개수)",
             "단어 (전체 개수)": "단어 (전체 개수)",
             "어휘유닛": "어휘유닛", 
