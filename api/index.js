@@ -406,7 +406,6 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
                 "오늘 읽은 한국 책": "국어 독서 제목", 
                 "문법 과제 내용": "문법 숙제 내용",
-                // [수정] 헤더님이 요청하신 하트 아이콘이 포함된 정확한 속성 이름
                 "Today's Notice!": "❤ Today's Notice!",
                 "오늘의 코멘트": "❤ Today's Notice!",
                 "오늘의 학습 소감": "오늘의 학습 소감"
@@ -449,30 +448,41 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
 
+// [수정] save-progress: 플래너(HTML)의 name과 노션 DB 속성을 정확히 1:1 매핑
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     try {
         const ALLOWED_PROPS = { 
-            "영어 더빙 학습 완료": "영어 더빙 학습 완료", "영어 더빙 학습": "영어 더빙 학습 완료",
-            "더빙 워크북 완료": "더빙 워크북 완료", "더빙 워크북": "더빙 워크북 완료",
+            // 1. 숙제 (HTML name -> Notion Property)
             "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제", 
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
-            "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기",
-            "6️⃣ 부&매&일": "6️⃣ 부&매&일", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
-            "단어 (맞은 개수)": "단어 (맞은 개수)", "단어 (맞은 개수)": "단어 (맞은 개수)",
-            "단어 (전체 개수)": "단어 (전체 개수)", "단어 (전체 개수)": "단어 (전체 개수)",
+            "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
+            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
+
+            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 맞춤)
+            "단어 (맞은 개수)": "단어 (맞은 개수)",
+            "단어 (전체 개수)": "단어 (전체 개수)",
             "어휘유닛": "어휘유닛", 
-            "문법 (전체 개수)": "문법 (전체 개수)", "문법 (전체 개수)": "문법 (전체 개수)",
-            "문법 (틀린 개수)": "문법 (틀린 개수)", "문법 (틀린 개수)": "문법 (틀린 개수)", "문법숙제오답": "문법 (틀린 개수)",
-            "독해 (틀린 개수)": "독해 (틀린 개수)", "독해 (틀린 개수)": "독해 (틀린 개수)", "독해오답갯수": "독해 (틀린 개수)",
-            "독해 하브루타": "독해 하브루타", "독해하브루타": "독해 하브루타",
-            "📖 영어독서": "📖 영어독서", "어휘학습": "어휘학습", "Writing": "Writing", 
-            "📕 책 읽는 거인": "📕 책 읽는 거인", "완료 여부": "📕 책 읽는 거인",
-            "오늘의 학습 소감": "오늘의 학습 소감", "오늘의 소감": "오늘의 학습 소감"
+            "문법 (전체 개수)": "문법 (전체 개수)", 
+            "문법 (틀린 개수)": "문법 (틀린 개수)", 
+            "독해 (틀린 개수)": "독해 (틀린 개수)",
+            "독해 하브루타": "독해 하브루타",
+
+            // 3. 리스닝 & 독서
+            "영어 더빙 학습": "영어 더빙 학습 완료",
+            "더빙 워크북": "더빙 워크북 완료",
+            "📖 영어독서": "📖 영어독서", 
+            "어휘학습": "어휘학습", 
+            "Writing": "Writing", 
+            "완료 여부": "📕 책 읽는 거인",
+
+            // 4. 소감
+            "오늘의 소감": "오늘의 학습 소감"
         };
+
         const valueMapping = { "해당없음": "숙제 없음", "안 해옴": "안 해옴", "숙제 함": "숙제 함", "진행하지 않음": "진행하지 않음", "완료": "완료", "미완료": "미완료", "원서독서로 대체": "원서독서로 대체", "듣기평가교재 완료": "듣기평가교재 완료", "못함": "못함", "완료함": "완료함", "SKIP": "SKIP", "안함": "안함", "숙제없음": "숙제없음", "못하고감": "못하고감", "시작함": "시작함", "절반": "절반", "거의다읽음": "거의다읽음" };
         const properties = {};
         
