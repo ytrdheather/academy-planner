@@ -51,10 +51,10 @@
             height: 70px; 
             border-bottom: 1px solid #e2e8f0;
         }
-        .header h1 { font-size: 1.6em; margin: 0; color: #6b46c1; }
+        .header h1 { font-size: 1.8em; margin: 0; color: #6b46c1; } /* 타이틀도 살짝 키움 */
         .user-info { display: flex; align-items: center; gap: 15px; }
-        .user-name { font-weight: 600; }
-        .logout-btn { background: #6b46c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px; transition: background 0.2s; }
+        .user-name { font-weight: 600; font-size: 16px; } /* 이름 폰트 키움 */
+        .logout-btn { background: #6b46c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; transition: background 0.2s; } /* 13px -> 15px */
         .logout-btn:hover { background: #5a3eaa; }
 
         /* 탭 메뉴 */
@@ -68,7 +68,7 @@
             background: white;
             flex-wrap: wrap;
         }
-        .tab-button { padding: 12px 16px; cursor: pointer; border: none; background: none; font-size: 14px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; white-space: nowrap; }
+        .tab-button { padding: 12px 16px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; white-space: nowrap; } /* 14px -> 16px */
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
 
@@ -84,17 +84,17 @@
             gap: 12px;
             justify-content: flex-start;
         }
-        .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; display:flex; align-items:center; gap:4px; }
+        .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px; display:flex; align-items:center; gap:4px; } /* 13px -> 15px */
         .filter-group { display:flex; align-items:center; gap:6px; }
-        .filter-label { font-weight: 600; color: #4a5568; font-size: 13px; }
-        .filter-select, .filter-input { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 13px; background: white; }
+        .filter-label { font-weight: 600; color: #4a5568; font-size: 15px; } /* 13px -> 15px */
+        .filter-select, .filter-input { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 15px; background: white; } /* 13px -> 15px */
 
         /* 공지사항 (고정 영역에 포함) */
         .notice-wrapper {
             background: #fffbeb;
             border-bottom: 1px solid #e2e8f0;
-            padding: 8px 20px;
-            font-size: 13px;
+            padding: 10px 20px;
+            font-size: 15px; /* 13px -> 15px */
             color: #744210;
             line-height: 1.4;
             display: none; /* 기본 숨김 */
@@ -111,7 +111,7 @@
         }
         .tab-content.active { display: flex; }
 
-        .section-title { font-size: 1.4em; font-weight: 700; color: #4a5568; margin-bottom: 10px; padding-left: 5px; flex: 0 0 auto; }
+        .section-title { font-size: 1.6em; font-weight: 700; color: #4a5568; margin-bottom: 10px; padding-left: 5px; flex: 0 0 auto; } /* 1.4em -> 1.6em */
 
         /* 테이블 스크롤 컨테이너 (여기가 진짜 스크롤되는 곳) */
         .table-scroll-area {
@@ -125,7 +125,7 @@
         }
 
         /* 테이블 스타일 */
-        .styled-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 1000px; }
+        .styled-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; min-width: 1000px; } /* 13px -> 15px */
         
         /* [3단 고정] 테이블 헤더 (top: 0으로 설정하면 스크롤 영역 맨 위에 붙음) */
         .styled-table th { 
@@ -141,7 +141,7 @@
             border-bottom: 1px solid #7c3aed;
         }
         
-        .styled-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; }
+        .styled-table td { padding: 10px 10px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } /* 패딩 살짝 증가 */
         .styled-table tr:last-child td { border-bottom: none; }
         
         /* 학생 이름 가로 스크롤 시 고정 (왼쪽) */
@@ -158,73 +158,75 @@
 
         .student-name-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 100%; }
         
-        .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 14px; }
+        .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; } /* 14px -> 16px */
 
         /* 기타 UI 컴포넌트 */
-        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin: 2px; }
-        .book-tag .remove-btn { cursor: pointer; color: #9333ea; font-size: 14px; font-weight: bold; }
-        .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 8px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 4px; }
+        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 3px 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin: 2px; } /* 11px -> 13px */
+        .book-tag .remove-btn { cursor: pointer; color: #9333ea; font-size: 16px; font-weight: bold; } /* 14px -> 16px */
+        .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 8px; padding: 3px 10px; font-size: 13px; cursor: pointer; font-weight: bold; margin-left: 4px; } /* 11px -> 13px */
 
-        .status-badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 50px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
+        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 50px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; } /* 11px -> 13px */
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
         .batch-controls { display: flex; gap: 2px; margin-top: 4px; justify-content: center; }
-        .batch-btn { font-size: 10px; padding: 2px 6px; border-radius: 4px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; background: white; }
+        .batch-btn { font-size: 12px; padding: 3px 8px; border-radius: 4px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; background: white; } /* 10px -> 12px */
         .batch-ok { color: #15803d; border-color: #16a34a; }
         .batch-no { color: #b91c1c; border-color: #dc2626; }
         .batch-reset { color: #475569; border-color: #94a3b8; }
 
-        .homework-dropdown { padding: 4px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; font-weight: 600; text-align: center; cursor: pointer; background: white; width: 100%; max-width: 100px; }
+        .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; background: white; width: 100%; max-width: 100px; } /* 11px -> 13px */
         .homework-dropdown.status-complete { background-color: #dcfce7; color: #166534; }
         .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; }
         .homework-dropdown.status-default { background-color: #f3f4f6; color: #6b7280; }
 
-        .editable-input { padding: 4px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 50px; font-size: 12px; }
-        .editable-text-input { width: 100px; text-align: left; }
+        .editable-input { padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 55px; font-size: 14px; } /* 12px -> 14px */
+        .editable-text-input { width: 110px; text-align: left; }
 
-        .score-circle { width: 32px; height: 32px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative; }
+        .score-circle { width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative; } /* 크기 약간 증가 */
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
-        .score-text { position: relative; font-size: 10px; font-weight: 700; color: var(--score-color, #6b7280); }
-        .score-none { font-size: 11px; font-weight: 600; color: #9ca3af; }
-        .reading-result-badge { padding: 3px 8px; border-radius: 8px; font-weight: 700; font-size: 10px; }
+        .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); } /* 10px -> 12px */
+        .score-none { font-size: 13px; font-weight: 600; color: #9ca3af; } /* 11px -> 13px */
+        .reading-result-badge { padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 12px; } /* 10px -> 12px */
         .result-pass { background-color: #dcfce7; color: #166534; }
         .result-fail { background-color: #fecaca; color: #991b1b; }
 
-        .comment-textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; min-height: 50px; resize: none; overflow: hidden; line-height: 1.4; }
+        .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; } /* 12px -> 14px */
         .report-btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
-        .action-btn { border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; } /* 11px -> 13px */
         .btn-save { background: #10b981; color: white; }
         .btn-daily-view { background: #e0f2fe; color: #0284c7; }
 
         /* 관리자 메뉴 스타일 */
-        .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
-        .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 20px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 700; text-align: center; transition: all 0.2s; }
+        .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; }
+        .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 22px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: center; transition: all 0.2s; } /* 14px -> 16px */
         .admin-link-button:hover { border-color: #8b5cf6; background: #fcf7ff; transform: translateY(-2px); }
         .manager-only-link { display: none; background-color: #f8fafc; border-color: #cbd5e0; color: #4a5568; }
 
         .grammar-input-container { background: #f3e8ff; padding: 15px; border-radius: 8px; border: 1px solid #d8b4fe; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
         .grammar-group { display: flex; flex-direction: column; gap: 4px; }
-        .grammar-label { font-size: 12px; font-weight: 700; color: #6b46c1; }
-        .grammar-input { padding: 6px 10px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 13px; }
-        .grammar-btn { padding: 8px 16px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .grammar-label { font-size: 14px; font-weight: 700; color: #6b46c1; } /* 12px -> 14px */
+        .grammar-input { padding: 8px 12px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 15px; } /* 13px -> 15px */
+        .grammar-btn { padding: 8px 18px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 14px; }
 
         /* 유틸리티 */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
-        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .modal-search-input { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-search-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 10px; font-size: 16px; }
         .modal-search-results { max-height: 250px; overflow-y: auto; border: 1px solid #f1f3f4; }
-        .result-item { padding: 10px; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+        .result-item { padding: 12px; border-bottom: 1px solid #f1f3f4; cursor: pointer; font-size: 15px; }
         .result-item:hover { background: #f8f9ff; }
         
-        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: #333; color: white; border-radius: 8px; z-index: 6000; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .toast-message { position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: #333; color: white; border-radius: 8px; z-index: 6000; opacity: 0; transition: opacity 0.3s; pointer-events: none; font-size: 15px; }
         .toast-message.show { opacity: 1; }
         
         .keyword-input-container { display: flex; gap: 4px; margin-bottom: 5px; }
-        .keyword-input { flex: 1; padding: 6px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 12px; }
-        .btn-ai-generate { padding: 6px 10px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .keyword-input { flex: 1; padding: 8px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 14px; } /* 12px -> 14px */
+        .btn-ai-generate { padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; } /* 11px -> 13px */
+        
+        .report-modal-desc { margin-bottom: 15px; font-size: 15px; color: #4b5563; } /* 13px -> 15px */
 
         .hidden { display: none !important; }
     </style>
@@ -403,7 +405,7 @@
     <div id="reportModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="section-title" id="reportModalTitle">🔗 리포트 링크</h2>
-            <p id="reportModalDesc" style="margin-bottom:15px; font-size:13px; color:#4b5563;"></p>
+            <p id="reportModalDesc" class="report-modal-desc"></p>
             <input type="text" id="reportLinkInput" class="modal-search-input" readonly>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
                 <button onclick="document.getElementById('reportModal').classList.remove('show')" style="padding:8px 16px; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;">닫기</button>
@@ -606,7 +608,7 @@
         }
 
         function renderToggleBadge(pageId, prop, val) {
-            const statusMap = { '숙제 함': 'status-complete', '완료': 'status-complete', '안 해옴': 'status-incomplete', '미완료': 'status-incomplete', '숙제 없음': 'status-none', '해당 없음': 'status-none' };
+            const statusMap = { '숙제 함': 'status-complete', '완료': 'status-complete', '안 해옴': 'status-incomplete', '미완료': 'status-incomplete', '숙제 없음': 'status-none', '해당 없음': 'status-none', '진행하지 않음': 'status-none' };
             const displayVal = val || '숙제 없음';
             const cls = statusMap[displayVal] || 'status-none';
             return `<span class="status-badge ${cls}" onclick="toggleStatus(this, '${pageId}', '${prop}', '${displayVal}')">${displayVal}</span>`;
