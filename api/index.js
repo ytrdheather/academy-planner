@@ -462,7 +462,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
             "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
-            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
+            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
 
             // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 띄어쓰기 포함)
             "단어 (맞은 개수)": "단어 (맞은 개수)",
@@ -622,14 +622,72 @@ app.get('/report', async (req, res) => {
     }
 });
 
+// [추가] 관리자용 리포트 URL 수동 재생성 API
+app.get('/api/admin/regenerate-urls', requireAuth, async (req, res) => {
+    // role check
+    if (req.user.role !== 'manager') return res.status(403).json({ success: false, message: '관리자 권한이 필요합니다.' });
+    
+    const { date } = req.query; // YYYY-MM-DD 형식
+    if (!date) return res.status(400).json({ success: false, message: '날짜가 필요합니다.' });
+
+    try {
+        console.log(`[Manual Trigger] Regenerating URLs for ${date}...`);
+        // 기존 필터 로직 사용
+        const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
+        
+        // 페이지네이션 처리 (안전을 위해)
+        let hasMore = true;
+        let startCursor = undefined;
+        let processedCount = 0;
+
+        while (hasMore) {
+            const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    filter: filter,
+                    page_size: 100,
+                    start_cursor: startCursor
+                }) 
+            });
+
+            for (const page of data.results) {
+                // http:// 제거 로직 적용
+                const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
+                const url = `${cleanDomain}/report?pageId=${page.id}&date=${date}`;
+
+                // 기존 URL과 다를 경우에만 업데이트
+                if (page.properties['데일리리포트URL']?.url === url) continue;
+
+                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { 
+                    method: 'PATCH', 
+                    body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) 
+                });
+                processedCount++;
+            }
+            
+            hasMore = data.has_more;
+            startCursor = data.next_cursor;
+        }
+
+        res.json({ success: true, message: `${date} 리포트 URL ${processedCount}개 업데이트 완료` });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 cron.schedule('0 22 * * *', async () => {
     console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {
         const { start, end, dateString } = getKSTTodayRange();
+        // [수정] 구버전 필터 구조 사용 ("and" 배열)
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter }) });
         for (const page of data.results) {
-            const url = `${DOMAIN_URL}/report?pageId=${page.id}&date=${dateString}`;
+            // [수정] http:// 또는 https:// 제거 (URL 생성 시)
+            const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
+            const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
+
             if (page.properties['데일리리포트URL']?.url === url) continue;
             await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) });
         }
