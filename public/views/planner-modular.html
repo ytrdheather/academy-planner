@@ -16,10 +16,17 @@
         /* 헤더 스타일 */
         .header { position: relative; background: #ffffff; color: #6b46c1; padding: 20px 30px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
         .header-left { display: flex; flex-direction: column; gap: 4px; }
+        .header-right { display: flex; gap: 10px; align-items: center; } /* 버튼 그룹 */
+        
         .welcome-title { font-size: 20px; font-weight: 700; color: #6b46c1; }
         .current-date { font-size: 14px; color: #718096; }
-        .header-logo { height: 40px; width: auto; }
-        .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        
+        /* [추가] 홈 버튼 스타일 */
+        .home-btn { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: none; } /* 기본은 숨김 */
+        .home-btn:hover { background: #c7d2fe; }
+        
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .logout-btn:hover { background: #dc2626; }
 
         /* 메뉴 화면 (Home) */
         #menu-view { padding: 40px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
@@ -44,7 +51,7 @@
         .sub-view.active { display: flex; }
         .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .view-title { font-size: 20px; font-weight: 700; color: #2d3748; }
-        .back-btn { background: #cbd5e0; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .back-btn { background: #cbd5e0; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
         
         /* 섹션 카드 */
         .section-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #edf2f7; margin-bottom: 20px; }
@@ -88,7 +95,11 @@
                 <div class="welcome-title"><span id="studentName">학생</span>의 플래너</div>
                 <div class="current-date" id="currentDate"></div>
             </div>
-            <button onclick="logout()" class="logout-btn">로그아웃</button>
+            <!-- [수정] 홈 버튼 추가 -->
+            <div class="header-right">
+                <button onclick="goToMenu()" class="home-btn" id="globalHomeBtn">🏠 홈으로</button>
+                <button onclick="logout()" class="logout-btn">로그아웃</button>
+            </div>
         </div>
 
         <!-- 1. 메인 메뉴 화면 -->
@@ -221,7 +232,7 @@
         <!-- 4. 스터디 로그 보기 화면 -->
         <div id="history-view" class="sub-view">
             <div class="view-header">
-                <!-- [수정] id 추가: historyTitle -->
+                <!-- 이름이 자동으로 들어갈 영역 -->
                 <div class="view-title" id="historyTitle">📅 스터디 로그</div>
                 <button class="back-btn" onclick="goToMenu()">메뉴로</button>
             </div>
@@ -275,6 +286,10 @@
         // 초기화
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href = '/'; return; }
+            
+            // [중요] 뒤로가기 처리를 위한 초기 히스토리 설정
+            window.history.replaceState({ view: 'menu' }, '', '');
+
             loadStudentInfo();
             // 날짜 표시
             const today = new Date();
@@ -285,7 +300,7 @@
             initializeSayuBookAutocomplete();
 
             // 기본 화면: 메뉴
-            goToMenu();
+            goToMenu(false); // false: 히스토리 추가 안함 (초기 로드)
         });
 
         async function loadStudentInfo() {
@@ -293,14 +308,12 @@
                 const res = await fetch('/api/student-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (res.ok) {
                     const data = await res.json();
-                    // [수정] 메인 타이틀뿐만 아니라 로그 보기 타이틀도 업데이트
                     const name = data.studentName;
                     document.getElementById('studentName').textContent = name;
                     
-                    // 로그 보기 화면 제목 변경 (예: "김철수(이)의 스터디 로그")
+                    // 로그 보기 화면 제목 변경
                     const historyTitle = document.getElementById('historyTitle');
                     if (historyTitle) {
-                        // 받침 유무에 따라 '이' 붙이기 (간단한 로직)
                         const lastChar = name.charCodeAt(name.length - 1);
                         const hasJongseong = (lastChar - 0xAC00) % 28 > 0; 
                         const suffix = hasJongseong ? '(이)의' : '의';
@@ -312,32 +325,79 @@
             } catch (e) { console.error(e); }
         }
 
-        // 화면 전환 함수
-        function goToMenu() {
+        // [수정] 화면 전환 함수 (브라우저 뒤로가기 지원)
+        function goToMenu(pushHistory = true) {
             document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
             document.getElementById('menu-view').style.display = 'flex';
+            document.getElementById('globalHomeBtn').style.display = 'none'; 
+            
+            // 메뉴로 올 때는 히스토리를 추가하는 것이 아니라, 
+            // 뒤로가기로 왔을 때 자연스럽게 보이도록 함.
+            // 명시적으로 홈 버튼을 눌렀을 때만 state를 replace하여 현재 위치를 명확히 함
+            if (pushHistory) {
+                 window.history.pushState({ view: 'menu' }, '', '');
+            }
         }
 
         function goToView(viewName) {
             document.getElementById('menu-view').style.display = 'none';
             document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('globalHomeBtn').style.display = 'block'; 
             
             if (viewName === 'homework') {
                 document.getElementById('homework-view').classList.add('active');
-                loadTodayData('homeworkForm'); // 데이터 불러오기
+                loadTodayData('homeworkForm'); 
             } else if (viewName === 'planner') {
                 document.getElementById('planner-view').classList.add('active');
-                loadTodayData('plannerForm'); // 데이터 불러오기
+                loadTodayData('plannerForm'); 
             } else if (viewName === 'history') {
                 document.getElementById('history-view').classList.add('active');
-                // 오늘 날짜로 초기화
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('historyDateInput').value = today;
                 loadHistoryData();
             }
+
+            // [핵심] 뷰 이동 시 히스토리 추가
+            window.history.pushState({ view: viewName }, '', `#${viewName}`);
         }
 
-        // [핵심] 서버에서 데이터 불러오기 (Auto-Load)
+        // [핵심] 브라우저 뒤로가기 버튼 감지
+        window.addEventListener('popstate', (event) => {
+            if (event.state && event.state.view && event.state.view !== 'menu') {
+                // 특정 뷰로 이동해야 하는 경우 (예: 앞으로 가기)
+                // 하지만 보통 뒤로가기면 메뉴로 가는 게 자연스러움
+                // 여기서는 간단하게 "서브 뷰가 아니면 메뉴를 보여준다"로 처리
+                goToViewHelper(event.state.view);
+            } else {
+                // 상태가 없거나 menu면 홈으로
+                goToMenuHelper();
+            }
+        });
+
+        // 내부 헬퍼 (히스토리 조작 없이 화면만 전환)
+        function goToMenuHelper() {
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('menu-view').style.display = 'flex';
+            document.getElementById('globalHomeBtn').style.display = 'none';
+        }
+
+        function goToViewHelper(viewName) {
+            document.getElementById('menu-view').style.display = 'none';
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('globalHomeBtn').style.display = 'block';
+            
+            if (viewName === 'homework') {
+                document.getElementById('homework-view').classList.add('active');
+                loadTodayData('homeworkForm');
+            } else if (viewName === 'planner') {
+                document.getElementById('planner-view').classList.add('active');
+                loadTodayData('plannerForm');
+            } else if (viewName === 'history') {
+                document.getElementById('history-view').classList.add('active');
+            }
+        }
+
+        // 서버에서 데이터 불러오기 (Auto-Load)
         async function loadTodayData(formId) {
             try {
                 const res = await fetch('/api/get-today-progress', { headers: { 'Authorization': `Bearer ${authToken}` } });
@@ -347,13 +407,11 @@
                     const form = document.getElementById(formId);
                     const data = json.progress;
 
-                    // 폼 채우기
                     Object.keys(data).forEach(key => {
                         const el = form.querySelector(`[name="${key}"]`);
                         if (el) el.value = data[key];
                     });
 
-                    // 책 목록 복구 (플래너 화면일 때만)
                     if (formId === 'plannerForm') {
                         if (data.englishBooks) {
                             selectedEnglishBooks = data.englishBooks;
@@ -368,25 +426,16 @@
             } catch (e) { console.error('Data load error:', e); }
         }
 
-        // [핵심] 과거 데이터 조회 (History)
+        // 과거 데이터 조회 (History)
         async function loadHistoryData() {
             const date = document.getElementById('historyDateInput').value;
             if (!date) return;
 
             try {
-                // 기존 API 활용 (날짜 파라미터 추가 필요 -> index.js 수정됨)
-                // 지금은 get-today-progress가 오늘만 가져오므로, 
-                // history용으로는 별도 API가 없지만 get-today-progress 로직이 '오늘'로 고정됨.
-                // *중요*: 이 부분은 index.js 수정이 필요함. (헤더님 요청대로 index.js 수정이 선행되어야 함)
-                // 일단 UI 로직은 구성함.
-                
-                // 임시: 현재 구조상 index.js를 수정하지 않으면 '오늘' 데이터만 나옴.
-                // index.js 수정 후 ?date=쿼리스트링 지원 시 아래 코드 동작.
                 const res = await fetch(`/api/get-today-progress?date=${date}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 const json = await res.json();
 
                 const form = document.getElementById('historyForm');
-                // 폼 초기화
                 form.reset();
                 document.getElementById('historyBookList').innerHTML = '';
                 document.getElementById('historyTeacherComment').textContent = '코멘트 없음';
@@ -398,14 +447,12 @@
                         if (el) el.value = data[key];
                     });
                     
-                    // 책 목록 표시
                     if (data.englishBooks) {
                         const titles = data.englishBooks.map(b => `<span class="book-tag">${b.title}</span>`).join('');
                         document.getElementById('historyBookList').innerHTML = titles || '없음';
                     }
                     
-                    // 선생님 코멘트 표시 (데이터에 있다면)
-                    if (data['Today\'s Notice!']) { // 노션 속성명 주의
+                    if (data['Today\'s Notice!']) { 
                          document.getElementById('historyTeacherComment').textContent = data['Today\'s Notice!'];
                     } else if (data['❤ Today\'s Notice!']) {
                          document.getElementById('historyTeacherComment').textContent = data['❤ Today\'s Notice!'];
@@ -423,7 +470,6 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
 
-            // 플래너 폼일 경우 책 목록 추가
             if (e.target.id === 'plannerForm') {
                 data.englishBooks = selectedEnglishBooks;
                 data.koreanBooks = selectedKoreanBooks;
@@ -465,7 +511,7 @@
             }
         }
 
-        // --- 책 검색 로직 (기존 유지) ---
+        // --- 책 검색 로직 ---
         let searchTimeout;
         let currentBooks = [];
         
@@ -510,7 +556,6 @@
                             ${b.title} <small>${b.author || ''}</small>
                         </div>`
                     ).join('');
-                    // 전역 변수에 임시 저장 (인덱스로 찾기 위해)
                     if(type==='english') window.tempEngBooks = books;
                     else window.tempKorBooks = books;
                 }
@@ -522,7 +567,6 @@
             const book = type === 'english' ? window.tempEngBooks[index] : window.tempKorBooks[index];
             const targetList = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
             
-            // 중복 체크
             if (!targetList.some(b => b.id === book.id)) {
                 targetList.push(book);
                 renderBookTags(type);
@@ -549,7 +593,6 @@
             renderBookTags(type);
         };
 
-        // 클릭 시 자동완성 닫기
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.autocomplete-container')) {
                 document.querySelectorAll('.autocomplete-suggestions').forEach(el => el.style.display = 'none');
