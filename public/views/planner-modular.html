@@ -9,484 +9,553 @@
     <meta http-equiv="Expires" content="0">
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        * { font-family: "NanumSquareRound", sans-serif !important; }
+        * { font-family: "NanumSquareRound", sans-serif !important; box-sizing: border-box; }
         body { background: #f7fafc; min-height: 100vh; color: #2d3748; margin: 0; padding: 20px; }
-        .planner-container { max-width: 700px; margin: auto; background: #ffffff; padding: 0; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; }
-        .header { position: relative; background: #ffffff; color: #6b46c1; padding: 25px 30px; min-height: 120px; border-bottom: 2px solid #e2e8f0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-        .header-buttons { justify-self: end; display: flex; flex-direction: column; gap: 8px; white-space: nowrap; }
-        .welcome-title { font-size: 24px; line-height: 1.3; margin: 0; font-weight: 700; text-align: left; color: #6b46c1; }
-        .header-logo { width: 300px; height: auto; justify-self: center; margin-right: -75px; }
-        .section-card { background: white; margin: 25px; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid rgba(139, 92, 246, 0.1); }
-        h2 { color: #6b46c1; border: none; padding: 0; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; position: relative; }
-        .input-group { margin-bottom: 20px; }
-        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #4a5568; }
-        .input-group input[type="text"], .input-group input[type="number"], .input-group select, .input-group textarea { width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; box-sizing: border-box; font-size: 16px; transition: all 0.3s ease; background: #f8fafc; }
-        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); background: white; }
-        .input-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        textarea { resize: vertical; min-height: 80px; }
-        .submit-button { width: 300px; padding: 12px; border: none; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600; margin: 25px auto; display: block; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
-        .submit-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4); }
-        .auto-save-button { padding: 10px 18px; border: none; background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3); }
-        .auto-save-button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4); }
-        .logout-button { padding: 10px 18px; border: none; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3); }
-        .logout-button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
-        .status-message { padding: 12px 20px; border-radius: 12px; margin: 15px 25px; text-align: center; display: none; font-weight: 500; }
-        .success { background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color: #065f46; border: 1px solid #6ee7b7; }
-        .error { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #991b1b; border: 1px solid #f87171; }
-        .auto-save-status { font-size: 12px; color: #6c757d; margin-left: 10px; }
+        .planner-container { max-width: 700px; margin: auto; background: #ffffff; padding: 0; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; min-height: 80vh; display: flex; flex-direction: column; }
         
+        /* 헤더 스타일 */
+        .header { position: relative; background: #ffffff; color: #6b46c1; padding: 20px 30px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; flex-direction: column; gap: 4px; }
+        .welcome-title { font-size: 20px; font-weight: 700; color: #6b46c1; }
+        .current-date { font-size: 14px; color: #718096; }
+        .header-logo { height: 40px; width: auto; }
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+        /* 메뉴 화면 (Home) */
+        #menu-view { padding: 40px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+        .menu-btn { 
+            padding: 25px; 
+            font-size: 18px; 
+            font-weight: 700; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 16px; 
+            background: white; 
+            color: #4a5568; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .menu-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); border-color: #8b5cf6; color: #6b46c1; }
+        .menu-icon { font-size: 24px; }
+
+        /* 서브 화면 (공통) */
+        .sub-view { display: none; padding: 20px; flex: 1; flex-direction: column; }
+        .sub-view.active { display: flex; }
+        .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .view-title { font-size: 20px; font-weight: 700; color: #2d3748; }
+        .back-btn { background: #cbd5e0; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        
+        /* 섹션 카드 */
+        .section-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #edf2f7; margin-bottom: 20px; }
+        h2 { color: #6b46c1; margin: 0 0 15px 0; font-size: 18px; font-weight: 700; }
+        
+        /* 입력 폼 스타일 */
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #4a5568; font-size: 14px; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 15px; background: #f8fafc; }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: #8b5cf6; background: white; }
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* 버튼 스타일 */
+        .submit-button { width: 100%; padding: 15px; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; }
+        
+        /* 날짜 필터 (로그 보기용) */
+        .date-filter-container { display: flex; justify-content: flex-end; margin-bottom: 15px; align-items: center; gap: 10px; }
+        
+        /* 자동 완성 및 태그 */
         .autocomplete-container { position: relative; }
-        .autocomplete-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #8b5cf6; border-top: none; border-radius: 0 0 12px 12px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15); }
-        .autocomplete-suggestion { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f3f9; transition: all 0.2s ease; }
-        .autocomplete-suggestion:hover { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); color: #6b46c1; }
-        
-        .book-tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 6px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
-        .book-tag:hover { background: #e9d5ff; }
-        .book-tag .remove-btn { cursor: pointer; font-weight: bold; color: #9333ea; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; }
-        .book-tag .remove-btn:hover { background: rgba(147, 51, 234, 0.1); }
+        .autocomplete-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e0; border-radius: 0 0 10px 10px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .autocomplete-suggestion { padding: 10px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .autocomplete-suggestion:hover { background: #f8fafc; }
+        .book-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .book-tag { background: #f3e8ff; color: #6b46c1; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        .book-tag .remove-btn { cursor: pointer; font-weight: bold; }
+
+        /* 로딩/메시지 */
+        .status-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 20px; background: #333; color: white; z-index: 9999; display: none; }
+        .status-message.success { background: #10b981; }
+        .status-message.error { background: #ef4444; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div class="planner-container">
+        <!-- 공통 헤더 -->
         <div class="header">
-            <div class="header-content">
-                <div id="welcomeMessage" class="welcome-title">
-                    <div id="studentName">000(이)의</div>
-                    <div>스터디플래너</div>
-                    <div id="currentDate" style="font-size: 0.8em; margin-top: 8px; color: #6b46c1;">날짜 : </div>
-                </div>
+            <div class="header-left">
+                <div class="welcome-title"><span id="studentName">학생</span>의 플래너</div>
+                <div class="current-date" id="currentDate"></div>
             </div>
-            <img src="/assets/logo.png" alt="리디튜드 로고" class="header-logo">
-            <div class="header-buttons">
-                <button id="autoSaveBtn" class="auto-save-button">임시 저장</button>
-                <span id="autoSaveStatus" class="auto-save-status"></span>
-                <button onclick="logout()" class="logout-button">로그아웃</button>
+            <button onclick="logout()" class="logout-btn">로그아웃</button>
+        </div>
+
+        <!-- 1. 메인 메뉴 화면 -->
+        <div id="menu-view">
+            <button class="menu-btn" onclick="goToView('homework')">
+                <span class="menu-icon">📤</span> 숙제 제출하기
+            </button>
+            <button class="menu-btn" onclick="goToView('planner')">
+                <span class="menu-icon">📝</span> 스터디 플래너 입력하기
+            </button>
+            <button class="menu-btn" onclick="goToView('history')">
+                <span class="menu-icon">📅</span> 나의 스터디 로그 보기
+            </button>
+        </div>
+
+        <!-- 2. 숙제 제출 화면 -->
+        <div id="homework-view" class="sub-view">
+            <div class="view-header">
+                <div class="view-title">📤 숙제 제출</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <form id="homeworkForm">
+                <div class="section-card">
+                    <h2>📋 숙제 확인</h2>
+                    <div class="input-group input-row">
+                        <div><label>⭕ 문법 숙제 검사</label><select name="⭕ 지난 문법 숙제 검사"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                        <div><label>1️⃣ 어휘 클카 암기</label><select name="1️⃣ 어휘 클카 암기 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    </div>
+                    <div class="input-group input-row">
+                        <div><label>2️⃣ 독해 단어 클카</label><select name="2️⃣ 독해 단어 클카 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                        <div><label>4️⃣ Summary 숙제</label><select name="4️⃣ Summary 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    </div>
+                    <div class="input-group input-row">
+                        <div><label>5️⃣ 매일 독해 숙제</label><select name="5️⃣ 매일 독해 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                        <div><label>6️⃣ 부&매&일</label><select name="6️⃣ 영어일기 or 개인 독해서"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    </div>
+                </div>
+                <button type="submit" class="submit-button">숙제 제출하기</button>
+            </form>
+        </div>
+
+        <!-- 3. 플래너 입력 화면 -->
+        <div id="planner-view" class="sub-view">
+            <div class="view-header">
+                <div class="view-title">📝 플래너 작성</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <form id="plannerForm">
+                <div class="section-card">
+                    <h2>📝 시험 결과</h2>
+                    <div class="input-group input-row">
+                        <div><label>단어 (맞은 개수)</label><input type="number" name="단어 (맞은 개수)" min="0"></div>
+                        <div><label>단어 (전체 개수)</label><input type="number" name="단어 (전체 개수)" min="0"></div>
+                    </div>
+                    <div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div>
+                    <div class="input-group input-row">
+                        <div><label>문법 (전체 개수)</label><input type="number" name="문법 (전체 개수)" min="0"></div>
+                        <div><label>문법 (틀린 개수)</label><input type="number" name="문법 (틀린 개수)" min="0"></div>
+                    </div>
+                    <div class="input-group input-row">
+                        <div><label>독해 (틀린 개수)</label><input type="number" name="독해 (틀린 개수)" min="0"></div>
+                        <div><label>독해 하브루타</label><select name="독해 하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h2>🎧 리스닝 학습</h2>
+                    <div class="input-group input-row">
+                        <div>
+                            <label>영어 더빙 학습</label>
+                            <select name="영어 더빙 학습">
+                                <option value="진행하지 않음">진행하지 않음</option>
+                                <option value="미완료">미완료</option>
+                                <option value="원서독서로 대체">원서독서로 대체</option>
+                                <option value="듣기평가교재 완료">듣기평가교재 완료</option>
+                                <option value="완료">완료</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>더빙 워크북</label>
+                            <select name="더빙 워크북">
+                                <option value="진행하지 않음">진행하지 않음</option>
+                                <option value="미완료">미완료</option>
+                                <option value="원서독서로 대체">원서독서로 대체</option>
+                                <option value="듣기평가교재 완료">듣기평가교재 완료</option>
+                                <option value="완료">완료</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h2>📚 원서 독서</h2>
+                    <div class="input-group">
+                        <label>오늘 읽은 영어 책</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="검색..." autocomplete="off">
+                            <div id="bookSuggestions" class="autocomplete-suggestions"></div>
+                        </div>
+                        <div id="englishBookTags" class="book-tags-container"></div>
+                    </div>
+                    <div class="input-group input-row">
+                        <div><label>영어독서</label><select name="📖 영어독서"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
+                        <div><label>어휘학습</label><select name="어휘학습"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
+                        <div><label>Writing</label><select name="Writing"><option value="SKIP">SKIP</option><option value="3 SENTENCE">3 SENTENCE</option><option value="북 리포트">북 리포트</option></select></div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h2>📕 책 읽는 거인</h2>
+                    <div class="input-group">
+                        <label>3독 독서 제목</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="giantBookTitle" name="오늘 읽은 한국 책" placeholder="검색..." autocomplete="off">
+                            <div id="sayuBookSuggestions" class="autocomplete-suggestions"></div>
+                        </div>
+                        <div id="giantBookTags" class="book-tags-container"></div>
+                    </div>
+                    <div class="input-group"><label>완료 여부</label><select name="완료 여부"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
+                </div>
+
+                <div class="section-card">
+                    <h2>💬 오늘의 소감</h2>
+                    <div class="input-group"><textarea name="오늘의 소감" rows="3" placeholder="오늘 학습하면서 느낀 점을 적어주세요."></textarea></div>
+                </div>
+                <button type="submit" class="submit-button">플래너 저장하기</button>
+            </form>
+        </div>
+
+        <!-- 4. 스터디 로그 보기 화면 -->
+        <div id="history-view" class="sub-view">
+            <div class="view-header">
+                <!-- [수정] id 추가: historyTitle -->
+                <div class="view-title" id="historyTitle">📅 스터디 로그</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <div class="date-filter-container">
+                <label>날짜 선택: </label>
+                <input type="date" id="historyDateInput" onchange="loadHistoryData()">
+            </div>
+            <div id="historyContent">
+                <!-- 여기에 전체 폼이 읽기 전용으로 들어감 -->
+                <form id="historyForm">
+                    <!-- (모든 섹션을 하나로 합친 읽기 전용 폼) -->
+                    <div class="section-card">
+                        <h2>📋 숙제 기록</h2>
+                        <div class="input-group input-row">
+                            <div><label>문법 숙제</label><input type="text" name="⭕ 지난 문법 숙제 검사" disabled></div>
+                            <div><label>어휘 클카</label><input type="text" name="1️⃣ 어휘 클카 암기 숙제" disabled></div>
+                        </div>
+                        <div class="input-group input-row">
+                            <div><label>독해 클카</label><input type="text" name="2️⃣ 독해 단어 클카 숙제" disabled></div>
+                            <div><label>Summary</label><input type="text" name="4️⃣ Summary 숙제" disabled></div>
+                        </div>
+                        <div class="input-group input-row">
+                            <div><label>매일 독해</label><input type="text" name="5️⃣ 매일 독해 숙제" disabled></div>
+                            <div><label>부&매&일</label><input type="text" name="6️⃣ 영어일기 or 개인 독해서" disabled></div>
+                        </div>
+                    </div>
+                    <div class="section-card">
+                        <h2>📝 시험/학습 기록</h2>
+                        <div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" disabled></div>
+                        <div class="input-group input-row">
+                            <div><label>단어 맞은개수</label><input type="text" name="단어 (맞은 개수)" disabled></div>
+                            <div><label>문법 틀린개수</label><input type="text" name="문법 (틀린 개수)" disabled></div>
+                        </div>
+                        <div class="input-group"><label>영어 독서</label><input type="text" name="📖 영어독서" disabled></div>
+                        <div class="input-group"><label>읽은 책 목록</label><div id="historyBookList" style="padding:10px; background:#f1f5f9; border-radius:8px; min-height:40px;"></div></div>
+                        <div class="input-group"><label>오늘의 소감</label><textarea name="오늘의 소감" disabled rows="3"></textarea></div>
+                        <div class="input-group"><label>선생님 코멘트</label><div id="historyTeacherComment" style="padding:15px; background:#fffbeb; border:1px solid #fbd38d; border-radius:8px; white-space: pre-wrap;"></div></div>
+                    </div>
+                </form>
             </div>
         </div>
-        
-        <form id="plannerForm">
-            <div class="section-card homework-section">
-                <h2>📋 숙제 확인 <small style="color: #a0a0a0; font-weight: normal; font-size: 12px;">(오늘 숙제가 없는 것은 빈칸으로 두세요.)</small></h2>
-                <div class="input-group input-row">
-                    <div><label>⭕ 지난 문법 숙제 검사</label><select name="⭕ 지난 문법 숙제 검사"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label>1️⃣ 어휘 클카 암기 숙제</label><select name="1️⃣ 어휘 클카 암기 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                </div>
-                <div class="input-group input-row">
-                    <div><label>2️⃣ 독해 단어 클카 숙제</label><select name="2️⃣ 독해 단어 클카 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label>4️⃣ Summary 숙제</label><select name="4️⃣ Summary 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                </div>
-                <div class="input-group input-row">
-                    <div><label>5️⃣ 매일 독해 숙제</label><select name="5️⃣ 매일 독해 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                    <div><label>6️⃣ 영어일기 or 개인 독해서</label><select name="6️⃣ 영어일기 or 개인 독해서"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
-                </div>
-            </div>
 
-            <div class="section-card">
-                <h2>📝 시험 결과</h2>
-                <div class="input-group input-row">
-                    <div><label>단어 (맞은 개수)</label><input type="number" name="단어 (맞은 개수)" min="0"></div>
-                    <div><label>단어 (전체 개수)</label><input type="number" name="단어 (전체 개수)" min="0"></div>
-                </div>
-                <div class="input-group"><label>어휘유닛 <small style="color: #666;">(오늘 시험 본 유닛을 쓰세요.)</small></label><input type="text" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div>
-                <div class="input-group input-row">
-                    <div><label>문법 (전체 개수)</label><input type="number" name="문법 (전체 개수)" min="0"></div>
-                    <div><label>문법 (틀린 개수)</label><input type="number" name="문법 (틀린 개수)" min="0"></div>
-                </div>
-                <div class="input-group input-row">
-                    <div><label>독해 (틀린 개수)</label><input type="number" name="독해 (틀린 개수)" min="0"></div>
-                    <div><label>독해 하브루타</label><select name="독해 하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div>
-                </div>
-            </div>
-
-            <div class="section-card">
-                <h2>🎧 리스닝 학습</h2>
-                <div class="input-group input-row">
-                    <div>
-                        <label>영어 더빙 학습</label>
-                        <select name="영어 더빙 학습">
-                            <option value="진행하지 않음">진행하지 않음</option>
-                            <option value="미완료">미완료</option>
-                            <option value="원서독서로 대체">원서독서로 대체</option>
-                            <option value="듣기평가교재 완료">듣기평가교재 완료</option>
-                            <option value="완료">완료</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>더빙 워크북</label>
-                        <select name="더빙 워크북">
-                            <option value="진행하지 않음">진행하지 않음</option>
-                            <option value="미완료">미완료</option>
-                            <option value="원서독서로 대체">원서독서로 대체</option>
-                            <option value="듣기평가교재 완료">듣기평가교재 완료</option>
-                            <option value="완료">완료</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section-card">
-                <h2>📚 원서 독서</h2>
-                <div class="input-group">
-                    <label for="englishBookTitle">오늘 읽은 영어 책</label>
-                    <div class="autocomplete-container">
-                        <input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
-                        <div id="bookSuggestions" class="autocomplete-suggestions"></div>
-                    </div>
-                    <div id="englishBookTags" class="book-tags-container"></div>
-                </div>
-                <div class="input-group input-row">
-                    <div><label>영어독서</label><select name="📖 영어독서"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
-                    <div><label>어휘학습</label><select name="어휘학습"><option value="못함">못함</option><option value="완료함">완료함</option></select></div>
-                    <div><label>Writing</label><select name="Writing"><option value="SKIP">SKIP</option><option value="3 SENTENCE">3 SENTENCE</option><option value="북 리포트">북 리포트</option></select></div>
-                </div>
-            </div>
-
-            <div class="section-card">
-                <h2>📕 책 읽는 거인</h2>
-                <div class="input-group">
-                    <label for="giantBookTitle">3독 독서 제목</label>
-                    <div class="autocomplete-container">
-                        <input type="text" id="giantBookTitle" name="오늘 읽은 한국 책" placeholder="책 제목을 입력하세요 (자동 검색됩니다)" autocomplete="off">
-                        <div id="sayuBookSuggestions" class="autocomplete-suggestions"></div>
-                    </div>
-                    <div id="giantBookTags" class="book-tags-container"></div>
-                </div>
-                <div class="input-group"><label>완료 여부</label><select name="완료 여부"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div>
-            </div>
-
-            <div class="section-card">
-                <h2>💬 오늘의 소감</h2>
-                <div class="input-group"><label for="feedback">오늘 학습하면서 느낀 점을 자유롭게 적어주세요.</label><textarea id="feedback" name="오늘의 소감" rows="4"></textarea></div>
-            </div>
-            <button type="submit" class="submit-button">오늘의 학습 저장하기</button>
-        </form>
         <div id="statusMessage" class="status-message"></div>
     </div>
 
     <script>
-        async function loadStudentInfo() {
-            try {
-                const token = localStorage.getItem('authToken');
-                if (!token) {
-                    alert('로그인 정보가 없습니다. 로그인 페이지로 이동합니다.');
-                    window.location.href = '/';
-                    return;
-                }
-                
-                const response = await fetch('/api/student-info', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const studentNameElement = document.getElementById('studentName');
-                    const currentDateElement = document.getElementById('currentDate');
-                    const realName = data.studentRealName || data.studentName || data.studentId;
-                    if (studentNameElement) { studentNameElement.textContent = `${realName}(이)의`; }
-                    if (currentDateElement) {
-                        const today = new Date();
-                        const dateString = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
-                        currentDateElement.textContent = `날짜 : ${dateString}`;
-                    }
-                } else {
-                    localStorage.removeItem('authToken');
-                    alert('인증 정보가 유효하지 않습니다. 다시 로그인해주세요.');
-                    window.location.href = '/';
-                }
-            } catch (error) {
-                console.error('학생 정보 로드 중 오류:', error);
-            }
-        }
-
-        function showStatus(message, isSuccess = true) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.textContent = message;
-            statusDiv.className = `status-message ${isSuccess ? 'success' : 'error'}`;
-            statusDiv.style.display = 'block';
-            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
-        }
-
+        let authToken = localStorage.getItem('authToken');
         let selectedEnglishBooks = [];
         let selectedKoreanBooks = [];
 
-        document.getElementById('plannerForm').addEventListener('submit', async (e) => {
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) { window.location.href = '/'; return; }
+            loadStudentInfo();
+            // 날짜 표시
+            const today = new Date();
+            document.getElementById('currentDate').textContent = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
+            
+            // 책 검색 초기화
+            initializeBookAutocomplete();
+            initializeSayuBookAutocomplete();
+
+            // 기본 화면: 메뉴
+            goToMenu();
+        });
+
+        async function loadStudentInfo() {
+            try {
+                const res = await fetch('/api/student-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    // [수정] 메인 타이틀뿐만 아니라 로그 보기 타이틀도 업데이트
+                    const name = data.studentName;
+                    document.getElementById('studentName').textContent = name;
+                    
+                    // 로그 보기 화면 제목 변경 (예: "김철수(이)의 스터디 로그")
+                    const historyTitle = document.getElementById('historyTitle');
+                    if (historyTitle) {
+                        // 받침 유무에 따라 '이' 붙이기 (간단한 로직)
+                        const lastChar = name.charCodeAt(name.length - 1);
+                        const hasJongseong = (lastChar - 0xAC00) % 28 > 0; 
+                        const suffix = hasJongseong ? '(이)의' : '의';
+                        historyTitle.textContent = `📅 ${name}${suffix} 스터디 로그`;
+                    }
+                } else {
+                    alert('로그인이 필요합니다.'); window.location.href = '/';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // 화면 전환 함수
+        function goToMenu() {
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('menu-view').style.display = 'flex';
+        }
+
+        function goToView(viewName) {
+            document.getElementById('menu-view').style.display = 'none';
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            
+            if (viewName === 'homework') {
+                document.getElementById('homework-view').classList.add('active');
+                loadTodayData('homeworkForm'); // 데이터 불러오기
+            } else if (viewName === 'planner') {
+                document.getElementById('planner-view').classList.add('active');
+                loadTodayData('plannerForm'); // 데이터 불러오기
+            } else if (viewName === 'history') {
+                document.getElementById('history-view').classList.add('active');
+                // 오늘 날짜로 초기화
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('historyDateInput').value = today;
+                loadHistoryData();
+            }
+        }
+
+        // [핵심] 서버에서 데이터 불러오기 (Auto-Load)
+        async function loadTodayData(formId) {
+            try {
+                const res = await fetch('/api/get-today-progress', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const json = await res.json();
+                
+                if (json.success && json.progress) {
+                    const form = document.getElementById(formId);
+                    const data = json.progress;
+
+                    // 폼 채우기
+                    Object.keys(data).forEach(key => {
+                        const el = form.querySelector(`[name="${key}"]`);
+                        if (el) el.value = data[key];
+                    });
+
+                    // 책 목록 복구 (플래너 화면일 때만)
+                    if (formId === 'plannerForm') {
+                        if (data.englishBooks) {
+                            selectedEnglishBooks = data.englishBooks;
+                            renderBookTags('english');
+                        }
+                        if (data.koreanBooks) {
+                            selectedKoreanBooks = data.koreanBooks;
+                            renderBookTags('giant');
+                        }
+                    }
+                }
+            } catch (e) { console.error('Data load error:', e); }
+        }
+
+        // [핵심] 과거 데이터 조회 (History)
+        async function loadHistoryData() {
+            const date = document.getElementById('historyDateInput').value;
+            if (!date) return;
+
+            try {
+                // 기존 API 활용 (날짜 파라미터 추가 필요 -> index.js 수정됨)
+                // 지금은 get-today-progress가 오늘만 가져오므로, 
+                // history용으로는 별도 API가 없지만 get-today-progress 로직이 '오늘'로 고정됨.
+                // *중요*: 이 부분은 index.js 수정이 필요함. (헤더님 요청대로 index.js 수정이 선행되어야 함)
+                // 일단 UI 로직은 구성함.
+                
+                // 임시: 현재 구조상 index.js를 수정하지 않으면 '오늘' 데이터만 나옴.
+                // index.js 수정 후 ?date=쿼리스트링 지원 시 아래 코드 동작.
+                const res = await fetch(`/api/get-today-progress?date=${date}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const json = await res.json();
+
+                const form = document.getElementById('historyForm');
+                // 폼 초기화
+                form.reset();
+                document.getElementById('historyBookList').innerHTML = '';
+                document.getElementById('historyTeacherComment').textContent = '코멘트 없음';
+
+                if (json.success && json.progress) {
+                    const data = json.progress;
+                    Object.keys(data).forEach(key => {
+                        const el = form.querySelector(`[name="${key}"]`);
+                        if (el) el.value = data[key];
+                    });
+                    
+                    // 책 목록 표시
+                    if (data.englishBooks) {
+                        const titles = data.englishBooks.map(b => `<span class="book-tag">${b.title}</span>`).join('');
+                        document.getElementById('historyBookList').innerHTML = titles || '없음';
+                    }
+                    
+                    // 선생님 코멘트 표시 (데이터에 있다면)
+                    if (data['Today\'s Notice!']) { // 노션 속성명 주의
+                         document.getElementById('historyTeacherComment').textContent = data['Today\'s Notice!'];
+                    } else if (data['❤ Today\'s Notice!']) {
+                         document.getElementById('historyTeacherComment').textContent = data['❤ Today\'s Notice!'];
+                    }
+                } else {
+                     document.getElementById('historyTeacherComment').textContent = '데이터가 없습니다.';
+                }
+
+            } catch (e) { console.error(e); }
+        }
+
+        // 폼 제출 (저장)
+        async function handleFormSubmit(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            const token = localStorage.getItem('authToken');
 
-            data.englishBooks = selectedEnglishBooks;
-            data.koreanBooks = selectedKoreanBooks;
-
-            if (!token) {
-                alert('인증 정보가 만료되었습니다. 다시 로그인해주세요.');
-                window.location.href = '/';
-                return;
+            // 플래너 폼일 경우 책 목록 추가
+            if (e.target.id === 'plannerForm') {
+                data.englishBooks = selectedEnglishBooks;
+                data.koreanBooks = selectedKoreanBooks;
             }
-            
+
             try {
-                const response = await fetch('/save-progress', {
+                const res = await fetch('/save-progress', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                     body: JSON.stringify(data)
                 });
+                const result = await res.json();
                 
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showStatus(result.message, true);
-                    localStorage.removeItem('plannerData');
-                    document.getElementById('autoSaveStatus').textContent = '저장 완료'; 
+                if (result.success) {
+                    showToast('저장되었습니다! 🎉', 'success');
                 } else {
-                    showStatus(result.message || result.error || '저장에 실패했습니다.', false);
+                    showToast('저장 실패 😢', 'error');
                 }
-            } catch (error) {
-                showStatus('저장 중 오류가 발생했습니다.', false);
+            } catch (e) {
+                showToast('오류 발생', 'error');
             }
-        });
+        }
+
+        document.getElementById('homeworkForm').addEventListener('submit', handleFormSubmit);
+        document.getElementById('plannerForm').addEventListener('submit', handleFormSubmit);
+
+        function showToast(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = `status-message ${type}`;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
 
         function logout() {
-            if (confirm('로그아웃 하시겠습니까?')) {
+            if(confirm('로그아웃 하시겠습니까?')) {
                 localStorage.removeItem('authToken');
-                localStorage.removeItem('plannerData');
                 window.location.href = '/';
             }
         }
 
+        // --- 책 검색 로직 (기존 유지) ---
         let searchTimeout;
         let currentBooks = [];
         
         function initializeBookAutocomplete() {
             const bookInput = document.getElementById('englishBookTitle');
+            if(!bookInput) return;
             
             bookInput.addEventListener('input', function() {
                 const query = this.value.trim();
                 clearTimeout(searchTimeout);
-                if (query.length < 2) { hideSuggestions(); return; }
-                showLoadingState();
-                searchTimeout = setTimeout(() => { searchBooks(query); }, 500);
+                if (query.length < 2) { document.getElementById('bookSuggestions').style.display='none'; return; }
+                searchTimeout = setTimeout(() => { searchBooks(query, 'english'); }, 500);
             });
-            bookInput.addEventListener('blur', function() { setTimeout(() => { hideSuggestions(); }, 200); });
-            bookInput.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') { hideSuggestions(); return; }
-                const suggestions = document.querySelectorAll('#bookSuggestions .autocomplete-suggestion');
-                const activeIndex = Array.from(suggestions).findIndex(s => s.classList.contains('active'));
-                if (event.key === 'ArrowDown') { event.preventDefault(); const nextIndex = activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0; setActiveSuggestion(nextIndex); } 
-                else if (event.key === 'ArrowUp') { event.preventDefault(); const prevIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1; setActiveSuggestion(prevIndex); } 
-                else if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); selectBook(activeIndex); }
-            });
-            document.addEventListener('click', function(event) { if (!event.target.closest('.autocomplete-container')) { hideSuggestions(); } });
         }
-        
-        async function searchBooks(query) {
-            try {
-                const token = localStorage.getItem('authToken');
-                const response = await fetch(`/api/search-books?query=${encodeURIComponent(query)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) { throw new Error('검색 실패'); }
-                const books = await response.json();
-                currentBooks = books;
-                showSuggestions(books);
-            } catch (error) { console.error('책 검색 오류:', error); hideSuggestions(); }
-        }
-        
-        function showLoadingState() {
-            const suggestionsList = document.getElementById('bookSuggestions');
-            suggestionsList.innerHTML = '<div class="autocomplete-suggestion">🔍 검색 중...</div>';
-            suggestionsList.style.display = 'block';
-        }
-        
-        function showSuggestions(books) {
-            const suggestionsList = document.getElementById('bookSuggestions');
-            if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
-            let html = '';
-            books.forEach((book, index) => {
-                html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.level ? `<div class="book-level">${book.level}</div>` : ''}</div>`;
-            });
-            suggestionsList.innerHTML = html;
-            suggestionsList.style.display = 'block';
-        }
-        
-        function setActiveSuggestion(index) {
-            const suggestions = document.querySelectorAll('#bookSuggestions .autocomplete-suggestion');
-            suggestions.forEach(s => s.classList.remove('active'));
-            if (suggestions[index]) { suggestions[index].classList.add('active'); }
-        }
-        
-        function hideSuggestions() {
-            const suggestionsList = document.getElementById('bookSuggestions');
-             if(suggestionsList) suggestionsList.style.display = 'none';
-        }
-        
-        function selectBook(index) {
-            const book = currentBooks[index];
-            if (!selectedEnglishBooks.some(b => b.id === book.id && b.title === book.title)) {
-                selectedEnglishBooks.push(book);
-                renderBookTags('english');
-            }
-            const bookInput = document.getElementById('englishBookTitle');
-            bookInput.value = ''; 
-            hideSuggestions();
-            saveFormData(); 
-        }
-
-        function renderBookTags(type) {
-            const containerId = type === 'english' ? 'englishBookTags' : 'giantBookTags';
-            const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
-            const container = document.getElementById(containerId);
-            
-            container.innerHTML = list.map((book, idx) => `
-                <div class="book-tag">
-                    ${book.title}
-                    <span class="remove-btn" onclick="removeBookTag('${type}', ${idx})">×</span>
-                </div>
-            `).join('');
-        }
-
-        function removeBookTag(type, index) {
-            if (type === 'english') {
-                selectedEnglishBooks.splice(index, 1);
-                renderBookTags('english');
-            } else {
-                selectedKoreanBooks.splice(index, 1);
-                renderBookTags('giant');
-            }
-            saveFormData();
-        }
-        
-        let sayuSearchTimeout;
-        let currentSayuBooks = [];
         
         function initializeSayuBookAutocomplete() {
-            const bookInput = document.getElementById('giantBookTitle');
-            
-            bookInput.addEventListener('input', function() {
+             const bookInput = document.getElementById('giantBookTitle');
+             if(!bookInput) return;
+
+             bookInput.addEventListener('input', function() {
                 const query = this.value.trim();
-                clearTimeout(sayuSearchTimeout);
-                if (query.length < 2) { hideSayuSuggestions(); return; }
-                showSayuLoadingState();
-                sayuSearchTimeout = setTimeout(() => { searchSayuBooks(query); }, 500);
+                clearTimeout(searchTimeout);
+                if (query.length < 2) { document.getElementById('sayuBookSuggestions').style.display='none'; return; }
+                searchTimeout = setTimeout(() => { searchBooks(query, 'korean'); }, 500);
             });
-            bookInput.addEventListener('blur', function() { setTimeout(() => { hideSayuSuggestions(); }, 200); });
-            bookInput.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') { hideSayuSuggestions(); return; }
-                const suggestions = document.querySelectorAll('#sayuBookSuggestions .autocomplete-suggestion');
-                const activeIndex = Array.from(suggestions).findIndex(s => s.classList.contains('active'));
-                if (event.key === 'ArrowDown') { event.preventDefault(); const nextIndex = activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0; setSayuActiveSuggestion(nextIndex); } 
-                else if (event.key === 'ArrowUp') { event.preventDefault(); const prevIndex = activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1; setSayuActiveSuggestion(prevIndex); } 
-                else if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); selectSayuBook(activeIndex); }
-            });
-            document.addEventListener('click', function(event) { if (!event.target.closest('.autocomplete-container') || event.target.id === 'giantBookTitle') { /* Do nothing? */ } else { hideSayuSuggestions(); } });
-        }
-        
-        async function searchSayuBooks(query) {
-            try {
-                const token = localStorage.getItem('authToken');
-                const response = await fetch(`/api/search-sayu-books?query=${encodeURIComponent(query)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) { throw new Error('검색 실패'); }
-                const books = await response.json();
-                currentSayuBooks = books;
-                showSayuSuggestions(books);
-            } catch (error) { console.error('사유독평 책 검색 오류:', error); hideSayuSuggestions(); }
-        }
-        
-        function showSayuLoadingState() {
-            const suggestionsList = document.getElementById('sayuBookSuggestions');
-            suggestionsList.innerHTML = '<div class="autocomplete-suggestion">🔍 검색 중...</div>';
-            suggestionsList.style.display = 'block';
-        }
-        
-        function showSayuSuggestions(books) {
-            const suggestionsList = document.getElementById('sayuBookSuggestions');
-            if (books.length === 0) { suggestionsList.innerHTML = '<div class="autocomplete-suggestion">📚 검색 결과가 없습니다</div>'; suggestionsList.style.display = 'block'; return; }
-            let html = '';
-            books.forEach((book, index) => {
-                 html += `<div class="autocomplete-suggestion" onmousedown="event.preventDefault()" onclick="selectSayuBook(${index})"><div class="book-title">${book.title || '제목 없음'}</div>${book.author ? `<div class="book-author">저자: ${book.author}</div>` : ''}${book.publisher ? `<div class="book-level">출판사: ${book.publisher}</div>` : ''}</div>`;
-            });
-            suggestionsList.innerHTML = html;
-            suggestionsList.style.display = 'block';
-        }
-        
-        function setSayuActiveSuggestion(index) {
-            const suggestions = document.querySelectorAll('#sayuBookSuggestions .autocomplete-suggestion');
-            suggestions.forEach(s => s.classList.remove('active'));
-            if (suggestions[index]) { suggestions[index].classList.add('active'); }
-        }
-        
-        function hideSayuSuggestions() {
-            const suggestionsList = document.getElementById('sayuBookSuggestions');
-             if(suggestionsList) suggestionsList.style.display = 'none';
-        }
-        
-        function selectSayuBook(index) {
-            const book = currentSayuBooks[index];
-            if (!selectedKoreanBooks.some(b => b.id === book.id && b.title === book.title)) {
-                selectedKoreanBooks.push(book);
-                renderBookTags('giant');
-            }
-            const bookInput = document.getElementById('giantBookTitle');
-            bookInput.value = ''; 
-            hideSayuSuggestions();
-            saveFormData(); 
         }
 
-        function loadSavedData() {
-            const savedData = localStorage.getItem('plannerData');
-            if (savedData) {
-                try {
-                    const data = JSON.parse(savedData);
-                    Object.keys(data).forEach(key => {
-                        if (key === 'englishBooks') {
-                            selectedEnglishBooks = data[key] || [];
-                            renderBookTags('english');
-                        } else if (key === 'koreanBooks') {
-                            selectedKoreanBooks = data[key] || [];
-                            renderBookTags('giant');
-                        } else {
-                            const element = document.querySelector(`[name="${key}"]`);
-                            if (element) { element.value = data[key]; }
-                        }
-                    });
-                    document.getElementById('autoSaveStatus').textContent = '임시 데이터 복원됨';
-                } catch (e) {
-                    console.error("저장된 데이터 로딩 오류:", e);
-                    localStorage.removeItem('plannerData'); 
-                }
-            }
-        }
-        function saveFormData() {
-            const formData = new FormData(document.getElementById('plannerForm'));
-            const data = Object.fromEntries(formData.entries());
+        async function searchBooks(query, type) {
+            const endpoint = type === 'english' ? '/api/search-books' : '/api/search-sayu-books';
+            const listId = type === 'english' ? 'bookSuggestions' : 'sayuBookSuggestions';
             
-            data.englishBooks = selectedEnglishBooks;
-            data.koreanBooks = selectedKoreanBooks;
-
             try {
-                localStorage.setItem('plannerData', JSON.stringify(data));
-                document.getElementById('autoSaveStatus').textContent = '임시 저장됨: ' + new Date().toLocaleTimeString();
-            } catch (e) {
-                console.error("데이터 임시 저장 오류:", e);
-                showStatus("데이터 임시 저장에 실패했습니다.", false);
-            }
+                const res = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const books = await res.json();
+                const list = document.getElementById(listId);
+                
+                if (!books.length) {
+                    list.innerHTML = '<div class="autocomplete-suggestion">결과 없음</div>';
+                } else {
+                    list.innerHTML = books.map((b, i) => 
+                        `<div class="autocomplete-suggestion" onclick="selectBook('${type}', ${i})">
+                            ${b.title} <small>${b.author || ''}</small>
+                        </div>`
+                    ).join('');
+                    // 전역 변수에 임시 저장 (인덱스로 찾기 위해)
+                    if(type==='english') window.tempEngBooks = books;
+                    else window.tempKorBooks = books;
+                }
+                list.style.display = 'block';
+            } catch (e) { console.error(e); }
         }
-        document.querySelectorAll('#plannerForm input, #plannerForm select, #plannerForm textarea').forEach(element => {
-            element.addEventListener('change', saveFormData);
-        });
-        document.getElementById('autoSaveBtn').addEventListener('click', saveFormData);
 
-        document.addEventListener('DOMContentLoaded', function() {
-            loadStudentInfo();
-            initializeBookAutocomplete();
-            initializeSayuBookAutocomplete();
-            loadSavedData(); 
+        window.selectBook = function(type, index) {
+            const book = type === 'english' ? window.tempEngBooks[index] : window.tempKorBooks[index];
+            const targetList = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            
+            // 중복 체크
+            if (!targetList.some(b => b.id === book.id)) {
+                targetList.push(book);
+                renderBookTags(type);
+            }
+            
+            document.getElementById(type === 'english' ? 'bookSuggestions' : 'sayuBookSuggestions').style.display = 'none';
+            document.getElementById(type === 'english' ? 'englishBookTitle' : 'giantBookTitle').value = '';
+        };
+
+        function renderBookTags(type) {
+            const container = document.getElementById(type === 'english' ? 'englishBookTags' : 'giantBookTags');
+            const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            
+            container.innerHTML = list.map((b, i) => 
+                `<div class="book-tag">
+                    ${b.title} <span class="remove-btn" onclick="removeBook('${type}', ${i})">×</span>
+                </div>`
+            ).join('');
+        }
+
+        window.removeBook = function(type, index) {
+            const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            list.splice(index, 1);
+            renderBookTags(type);
+        };
+
+        // 클릭 시 자동완성 닫기
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.querySelectorAll('.autocomplete-suggestions').forEach(el => el.style.display = 'none');
+            }
         });
+
     </script>
 </body>
 </html>
