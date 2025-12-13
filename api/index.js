@@ -690,4 +690,15 @@ cron.schedule('0 22 * * *', async () => {
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
 
+// ... existing code ...
+app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
+// ... existing code ...
+app.listen(PORT, ...);
+
+### ✅ 테스트 방법
+1.  Firebase 콘솔에서 복사한 설정값을 `planner-test.html`의 `const firebaseConfig = { ... }` 부분에 붙여넣습니다.
+2.  두 파일을 서버에 올립니다.
+3.  브라우저 주소창에 `https://readitude.onrender.com/planner-test` 를 입력해서 접속합니다.
+4.  새로운 기능들이 잘 작동하는지 마음껏 테스트해보세요! (숙제 제출 시 이미지 업로드도 해보시고요!)
+
 app.listen(PORT, '0.0.0.0', () => console.log(`✅ Final Server running on ${PORT}`));

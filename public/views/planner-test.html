@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>테스트용 학습 플래너</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <style>
+        * { font-family: "NanumSquareRound", sans-serif !important; box-sizing: border-box; }
+        body { background: #f0fdf4; /* 테스트 페이지임을 알리는 배경색 (연한 초록) */ min-height: 100vh; color: #2d3748; margin: 0; padding: 20px; }
+        
+        .planner-container { max-width: 700px; margin: auto; background: #ffffff; padding: 0; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 2px solid #22c55e; /* 테스트용 초록 테두리 */ overflow: hidden; min-height: 80vh; display: flex; flex-direction: column; }
+        
+        /* 헤더 스타일 */
+        .header { position: relative; background: #ffffff; color: #6b46c1; padding: 20px 30px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; flex-direction: column; gap: 4px; }
+        .header-right { display: flex; gap: 10px; align-items: center; }
+        .welcome-title { font-size: 20px; font-weight: 700; color: #6b46c1; }
+        .current-date { font-size: 14px; color: #718096; }
+        .test-badge { background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-left: 8px; }
+        
+        .home-btn { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: none; }
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+        /* 메뉴 화면 (Home) */
+        #menu-view { padding: 40px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+        .menu-btn { 
+            padding: 25px; 
+            font-size: 18px; 
+            font-weight: 700; 
+            border: 2px solid #e2e8f0; 
+            border-radius: 16px; 
+            background: white; 
+            color: #4a5568; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .menu-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); border-color: #8b5cf6; color: #6b46c1; }
+        .menu-icon { font-size: 24px; }
+
+        /* 서브 화면 (공통) */
+        .sub-view { display: none; padding: 20px; flex: 1; flex-direction: column; }
+        .sub-view.active { display: flex; }
+        .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .view-title { font-size: 20px; font-weight: 700; color: #2d3748; }
+        .back-btn { background: #cbd5e0; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        
+        /* 섹션 카드 */
+        .section-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #edf2f7; margin-bottom: 20px; }
+        h2 { color: #6b46c1; margin: 0 0 15px 0; font-size: 18px; font-weight: 700; }
+        
+        /* 입력 폼 스타일 */
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #4a5568; font-size: 14px; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #cbd5e0; font-size: 15px; background: #f8fafc; }
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: #8b5cf6; background: white; }
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* 버튼 스타일 */
+        .submit-button { width: 100%; padding: 15px; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; }
+        
+        /* 파일 업로드 스타일 */
+        .file-upload-wrapper { margin-top: 5px; display: none; }
+        .file-upload-btn { background: #f0fdf4; border: 1px dashed #16a34a; color: #166534; padding: 8px; width: 100%; border-radius: 8px; font-size: 13px; cursor: pointer; text-align: center; }
+        .file-preview { font-size: 12px; color: #166534; margin-top: 4px; display: block; }
+        
+        /* 기타 유틸리티 */
+        .date-filter-container { display: flex; justify-content: flex-end; margin-bottom: 15px; align-items: center; gap: 10px; }
+        .status-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 20px; background: #333; color: white; z-index: 9999; display: none; }
+        .status-message.success { background: #10b981; }
+        .status-message.error { background: #ef4444; }
+        .hidden { display: none !important; }
+
+        /* 자동완성 */
+        .autocomplete-container { position: relative; }
+        .autocomplete-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e0; border-radius: 0 0 10px 10px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .autocomplete-suggestion { padding: 10px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .autocomplete-suggestion:hover { background: #f8fafc; }
+        .book-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .book-tag { background: #f3e8ff; color: #6b46c1; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+        .book-tag .remove-btn { cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="planner-container">
+        <!-- 헤더 -->
+        <div class="header">
+            <div class="header-left">
+                <div class="welcome-title"><span id="studentName">학생</span>의 플래너 <span class="test-badge">TEST</span></div>
+                <div class="current-date" id="currentDate"></div>
+            </div>
+            <div class="header-right">
+                <button onclick="goToMenu()" class="home-btn" id="globalHomeBtn">🏠 홈으로</button>
+                <button onclick="logout()" class="logout-btn">로그아웃</button>
+            </div>
+        </div>
+
+        <!-- 1. 메뉴 -->
+        <div id="menu-view">
+            <button class="menu-btn" onclick="goToView('homework')"><span class="menu-icon">📤</span> 숙제 제출하기</button>
+            <button class="menu-btn" onclick="goToView('planner')"><span class="menu-icon">📝</span> 스터디 플래너 입력하기</button>
+            <button class="menu-btn" onclick="goToView('history')"><span class="menu-icon">📅</span> 나의 스터디 로그 보기</button>
+        </div>
+
+        <!-- 2. 숙제 제출 (개편됨) -->
+        <div id="homework-view" class="sub-view">
+            <div class="view-header">
+                <div class="view-title">📤 숙제 제출</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <form id="homeworkForm">
+                <div class="section-card">
+                    <h2>📋 숙제 확인</h2>
+                    <!-- 1. 문법 (인증샷 O) -->
+                    <div class="input-group">
+                        <label>⭕ 지난 문법 숙제 검사</label>
+                        <select name="⭕ 지난 문법 숙제 검사" onchange="toggleFileUpload(this, 'file-grammar')">
+                            <option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option>
+                        </select>
+                        <div class="file-upload-wrapper" id="wrapper-file-grammar">
+                            <input type="file" id="file-grammar" accept="image/*" class="file-upload-btn">
+                            <span class="file-preview">📸 문법 숙제 사진을 올려주세요</span>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group input-row">
+                        <div><label>1️⃣ 어휘 클카 암기</label><select name="1️⃣ 어휘 클카 암기 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                        <div><label>2️⃣ 독해 단어 클카</label><select name="2️⃣ 독해 단어 클카 숙제"><option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option></select></div>
+                    </div>
+                    
+                    <!-- 4. Summary (인증샷 O) -->
+                    <div class="input-group">
+                        <label>4️⃣ Summary 숙제</label>
+                        <select name="4️⃣ Summary 숙제" onchange="toggleFileUpload(this, 'file-summary')">
+                            <option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option>
+                        </select>
+                        <div class="file-upload-wrapper" id="wrapper-file-summary">
+                            <input type="file" id="file-summary" accept="image/*" class="file-upload-btn">
+                            <span class="file-preview">📸 Summary 사진을 올려주세요</span>
+                        </div>
+                    </div>
+
+                    <!-- 5. 독해서 풀기 (이름 수정됨, 인증샷 O) -->
+                    <div class="input-group">
+                        <label>5️⃣ 독해서 풀기 숙제</label>
+                        <select name="5️⃣ 독해서 풀기 숙제" onchange="toggleFileUpload(this, 'file-reading')">
+                            <option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option>
+                        </select>
+                        <div class="file-upload-wrapper" id="wrapper-file-reading">
+                            <input type="file" id="file-reading" accept="image/*" class="file-upload-btn">
+                            <span class="file-preview">📸 독해서 푼 사진을 올려주세요</span>
+                        </div>
+                    </div>
+
+                    <!-- 6. 부매일 (인증샷 O) -->
+                    <div class="input-group">
+                        <label>6️⃣ 부&매&일</label>
+                        <select name="6️⃣ 영어일기 or 개인 독해서" onchange="toggleFileUpload(this, 'file-diary')">
+                            <option value="해당없음">해당없음</option><option value="안 해옴">안 해옴</option><option value="숙제 함">숙제 함</option>
+                        </select>
+                        <div class="file-upload-wrapper" id="wrapper-file-diary">
+                            <input type="file" id="file-diary" accept="image/*" class="file-upload-btn">
+                            <span class="file-preview">📸 부&매&일 사진을 올려주세요</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="submit-button">숙제 제출하기</button>
+            </form>
+        </div>
+
+        <!-- 3. 플래너 입력 -->
+        <div id="planner-view" class="sub-view">
+             <div class="view-header"><div class="view-title">📝 플래너 작성</div><button class="back-btn" onclick="goToMenu()">메뉴로</button></div>
+             <form id="plannerForm">
+                <div class="section-card"><h2>📝 시험 결과</h2><div class="input-group input-row"><div><label>단어 (맞은 개수)</label><input type="number" name="단어 (맞은 개수)" min="0"></div><div><label>단어 (전체 개수)</label><input type="number" name="단어 (전체 개수)" min="0"></div></div><div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" placeholder="예: Unit 1, Unit 2-3"></div><div class="input-group input-row"><div><label>문법 (전체 개수)</label><input type="number" name="문법 (전체 개수)" min="0"></div><div><label>문법 (틀린 개수)</label><input type="number" name="문법 (틀린 개수)" min="0"></div></div><div class="input-group input-row"><div><label>독해 (틀린 개수)</label><input type="number" name="독해 (틀린 개수)" min="0"></div><div><label>독해 하브루타</label><select name="독해 하브루타"><option value="숙제없음">숙제없음</option><option value="완료함">완료함</option><option value="못하고감">못하고감</option></select></div></div></div>
+                <div class="section-card"><h2>🎧 리스닝 학습</h2><div class="input-group input-row"><div><label>영어 더빙 학습</label><select name="영어 더빙 학습"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="원서독서로 대체">원서독서로 대체</option><option value="듣기평가교재 완료">듣기평가교재 완료</option><option value="완료">완료</option></select></div><div><label>더빙 워크북</label><select name="더빙 워크북"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="원서독서로 대체">원서독서로 대체</option><option value="듣기평가교재 완료">듣기평가교재 완료</option><option value="완료">완료</option></select></div></div></div>
+                <div class="section-card"><h2>📚 원서 독서</h2><div class="input-group"><label>오늘 읽은 영어 책</label><div class="autocomplete-container"><input type="text" id="englishBookTitle" name="오늘 읽은 영어 책" placeholder="검색..."><div id="bookSuggestions" class="autocomplete-suggestions"></div></div><div id="englishBookTags" class="book-tags-container"></div></div><div class="input-group input-row"><div><label>영어독서</label><select name="📖 영어독서"><option value="못함">못함</option><option value="완료함">완료함</option></select></div><div><label>어휘학습</label><select name="어휘학습"><option value="못함">못함</option><option value="완료함">완료함</option></select></div><div><label>Writing</label><select name="Writing"><option value="SKIP">SKIP</option><option value="3 SENTENCE">3 SENTENCE</option><option value="북 리포트">북 리포트</option></select></div></div></div>
+                <div class="section-card"><h2>📕 책 읽는 거인</h2><div class="input-group"><label>3독 독서 제목</label><div class="autocomplete-container"><input type="text" id="giantBookTitle" name="오늘 읽은 한국 책" placeholder="검색..."><div id="sayuBookSuggestions" class="autocomplete-suggestions"></div></div><div id="giantBookTags" class="book-tags-container"></div></div><div class="input-group"><label>완료 여부</label><select name="완료 여부"><option value="진행하지 않음">진행하지 않음</option><option value="미완료">미완료</option><option value="완료">완료</option></select></div></div>
+                <div class="section-card"><h2>💬 오늘의 소감</h2><div class="input-group"><textarea name="오늘의 소감" rows="3" placeholder="오늘 학습하면서 느낀 점을 적어주세요."></textarea></div></div>
+                <button type="submit" class="submit-button">플래너 저장하기</button>
+             </form>
+        </div>
+
+        <!-- 4. 로그 보기 -->
+        <div id="history-view" class="sub-view">
+             <div class="view-header"><div class="view-title" id="historyTitle">📅 스터디 로그</div><button class="back-btn" onclick="goToMenu()">메뉴로</button></div><div class="date-filter-container"><label>날짜 선택: </label><input type="date" id="historyDateInput" onchange="loadHistoryData()"></div>
+             <div id="historyContent">
+                <!-- 읽기 전용 폼 -->
+                <form id="historyForm">
+                    <div class="section-card"><h2>📋 숙제 기록</h2><div class="input-group input-row"><div><label>문법 숙제</label><input type="text" name="⭕ 지난 문법 숙제 검사" disabled></div><div><label>어휘 클카</label><input type="text" name="1️⃣ 어휘 클카 암기 숙제" disabled></div></div><div class="input-group input-row"><div><label>독해 클카</label><input type="text" name="2️⃣ 독해 단어 클카 숙제" disabled></div><div><label>Summary</label><input type="text" name="4️⃣ Summary 숙제" disabled></div></div><div class="input-group input-row"><div><label>매일 독해</label><input type="text" name="5️⃣ 매일 독해 숙제" disabled></div><div><label>부&매&일</label><input type="text" name="6️⃣ 영어일기 or 개인 독해서" disabled></div></div></div>
+                    <div class="section-card"><h2>📝 시험/학습 기록</h2><div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" disabled></div><div class="input-group input-row"><div><label>단어 맞은개수</label><input type="text" name="단어 (맞은 개수)" disabled></div><div><label>문법 틀린개수</label><input type="text" name="문법 (틀린 개수)" disabled></div></div><div class="input-group"><label>영어 독서</label><input type="text" name="📖 영어독서" disabled></div><div class="input-group"><label>읽은 책 목록</label><div id="historyBookList" style="padding:10px; background:#f1f5f9; border-radius:8px; min-height:40px;"></div></div><div class="input-group"><label>오늘의 소감</label><textarea name="오늘의 소감" disabled rows="3"></textarea></div><div class="input-group"><label>선생님 코멘트</label><div id="historyTeacherComment" style="padding:15px; background:#fffbeb; border:1px solid #fbd38d; border-radius:8px; white-space: pre-wrap;"></div></div></div>
+                </form>
+             </div>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <script>
+        // [중요] 여기에 Firebase 설정값을 붙여넣으세요!
+        // 예: const firebaseConfig = { apiKey: "...", ... };
+        const firebaseConfig = {
+            // 여기에 복사한 config 내용을 붙여넣으세요
+        };
+
+        // Firebase 초기화
+        let storage;
+        try {
+            if (firebaseConfig.apiKey && firebase.apps.length === 0) { 
+                firebase.initializeApp(firebaseConfig); 
+                storage = firebase.storage();
+                console.log("Firebase initialized");
+            }
+        } catch(e) { console.error("Firebase init failed:", e); }
+
+        let authToken = localStorage.getItem('authToken');
+        let selectedEnglishBooks = [];
+        let selectedKoreanBooks = [];
+
+        // UI 로직: 파일 업로드 칸 토글
+        window.toggleFileUpload = function(selectEl, fileInputId) {
+            const wrapper = document.getElementById('wrapper-' + fileInputId);
+            if (selectEl.value === '숙제 함') {
+                wrapper.style.display = 'block';
+            } else {
+                wrapper.style.display = 'none';
+            }
+        };
+
+        // 이미지 업로드 함수
+        async function uploadImage(file) {
+            if (!storage) { alert("이미지 저장소 설정이 필요합니다."); return null; }
+            const storageRef = storage.ref();
+            const fileName = `${new Date().getTime()}_${file.name}`;
+            const fileRef = storageRef.child('homework_images/' + fileName);
+            
+            try {
+                const snapshot = await fileRef.put(file);
+                return await snapshot.ref.getDownloadURL();
+            } catch (e) {
+                console.error("Upload failed:", e);
+                return null;
+            }
+        }
+
+        // 폼 제출 (저장) - 숙제 제출 시 이미지 업로드 포함
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const formId = e.target.id;
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            // 1. 이미지 업로드 처리 (숙제 폼인 경우)
+            if (formId === 'homeworkForm') {
+                const uploadPromises = [];
+                const fileInputs = {
+                    'file-grammar': 'grammarImage',
+                    'file-summary': 'summaryImage',
+                    'file-reading': 'readingImage',
+                    'file-diary': 'diaryImage'
+                };
+
+                // 로딩 표시
+                showToast('저장 중... (이미지가 있으면 시간이 걸릴 수 있습니다)', 'success');
+
+                for (const [inputId, dataKey] of Object.entries(fileInputs)) {
+                    const fileInput = document.getElementById(inputId);
+                    if (fileInput && fileInput.files.length > 0) {
+                        const file = fileInput.files[0];
+                        uploadPromises.push(
+                            uploadImage(file).then(url => {
+                                if (url) data[dataKey] = url; 
+                            })
+                        );
+                    }
+                }
+                
+                if (uploadPromises.length > 0) {
+                    await Promise.all(uploadPromises);
+                }
+            }
+
+            // 2. 책 목록 처리 (플래너 폼인 경우)
+            if (formId === 'plannerForm') {
+                data.englishBooks = selectedEnglishBooks;
+                data.koreanBooks = selectedKoreanBooks;
+            }
+
+            // 3. 서버 전송
+            try {
+                const res = await fetch('/save-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showToast('저장되었습니다! 🎉', 'success');
+                } else {
+                    showToast('저장 실패 😢', 'error');
+                }
+            } catch (e) { showToast('오류 발생', 'error'); }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!authToken) { window.location.href = '/'; return; }
+            window.history.replaceState({ view: 'menu' }, '', '');
+            loadStudentInfo();
+            const today = new Date();
+            document.getElementById('currentDate').textContent = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
+            initializeBookAutocomplete();
+            initializeSayuBookAutocomplete();
+            goToMenu(false);
+            
+            document.getElementById('homeworkForm').addEventListener('submit', handleFormSubmit);
+            document.getElementById('plannerForm').addEventListener('submit', handleFormSubmit);
+        });
+        
+        async function loadStudentInfo() {
+            try {
+                const res = await fetch('/api/student-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const name = data.studentName;
+                    document.getElementById('studentName').textContent = name;
+                    const historyTitle = document.getElementById('historyTitle');
+                    if (historyTitle) {
+                        const lastChar = name.charCodeAt(name.length - 1);
+                        const hasJongseong = (lastChar - 0xAC00) % 28 > 0; 
+                        const suffix = hasJongseong ? '(이)의' : '의';
+                        historyTitle.textContent = `📅 ${name}${suffix} 스터디 로그`;
+                    }
+                } else {
+                    alert('로그인이 필요합니다.'); window.location.href = '/';
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function goToMenu(pushHistory = true) {
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('menu-view').style.display = 'flex';
+            document.getElementById('globalHomeBtn').style.display = 'none'; 
+            if (pushHistory) { window.history.pushState({ view: 'menu' }, '', ''); }
+        }
+
+        function goToView(viewName) {
+            document.getElementById('menu-view').style.display = 'none';
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('globalHomeBtn').style.display = 'block'; 
+            
+            if (viewName === 'homework') {
+                document.getElementById('homework-view').classList.add('active');
+                loadTodayData('homeworkForm'); 
+            } else if (viewName === 'planner') {
+                document.getElementById('planner-view').classList.add('active');
+                loadTodayData('plannerForm'); 
+            } else if (viewName === 'history') {
+                document.getElementById('history-view').classList.add('active');
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('historyDateInput').value = today;
+                loadHistoryData();
+            }
+            window.history.pushState({ view: viewName }, '', `#${viewName}`);
+        }
+
+        window.addEventListener('popstate', (event) => {
+            if (event.state && event.state.view && event.state.view !== 'menu') {
+                goToViewHelper(event.state.view);
+            } else {
+                goToMenuHelper();
+            }
+        });
+
+        function goToMenuHelper() {
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('menu-view').style.display = 'flex';
+            document.getElementById('globalHomeBtn').style.display = 'none';
+        }
+
+        function goToViewHelper(viewName) {
+            document.getElementById('menu-view').style.display = 'none';
+            document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('globalHomeBtn').style.display = 'block';
+            
+            if (viewName === 'homework') {
+                document.getElementById('homework-view').classList.add('active');
+                loadTodayData('homeworkForm');
+            } else if (viewName === 'planner') {
+                document.getElementById('planner-view').classList.add('active');
+                loadTodayData('plannerForm');
+            } else if (viewName === 'history') {
+                document.getElementById('history-view').classList.add('active');
+            }
+        }
+
+        async function loadTodayData(formId) {
+            try {
+                const res = await fetch('/api/get-today-progress', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const json = await res.json();
+                
+                if (json.success && json.progress) {
+                    const form = document.getElementById(formId);
+                    const data = json.progress;
+
+                    Object.keys(data).forEach(key => {
+                        const el = form.querySelector(`[name="${key}"]`);
+                        if (el) el.value = data[key];
+                    });
+
+                    if (formId === 'plannerForm') {
+                        if (data.englishBooks) {
+                            selectedEnglishBooks = data.englishBooks;
+                            renderBookTags('english');
+                        }
+                        if (data.koreanBooks) {
+                            selectedKoreanBooks = data.koreanBooks;
+                            renderBookTags('giant');
+                        }
+                    }
+                }
+            } catch (e) { console.error('Data load error:', e); }
+        }
+
+        async function loadHistoryData() {
+            const date = document.getElementById('historyDateInput').value;
+            if (!date) return;
+
+            try {
+                const res = await fetch(`/api/get-today-progress?date=${date}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const json = await res.json();
+
+                const form = document.getElementById('historyForm');
+                form.reset();
+                document.getElementById('historyBookList').innerHTML = '';
+                document.getElementById('historyTeacherComment').textContent = '코멘트 없음';
+
+                if (json.success && json.progress) {
+                    const data = json.progress;
+                    Object.keys(data).forEach(key => {
+                        const el = form.querySelector(`[name="${key}"]`);
+                        if (el) el.value = data[key];
+                    });
+                    
+                    if (data.englishBooks) {
+                        const titles = data.englishBooks.map(b => `<span class="book-tag">${b.title}</span>`).join('');
+                        document.getElementById('historyBookList').innerHTML = titles || '없음';
+                    }
+                    
+                    if (data['Today\'s Notice!']) { 
+                         document.getElementById('historyTeacherComment').textContent = data['Today\'s Notice!'];
+                    } else if (data['❤ Today\'s Notice!']) {
+                         document.getElementById('historyTeacherComment').textContent = data['❤ Today\'s Notice!'];
+                    }
+                } else {
+                     document.getElementById('historyTeacherComment').textContent = '데이터가 없습니다.';
+                }
+
+            } catch (e) { console.error(e); }
+        }
+
+        function showToast(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = `status-message ${type}`;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        function logout() {
+            if(confirm('로그아웃 하시겠습니까?')) {
+                localStorage.removeItem('authToken');
+                window.location.href = '/';
+            }
+        }
+
+        let searchTimeout;
+        let currentBooks = [];
+        
+        function initializeBookAutocomplete() {
+            const bookInput = document.getElementById('englishBookTitle');
+            if(!bookInput) return;
+            
+            bookInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(searchTimeout);
+                if (query.length < 2) { document.getElementById('bookSuggestions').style.display='none'; return; }
+                searchTimeout = setTimeout(() => { searchBooks(query, 'english'); }, 500);
+            });
+        }
+        
+        function initializeSayuBookAutocomplete() {
+             const bookInput = document.getElementById('giantBookTitle');
+             if(!bookInput) return;
+
+             bookInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(searchTimeout);
+                if (query.length < 2) { document.getElementById('sayuBookSuggestions').style.display='none'; return; }
+                searchTimeout = setTimeout(() => { searchBooks(query, 'korean'); }, 500);
+            });
+        }
+
+        async function searchBooks(query, type) {
+            const endpoint = type === 'english' ? '/api/search-books' : '/api/search-sayu-books';
+            const listId = type === 'english' ? 'bookSuggestions' : 'sayuBookSuggestions';
+            
+            try {
+                const res = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const books = await res.json();
+                const list = document.getElementById(listId);
+                
+                if (!books.length) {
+                    list.innerHTML = '<div class="autocomplete-suggestion">결과 없음</div>';
+                } else {
+                    list.innerHTML = books.map((b, i) => 
+                        `<div class="autocomplete-suggestion" onclick="selectBook('${type}', ${i})">
+                            ${b.title} <small>${b.author || ''}</small>
+                        </div>`
+                    ).join('');
+                    if(type==='english') window.tempEngBooks = books;
+                    else window.tempKorBooks = books;
+                }
+                list.style.display = 'block';
+            } catch (e) { console.error(e); }
+        }
+
+        window.selectBook = function(type, index) {
+            const book = type === 'english' ? window.tempEngBooks[index] : window.tempKorBooks[index];
+            const targetList = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            
+            if (!targetList.some(b => b.id === book.id)) {
+                targetList.push(book);
+                renderBookTags(type);
+            }
+            
+            document.getElementById(type === 'english' ? 'bookSuggestions' : 'sayuBookSuggestions').style.display = 'none';
+            document.getElementById(type === 'english' ? 'englishBookTitle' : 'giantBookTitle').value = '';
+        };
+
+        function renderBookTags(type) {
+            const container = document.getElementById(type === 'english' ? 'englishBookTags' : 'giantBookTags');
+            const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            
+            container.innerHTML = list.map((b, i) => 
+                `<div class="book-tag">
+                    ${b.title} <span class="remove-btn" onclick="removeBook('${type}', ${i})">×</span>
+                </div>`
+            ).join('');
+        }
+
+        window.removeBook = function(type, index) {
+            const list = type === 'english' ? selectedEnglishBooks : selectedKoreanBooks;
+            list.splice(index, 1);
+            renderBookTags(type);
+        };
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.querySelectorAll('.autocomplete-suggestions').forEach(el => el.style.display = 'none');
+            }
+        });
+    </script>
+</body>
+</html>
