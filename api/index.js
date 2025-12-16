@@ -261,15 +261,15 @@ async function parseDailyReportData(page) {
 
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
-        // [수정] 띄어쓰기 없는 속성명(단어(맞은 개수) 등) 사용
-        vocabCorrect: props['단어(맞은 개수)']?.number ?? null,
-        vocabTotal: props['단어(전체 개수)']?.number ?? null,
+        // [수정] 노션 DB 속성 이름(띄어쓰기 없음)에 맞춰 데이터 파싱
+        vocabCorrect: (props['단어(맞은 개수)'] || props['단어 (맞은 개수)'])?.number ?? null,
+        vocabTotal: (props['단어(전체 개수)'] || props['단어 (전체 개수)'])?.number ?? null,
         vocabScore: getFormulaValue(props['📰 단어 테스트 점수']),
-        readingWrong: props['독해(틀린 개수)']?.number ?? null,
+        readingWrong: (props['독해(틀린 개수)'] || props['독해 (틀린 개수)'])?.number ?? null,
         readingResult: getFormulaValue(props['📚 독해 해석 시험 결과']),
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-        grammarTotal: props['문법(전체 개수)']?.number ?? null,
-        grammarWrong: props['문법(틀린 개수)']?.number ?? null,
+        grammarTotal: (props['문법(전체 개수)'] || props['문법 (전체 개수)'])?.number ?? null,
+        grammarWrong: (props['문법(틀린 개수)'] || props['문법 (틀린 개수)'])?.number ?? null,
         grammarScore: getFormulaValue(props['📑 문법 시험 점수'])
     };
 
@@ -489,6 +489,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
         const ALLOWED_PROPS = { 
+            // 1. 숙제 (HTML name -> Notion Property)
             "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제", 
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
@@ -497,7 +498,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
 
-            // [핵심] 노션 속성 이름 띄어쓰기 없음으로 통일
+            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 맞춤)
             "단어(맞은 개수)": "단어(맞은 개수)",
             "단어(전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛", 
@@ -506,14 +507,18 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "독해(틀린 개수)": "독해(틀린 개수)",
             "독해 하브루타": "독해 하브루타",
 
+            // 3. 리스닝 & 독서
             "영어 더빙 학습": "영어 더빙 학습 완료",
             "더빙 워크북": "더빙 워크북 완료",
             "📖 영어독서": "📖 영어독서", 
             "어휘학습": "어휘학습", 
             "Writing": "Writing", 
             "완료 여부": "📕 책 읽는 거인",
+
+            // 4. 소감
             "오늘의 소감": "오늘의 학습 소감",
             
+            // 이미지
             "grammarImage": "문법 인증샷",
             "summaryImage": "Summary 인증샷",
             "readingImage": "독해서 인증샷",
@@ -565,9 +570,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         res.json({ success: true, message: '저장 완료' });
     } catch (error) { console.error('Save Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
-
-// ... (이하 동일) ...
-// 리포트 템플릿 로드, report 엔드포인트, URL 재생성 API, 크론잡, 서버 시작 부분은 변경 없음
 
 let reportTemplate = '';
 try {
@@ -644,6 +646,7 @@ app.get('/report', async (req, res) => {
     }
 });
 
+// [추가] 관리자용 리포트 URL 수동 재생성 API
 app.get('/api/admin/regenerate-urls', requireAuth, async (req, res) => {
     if (req.user.role !== 'manager') return res.status(403).json({ success: false, message: '관리자 권한이 필요합니다.' });
     
@@ -689,9 +692,11 @@ cron.schedule('0 22 * * *', async () => {
     console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {
         const { start, end, dateString } = getKSTTodayRange();
+        // [수정] 구버전 필터 구조 사용 ("and" 배열)
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter }) });
         for (const page of data.results) {
+            // [수정] http:// 또는 https:// 제거 (URL 생성 시)
             const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
             const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
 
