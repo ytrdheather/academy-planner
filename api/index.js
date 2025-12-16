@@ -188,12 +188,12 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 
         const prompt = `
         너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해. 자기 소개는 절대로 하지마.
-        [역할] 초중고 학생을 가르치는 영어 전문가, 중립적인 톤으로 점잖게, ~합니다, ~입니다 와 ~요 의 말투를 적절히 섞어 쓰는 친근한 말투의 소유자. 절대 xxx학생은 이라고 부르지 않음. *중요* 한국어 조사를 판단해서 ~이 ~가  ~이는 등으로 자연스럽게 학생을 부를 것.
+        [역할] 초중고 학생을 가르치는 영어 전문가, 중립적인 톤으로 점잖게, ~합니다, ~입니다 와 ~요 의 말투를 적절히 섞어 쓰는 친근한 말투의 소유자
         [입력 정보] 학생 이름: ${studentName}, 키워드: ${keywords}, 숙제 수행율: ${parsedData.completionRate}%
         [작성 규칙]
-        1. 첫 번째 문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다."로 시작. 이후에 한줄을 반드시 띄워주기 바람. 입력된 키워드를 사용하여 학생의 오늘 태도에 대해서 키워드가 자연스러운 문장이 되도록만 수정. 키워드가 "없음" 으로 입력될 경우 "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다." 만 출력하고 바로 다음 문단으로 넘어갈 것. 거짓 에피소드 넣지 말것.
-        2. 두 번째 문단: <📢 오늘의 숙제 수행율> 제목 사용. 숙제 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내. 학습 성취(테스트 결과 입력된 것만) 피드백. 테스트 결과가 아무 것도 없으면 테스트 결과 피드백 생략할 것.
-        3. 마무리: <📢 선생님 특별 전달 사항> 제목 사용. 후 밑은 비워둘 것.
+        1. 첫 번째 문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다."로 시작. 키워드를 사용하여 학생의 오늘 태도나 에피소드를 2~3줄로 자연스럽게 서술.
+        2. 두 번째 문단: <📢 오늘의 숙제 수행율> 제목 사용. 숙제 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내. 학습 성취(테스트 결과 등) 피드백.
+        3. 마무리: 긍정적 성취 칭찬, 아쉬운 점 대안 제시 너무 길지 않도록 내용 2~3줄로 조절할 것.
         [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
         `;
 
@@ -261,7 +261,7 @@ async function parseDailyReportData(page) {
 
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
-        // [수정] 노션 DB 속성 이름(띄어쓰기 없음)에 맞춰 데이터 파싱
+        // [수정] 띄어쓰기 없는 속성명(단어(맞은 개수) 등) 사용
         vocabCorrect: props['단어(맞은 개수)']?.number ?? null,
         vocabTotal: props['단어(전체 개수)']?.number ?? null,
         vocabScore: getFormulaValue(props['📰 단어 테스트 점수']),
@@ -420,27 +420,23 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
     try {
-        // [수정] 띄어쓰기 여부에 상관없이 노션의 올바른 속성 이름(띄어쓰기 없음)으로 매핑
+        // [수정] 선생님 저장: 띄어쓰기 유무 모두 대응하여 -> 띄어쓰기 없는 노션 속성명으로 매핑
         const mapPropName = (name) => {
             const mapping = { 
-                // 선생님 대시보드(띄어쓰기 포함) -> 노션 DB(띄어쓰기 없음)
+                "단어 (맞은 개수)": "단어(맞은 개수)",
                 "단어(맞은 개수)": "단어(맞은 개수)",
+                "단어 (전체 개수)": "단어(전체 개수)",
                 "단어(전체 개수)": "단어(전체 개수)",
+                "문법 (전체 개수)": "문법(전체 개수)",
                 "문법(전체 개수)": "문법(전체 개수)",
+                "문법 (틀린 개수)": "문법(틀린 개수)",
                 "문법(틀린 개수)": "문법(틀린 개수)",
+                "독해 (틀린 개수)": "독해(틀린 개수)",
                 "독해(틀린 개수)": "독해(틀린 개수)",
-
-                // 플래너 및 직접 요청(띄어쓰기 없음) -> 노션 DB(띄어쓰기 없음)
-                "단어(맞은 개수)": "단어(맞은 개수)",
-                "단어(전체 개수)": "단어(전체 개수)",
-                "문법(전체 개수)": "문법(전체 개수)",
-                "문법(틀린 개수)": "문법(틀린 개수)",
-                "독해(틀린 개수)": "독해(틀린 개수)",
-
-                // 기타 항목들
-                "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", // 구버전 호환
-                "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기", // 신버전
-                "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", // 직접 매핑
+                
+                "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
+                "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
+                "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", 
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
                 "오늘 읽은 한국 책": "국어 독서 제목", 
                 "문법 과제 내용": "문법 숙제 내용",
@@ -487,13 +483,12 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
 
-// [수정] save-progress: 노션 DB 속성에 맞춰 띄어쓰기 없는 이름으로 매핑
+// [수정] save-progress: 플래너 HTML name (띄어쓰기 없음) -> 노션 DB (띄어쓰기 없음)
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
     try {
         const ALLOWED_PROPS = { 
-            // 1. 숙제
             "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
             "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제", 
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
@@ -502,7 +497,7 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
 
-            // 2. 시험 결과 (띄어쓰기 없는 노션 속성명으로 매핑)
+            // [핵심] 노션 속성 이름 띄어쓰기 없음으로 통일
             "단어(맞은 개수)": "단어(맞은 개수)",
             "단어(전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛", 
@@ -511,18 +506,14 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "독해(틀린 개수)": "독해(틀린 개수)",
             "독해 하브루타": "독해 하브루타",
 
-            // 3. 리스닝 & 독서
             "영어 더빙 학습": "영어 더빙 학습 완료",
             "더빙 워크북": "더빙 워크북 완료",
             "📖 영어독서": "📖 영어독서", 
             "어휘학습": "어휘학습", 
             "Writing": "Writing", 
             "완료 여부": "📕 책 읽는 거인",
-
-            // 4. 소감
             "오늘의 소감": "오늘의 학습 소감",
             
-            // 이미지
             "grammarImage": "문법 인증샷",
             "summaryImage": "Summary 인증샷",
             "readingImage": "독해서 인증샷",
@@ -540,7 +531,6 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             let value = valueMapping[rawValue] || rawValue; 
             const notionPropName = ALLOWED_PROPS[key]; 
             
-            // [수정] 띄어쓰기 없는 노션 속성명 확인
             if (['단어(맞은 개수)', '단어(전체 개수)', '문법(전체 개수)', '문법(틀린 개수)', '독해(틀린 개수)'].includes(notionPropName)) { 
                 const numVal = Number(value); 
                 properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal }; 
@@ -575,6 +565,9 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         res.json({ success: true, message: '저장 완료' });
     } catch (error) { console.error('Save Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
+
+// ... (이하 동일) ...
+// 리포트 템플릿 로드, report 엔드포인트, URL 재생성 API, 크론잡, 서버 시작 부분은 변경 없음
 
 let reportTemplate = '';
 try {
@@ -651,7 +644,6 @@ app.get('/report', async (req, res) => {
     }
 });
 
-// [추가] 관리자용 리포트 URL 수동 재생성 API
 app.get('/api/admin/regenerate-urls', requireAuth, async (req, res) => {
     if (req.user.role !== 'manager') return res.status(403).json({ success: false, message: '관리자 권한이 필요합니다.' });
     
