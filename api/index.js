@@ -188,12 +188,12 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 
         const prompt = `
         너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해. 자기 소개는 절대로 하지마.
-        [역할] 초중고 학생을 가르치는 영어 전문가, 중립적인 톤으로 점잖게, ~합니다, ~입니다 와 ~요 의 말투를 적절히 섞어 쓰는 친근한 말투의 소유자
+        [역할] 초중고 학생을 가르치는 영어 전문가, 중립적인 톤으로 점잖게, ~합니다, ~입니다 와 ~요 의 말투를 적절히 섞어 쓰는 친근한 말투의 소유자. 학생의 이름을 xxx학생이라고 절대 말하지 않는다. xx이 xx가 xx이는 등등 한국어 조사를 고려한 자연스러운 호칭으로 부른다.
         [입력 정보] 학생 이름: ${studentName}, 키워드: ${keywords}, 숙제 수행율: ${parsedData.completionRate}%
         [작성 규칙]
-        1. 첫 번째 문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다."로 시작. 키워드를 사용하여 학생의 오늘 태도나 에피소드를 2~3줄로 자연스럽게 서술.
-        2. 두 번째 문단: <📢 오늘의 숙제 수행율> 제목 사용. 숙제 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내. 학습 성취(테스트 결과 등) 피드백.
-        3. 마무리: 긍정적 성취 칭찬, 아쉬운 점 대안 제시 너무 길지 않도록 내용 2~3줄로 조절할 것.
+        1. 첫 번째 문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다."로 시작.이 문장 밑은 반드시 한줄 띄워줌.  키워드를 자연스러운 문장으로 만들어 서술해 주면 됨. 없는 에피소드 만들어내지 말 것. 혹시 키워드가 "없음" 으로 쳐졌으면 아무것도 출력하지 말고 두번 째 문단으로 넘어감.
+        2. 두 번째 문단: <📢 오늘의 숙제 수행율> 제목 사용. 숙제 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내. 학습 성취(테스트 결과 등) 피드백. 테스트 결과 입력이 없는 것은 언급하지 않고 넘어감. 
+        3. 마무리: <📢 오늘의 중요 전달 사항> 이라고 제목만 출력해 줄 것.
         [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
         `;
 
@@ -261,14 +261,15 @@ async function parseDailyReportData(page) {
 
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
-        vocabCorrect: props['단어 (맞은 개수)']?.number ?? null,
-        vocabTotal: props['단어 (전체 개수)']?.number ?? null,
+        // [수정] 노션 DB 속성 이름(띄어쓰기 없음)에 맞춰 데이터 파싱
+        vocabCorrect: (props['단어(맞은 개수)'] || props['단어 (맞은 개수)'])?.number ?? null,
+        vocabTotal: (props['단어(전체 개수)'] || props['단어 (전체 개수)'])?.number ?? null,
         vocabScore: getFormulaValue(props['📰 단어 테스트 점수']),
-        readingWrong: props['독해 (틀린 개수)']?.number ?? null,
+        readingWrong: (props['독해(틀린 개수)'] || props['독해 (틀린 개수)'])?.number ?? null,
         readingResult: getFormulaValue(props['📚 독해 해석 시험 결과']),
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
-        grammarTotal: props['문법 (전체 개수)']?.number ?? null,
-        grammarWrong: props['문법 (틀린 개수)']?.number ?? null,
+        grammarTotal: (props['문법(전체 개수)'] || props['문법 (전체 개수)'])?.number ?? null,
+        grammarWrong: (props['문법(틀린 개수)'] || props['문법 (틀린 개수)'])?.number ?? null,
         grammarScore: getFormulaValue(props['📑 문법 시험 점수'])
     };
 
@@ -317,17 +318,16 @@ async function parseDailyReportData(page) {
     return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
 }
 
-// 데이터 로드 로직 (안정적인 구버전 필터 복구)
+// 데이터 로드 로직
 async function fetchProgressData(req, res, parseFunction) {
-    // [수정] date 파라미터가 있으면 그 날짜를 사용 (로그 보기 기능용)
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
     
     let dateString;
     if (date) {
-        dateString = date; // 직접 날짜 지정
+        dateString = date;
     } else {
-        dateString = getKSTTodayRange().dateString; // 오늘 날짜
+        dateString = getKSTTodayRange().dateString;
     }
 
     const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
@@ -353,7 +353,6 @@ async function fetchProgressData(req, res, parseFunction) {
     return await Promise.all(pages.map(parseFunction));
 }
 
-// [수정] API가 date 파라미터를 받을 수 있도록 위에서 로직 변경됨
 app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
         const data = await fetchProgressData(req, res, parseDailyReportData);
@@ -364,15 +363,12 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     }
 });
 
-// [추가] 학생 전용: 자신의 오늘 데이터 조회 (로그아웃 후에도 데이터 유지용)
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
-    const { date } = req.query; // 로그 보기 기능 지원
+    const { date } = req.query;
     
     try {
-        // 날짜 지정이 없으면 오늘, 있으면 그 날짜
         const dateString = date || getKSTTodayRange().dateString;
-        
         const filter = { "and": [ { property: '이름', title: { equals: studentName } }, { property: '🕐 날짜', date: { equals: dateString } } ] };
         
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter, page_size: 1 }) });
@@ -381,13 +377,13 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         const props = query.results[0].properties;
         const progress = {};
         
-        // 데이터 매핑 (기존 로직 유지)
         for (const [key, value] of Object.entries(props)) { 
             if (value.type === 'title') progress[key] = value.title[0]?.plain_text; 
             else if (value.type === 'rich_text') progress[key] = value.rich_text[0]?.plain_text; 
             else if (value.type === 'number') progress[key] = value.number; 
             else if (value.type === 'select') progress[key] = value.select?.name; 
-            else if (value.type === 'status') progress[key] = value.status?.name; 
+            else if (value.type === 'status') progress[key] = value.status?.name;
+            else if (value.type === 'files') progress[key] = value.files?.[0]?.external?.url || value.files?.[0]?.file?.url || '';
         }
         const engBookTitles = getRollupArray(props['📖 책제목 (롤업)']); const engBookARs = getRollupArray(props['AR']); const engBookLexiles = getRollupArray(props['Lexile']); const engBookIds = props['오늘 읽은 영어 책']?.relation?.map(r => r.id) || []; progress.englishBooks = engBookTitles.map((title, idx) => ({ title: title, id: engBookIds[idx] || null, ar: engBookARs[idx] || null, lexile: engBookLexiles[idx] || null }));
         const korBookTitles = getRollupArray(props['국어책제목(롤업)']); const korBookIds = props['국어 독서 제목']?.relation?.map(r => r.id) || []; progress.koreanBooks = korBookTitles.map((title, idx) => ({ title, id: korBookIds[idx] || null }));
@@ -424,15 +420,23 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     const { pageId, propertyName, newValue, propertyType, updates } = req.body;
     if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
     try {
-        // [핵심 수정] 코멘트 저장 시 정확한 노션 속성 이름 매핑 (띄어쓰기 포함)
+        // [수정] 선생님 저장: 띄어쓰기 유무 모두 대응하여 -> 띄어쓰기 없는 노션 속성명으로 매핑
         const mapPropName = (name) => {
             const mapping = { 
-                "단어 (맞은 개수)": "단어 (맞은 개수)",
-                "단어 (전체 개수)": "단어 (전체 개수)",
-                "문법 (전체 개수)": "문법 (전체 개수)",
-                "문법 (틀린 개수)": "문법 (틀린 개수)",
-                "독해 (틀린 개수)": "독해 (틀린 개수)",
+                "단어 (맞은 개수)": "단어(맞은 개수)",
+                "단어(맞은 개수)": "단어(맞은 개수)",
+                "단어 (전체 개수)": "단어(전체 개수)",
+                "단어(전체 개수)": "단어(전체 개수)",
+                "문법 (전체 개수)": "문법(전체 개수)",
+                "문법(전체 개수)": "문법(전체 개수)",
+                "문법 (틀린 개수)": "문법(틀린 개수)",
+                "문법(틀린 개수)": "문법(틀린 개수)",
+                "독해 (틀린 개수)": "독해(틀린 개수)",
+                "독해(틀린 개수)": "독해(틀린 개수)",
+                
                 "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
+                "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
+                "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", 
                 "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
                 "오늘 읽은 한국 책": "국어 독서 제목", 
                 "문법 과제 내용": "문법 숙제 내용",
@@ -451,6 +455,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
             if (type === 'select') return { select: val ? { name: val } : null };
             if (type === 'relation') return { relation: Array.isArray(val) ? val.map(id => ({ id })) : (val ? [{ id: val }] : []) };
             if (type === 'checkbox') return { checkbox: val };
+            if (type === 'file') return { files: [{ name: "인증샷", external: { url: val } }] }; 
             return { status: { name: val || '숙제 없음' } };
         };
 
@@ -478,7 +483,7 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
 
-// [수정] save-progress: 플래너(HTML)의 name과 노션 DB 속성을 정확히 1:1 매핑 (띄어쓰기 포함)
+// [수정] save-progress: 플래너 HTML name (띄어쓰기 없음) -> 노션 DB (띄어쓰기 없음)
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
     const studentName = req.user.name;
@@ -490,15 +495,16 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
             "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
             "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
+            "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
             "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
 
-            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 띄어쓰기 포함)
-            "단어 (맞은 개수)": "단어 (맞은 개수)",
-            "단어 (전체 개수)": "단어 (전체 개수)",
+            // 2. 시험 결과 (핵심 수정: 플래너 name과 동일하게 맞춤)
+            "단어(맞은 개수)": "단어(맞은 개수)",
+            "단어(전체 개수)": "단어(전체 개수)",
             "어휘유닛": "어휘유닛", 
-            "문법 (전체 개수)": "문법 (전체 개수)", 
-            "문법 (틀린 개수)": "문법 (틀린 개수)", 
-            "독해 (틀린 개수)": "독해 (틀린 개수)",
+            "문법(전체 개수)": "문법(전체 개수)", 
+            "문법(틀린 개수)": "문법(틀린 개수)", 
+            "독해(틀린 개수)": "독해(틀린 개수)",
             "독해 하브루타": "독해 하브루타",
 
             // 3. 리스닝 & 독서
@@ -510,7 +516,13 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             "완료 여부": "📕 책 읽는 거인",
 
             // 4. 소감
-            "오늘의 소감": "오늘의 학습 소감"
+            "오늘의 소감": "오늘의 학습 소감",
+            
+            // 이미지
+            "grammarImage": "문법 인증샷",
+            "summaryImage": "Summary 인증샷",
+            "readingImage": "독해서 인증샷",
+            "diaryImage": "부매일 인증샷"
         };
 
         const valueMapping = { "해당없음": "숙제 없음", "안 해옴": "안 해옴", "숙제 함": "숙제 함", "진행하지 않음": "진행하지 않음", "완료": "완료", "미완료": "미완료", "원서독서로 대체": "원서독서로 대체", "듣기평가교재 완료": "듣기평가교재 완료", "못함": "못함", "완료함": "완료함", "SKIP": "SKIP", "안함": "안함", "숙제없음": "숙제없음", "못하고감": "못하고감", "시작함": "시작함", "절반": "절반", "거의다읽음": "거의다읽음" };
@@ -524,13 +536,15 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             let value = valueMapping[rawValue] || rawValue; 
             const notionPropName = ALLOWED_PROPS[key]; 
             
-            if (['단어 (맞은 개수)', '단어 (전체 개수)', '문법 (전체 개수)', '문법 (틀린 개수)', '독해 (틀린 개수)'].includes(notionPropName)) { 
+            if (['단어(맞은 개수)', '단어(전체 개수)', '문법(전체 개수)', '문법(틀린 개수)', '독해(틀린 개수)'].includes(notionPropName)) { 
                 const numVal = Number(value); 
                 properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal }; 
             } else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(notionPropName)) { 
                 properties[notionPropName] = { select: { name: value } }; 
             } else if (['어휘유닛', '오늘의 학습 소감'].includes(notionPropName)) { 
                 properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; 
+            } else if (['문법 인증샷', 'Summary 인증샷', '독해서 인증샷', '부매일 인증샷'].includes(notionPropName)) {
+                if (value) properties[notionPropName] = { files: [{ name: "인증샷", external: { url: value } }] };
             } else { 
                 properties[notionPropName] = { status: { name: value } }; 
             } 
@@ -678,9 +692,11 @@ cron.schedule('0 22 * * *', async () => {
     console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {
         const { start, end, dateString } = getKSTTodayRange();
+        // [수정] 구버전 필터 구조 사용 ("and" 배열)
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter }) });
         for (const page of data.results) {
+            // [수정] http:// 또는 https:// 제거 (URL 생성 시)
             const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
             const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
 
@@ -690,15 +706,6 @@ cron.schedule('0 22 * * *', async () => {
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
 
-// ... existing code ...
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
-// ... existing code ...
-app.listen(PORT, ...);
-
-### ✅ 테스트 방법
-1.  Firebase 콘솔에서 복사한 설정값을 `planner-test.html`의 `const firebaseConfig = { ... }` 부분에 붙여넣습니다.
-2.  두 파일을 서버에 올립니다.
-3.  브라우저 주소창에 `https://readitude.onrender.com/planner-test` 를 입력해서 접속합니다.
-4.  새로운 기능들이 잘 작동하는지 마음껏 테스트해보세요! (숙제 제출 시 이미지 업로드도 해보시고요!)
 
 app.listen(PORT, '0.0.0.0', () => console.log(`✅ Final Server running on ${PORT}`));
