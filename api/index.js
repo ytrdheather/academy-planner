@@ -73,7 +73,7 @@ if (GEMINI_API_KEY) {
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
-    'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '주디쌤' },
+    'teacher2': { password: 'rdtd112!@', role: 'manager', name: '주디쌤' },
     'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '소영쌤' },
     'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '레일라쌤' },
     'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '제니쌤' },
