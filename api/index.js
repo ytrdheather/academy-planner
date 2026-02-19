@@ -65,7 +65,7 @@ async function fetchNotion(url, options, retries = 3) {
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     console.log('✅ Gemini AI 연결됨');
 }
 
