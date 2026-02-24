@@ -178,13 +178,27 @@ try {
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
+    console.log('-----------------------------------------');
+    console.log('🚀 [API 호출됨] AI 코멘트 생성 시작');
+    
     const { pageId, studentName, keywords } = req.body;
-    if (!pageId || !keywords) return res.status(400).json({ success: false, message: 'Missing info' });
-    if (!GEMINI_API_KEY) return res.status(500).json({ success: false, message: 'AI not configured' });
+    console.log(`- 입력받은 데이터: pageId=${pageId}, studentName=${studentName}, keywords=${keywords}`);
+
+    if (!pageId || !keywords) {
+        console.warn('🚨 실패: 필수 데이터 누락');
+        return res.status(400).json({ success: false, message: 'Missing info' });
+    }
+
+    if (!geminiModel) {
+        console.error('🚨 실패: Gemini 모델이 셋팅되지 않았습니다. (API 키 확인 필요)');
+        return res.status(500).json({ success: false, message: 'AI not configured' });
+    }
 
     try {
+        console.log('- Notion에서 학생 데이터 파싱 시작...');
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsedData = await parseDailyReportData(page);
+        console.log(`- 파싱 완료: 이번 주 수행율 ${parsedData.completionRate}%`);
 
         const prompt = `
         너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해. 자기 소개는 절대로 하지마.
@@ -197,11 +211,24 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
         [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
         `;
 
+        console.log('- Gemini API에 텍스트 생성 요청 중... (조금 걸릴 수 있습니다)');
         const result = await geminiModel.generateContent(prompt);
-        res.json({ success: true, comment: result.response.text() });
+        const commentText = result.response.text();
+        
+        console.log('✅ 코멘트 생성 성공!');
+        console.log('-----------------------------------------');
+        res.json({ success: true, comment: commentText });
+
     } catch (error) {
-        console.error('AI Comment Error:', error);
-        res.status(500).json({ success: false, message: 'AI generation failed' });
+        console.error('🚨 [치명적 에러 발생] AI Comment Error:', error);
+        
+        // 브라우저 네트워크 탭에서 에러 원인을 즉시 볼 수 있도록 상세 정보 전송
+        res.status(500).json({ 
+            success: false, 
+            message: 'AI generation failed',
+            errorDetail: error.message, // 진짜 에러 원인이 여기에 담깁니다.
+            errorStack: error.stack
+        });
     }
 });
 
