@@ -65,18 +65,19 @@ async function fetchNotion(url, options, retries = 3) {
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     console.log('✅ Gemini AI 연결됨');
 }
 
 // 선생님 계정 정보
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
-    'teacher1': { password: 'rdtd112!@', role: 'manager', name: '앨리스쌤' },
+    'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
     'teacher2': { password: 'rdtd112!@', role: 'manager', name: '주디쌤' },
     'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '소영쌤' },
     'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '레일라쌤' },
-    'manager2': { password: 'rdtd112!@', role: 'manager', name: '매니져조교' }
+    'manager2': { password: 'rdtd112!@', role: 'manager', name: '매니져조교' },
+    'teacher5': { password: 'rdtd112!@', role: 'manager', name: '앨리스쌤' }
 };
 
 // Helper Functions
