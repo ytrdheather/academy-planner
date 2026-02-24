@@ -72,12 +72,11 @@ if (GEMINI_API_KEY) {
 // 선생님 계정 정보
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
-    'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
-    'teacher2': { password: 'rdtd112!@', role: 'teacher', name: '주디쌤' },
+    'teacher1': { password: 'rdtd112!@', role: 'manager', name: '앨리스쌤' },
+    'teacher2': { password: 'rdtd112!@', role: 'manager', name: '주디쌤' },
     'teacher3': { password: 'rdtd112!@', role: 'teacher', name: '소영쌤' },
     'teacher4': { password: 'rdtd112!@', role: 'teacher', name: '레일라쌤' },
-    'assistant1': { password: 'rdtd112!@', role: 'assistant', name: '제니쌤' },
-    'assistant2': { password: 'rdtd112!@', role: 'assistant', name: '릴리쌤' }
+    'manager2': { password: 'rdtd112!@', role: 'manager', name: '매니져조교' }
 };
 
 // Helper Functions
