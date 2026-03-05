@@ -508,8 +508,40 @@ app.post('/teacher-login', async (req, res) => { const { teacherId, teacherPassw
 app.get('/api/teacher/user-info', requireAuth, (req, res) => { res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId }); });
 app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.user.userId, userName: req.user.name, userRole: req.user.role }); });
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
-app.post('/login', async (req, res) => { const { studentId, studentPassword } = req.body; try { const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: { and: [{ property: '학생 ID', rich_text: { equals: studentId } }, { property: '비밀번호', rich_text: { equals: studentPassword.toString() } }] } }) }); if (data.results.length > 0) { const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || studentId; const token = generateToken({ userId: studentId, role: 'student', name: name }); res.json({ success: true, token }); } else { res.json({ success: false, message: '로그인 실패' }); } } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } });
+app.post('/login', async (req, res) => { 
+    const { studentId, studentPassword } = req.body; 
 
+    // 🚨 [핵심 방어 코드] 앞뒤의 보이지 않는 줄바꿈, 공백 무조건 제거 및 소문자 통일
+    const cleanId = studentId ? studentId.trim().toLowerCase() : '';
+    const cleanPw = studentPassword ? studentPassword.toString().trim() : '';
+
+    console.log(`[로그인 시도] 정제된 ID: '${cleanId}', 정제된 PW: '${cleanPw}'`);
+
+    try { 
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+                filter: { 
+                    and: [
+                        { property: '학생 ID', rich_text: { equals: cleanId } }, 
+                        { property: '비밀번호', rich_text: { equals: cleanPw } }
+                    ] 
+                } 
+            }) 
+        }); 
+
+        if (data.results.length > 0) { 
+            const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || cleanId; 
+            const token = generateToken({ userId: cleanId, role: 'student', name: name }); 
+            res.json({ success: true, token }); 
+        } else { 
+            res.json({ success: false, message: '로그인 실패' }); 
+        } 
+    } catch (e) { 
+        console.error('[로그인 에러]', e);
+        res.status(500).json({ success: false, message: 'Error' }); 
+    } 
+});
 // [수정] save-progress: 플래너 HTML name (띄어쓰기 없음) -> 노션 DB (띄어쓰기 없음)
 app.post('/save-progress', requireAuth, async (req, res) => {
     const formData = req.body;
