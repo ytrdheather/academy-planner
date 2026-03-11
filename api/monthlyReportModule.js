@@ -16,7 +16,7 @@ let getKSTTodayRange;
 let getKoreanDate;
 
 /**
- * 월간 리포트용 데이터 파서 (다중 책 지원 업데이트)
+ * 월간 리포트용 데이터 파서 (다중 책 지원 + AR 점수 포함)
  */
 async function parseMonthlyStatsData(page) {
     const props = page.properties;
@@ -25,27 +25,46 @@ async function parseMonthlyStatsData(page) {
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-    // 2. 시험 점수
-    const vocabScoreString = props['📰 단어 테스트 점수']?.formula?.string || 'N/A';
-    const vocabScore = (vocabScoreString === 'N/A') ? 'N/A' : (parseFloat(vocabScoreString) || 0);
+   // 2. 시험 점수 (수정됨: 노션 수식이 숫자(number)로 반환될 때와 문자열(string)일 때 모두 완벽 대응)
+    const getScoreFromFormula = (prop) => {
+        if (!prop || !prop.formula) return 'N/A';
+        // 결과가 숫자일 때
+        if (prop.formula.type === 'number') return prop.formula.number !== null ? prop.formula.number : 'N/A';
+        // 결과가 문자열일 때
+        if (prop.formula.type === 'string') {
+            const str = prop.formula.string;
+            if (!str || str === 'N/A') return 'N/A';
+            const parsed = parseFloat(str);
+            return isNaN(parsed) ? 'N/A' : parsed;
+        }
+        return 'N/A';
+    };
 
-    const grammarScoreString = props['📑 문법 시험 점수']?.formula?.string || 'N/A';
-    const grammarScore = (grammarScoreString === 'N/A') ? 'N/A' : (parseFloat(grammarScoreString) || 0);
+    // 외운 단어 수 (맞은 개수) 가져오기 (띄어쓰기 유무 방어)
+    const vocabCorrect = props['단어(맞은 개수)']?.number || props['단어 (맞은 개수)']?.number || 0;
 
-    const readingResult = props['📚 독해 해석 시험 결과']?.formula?.string || 'N/A';
-
-    // 3. [핵심 수정] 총 읽은 권수 (다중 책 처리)
-    // 롤업된 책 제목들을 배열로 모두 가져옵니다.
-    let bookTitles = [];
-    const rollup = props['📖 책제목 (롤업)']?.rollup;
+    // 3. [신규] 총 읽은 권수 (다중 책 처리 + AR 점수 매핑)
+    let books = [];
+    const titleRollup = props['📖 책제목 (롤업)']?.rollup;
+    const arRollup = props['AR']?.rollup; // 노션의 AR 롤업 속성 가져오기
     
-    if (rollup && rollup.array) {
-        bookTitles = rollup.array.map(item => {
-            // 롤업 데이터 타입에 따라 텍스트 추출
-            if (item.type === 'title') return item.title?.[0]?.plain_text;
-            if (item.type === 'rich_text') return item.rich_text?.[0]?.plain_text;
-            return null;
-        }).filter(title => title && title !== '읽은 책 없음');
+    if (titleRollup && titleRollup.array) {
+        titleRollup.array.forEach((item, index) => {
+            let title = null;
+            if (item.type === 'title') title = item.title?.[0]?.plain_text;
+            else if (item.type === 'rich_text') title = item.rich_text?.[0]?.plain_text;
+            
+            if (title && title !== '읽은 책 없음') {
+                let ar = null;
+                // 같은 순서(index)에 있는 AR 점수 가져오기
+                if (arRollup && arRollup.array && arRollup.array[index]) {
+                    const arItem = arRollup.array[index];
+                    if (arItem.type === 'number') ar = arItem.number;
+                    else if (arItem.type === 'rich_text') ar = arItem.rich_text?.[0]?.plain_text;
+                }
+                books.push({ title, ar });
+            }
+        });
     }
 
     // 4. 일일 코멘트
@@ -59,7 +78,8 @@ async function parseMonthlyStatsData(page) {
         vocabScore,
         grammarScore,
         readingResult,
-        bookTitles: bookTitles, // 배열로 반환 (예: ['해리포터', '매직트리하우스'])
+        vocabCorrect,
+        books: books, // 기존 bookTitles 배열 대신 객체(제목, AR) 배열 반환
         teacherComment,
         date: pageDate
     };
@@ -74,21 +94,25 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
     const totalDaysInMonth = new Date(year, monthNum, 0).getDate();
 
-    // [핵심 수정] 독서 목록 생성 (다중 책 펼치기 + 중복 제거)
-    // 1. 모든 날짜의 책 배열을 하나로 합침 (flat)
-    const allBookTitles = monthPages.flatMap(p => p.bookTitles || []);
+    // 모든 책 데이터를 합치고 '제목'을 기준으로 중복 제거
+    const allBooks = monthPages.flatMap(p => p.books || []);
+    const uniqueBooksMap = new Map();
+    allBooks.forEach(b => {
+        if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
+    });
+    const uniqueBooks = Array.from(uniqueBooksMap.values());
     
-    // 2. 중복 제거
-    const uniqueBooks = [...new Set(allBookTitles)];
-    
-    // 3. HTML 리스트 생성
+    // [신규] 리포트 화면에 뿌려줄 때 AR 점수가 있으면 예쁜 뱃지 추가
     const bookListHtml = uniqueBooks.length > 0
-        ? uniqueBooks.map(title => `<li>${title}</li>`).join('\n')
+        ? uniqueBooks.map(b => {
+            const arBadge = b.ar ? `<span class="inline-block bg-teal-100 text-teal-700 text-[11px] font-extrabold px-2 py-0.5 rounded-full ml-1.5 align-middle border border-teal-200">AR ${b.ar}</span>` : '';
+            return `<li class="flex items-center mb-1.5"><span class="text-gray-800">${b.title}</span>${arBadge}</li>`;
+        }).join('\n')
         : '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
-    // 통계 계산 (자동 생성 시 stats가 없을 경우를 대비해 재계산 로직 보강 가능하나, 여기서는 전달받은 stats 사용)
-    // 단, 총 권수는 uniqueBooks.length가 더 정확할 수 있음 (선택 사항)
-    
+    // 한 달 동안 외운 총 단어 수 합산
+    const totalVocabWords = monthPages.reduce((sum, p) => sum + (p.vocabCorrect || 0), 0);
+
     const hwScore = Math.round(stats.hwAvg);
     const rtNotice = {};
     if (hwScore < 70) {
@@ -132,6 +156,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         '{{READING_PASS_RATE_COLOR}}': readingPassRateColor,
         '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
         '{{BOOK_LIST_HTML}}': bookListHtml,
+        '{{TOTAL_VOCAB_WORDS}}': totalVocabWords 
     };
 
     let html = template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
@@ -168,7 +193,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         if (!monthlyReportTemplate) return res.status(500).send('Template Error');
 
         try {
-            // DB에서 리포트 데이터 조회
             const reportQuery = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -185,7 +209,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
             if (reportQuery.results.length === 0) return res.status(404).send('Report not found');
             const reportData = reportQuery.results[0].properties;
 
-            // 학생 이름 가져오기
             let studentName = '학생';
             if (reportData['학생']?.relation?.[0]?.id) {
                 const studentPage = await fetchNotion(`https://api.notion.com/v1/pages/${reportData['학생'].relation[0].id}`);
@@ -201,7 +224,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 readingPassRate: reportData['독해 통과율(%)']?.number || 0
             };
 
-            // 진도 DB에서 상세 데이터(책 목록 등) 조회
             const [year, monthNum] = month.split('-').map(Number);
             const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
             const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
@@ -234,7 +256,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         const { studentName, date } = req.query;
         try {
             const d = new Date(date);
-            // 지난 달 구하기
             const lastMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1);
             const monthStr = `${lastMonth.getFullYear()}-${(lastMonth.getMonth() + 1).toString().padStart(2, '0')}`;
 
@@ -259,13 +280,12 @@ export function initializeMonthlyReportRoutes(dependencies) {
         } catch (e) { res.status(500).json({ message: e.message }); }
     });
 
-    // 3. 수동 생성 API (다중 책 카운팅 적용)
+    // 3. 수동 생성 API
     app.get('/api/manual-monthly-report-gen', async (req, res) => {
         const { studentName, month } = req.query;
         if (!studentName || !month) return res.status(400).json({ message: 'Missing info' });
 
         try {
-            // 학생 찾기
             const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_DATABASE_ID}/query`, {
                 method: 'POST',
                 body: JSON.stringify({ filter: { property: '이름', title: { equals: studentName } } })
@@ -273,7 +293,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
             if (!studentData.results.length) return res.status(404).json({ message: 'Student not found' });
             const studentPageId = studentData.results[0].id;
 
-            // 진도 데이터 가져오기
             const [y, m] = month.split('-');
             const firstDay = new Date(y, m - 1, 1).toISOString().split('T')[0];
             const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
@@ -294,15 +313,17 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
             if (monthPages.length === 0) return res.json({ message: 'No data for this month' });
 
-            // [통계 계산]
             const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
             const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
             
-            // [핵심] 책 통계 (flatten & unique)
-            const allBookTitles = monthPages.flatMap(p => p.bookTitles);
-            const uniqueBooks = [...new Set(allBookTitles)];
+            const allBooks = monthPages.flatMap(p => p.books || []);
+            const uniqueBooksMap = new Map();
+            allBooks.forEach(b => {
+                if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
+            });
+            const uniqueBooks = Array.from(uniqueBooksMap.values());
             
             const comments = monthPages.map(p => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim().length > 15).join('\n');
 
@@ -311,11 +332,11 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 vocabAvg: vocabScores.length ? Math.round(vocabScores.reduce((a,b)=>a+b,0)/vocabScores.length) : 0,
                 grammarAvg: grammarScores.length ? Math.round(grammarScores.reduce((a,b)=>a+b,0)/grammarScores.length) : 0,
                 readingPassRate: readingResults.length ? Math.round(readingResults.filter(r=>r==='PASS').length/readingResults.length*100) : 0,
-                totalBooks: uniqueBooks.length, // 중복 제거된 권수
-                bookListString: uniqueBooks.join(', ') || '읽은 책 없음'
+                totalBooks: uniqueBooks.length,
+                // AI 요약 및 노션 DB 저장을 위해 (AR:x.x) 형태의 문자열로 만들어줌
+                bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
             };
 
-            // Gemini 요약
             let aiSummary = 'AI 요약 불가';
             if (geminiModel) {
                 try {
@@ -331,8 +352,9 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 } catch (e) { console.error(e); }
             }
 
-            // DB 저장
-            const reportUrl = `${domainUrl}/monthly-report?studentId=${studentPageId}&month=${month}`;
+            const cleanDomain = domainUrl.replace(/^https?:\/\//, '');
+            const reportUrl = `${cleanDomain}/monthly-report?studentId=${studentPageId}&month=${month}`;
+            
             const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -346,7 +368,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
             });
 
             const props = {
-                '월간리포트URL': { url: reportUrl },
+                '월간리포트URL': { url: `https://${reportUrl}` },
                 '숙제수행율(평균)': { number: stats.hwAvg },
                 '어휘점수(평균)': { number: stats.vocabAvg },
                 '문법점수(평균)': { number: stats.grammarAvg },
@@ -375,7 +397,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 });
             }
 
-            res.json({ success: true, message: 'Generated', url: reportUrl });
+            res.json({ success: true, message: 'Generated', url: `https://${reportUrl}` });
 
         } catch (e) {
             console.error(e);
@@ -383,7 +405,138 @@ export function initializeMonthlyReportRoutes(dependencies) {
         }
     });
 
-    // 4. 스케줄링 (매월 마지막 주 금요일)
-    // (간소화를 위해 로직은 위 수동 생성과 거의 동일하므로 생략하거나 필요시 추가)
-    // ...
+    // 4. 스케줄링 (매월 마지막 주 토요일 밤 10시 자동 실행)
+    cron.schedule('0 22 * * 6', async () => {
+        const today = new Date();
+        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        if (today.getMonth() !== nextWeek.getMonth()) {
+            console.log('--- 🚀 이번 달 마지막 토요일: 월말 리포트 자동 생성 시작 ---');
+
+            try {
+                const currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
+                const studentData = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_DATABASE_ID}/query`, {
+                    method: 'POST'
+                });
+
+                for (const student of studentData.results) {
+                    const studentName = student.properties['이름']?.title?.[0]?.plain_text;
+                    const studentPageId = student.id;
+                    
+                    if (!studentName) continue;
+                    console.log(`[자동 생성] ${studentName} 학생의 ${currentMonth}월 리포트 작업 중...`);
+
+                    const progressData = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.PROGRESS_DATABASE_ID}/query`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            filter: {
+                                and: [
+                                    { property: '이름', title: { equals: studentName } },
+                                    { property: '🕐 날짜', date: { on_or_after: firstDay } },
+                                    { property: '🕐 날짜', date: { on_or_before: lastDay } }
+                                ]
+                            }
+                        })
+                    });
+
+                    const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
+                    if (monthPages.length === 0) {
+                        console.log(`   -> ${studentName} 학생은 이번 달 데이터가 없어 건너뜁니다.`);
+                        continue;
+                    }
+
+                    const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
+                    const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
+                    const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
+                    const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
+                    
+                    const allBooks = monthPages.flatMap(p => p.books || []);
+                    const uniqueBooksMap = new Map();
+                    allBooks.forEach(b => {
+                        if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
+                    });
+                    const uniqueBooks = Array.from(uniqueBooksMap.values());
+                    
+                    const comments = monthPages.map(p => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim().length > 15).join('\n');
+
+                    const stats = {
+                        hwAvg: hwRates.length ? Math.round(hwRates.reduce((a,b)=>a+b,0)/hwRates.length) : 0,
+                        vocabAvg: vocabScores.length ? Math.round(vocabScores.reduce((a,b)=>a+b,0)/vocabScores.length) : 0,
+                        grammarAvg: grammarScores.length ? Math.round(grammarScores.reduce((a,b)=>a+b,0)/grammarScores.length) : 0,
+                        readingPassRate: readingResults.length ? Math.round(readingResults.filter(r=>r==='PASS').length/readingResults.length*100) : 0,
+                        totalBooks: uniqueBooks.length,
+                        bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
+                    };
+
+                    let aiSummary = 'AI 요약 불가';
+                    if (geminiModel) {
+                        try {
+                            const prompt = `
+                            선생님 입장에서 학부모님께 보낼 ${currentMonth}월 리포트 총평을 작성해줘. 학생 이름: ${studentName}.
+                            [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}, 문법:${stats.grammarAvg}, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                            [책목록] ${stats.bookListString}
+                            [일일코멘트] ${comments}
+                            친근하고 격려하는 톤으로, 구체적인 개선점도 포함해서 작성해줘.
+                            `;
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            const result = await geminiModel.generateContent(prompt);
+                            aiSummary = (await result.response).text();
+                        } catch (e) { console.error('Gemini Error:', e); }
+                    }
+
+                    const cleanDomain = domainUrl.replace(/^https?:\/\//, '');
+                    const reportUrl = `${cleanDomain}/monthly-report?studentId=${studentPageId}&month=${currentMonth}`;
+                    
+                    const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            filter: {
+                                and: [
+                                    { property: '학생', relation: { contains: studentPageId } },
+                                    { property: '리포트 월', rich_text: { equals: currentMonth } }
+                                ]
+                            }
+                        })
+                    });
+
+                    const props = {
+                        '월간리포트URL': { url: `https://${reportUrl}` },
+                        '숙제수행율(평균)': { number: stats.hwAvg },
+                        '어휘점수(평균)': { number: stats.vocabAvg },
+                        '문법점수(평균)': { number: stats.grammarAvg },
+                        '총 읽은 권수': { number: stats.totalBooks },
+                        '읽은 책 목록': { rich_text: [{ text: { content: stats.bookListString.substring(0, 2000) } }] },
+                        'AI 요약': { rich_text: [{ text: { content: aiSummary.substring(0, 2000) } }] },
+                        '독해 통과율(%)': { number: stats.readingPassRate }
+                    };
+
+                    if (existingReport.results.length > 0) {
+                        await fetchNotion(`https://api.notion.com/v1/pages/${existingReport.results[0].id}`, {
+                            method: 'PATCH', body: JSON.stringify({ properties: props })
+                        });
+                    } else {
+                        await fetchNotion('https://api.notion.com/v1/pages', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                parent: { database_id: dbIds.MONTHLY_REPORT_DB_ID },
+                                properties: {
+                                    ...props,
+                                    '이름': { title: [{ text: { content: `${studentName} - ${currentMonth} 리포트` } }] },
+                                    '학생': { relation: [{ id: studentPageId }] },
+                                    '리포트 월': { rich_text: [{ text: { content: currentMonth } }] }
+                                }
+                            })
+                        });
+                    }
+                    console.log(`   -> ${studentName} 리포트 발행 완료`);
+                }
+                console.log('--- 🎉 이번 달 리포트 자동 생성 완료 ---');
+            } catch (error) {
+                console.error('🚨 월말 리포트 스케줄러 에러:', error);
+            }
+        }
+    }, { timezone: "Asia/Seoul" });
 }
