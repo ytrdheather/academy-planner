@@ -25,7 +25,7 @@ async function parseMonthlyStatsData(page) {
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-   // 2. 시험 점수 (수정됨: 노션 수식이 숫자(number)로 반환될 때와 문자열(string)일 때 모두 완벽 대응)
+    // 2. 시험 점수 (수정됨: 노션 수식 대응 및 속성 이름 불일치 완벽 방어)
     const getScoreFromFormula = (prop) => {
         if (!prop || !prop.formula) return 'N/A';
         // 결과가 숫자일 때
@@ -40,13 +40,31 @@ async function parseMonthlyStatsData(page) {
         return 'N/A';
     };
 
+    // [핵심 신규 추가] 이모지가 아이콘으로 처리되거나 띄어쓰기가 달라도 '핵심 키워드'만으로 속성을 무조건 찾아내는 헬퍼
+    const getPropByKeywords = (propsObj, keywords) => {
+        const keys = Object.keys(propsObj);
+        for (const k of keys) {
+            if (keywords.every(word => k.includes(word))) return propsObj[k];
+        }
+        return null;
+    };
+
+    // 속성 이름을 스마트하게 탐색
+    const vocabScoreProp = props['📰 단어 테스트 점수'] || getPropByKeywords(props, ['단어', '점수']);
+    const grammarScoreProp = props['📑 문법 시험 점수'] || getPropByKeywords(props, ['문법', '점수']);
+    const readingResultProp = props['📚 독해 해석 시험 결과'] || getPropByKeywords(props, ['독해', '결과']);
+
+    const vocabScore = getScoreFromFormula(vocabScoreProp);
+    const grammarScore = getScoreFromFormula(grammarScoreProp);
+    const readingResult = readingResultProp?.formula?.string || 'N/A';
+
     // 외운 단어 수 (맞은 개수) 가져오기 (띄어쓰기 유무 방어)
     const vocabCorrect = props['단어(맞은 개수)']?.number || props['단어 (맞은 개수)']?.number || 0;
 
-    // 3. [신규] 총 읽은 권수 (다중 책 처리 + AR 점수 매핑)
+    // 3. 총 읽은 권수 (다중 책 처리 + AR 점수 매핑)
     let books = [];
-    const titleRollup = props['📖 책제목 (롤업)']?.rollup;
-    const arRollup = props['AR']?.rollup; // 노션의 AR 롤업 속성 가져오기
+    const titleRollup = props['📖 책제목 (롤업)']?.rollup || getPropByKeywords(props, ['책제목', '롤업'])?.rollup;
+    const arRollup = props['AR']?.rollup; 
     
     if (titleRollup && titleRollup.array) {
         titleRollup.array.forEach((item, index) => {
@@ -56,7 +74,6 @@ async function parseMonthlyStatsData(page) {
             
             if (title && title !== '읽은 책 없음') {
                 let ar = null;
-                // 같은 순서(index)에 있는 AR 점수 가져오기
                 if (arRollup && arRollup.array && arRollup.array[index]) {
                     const arItem = arRollup.array[index];
                     if (arItem.type === 'number') ar = arItem.number;
@@ -68,10 +85,10 @@ async function parseMonthlyStatsData(page) {
     }
 
     // 4. 일일 코멘트
-    const teacherComment = getSimpleText(props['❤ Today\'s Notice!']) || '';
+    const teacherComment = getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '';
 
     // 5. 날짜
-    const pageDate = props['🕐 날짜']?.date?.start || '';
+    const pageDate = props['🕐 날짜']?.date?.start || getPropByKeywords(props, ['날짜'])?.date?.start || '';
 
     return {
         completionRate: (completionRate === null) ? null : Math.round(completionRate),
@@ -79,7 +96,7 @@ async function parseMonthlyStatsData(page) {
         grammarScore,
         readingResult,
         vocabCorrect,
-        books: books, // 기존 bookTitles 배열 대신 객체(제목, AR) 배열 반환
+        books: books, 
         teacherComment,
         date: pageDate
     };
@@ -94,7 +111,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
     const totalDaysInMonth = new Date(year, monthNum, 0).getDate();
 
-    // 모든 책 데이터를 합치고 '제목'을 기준으로 중복 제거
     const allBooks = monthPages.flatMap(p => p.books || []);
     const uniqueBooksMap = new Map();
     allBooks.forEach(b => {
@@ -102,7 +118,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     });
     const uniqueBooks = Array.from(uniqueBooksMap.values());
     
-    // [신규] 리포트 화면에 뿌려줄 때 AR 점수가 있으면 예쁜 뱃지 추가
     const bookListHtml = uniqueBooks.length > 0
         ? uniqueBooks.map(b => {
             const arBadge = b.ar ? `<span class="inline-block bg-teal-100 text-teal-700 text-[11px] font-extrabold px-2 py-0.5 rounded-full ml-1.5 align-middle border border-teal-200">AR ${b.ar}</span>` : '';
@@ -110,7 +125,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         }).join('\n')
         : '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
-    // 한 달 동안 외운 총 단어 수 합산
     const totalVocabWords = monthPages.reduce((sum, p) => sum + (p.vocabCorrect || 0), 0);
 
     const hwScore = Math.round(stats.hwAvg);
@@ -313,6 +327,8 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
             if (monthPages.length === 0) return res.json({ message: 'No data for this month' });
 
+            // [핵심] 여기서 0점을 필터링하는 로직(s !== 0)은 아주 완벽하게 잘 작동하는 코드입니다! 
+            // 학생이 아예 시험을 안 본 날(결석 등)은 수식이 0을 뱉는데, 그 0점들을 평균에서 빼주어 평균이 억울하게 낮아지는 걸 막아줍니다.
             const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
             const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
@@ -333,7 +349,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 grammarAvg: grammarScores.length ? Math.round(grammarScores.reduce((a,b)=>a+b,0)/grammarScores.length) : 0,
                 readingPassRate: readingResults.length ? Math.round(readingResults.filter(r=>r==='PASS').length/readingResults.length*100) : 0,
                 totalBooks: uniqueBooks.length,
-                // AI 요약 및 노션 DB 저장을 위해 (AR:x.x) 형태의 문자열로 만들어줌
                 bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
             };
 
