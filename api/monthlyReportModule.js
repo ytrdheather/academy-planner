@@ -151,6 +151,13 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
     const readingPassRateColor = (stats.readingPassRate < 80) ? 'text-red-600' : 'text-teal-600';
 
+    // [신규] AI 코멘트 마크다운 스타일링 (프론트엔드에서 예쁘게 보이도록 HTML 태그로 변환)
+    let displaySummary = stats.aiSummary || '';
+    displaySummary = displaySummary
+        .replace(/^###\s*(.*)$/gm, '<h3 class="text-[1.1rem] font-extrabold text-teal-800 mt-8 mb-3 bg-teal-50 px-3 py-2 rounded-lg border-l-4 border-teal-500 shadow-sm flex items-center">$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-teal-700 font-bold bg-teal-50/50 px-1 rounded">$1</strong>')
+        .replace(/\n/g, '<br>');
+
     const replacements = {
         '{{STUDENT_NAME}}': studentName,
         '{{REPORT_MONTH}}': `${year}년 ${monthNum}월`,
@@ -163,7 +170,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         '{{RT_NOTICE_TITLE_COLOR}}': rtNotice.titleColor,
         '{{RT_NOTICE_TEXT_COLOR}}': rtNotice.textColor,
         '{{RT_NOTICE_TITLE}}': rtNotice.title,
-        '{{AI_SUMMARY}}': stats.aiSummary.replace(/\n/g, '<br>'),
+        '{{AI_SUMMARY}}': displaySummary,
         '{{ATTENDANCE_DAYS}}': attendanceDays,
         '{{TOTAL_DAYS_IN_MONTH}}': totalDaysInMonth,
         '{{VOCAB_AVG_SCORE}}': Math.round(stats.vocabAvg),
@@ -358,11 +365,18 @@ export function initializeMonthlyReportRoutes(dependencies) {
             if (geminiModel) {
                 try {
                     const prompt = `
-                    선생님 입장에서 학부모님께 보낼 ${month}월 리포트 총평을 작성해줘. 학생 이름: ${studentName}.
+                    당신은 영어 학원 선생님입니다. 학부모님께 보낼 ${month}월 리포트 총평을 작성해주세요. 학생 이름: ${studentName}.
                     [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}, 문법:${stats.grammarAvg}, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
                     [책목록] ${stats.bookListString}
                     [일일코멘트] ${comments}
-                    친근하고 격려하는 톤으로, 구체적인 개선점도 포함해서 작성해줘.
+                    
+                    반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                    ### 🌟 학습 태도 및 성실도
+                    ### 📚 독서 및 어휘
+                    ### 💡 독해 및 문법
+                    ### 👩‍🏫 선생님의 한마디
+                    
+                    단순한 사실 나열보다는 전문가다운 분석과 따뜻한 격려가 돋보이게 작성하고, 중요한 부분은 **강조표시**를 해주세요.
                     `;
                     const result = await geminiModel.generateContent(prompt);
                     aiSummary = (await result.response).text();
@@ -492,11 +506,18 @@ export function initializeMonthlyReportRoutes(dependencies) {
                     if (geminiModel) {
                         try {
                             const prompt = `
-                            선생님 입장에서 학부모님께 보낼 ${currentMonth}월 리포트 총평을 작성해줘. 학생 이름: ${studentName}.
+                            당신은 영어 학원 선생님입니다. 학부모님께 보낼 ${currentMonth}월 리포트 총평을 작성해주세요. 학생 이름: ${studentName}.
                             [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}, 문법:${stats.grammarAvg}, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
                             [책목록] ${stats.bookListString}
                             [일일코멘트] ${comments}
-                            친근하고 격려하는 톤으로, 구체적인 개선점도 포함해서 작성해줘.
+                            
+                            반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                            ### 🌟 학습 태도 및 성실도
+                            ### 📚 독서 및 어휘
+                            ### 💡 독해 및 문법
+                            ### 👩‍🏫 선생님의 한마디
+                            
+                            단순한 사실 나열보다는 전문가다운 분석과 따뜻한 격려가 돋보이게 작성하고, 중요한 부분은 **강조표시**를 해주세요.
                             `;
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             const result = await geminiModel.generateContent(prompt);

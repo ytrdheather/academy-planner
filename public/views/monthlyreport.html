@@ -23,11 +23,11 @@
 </head>
 <body class="bg-custom-gray m-0 p-0">
 
-    <!-- 전체 컨테이너 -->
-    <div class="max-w-2xl mx-auto min-h-screen flex flex-col shadow-xl bg-white">
+    <!-- [신규] 전체 컨테이너를 max-w-4xl로 넓혀서 성적표(A4) 느낌 구현 -->
+    <div class="max-w-4xl mx-auto min-h-screen flex flex-col shadow-2xl bg-white">
         
         <!-- 1. 헤더 이미지 -->
-        <header class="w-full relative">
+        <header class="w-full relative border-b-4 border-teal-600">
             <img src="/assets/monthlyheader.png" 
                  alt="리디튜드 월간 리포트 헤더" 
                  class="w-full h-auto object-cover block"
@@ -36,91 +36,84 @@
         </header>
         
         <!-- 메인 컨텐츠 -->
-        <main class="bg-white flex-1 p-6 sm:p-8 space-y-8">
+        <main class="bg-white flex-1 p-6 sm:p-10 space-y-10">
             
             <!-- 1. 제목 영역 -->
             <section class="text-center border-b border-gray-100 pb-6">
-                <h1 class="text-3xl font-extrabold text-gray-800 mb-2 leading-tight">
-                    <span class="text-teal-600">리디튜더</span><br>{{STUDENT_NAME}}'s<br>
+                <h1 class="text-4xl font-extrabold text-gray-800 mb-3 leading-tight tracking-tight">
+                    <span class="text-teal-600">리디튜더</span> {{STUDENT_NAME}}'s<br>
                     Monthly Report
                 </h1>
-                <p class="text-lg text-teal-700 font-bold mt-2">{{REPORT_MONTH}}</p>
-                <p class="text-sm text-gray-500 font-medium mt-1">({{START_DATE}} ~ {{END_DATE}})</p>
+                <p class="text-xl text-teal-700 font-bold mt-2 bg-teal-50 inline-block px-4 py-1 rounded-full">{{REPORT_MONTH}}</p>
+                <p class="text-sm text-gray-500 font-medium mt-3">({{START_DATE}} ~ {{END_DATE}})</p>
             </section>
             
-            <!-- 2. AI 월간 종합 평가 -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-3 flex items-center">
-                    <span class="text-3xl mr-2">🤖</span> AI 월간 종합 평가
-                </h2>
-                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-5 rounded-r-lg shadow-sm">
-                    <p class="text-gray-800 text-base leading-relaxed whitespace-pre-line font-medium">
-                        {{AI_SUMMARY}}
-                    </p>
-                </div>
-            </section>
-
-            <!-- 3. 한눈에 보는 학습 밸런스 (방사형 그래프) -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">🕸️</span> 한눈에 보는 학습 밸런스
-                </h2>
-                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <div class="w-full h-64 sm:h-80 relative">
+            <!-- 2. 대시보드 상단 (방사형 차트 + 주요 통계 2단 분리) -->
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- 왼쪽: 한눈에 보는 학습 밸런스 (방사형 그래프) -->
+                <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                    <h2 class="text-lg font-bold text-teal-700 mb-4 flex items-center">
+                        <span class="text-2xl mr-2">🕸️</span> 영역별 밸런스
+                    </h2>
+                    <div class="w-full flex-1 relative min-h-[250px]">
                         <canvas id="balanceChart"></canvas>
                     </div>
                 </div>
-            </section>
-        
-            <!-- 4. 월간 학습 통계 (그리드) -->
-            <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">📊</span> 이번 달 세부 통계
-                </h2>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center">
-                    
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+            
+                <!-- 오른쪽: 이번 달 세부 통계 (그리드) -->
+                <div class="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center hover:bg-teal-50 transition">
                         <div class="text-4xl font-extrabold mb-1 {{HW_SCORE_COLOR}}">{{HW_AVG_SCORE}}</div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">숙제 수행율(%)</div>
+                        <div class="text-sm font-bold text-gray-600 mt-2">숙제 수행율(%)</div>
                     </div>
                     
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center hover:bg-teal-50 transition">
                         <div class="text-4xl font-extrabold mb-1 {{GRAMMAR_SCORE_COLOR}}">{{GRAMMAR_AVG_SCORE}}</div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">문법 평균(점)</div>
+                        <div class="text-sm font-bold text-gray-600 mt-2">문법 평균(점)</div>
                     </div>
                     
-                    <!-- [신규] 어휘 평균과 총 외운 단어 수 뱃지 추가 -->
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center relative">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center relative hover:bg-teal-50 transition">
                         <div class="text-4xl font-extrabold mb-1 {{VOCAB_SCORE_COLOR}}">{{VOCAB_AVG_SCORE}}</div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">어휘 평균(점)</div>
-                        <div class="text-xs font-bold text-teal-700 mt-2 bg-teal-100 px-3 py-1 rounded-full shadow-sm">
-                            총 {{TOTAL_VOCAB_WORDS}}단어 암기
+                        <div class="text-sm font-bold text-gray-600 mt-2">어휘 평균(점)</div>
+                        <div class="absolute top-2 right-2 text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full shadow-sm">
+                            총 {{TOTAL_VOCAB_WORDS}}단어
                         </div>
                     </div>
                     
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center hover:bg-teal-50 transition">
                         <div class="text-4xl font-extrabold mb-1 {{READING_PASS_RATE_COLOR}}">{{READING_PASS_RATE}}</div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">독해 통과율(%)</div>
+                        <div class="text-sm font-bold text-gray-600 mt-2">독해 통과율(%)</div>
                     </div>
                     
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center hover:bg-teal-50 transition">
                         <div class="text-4xl font-extrabold mb-1 text-blue-600">{{TOTAL_BOOKS_READ}}</div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">읽은 책(권)</div>
+                        <div class="text-sm font-bold text-gray-600 mt-2">읽은 책(권)</div>
                     </div>
 
-                    <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+                    <div class="bg-gray-50 p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center items-center hover:bg-teal-50 transition">
                         <div class="flex items-baseline gap-1 mb-1">
                             <span class="text-4xl font-extrabold text-teal-600">{{ATTENDANCE_DAYS}}</span>
                             <span class="text-xl font-bold text-gray-400">/{{TOTAL_DAYS_IN_MONTH}}</span>
                         </div>
-                        <div class="text-sm font-bold text-gray-600 mt-1">학습 일수</div>
+                        <div class="text-sm font-bold text-gray-600 mt-2">학습 일수</div>
                     </div>
                 </div>
             </section>
 
-            <!-- 5. RT-Check Point -->
+            <!-- 3. [신규] 대시보드 하단 (막대 차트) -->
+            <section class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                 <h2 class="text-xl font-bold text-teal-700 mb-6 flex items-center">
+                    <span class="text-2xl mr-2">📈</span> 영역별 성취도 분석 (100점 만점 기준)
+                </h2>
+                <div class="w-full h-64 relative">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </section>
+
+            <!-- 4. RT-Check Point -->
             <section>
-                <div class="{{RT_NOTICE_BG_COLOR}} border-l-4 {{RT_NOTICE_BORDER_COLOR}} p-5 rounded-r-lg shadow-sm">
+                <div class="{{RT_NOTICE_BG_COLOR}} border-l-4 {{RT_NOTICE_BORDER_COLOR}} p-5 rounded-xl shadow-sm">
                     <h3 class="text-xl font-bold {{RT_NOTICE_TITLE_COLOR}} mb-2 flex items-center">
                         <span class="mr-2">🎯</span> {{RT_NOTICE_TITLE}}
                     </h3>
@@ -130,13 +123,24 @@
                     </p>
                 </div>
             </section>
+
+            <!-- 5. [업그레이드] AI 월간 종합 평가 (섹션별로 나뉨) -->
+            <section class="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-md">
+                <h2 class="text-2xl font-bold text-teal-700 mb-2 flex items-center border-b-2 border-teal-600 pb-3">
+                    <span class="text-3xl mr-2">🤖</span> AI 월간 종합 리포트
+                </h2>
+                <!-- 여기서부터 백엔드에서 예쁘게 변환된 HTML(소제목, 강조표시 등)이 들어갑니다 -->
+                <div class="text-gray-800 text-[1.05rem] leading-relaxed font-medium">
+                    {{AI_SUMMARY}}
+                </div>
+            </section>
             
             <!-- 6. 읽은 책 목록 -->
             <section>
-                <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <span class="text-3xl mr-2">📚</span> 이번 달 읽은 책 목록
+                <h2 class="text-xl font-bold text-teal-700 mb-4 flex items-center">
+                    <span class="text-2xl mr-2">📚</span> 이번 달 읽은 책 목록
                 </h2>
-                <div class="bg-white p-5 rounded-xl border border-gray-200">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                     <ul class="list-disc list-inside space-y-2 text-gray-700 font-medium ml-2">
                         {{BOOK_LIST_HTML}}
                     </ul>
@@ -164,9 +168,9 @@
             const vocabScore = Number('{{VOCAB_AVG_SCORE}}') || 0;
             const readingScore = Number('{{READING_PASS_RATE}}') || 0;
 
-            const ctx = document.getElementById('balanceChart').getContext('2d');
-            
-            new Chart(ctx, {
+            // 1. 방사형 차트 (Radar)
+            const ctxRadar = document.getElementById('balanceChart').getContext('2d');
+            new Chart(ctxRadar, {
                 type: 'radar',
                 data: {
                     labels: ['숙제 성실도', '문법', '어휘', '독해'],
@@ -190,17 +194,58 @@
                             angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
                             grid: { color: 'rgba(0, 0, 0, 0.1)' },
                             pointLabels: {
-                                font: { family: 'Pretendard', size: 14, weight: 'bold' },
+                                font: { family: 'Pretendard', size: 13, weight: 'bold' },
                                 color: '#374151'
                             },
                             ticks: {
-                                beginAtZero: true,
-                                max: 100,
-                                stepSize: 20,
+                                beginAtZero: true, max: 100, stepSize: 20,
                                 backdropColor: 'transparent',
                                 font: { family: 'Pretendard', size: 10 },
                                 color: '#9ca3af'
                             }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 2. [신규] 막대 차트 (Bar)
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['숙제 성실도', '문법 평균', '어휘 평균', '독해 통과율'],
+                    datasets: [{
+                        label: '성취도 점수',
+                        data: [hwScore, grammarScore, vocabScore, readingScore],
+                        backgroundColor: [
+                            'rgba(52, 211, 153, 0.7)', // Emerald
+                            'rgba(96, 165, 250, 0.7)', // Blue
+                            'rgba(244, 114, 182, 0.7)', // Pink
+                            'rgba(167, 139, 250, 0.7)'  // Purple
+                        ],
+                        borderColor: [
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(236, 72, 153, 1)',
+                            'rgba(139, 92, 246, 1)'
+                        ],
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barThickness: 40 // 막대 두께 조정
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { font: { family: 'Pretendard' } }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Pretendard', weight: 'bold', size: 13 } }
                         }
                     },
                     plugins: {
