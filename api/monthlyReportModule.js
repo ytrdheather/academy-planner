@@ -25,22 +25,26 @@ async function parseMonthlyStatsData(page) {
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-    // 2. 시험 점수 (수정됨: 노션 수식 대응 및 속성 이름 불일치 완벽 방어)
+    // 2. 시험 점수 (수정됨: 숫자 자석(정규식)을 달아서 이모지가 섞여 있어도 숫자만 완벽하게 추출)
     const getScoreFromFormula = (prop) => {
         if (!prop || !prop.formula) return 'N/A';
         // 결과가 숫자일 때
         if (prop.formula.type === 'number') return prop.formula.number !== null ? prop.formula.number : 'N/A';
-        // 결과가 문자열일 때
+        // 결과가 문자열(이모지 포함)일 때
         if (prop.formula.type === 'string') {
             const str = prop.formula.string;
             if (!str || str === 'N/A') return 'N/A';
-            const parsed = parseFloat(str);
-            return isNaN(parsed) ? 'N/A' : parsed;
+            
+            // [강력한 신규 기능] "100 ⭕", "⭕ 100" 문자열 속에서 숫자만 자석처럼 추출
+            const match = str.match(/-?\d+(\.\d+)?/); 
+            if (match) return parseFloat(match[0]);
+            
+            return 'N/A';
         }
         return 'N/A';
     };
 
-    // [핵심 신규 추가] 이모지가 아이콘으로 처리되거나 띄어쓰기가 달라도 '핵심 키워드'만으로 속성을 무조건 찾아내는 헬퍼
+    // [핵심 헬퍼] 이모지가 아이콘으로 처리되거나 띄어쓰기가 달라도 '핵심 키워드'만으로 속성을 무조건 찾아냅니다.
     const getPropByKeywords = (propsObj, keywords) => {
         const keys = Object.keys(propsObj);
         for (const k of keys) {
@@ -327,8 +331,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const monthPages = await Promise.all(progressData.results.map(parseMonthlyStatsData));
             if (monthPages.length === 0) return res.json({ message: 'No data for this month' });
 
-            // [핵심] 여기서 0점을 필터링하는 로직(s !== 0)은 아주 완벽하게 잘 작동하는 코드입니다! 
-            // 학생이 아예 시험을 안 본 날(결석 등)은 수식이 0을 뱉는데, 그 0점들을 평균에서 빼주어 평균이 억울하게 낮아지는 걸 막아줍니다.
             const hwRates = monthPages.map(p => p.completionRate).filter(r => r !== null);
             const vocabScores = monthPages.map(p => p.vocabScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
