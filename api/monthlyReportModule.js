@@ -16,7 +16,7 @@ let getKSTTodayRange;
 let getKoreanDate;
 
 /**
- * 월간 리포트용 데이터 파서 (다중 책 지원 + AR 점수 + 문법 세부 파트 포함)
+ * 월간 리포트용 데이터 파서
  */
 async function parseMonthlyStatsData(page) {
     const props = page.properties;
@@ -25,7 +25,7 @@ async function parseMonthlyStatsData(page) {
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-    // 2. 시험 점수
+    // 2. 시험 점수 (숫자 자석 정규식 적용)
     const getScoreFromFormula = (prop) => {
         if (!prop || !prop.formula) return 'N/A';
         if (prop.formula.type === 'number') return prop.formula.number !== null ? prop.formula.number : 'N/A';
@@ -55,7 +55,7 @@ async function parseMonthlyStatsData(page) {
     const grammarScore = getScoreFromFormula(grammarScoreProp);
     const readingResult = readingResultProp?.formula?.string || 'N/A';
 
-    // [핵심 신규] 문법 테스트 내용(파트) 가져오기 (선택 or 다중선택 모두 호환)
+    // [핵심] 문법 테스트 내용(파트) 가져오기 (선택 or 다중선택 모두 호환)
     const grammarTopicProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
     let grammarTopics = [];
     if (grammarTopicProp) {
@@ -70,11 +70,13 @@ async function parseMonthlyStatsData(page) {
 
     const vocabCorrect = props['단어(맞은 개수)']?.number || props['단어 (맞은 개수)']?.number || 0;
 
-    // 3. 총 읽은 권수
+    // 3. 총 읽은 권수 (날짜 정보 추가)
     let books = [];
     const titleRollup = props['📖 책제목 (롤업)']?.rollup || getPropByKeywords(props, ['책제목', '롤업'])?.rollup;
     const arRollup = props['AR']?.rollup; 
     
+    const pageDate = props['🕐 날짜']?.date?.start || getPropByKeywords(props, ['날짜'])?.date?.start || '';
+
     if (titleRollup && titleRollup.array) {
         titleRollup.array.forEach((item, index) => {
             let title = null;
@@ -88,19 +90,18 @@ async function parseMonthlyStatsData(page) {
                     if (arItem.type === 'number') ar = arItem.number;
                     else if (arItem.type === 'rich_text') ar = arItem.rich_text?.[0]?.plain_text;
                 }
-                books.push({ title, ar });
+                books.push({ title, ar, date: pageDate });
             }
         });
     }
 
     const teacherComment = getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '';
-    const pageDate = props['🕐 날짜']?.date?.start || getPropByKeywords(props, ['날짜'])?.date?.start || '';
 
     return {
         completionRate: (completionRate === null) ? null : Math.round(completionRate),
         vocabScore,
         grammarScore,
-        grammarTopics, // 파싱된 문법 파트 배열 반환
+        grammarTopics, 
         readingResult,
         vocabCorrect,
         books: books, 
@@ -110,30 +111,35 @@ async function parseMonthlyStatsData(page) {
 }
 
 /**
- * [신규] 문법 세부 파트별 평균 점수를 계산하는 헬퍼 함수
+ * [신규] 문법 세부 파트별 점수를 합치지 않고 낱개로 모두 반환하도록 수정 (날짜 포함)
  */
 function calculateGrammarDetails(monthPages) {
-    const grammarStats = {};
+    const tests = [];
     monthPages.forEach(p => {
         if (p.grammarScore !== 'N/A' && p.grammarScore !== null && p.grammarScore !== 0) {
-            // 태그가 없으면 '종합 문법'으로 임시 분류
-            const topics = (p.grammarTopics && p.grammarTopics.length > 0) ? p.grammarTopics : ['종합/기본 문법'];
-            topics.forEach(t => {
-                if (!grammarStats[t]) grammarStats[t] = { sum: 0, count: 0 };
-                grammarStats[t].sum += p.grammarScore;
-                grammarStats[t].count += 1;
+            const topics = (p.grammarTopics && p.grammarTopics.length > 0) ? p.grammarTopics.join(', ') : '종합/기본 문법';
+            
+            let dateStr = '';
+            if (p.date) {
+                const parts = p.date.split('-');
+                if (parts.length >= 3) {
+                    dateStr = `[${parseInt(parts[1])}/${parseInt(parts[2])}] `;
+                }
+            }
+
+            tests.push({
+                topic: dateStr + topics,
+                score: p.grammarScore,
+                date: p.date
             });
         }
     });
-    // 점수 높은 순으로 정렬하여 반환
-    return Object.keys(grammarStats).map(topic => ({
-        topic: topic,
-        score: Math.round(grammarStats[topic].sum / grammarStats[topic].count)
-    })).sort((a, b) => b.score - a.score);
+    // 날짜 순으로 정렬
+    return tests.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 /**
- * 월간 리포트 HTML 렌더링 헬퍼 (인자에 grammarDetails 추가)
+ * 월간 리포트 HTML 렌더링 헬퍼 
  */
 function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays, grammarDetails) {
     const [year, monthNum] = month.split('-').map(Number);
@@ -141,17 +147,21 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
     const totalDaysInMonth = new Date(year, monthNum, 0).getDate();
 
+    // [신규] 책도 중복 제거(합치기) 없이 모두 날짜순으로 표시
     const allBooks = monthPages.flatMap(p => p.books || []);
-    const uniqueBooksMap = new Map();
-    allBooks.forEach(b => {
-        if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
-    });
-    const uniqueBooks = Array.from(uniqueBooksMap.values());
+    allBooks.sort((a, b) => new Date(a.date) - new Date(b.date));
     
-    const bookListHtml = uniqueBooks.length > 0
-        ? uniqueBooks.map(b => {
+    const bookListHtml = allBooks.length > 0
+        ? allBooks.map(b => {
             const arBadge = b.ar ? `<span class="inline-block bg-teal-100 text-teal-700 text-[11px] font-extrabold px-2 py-0.5 rounded-full ml-1.5 align-middle border border-teal-200">AR ${b.ar}</span>` : '';
-            return `<li class="flex items-center mb-1.5"><span class="text-gray-800">${b.title}</span>${arBadge}</li>`;
+            let dateStr = '';
+            if (b.date) {
+                const parts = b.date.split('-');
+                if (parts.length >= 3) {
+                    dateStr = `<span class="text-gray-400 text-[13px] mr-2 font-bold">[${parseInt(parts[1])}/${parseInt(parts[2])}]</span>`;
+                }
+            }
+            return `<li class="flex items-center mb-1.5">${dateStr}<span class="text-gray-800">${b.title}</span>${arBadge}</li>`;
         }).join('\n')
         : '<li class="text-gray-500 font-normal">이번 달에 읽은 원서가 없습니다.</li>';
 
@@ -177,7 +187,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
     const readingPassRateColor = (stats.readingPassRate < 80) ? 'text-red-600' : 'text-teal-600';
 
-    // [신규] 문법 세부 성취도 Tailwind HTML 생성
     let grammarBarsHtml = '';
     if (grammarDetails && grammarDetails.length > 0) {
         const maxScore = Math.max(...grammarDetails.map(g => g.score));
@@ -186,7 +195,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
             const isPass = g.score >= 70;
             const isReview = g.score <= 60;
 
-            // 디자인 차등 적용
             let barColor = isMax ? 'bg-blue-500' : (isReview ? 'bg-orange-400' : 'bg-teal-400');
             let barHeight = isMax ? 'h-5' : 'h-3';
             let textWeight = isMax ? 'font-extrabold text-blue-700' : 'font-bold text-gray-700';
@@ -247,7 +255,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
         '{{BOOK_LIST_HTML}}': bookListHtml,
         '{{TOTAL_VOCAB_WORDS}}': totalVocabWords,
-        '{{GRAMMAR_BARS_HTML}}': grammarBarsHtml // 신규 교체 변수
+        '{{GRAMMAR_BARS_HTML}}': grammarBarsHtml
     };
 
     let html = template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
@@ -277,7 +285,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
     } catch (e) { console.error('Monthly Report Template Error', e); }
 
-    // 1. 월간 리포트 뷰 (HTML 생성)
     app.get('/monthly-report', async (req, res) => {
         const { studentId, month } = req.query;
         if (!studentId || !month) return res.status(400).send('Missing info');
@@ -334,7 +341,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
             });
 
             const monthPages = await Promise.all(progressQuery.results.map(parseMonthlyStatsData));
-            const grammarDetails = calculateGrammarDetails(monthPages); // [신규]
+            const grammarDetails = calculateGrammarDetails(monthPages); 
 
             renderMonthlyReportHTML(res, monthlyReportTemplate, studentName, month, stats, monthPages, monthPages.length, grammarDetails);
 
@@ -344,7 +351,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         }
     });
 
-    // 2. URL 조회 API
     app.get('/api/monthly-report-url', async (req, res) => {
         const { studentName, date } = req.query;
         try {
@@ -373,7 +379,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         } catch (e) { res.status(500).json({ message: e.message }); }
     });
 
-    // 3. 수동 생성 API
     app.get('/api/manual-monthly-report-gen', async (req, res) => {
         const { studentName, month } = req.query;
         if (!studentName || !month) return res.status(400).json({ message: 'Missing info' });
@@ -411,12 +416,9 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
             
+            // [핵심 신규] 책 총합 계산 시 중복제거 안함
             const allBooks = monthPages.flatMap(p => p.books || []);
-            const uniqueBooksMap = new Map();
-            allBooks.forEach(b => {
-                if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
-            });
-            const uniqueBooks = Array.from(uniqueBooksMap.values());
+            allBooks.sort((a, b) => new Date(a.date) - new Date(b.date));
             
             const comments = monthPages.map(p => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim().length > 15).join('\n');
 
@@ -425,11 +427,10 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 vocabAvg: vocabScores.length ? Math.round(vocabScores.reduce((a,b)=>a+b,0)/vocabScores.length) : 0,
                 grammarAvg: grammarScores.length ? Math.round(grammarScores.reduce((a,b)=>a+b,0)/grammarScores.length) : 0,
                 readingPassRate: readingResults.length ? Math.round(readingResults.filter(r=>r==='PASS').length/readingResults.length*100) : 0,
-                totalBooks: uniqueBooks.length,
-                bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
+                totalBooks: allBooks.length,
+                bookListString: allBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
             };
 
-            // [신규] AI에게 보낼 문법 상세 데이터 생성
             const grammarDetails = calculateGrammarDetails(monthPages);
             const grammarDetailsString = grammarDetails.map(g => `${g.topic}(${g.score}점)`).join(', ') || '상세 기록 없음';
 
@@ -517,7 +518,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
         }
     });
 
-    // 4. 스케줄링 (매월 마지막 주 토요일 밤 10시 자동 실행)
     cron.schedule('0 22 * * 6', async () => {
         const today = new Date();
         const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -566,11 +566,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
                     const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
                     
                     const allBooks = monthPages.flatMap(p => p.books || []);
-                    const uniqueBooksMap = new Map();
-                    allBooks.forEach(b => {
-                        if (!uniqueBooksMap.has(b.title)) uniqueBooksMap.set(b.title, b);
-                    });
-                    const uniqueBooks = Array.from(uniqueBooksMap.values());
+                    allBooks.sort((a, b) => new Date(a.date) - new Date(b.date));
                     
                     const comments = monthPages.map(p => `[${p.date}] ${p.teacherComment}`).filter(c => c.trim().length > 15).join('\n');
 
@@ -579,8 +575,8 @@ export function initializeMonthlyReportRoutes(dependencies) {
                         vocabAvg: vocabScores.length ? Math.round(vocabScores.reduce((a,b)=>a+b,0)/vocabScores.length) : 0,
                         grammarAvg: grammarScores.length ? Math.round(grammarScores.reduce((a,b)=>a+b,0)/grammarScores.length) : 0,
                         readingPassRate: readingResults.length ? Math.round(readingResults.filter(r=>r==='PASS').length/readingResults.length*100) : 0,
-                        totalBooks: uniqueBooks.length,
-                        bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
+                        totalBooks: allBooks.length,
+                        bookListString: allBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
                     };
 
                     const grammarDetails = calculateGrammarDetails(monthPages);
