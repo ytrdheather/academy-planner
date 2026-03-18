@@ -16,7 +16,7 @@ let getKSTTodayRange;
 let getKoreanDate;
 
 /**
- * 월간 리포트용 데이터 파서 (다중 책 지원 + AR 점수 포함)
+ * 월간 리포트용 데이터 파서 (다중 책 지원 + AR 점수 + 문법 세부 파트 포함)
  */
 async function parseMonthlyStatsData(page) {
     const props = page.properties;
@@ -25,26 +25,20 @@ async function parseMonthlyStatsData(page) {
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-    // 2. 시험 점수 (수정됨: 숫자 자석(정규식)을 달아서 이모지가 섞여 있어도 숫자만 완벽하게 추출)
+    // 2. 시험 점수
     const getScoreFromFormula = (prop) => {
         if (!prop || !prop.formula) return 'N/A';
-        // 결과가 숫자일 때
         if (prop.formula.type === 'number') return prop.formula.number !== null ? prop.formula.number : 'N/A';
-        // 결과가 문자열(이모지 포함)일 때
         if (prop.formula.type === 'string') {
             const str = prop.formula.string;
             if (!str || str === 'N/A') return 'N/A';
-            
-            // [강력한 신규 기능] "100 ⭕", "⭕ 100" 문자열 속에서 숫자만 자석처럼 추출
             const match = str.match(/-?\d+(\.\d+)?/); 
             if (match) return parseFloat(match[0]);
-            
             return 'N/A';
         }
         return 'N/A';
     };
 
-    // [핵심 헬퍼] 이모지가 아이콘으로 처리되거나 띄어쓰기가 달라도 '핵심 키워드'만으로 속성을 무조건 찾아냅니다.
     const getPropByKeywords = (propsObj, keywords) => {
         const keys = Object.keys(propsObj);
         for (const k of keys) {
@@ -53,7 +47,6 @@ async function parseMonthlyStatsData(page) {
         return null;
     };
 
-    // 속성 이름을 스마트하게 탐색
     const vocabScoreProp = props['📰 단어 테스트 점수'] || getPropByKeywords(props, ['단어', '점수']);
     const grammarScoreProp = props['📑 문법 시험 점수'] || getPropByKeywords(props, ['문법', '점수']);
     const readingResultProp = props['📚 독해 해석 시험 결과'] || getPropByKeywords(props, ['독해', '결과']);
@@ -62,10 +55,22 @@ async function parseMonthlyStatsData(page) {
     const grammarScore = getScoreFromFormula(grammarScoreProp);
     const readingResult = readingResultProp?.formula?.string || 'N/A';
 
-    // 외운 단어 수 (맞은 개수) 가져오기 (띄어쓰기 유무 방어)
+    // [핵심 신규] 문법 테스트 내용(파트) 가져오기 (선택 or 다중선택 모두 호환)
+    const grammarTopicProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
+    let grammarTopics = [];
+    if (grammarTopicProp) {
+        if (grammarTopicProp.type === 'multi_select' && grammarTopicProp.multi_select) {
+            grammarTopics = grammarTopicProp.multi_select.map(i => i.name);
+        } else if (grammarTopicProp.type === 'select' && grammarTopicProp.select) {
+            grammarTopics = [grammarTopicProp.select.name];
+        } else if (grammarTopicProp.type === 'rich_text' && grammarTopicProp.rich_text && grammarTopicProp.rich_text.length > 0) {
+            grammarTopics = grammarTopicProp.rich_text[0].plain_text.split(',').map(s => s.trim());
+        }
+    }
+
     const vocabCorrect = props['단어(맞은 개수)']?.number || props['단어 (맞은 개수)']?.number || 0;
 
-    // 3. 총 읽은 권수 (다중 책 처리 + AR 점수 매핑)
+    // 3. 총 읽은 권수
     let books = [];
     const titleRollup = props['📖 책제목 (롤업)']?.rollup || getPropByKeywords(props, ['책제목', '롤업'])?.rollup;
     const arRollup = props['AR']?.rollup; 
@@ -88,16 +93,14 @@ async function parseMonthlyStatsData(page) {
         });
     }
 
-    // 4. 일일 코멘트
     const teacherComment = getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '';
-
-    // 5. 날짜
     const pageDate = props['🕐 날짜']?.date?.start || getPropByKeywords(props, ['날짜'])?.date?.start || '';
 
     return {
         completionRate: (completionRate === null) ? null : Math.round(completionRate),
         vocabScore,
         grammarScore,
+        grammarTopics, // 파싱된 문법 파트 배열 반환
         readingResult,
         vocabCorrect,
         books: books, 
@@ -107,9 +110,32 @@ async function parseMonthlyStatsData(page) {
 }
 
 /**
- * 월간 리포트 HTML 렌더링 헬퍼
+ * [신규] 문법 세부 파트별 평균 점수를 계산하는 헬퍼 함수
  */
-function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays) {
+function calculateGrammarDetails(monthPages) {
+    const grammarStats = {};
+    monthPages.forEach(p => {
+        if (p.grammarScore !== 'N/A' && p.grammarScore !== null && p.grammarScore !== 0) {
+            // 태그가 없으면 '종합 문법'으로 임시 분류
+            const topics = (p.grammarTopics && p.grammarTopics.length > 0) ? p.grammarTopics : ['종합/기본 문법'];
+            topics.forEach(t => {
+                if (!grammarStats[t]) grammarStats[t] = { sum: 0, count: 0 };
+                grammarStats[t].sum += p.grammarScore;
+                grammarStats[t].count += 1;
+            });
+        }
+    });
+    // 점수 높은 순으로 정렬하여 반환
+    return Object.keys(grammarStats).map(topic => ({
+        topic: topic,
+        score: Math.round(grammarStats[topic].sum / grammarStats[topic].count)
+    })).sort((a, b) => b.score - a.score);
+}
+
+/**
+ * 월간 리포트 HTML 렌더링 헬퍼 (인자에 grammarDetails 추가)
+ */
+function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays, grammarDetails) {
     const [year, monthNum] = month.split('-').map(Number);
     const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
     const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
@@ -151,7 +177,46 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     const grammarScoreColor = (stats.grammarAvg < 80) ? 'text-red-600' : 'text-teal-600';
     const readingPassRateColor = (stats.readingPassRate < 80) ? 'text-red-600' : 'text-teal-600';
 
-    // [신규] AI 코멘트 마크다운 스타일링 (프론트엔드에서 예쁘게 보이도록 HTML 태그로 변환)
+    // [신규] 문법 세부 성취도 Tailwind HTML 생성
+    let grammarBarsHtml = '';
+    if (grammarDetails && grammarDetails.length > 0) {
+        const maxScore = Math.max(...grammarDetails.map(g => g.score));
+        grammarBarsHtml = grammarDetails.map((g) => {
+            const isMax = g.score === maxScore && maxScore > 0; 
+            const isPass = g.score >= 70;
+            const isReview = g.score <= 60;
+
+            // 디자인 차등 적용
+            let barColor = isMax ? 'bg-blue-500' : (isReview ? 'bg-orange-400' : 'bg-teal-400');
+            let barHeight = isMax ? 'h-5' : 'h-3';
+            let textWeight = isMax ? 'font-extrabold text-blue-700' : 'font-bold text-gray-700';
+            
+            let badgeHtml = '';
+            if (isReview) {
+                badgeHtml = '<span class="ml-2 px-2 py-0.5 text-[11px] font-extrabold bg-orange-50 text-orange-600 border border-orange-200 rounded-md">⭐ 복습필요</span>';
+            } else if (isPass) {
+                badgeHtml = '<span class="ml-2 px-2 py-0.5 text-[11px] font-extrabold bg-green-50 text-green-600 border border-green-200 rounded-md">✅ PASS</span>';
+            }
+
+            return `
+            <div class="mb-5 last:mb-0">
+                <div class="flex justify-between items-end mb-1.5">
+                    <span class="text-[14px] ${textWeight} flex items-center">${g.topic} ${badgeHtml}</span>
+                    <span class="text-[14px] ${textWeight}">${g.score}점</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-5 flex items-center p-0.5 border border-gray-200 shadow-inner">
+                    <div class="${barColor} ${barHeight} rounded-full shadow-sm" style="width: ${g.score}%;"></div>
+                </div>
+            </div>`;
+        }).join('\n');
+    } else {
+        grammarBarsHtml = `
+        <div class="flex flex-col items-center justify-center h-full min-h-[150px] text-gray-400">
+            <span class="text-4xl mb-3">📭</span>
+            <p class="text-sm font-medium">이번 달 세부 문법 파트 기록이 없습니다.</p>
+        </div>`;
+    }
+
     let displaySummary = stats.aiSummary || '';
     displaySummary = displaySummary
         .replace(/^###\s*(.*)$/gm, '<h3 class="text-[1.1rem] font-extrabold text-teal-800 mt-8 mb-3 bg-teal-50 px-3 py-2 rounded-lg border-l-4 border-teal-500 shadow-sm flex items-center">$1</h3>')
@@ -181,7 +246,8 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
         '{{READING_PASS_RATE_COLOR}}': readingPassRateColor,
         '{{TOTAL_BOOKS_READ}}': stats.totalBooks,
         '{{BOOK_LIST_HTML}}': bookListHtml,
-        '{{TOTAL_VOCAB_WORDS}}': totalVocabWords 
+        '{{TOTAL_VOCAB_WORDS}}': totalVocabWords,
+        '{{GRAMMAR_BARS_HTML}}': grammarBarsHtml // 신규 교체 변수
     };
 
     let html = template.replace(new RegExp(Object.keys(replacements).join('|'), 'g'), (match) => {
@@ -268,7 +334,9 @@ export function initializeMonthlyReportRoutes(dependencies) {
             });
 
             const monthPages = await Promise.all(progressQuery.results.map(parseMonthlyStatsData));
-            renderMonthlyReportHTML(res, monthlyReportTemplate, studentName, month, stats, monthPages, monthPages.length);
+            const grammarDetails = calculateGrammarDetails(monthPages); // [신규]
+
+            renderMonthlyReportHTML(res, monthlyReportTemplate, studentName, month, stats, monthPages, monthPages.length, grammarDetails);
 
         } catch (error) {
             console.error(error);
@@ -361,22 +429,35 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
             };
 
+            // [신규] AI에게 보낼 문법 상세 데이터 생성
+            const grammarDetails = calculateGrammarDetails(monthPages);
+            const grammarDetailsString = grammarDetails.map(g => `${g.topic}(${g.score}점)`).join(', ') || '상세 기록 없음';
+
             let aiSummary = 'AI 요약 불가';
             if (geminiModel) {
                 try {
                     const prompt = `
-                    당신은 영어 학원 선생님입니다. 학부모님께 보낼 ${month}월 리포트 총평을 작성해주세요. 학생 이름: ${studentName}.
-                    [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}, 문법:${stats.grammarAvg}, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                    당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
+                    학생 이름: ${studentName}
+                    이번 달: ${month}
+                    [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                    [문법 파트별 세부 점수] ${grammarDetailsString}
                     [책목록] ${stats.bookListString}
                     [일일코멘트] ${comments}
                     
-                    반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
-                    ### 🌟 학습 태도 및 성실도
-                    ### 📚 독서 및 어휘
-                    ### 💡 독해 및 문법
-                    ### 👩‍🏫 선생님의 한마디
+                    위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요. 
+                    선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요. 
+                    대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
                     
-                    단순한 사실 나열보다는 전문가다운 분석과 따뜻한 격려가 돋보이게 작성하고, 중요한 부분은 **강조표시**를 해주세요.
+                    특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
+                    
+                    반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                    ### 🌟 월간 성취도 종합 평가
+                    ### 💪 발견된 강점 (Strengths)
+                    ### 🎯 보완할 점 및 약점 (Weaknesses)
+                    ### 👩‍🏫 선생님 종합 코멘트
+                    
+                    단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
                     `;
                     const result = await geminiModel.generateContent(prompt);
                     aiSummary = (await result.response).text();
@@ -502,22 +583,34 @@ export function initializeMonthlyReportRoutes(dependencies) {
                         bookListString: uniqueBooks.map(b => b.ar ? `${b.title}(AR:${b.ar})` : b.title).join(', ') || '읽은 책 없음'
                     };
 
+                    const grammarDetails = calculateGrammarDetails(monthPages);
+                    const grammarDetailsString = grammarDetails.map(g => `${g.topic}(${g.score}점)`).join(', ') || '상세 기록 없음';
+
                     let aiSummary = 'AI 요약 불가';
                     if (geminiModel) {
                         try {
                             const prompt = `
-                            당신은 영어 학원 선생님입니다. 학부모님께 보낼 ${currentMonth}월 리포트 총평을 작성해주세요. 학생 이름: ${studentName}.
-                            [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}, 문법:${stats.grammarAvg}, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                            당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
+                            학생 이름: ${studentName}
+                            이번 달: ${currentMonth}
+                            [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                            [문법 파트별 세부 점수] ${grammarDetailsString}
                             [책목록] ${stats.bookListString}
                             [일일코멘트] ${comments}
                             
-                            반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
-                            ### 🌟 학습 태도 및 성실도
-                            ### 📚 독서 및 어휘
-                            ### 💡 독해 및 문법
-                            ### 👩‍🏫 선생님의 한마디
+                            위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요. 
+                            선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요. 
+                            대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
                             
-                            단순한 사실 나열보다는 전문가다운 분석과 따뜻한 격려가 돋보이게 작성하고, 중요한 부분은 **강조표시**를 해주세요.
+                            특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
+                            
+                            반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                            ### 🌟 월간 성취도 종합 평가
+                            ### 💪 발견된 강점 (Strengths)
+                            ### 🎯 보완할 점 및 약점 (Weaknesses)
+                            ### 👩‍🏫 선생님 종합 코멘트
+                            
+                            단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
                             `;
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             const result = await geminiModel.generateContent(prompt);

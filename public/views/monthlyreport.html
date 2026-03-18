@@ -23,7 +23,6 @@
 </head>
 <body class="bg-custom-gray m-0 p-0">
 
-    <!-- [신규] 전체 컨테이너를 max-w-4xl로 넓혀서 성적표(A4) 느낌 구현 -->
     <div class="max-w-4xl mx-auto min-h-screen flex flex-col shadow-2xl bg-white">
         
         <!-- 1. 헤더 이미지 -->
@@ -101,13 +100,27 @@
                 </div>
             </section>
 
-            <!-- 3. [신규] 대시보드 하단 (막대 차트) -->
-            <section class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                 <h2 class="text-xl font-bold text-teal-700 mb-6 flex items-center">
-                    <span class="text-2xl mr-2">📈</span> 영역별 성취도 분석 (100점 만점 기준)
-                </h2>
-                <div class="w-full h-64 relative">
-                    <canvas id="barChart"></canvas>
+            <!-- 3. [개편] 대시보드 중단 (막대 차트 & 문법 세부 성취도 2단 분리) -->
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 왼쪽: 영역별 성취도 분석 -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                    <h2 class="text-xl font-bold text-teal-700 mb-6 flex items-center">
+                        <span class="text-2xl mr-2">📈</span> 영역별 종합 성취도
+                    </h2>
+                    <div class="w-full flex-1 relative min-h-[250px]">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 오른쪽: 문법 세부 성취도 (Tailwind CSS 동적 막대) -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                    <h2 class="text-xl font-bold text-teal-700 mb-6 flex items-center">
+                        <span class="text-2xl mr-2">🔍</span> 파트별 문법 성취도
+                    </h2>
+                    <div class="flex-1 flex flex-col justify-center">
+                        <!-- 서버에서 삽입되는 동적 막대 차트 영역 -->
+                        {{GRAMMAR_BARS_HTML}}
+                    </div>
                 </div>
             </section>
 
@@ -124,12 +137,11 @@
                 </div>
             </section>
 
-            <!-- 5. [업그레이드] AI 월간 종합 평가 (섹션별로 나뉨) -->
+            <!-- 5. AI 월간 종합 평가 (섹션별로 나뉨) -->
             <section class="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-md">
                 <h2 class="text-2xl font-bold text-teal-700 mb-2 flex items-center border-b-2 border-teal-600 pb-3">
                     <span class="text-3xl mr-2">🤖</span> AI 월간 종합 리포트
                 </h2>
-                <!-- 여기서부터 백엔드에서 예쁘게 변환된 HTML(소제목, 강조표시 등)이 들어갑니다 -->
                 <div class="text-gray-800 text-[1.05rem] leading-relaxed font-medium">
                     {{AI_SUMMARY}}
                 </div>
@@ -209,7 +221,7 @@
                 }
             });
 
-            // 2. [신규] 막대 차트 (Bar)
+            // 2. 막대 차트 (Bar)
             const ctxBar = document.getElementById('barChart').getContext('2d');
             new Chart(ctxBar, {
                 type: 'bar',
@@ -232,7 +244,7 @@
                         ],
                         borderWidth: 1,
                         borderRadius: 6,
-                        barThickness: 40 // 막대 두께 조정
+                        barThickness: 30 // 2단 분리를 위해 막대 두께 살짝 얇게 조정
                     }]
                 },
                 options: {
@@ -245,7 +257,7 @@
                             ticks: { font: { family: 'Pretendard' } }
                         },
                         x: {
-                            ticks: { font: { family: 'Pretendard', weight: 'bold', size: 13 } }
+                            ticks: { font: { family: 'Pretendard', weight: 'bold', size: 12 } }
                         }
                     },
                     plugins: {
