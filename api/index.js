@@ -24,7 +24,6 @@ const {
     GRAMMAR_DB_ID,
 } = process.env;
 
-// [핵심] HTTPS 강제
 const DOMAIN_URL = 'https://readitude.onrender.com';
 const PORT = process.env.PORT || 5001;
 
@@ -33,7 +32,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
-// Notion API 호출 헬퍼
 async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -43,25 +41,20 @@ async function fetchNotion(url, options, retries = 3) {
     
     try {
         const response = await fetch(url, { ...options, headers });
-
         if (response.status === 409 && retries > 0) {
             console.warn(`⚠️ Notion API Conflict (409). Retrying...`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
             return fetchNotion(url, options, retries - 1);
         }
-
         if (!response.ok) {
             const errorData = await response.json();
             console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
             throw new Error(errorData.message || `Notion API Error: ${response.status}`);
         }
         return response.json();
-    } catch (error) {
-        throw error;
-    }
+    } catch (error) { throw error; }
 }
 
-// Gemini AI 설정
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -69,7 +62,6 @@ if (GEMINI_API_KEY) {
     console.log('✅ Gemini AI 연결됨');
 }
 
-// 선생님 계정 정보
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
@@ -80,7 +72,6 @@ const userAccounts = {
     'teacher5': { password: 'rdtd112!@', role: 'manager', name: '앨리스쌤' }
 };
 
-// Helper Functions
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
@@ -165,6 +156,10 @@ app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.ht
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
+
+// [신규 연결] 지난주 문법숙제 HTML 연결
+app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
+
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 initializeBookRoutes(app, fetchNotion, process.env);
@@ -178,27 +173,13 @@ try {
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
-    console.log('-----------------------------------------');
-    console.log('🚀 [API 호출됨] AI 코멘트 생성 시작');
-    
     const { pageId, studentName, keywords } = req.body;
-    console.log(`- 입력받은 데이터: pageId=${pageId}, studentName=${studentName}, keywords=${keywords}`);
-
-    if (!pageId || !keywords) {
-        console.warn('🚨 실패: 필수 데이터 누락');
-        return res.status(400).json({ success: false, message: 'Missing info' });
-    }
-
-    if (!geminiModel) {
-        console.error('🚨 실패: Gemini 모델이 셋팅되지 않았습니다. (API 키 확인 필요)');
-        return res.status(500).json({ success: false, message: 'AI not configured' });
-    }
+    if (!pageId || !keywords) return res.status(400).json({ success: false, message: 'Missing info' });
+    if (!geminiModel) return res.status(500).json({ success: false, message: 'AI not configured' });
 
     try {
-        console.log('- Notion에서 학생 데이터 파싱 시작...');
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsedData = await parseDailyReportData(page);
-        console.log(`- 파싱 완료: 이번 주 수행율 ${parsedData.completionRate}%`);
 
         const prompt = `
         너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해. 자기 소개는 절대로 하지마.
@@ -211,23 +192,12 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
         [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
         `;
 
-        console.log('- Gemini API에 텍스트 생성 요청 중... (조금 걸릴 수 있습니다)');
         const result = await geminiModel.generateContent(prompt);
         const commentText = result.response.text();
-        
-        console.log('✅ 코멘트 생성 성공!');
-        console.log('-----------------------------------------');
         res.json({ success: true, comment: commentText });
-
     } catch (error) {
-        console.error('🚨 [치명적 에러 발생] AI Comment Error:', error);
-        
-        res.status(500).json({ 
-            success: false, 
-            message: 'AI generation failed',
-            errorDetail: error.message, 
-            errorStack: error.stack
-        });
+        console.error('AI Comment Error:', error);
+        res.status(500).json({ success: false, message: 'AI generation failed' });
     }
 });
 
@@ -252,27 +222,15 @@ async function parseDailyReportData(page) {
     };
 
     const checkList = [
-        homework.grammar,
-        homework.vocabCards,
-        homework.readingCards,
-        homework.summary,
-        homework.dailyReading,
-        homework.diary
+        homework.grammar, homework.vocabCards, homework.readingCards,
+        homework.summary, homework.dailyReading, homework.diary
     ];
 
-    let totalScore = 0;
-    let count = 0;
-
+    let totalScore = 0; let count = 0;
     checkList.forEach(status => {
         if (!status) return;
-        if (['숙제 함', '완료', '완료함'].includes(status)) {
-            totalScore += 100;
-            count++;
-        } 
-        else if (['안 해옴', '미완료', '못함', '못하고감'].includes(status)) {
-            totalScore += 0;
-            count++;
-        }
+        if (['숙제 함', '완료', '완료함'].includes(status)) { totalScore += 100; count++; } 
+        else if (['안 해옴', '미완료', '못함', '못하고감'].includes(status)) { totalScore += 0; count++; }
     });
 
     const performanceRate = count > 0 ? Math.round(totalScore / count) : null;
@@ -332,10 +290,24 @@ async function parseDailyReportData(page) {
     let grammarTopic = getSimpleText(props['오늘 문법 진도']);
     let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
 
+    // [신규] 프론트엔드로 보내주기 위해 문법 테스트 데이터도 꼼꼼히 파싱
+    const grammarTestProp = props['문법 테스트 내용'] || props['문법 파트'];
+    let grammarTestStr = '';
+    if (grammarTestProp) {
+        if (grammarTestProp.type === 'multi_select' && grammarTestProp.multi_select) {
+            grammarTestStr = grammarTestProp.multi_select.map(i => i.name).join(', ');
+        } else if (grammarTestProp.type === 'select' && grammarTestProp.select) {
+            grammarTestStr = grammarTestProp.select.name;
+        } else if (grammarTestProp.type === 'rich_text' && grammarTestProp.rich_text && grammarTestProp.rich_text.length > 0) {
+            grammarTestStr = grammarTestProp.rich_text[0].plain_text;
+        }
+    }
+
     const comment = {
         teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
         grammarClass: grammarClassName || '진도 해당 없음',
         grammarTopic: grammarTopic || '진도 해당 없음', 
+        grammarTest: grammarTestStr, // [신규 추가]
         grammarHomework: grammarHomework || '숙제 내용 없음'
     };
 
@@ -346,13 +318,7 @@ async function fetchProgressData(req, res, parseFunction) {
     const { period = 'today', date } = req.query;
     if (!NOTION_ACCESS_TOKEN || !PROGRESS_DATABASE_ID) throw new Error('Server config error');
     
-    let dateString;
-    if (date) {
-        dateString = date;
-    } else {
-        dateString = getKSTTodayRange().dateString;
-    }
-
+    let dateString = date || getKSTTodayRange().dateString;
     const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
 
     const pages = [];
@@ -380,10 +346,7 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
         const data = await fetchProgressData(req, res, parseDailyReportData);
         res.json(data);
-    } catch (error) {
-        console.error('Daily Report Data Error:', error);
-        res.status(500).json({ message: error.message });
-    }
+    } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
@@ -412,10 +375,91 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
         const korBookTitles = getRollupArray(props['국어책제목(롤업)']); const korBookIds = props['국어 독서 제목']?.relation?.map(r => r.id) || []; progress.koreanBooks = korBookTitles.map((title, idx) => ({ title, id: korBookIds[idx] || null }));
         
         res.json({ success: true, progress });
-    } catch (error) { console.error('Load Error:', error); res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
-// [신규 변경] 문법 일괄 적용 시 '테스트 내용' (testContent) 추가 적용
+// [신규 API] 지난 1회 코멘트만 불러오기 (미니 팝업용)
+app.get('/api/last-comment', requireAuth, async (req, res) => {
+    const { studentName, currentDate } = req.query;
+    try {
+        const filter = {
+            and: [
+                { property: '이름', title: { equals: studentName } },
+                { property: '🕐 날짜', date: { before: currentDate } }
+            ]
+        };
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter,
+                sorts: [{ property: '🕐 날짜', direction: 'descending' }],
+                page_size: 1
+            })
+        });
+        
+        if (query.results.length === 0) return res.json({ success: true, record: null });
+        
+        const props = query.results[0].properties;
+        const date = props['🕐 날짜']?.date?.start || '';
+        const comment = getSimpleText(props['❤ Today\'s Notice!'] || props['Today\'s Notice!']) || '';
+        
+        res.json({ success: true, record: { date, comment } });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// [신규 API] 지난주 문법숙제 전체 데이터 불러오기 (새창용)
+app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
+    try {
+        const today = new Date();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        const start = sevenDaysAgo.toISOString().split('T')[0];
+        const end = today.toISOString().split('T')[0];
+
+        const filter = {
+            and: [
+                { property: '🕐 날짜', date: { on_or_after: start } },
+                { property: '🕐 날짜', date: { on_or_before: end } }
+            ]
+        };
+        
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter, sorts: [{ property: '🕐 날짜', direction: 'descending' }], page_size: 100 })
+        });
+        
+        const records = query.results.map(page => {
+            const props = page.properties;
+            const className = getRollupValue(props['문법클래스']) || '미분류';
+            const topic = getSimpleText(props['오늘 문법 진도']) || '-';
+            const homework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']) || '-';
+            
+            let testStr = '-';
+            const testProp = props['문법 테스트 내용'] || props['문법 파트'];
+            if (testProp) {
+                if (testProp.type === 'multi_select') testStr = testProp.multi_select.map(i=>i.name).join(', ');
+                else if (testProp.type === 'select') testStr = testProp.select?.name || '-';
+                else if (testProp.type === 'rich_text') testStr = getSimpleText(testProp);
+            }
+            
+            let score = 'N/A';
+            const scoreProp = props['📑 문법 시험 점수'];
+            if (scoreProp?.formula?.type === 'number') score = scoreProp.formula.number !== null ? scoreProp.formula.number : 'N/A';
+            else if (scoreProp?.formula?.type === 'string') {
+                const match = scoreProp.formula.string.match(/-?\d+(\.\d+)?/);
+                if (match) score = match[0];
+            }
+            
+            const date = props['🕐 날짜']?.date?.start || '';
+            const studentName = getSimpleText(props['이름']);
+            
+            return { date, className, studentName, topic, homework, test: testStr, score };
+        }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
+
+        res.json({ success: true, data: records });
+    } catch(e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, testContent, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
@@ -433,26 +477,21 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
                     '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
                 };
 
-                // [신규] 문법 테스트 내용 다중 선택(Multi-select) 처리 (쉼표로 구분)
                 if (testContent !== undefined) {
-                    if (testContent.trim() === '') {
-                        properties['문법 테스트 내용'] = { multi_select: [] };
-                    } else {
+                    if (testContent.trim() === '') { properties['문법 테스트 내용'] = { multi_select: [] }; } 
+                    else {
                         const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
                         properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
                     }
                 }
 
-                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ properties })
-                });
+                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties }) });
                 updatedCount++;
             }
         });
         await Promise.all(updatePromises);
         res.json({ success: true, message: `Updated ${updatedCount} students` });
-    } catch (error) { console.error('Grammar Update Error:', error); res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
 app.post('/api/update-homework', requireAuth, async (req, res) => {
@@ -461,33 +500,21 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
     try {
         const mapPropName = (name) => {
             const mapping = { 
-                "단어 (맞은 개수)": "단어(맞은 개수)",
-                "단어(맞은 개수)": "단어(맞은 개수)",
-                "단어 (전체 개수)": "단어(전체 개수)",
-                "단어(전체 개수)": "단어(전체 개수)",
-                "문법 (전체 개수)": "문법(전체 개수)",
-                "문법(전체 개수)": "문법(전체 개수)",
-                "문법 (틀린 개수)": "문법(틀린 개수)",
-                "문법(틀린 개수)": "문법(틀린 개수)",
-                "독해 (틀린 개수)": "독해(틀린 개수)",
-                "독해(틀린 개수)": "독해(틀린 개수)",
-                
-                "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
-                "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
-                "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", 
-                "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
-                "오늘 읽은 한국 책": "국어 독서 제목", 
-                "문법 과제 내용": "문법 숙제 내용",
-                "Today's Notice!": "❤ Today's Notice!",
-                "오늘의 코멘트": "❤ Today's Notice!",
-                "오늘의 학습 소감": "오늘의 학습 소감"
+                "단어 (맞은 개수)": "단어(맞은 개수)", "단어(맞은 개수)": "단어(맞은 개수)",
+                "단어 (전체 개수)": "단어(전체 개수)", "단어(전체 개수)": "단어(전체 개수)",
+                "문법 (전체 개수)": "문법(전체 개수)", "문법(전체 개수)": "문법(전체 개수)",
+                "문법 (틀린 개수)": "문법(틀린 개수)", "문법(틀린 개수)": "문법(틀린 개수)",
+                "독해 (틀린 개수)": "독해(틀린 개수)", "독해(틀린 개수)": "독해(틀린 개수)",
+                "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
+                "5️⃣ 독해서 풀기": "5️⃣ 독해서 풀기", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일", 
+                "오늘 읽은 한국 책": "국어 독서 제목", "문법 과제 내용": "문법 숙제 내용",
+                "Today's Notice!": "❤ Today's Notice!", "오늘의 코멘트": "❤ Today's Notice!", "오늘의 학습 소감": "오늘의 학습 소감"
             };
             return mapping[name] || name; 
         };
         const mapValue = (val) => { if (val === "해당 없음" || val === "해당없음") return "숙제 없음"; return val; };
         const propertiesToUpdate = {};
         
-        // [신규] 다중 선택(multi_select) 타입도 처리할 수 있도록 헬퍼 함수 개선
         const processPayload = (type, val) => {
             if (type === 'number') return { number: Number(val) || 0 };
             if (type === 'rich_text') return { rich_text: [{ text: { content: val || '' } }] };
@@ -516,7 +543,7 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         
         await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: propertiesToUpdate }) });
         res.json({ success: true });
-    } catch (error) { console.error('Update Error:', error); res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
 app.get('/api/teachers', requireAuth, async (req, res) => { const list = Object.values(userAccounts).filter(a => a.role === 'teacher' || a.role === 'manager').map(a => ({ name: a.name })); res.json(list); });
@@ -526,36 +553,21 @@ app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.us
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
 app.post('/login', async (req, res) => { 
     const { studentId, studentPassword } = req.body; 
-
     const cleanId = studentId ? studentId.trim().toLowerCase() : '';
     const cleanPw = studentPassword ? studentPassword.toString().trim() : '';
-
-    console.log(`[로그인 시도] 정제된 ID: '${cleanId}', 정제된 PW: '${cleanPw}'`);
 
     try { 
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { 
             method: 'POST', 
-            body: JSON.stringify({ 
-                filter: { 
-                    and: [
-                        { property: '학생 ID', rich_text: { equals: cleanId } }, 
-                        { property: '비밀번호', rich_text: { equals: cleanPw } }
-                    ] 
-                } 
-            }) 
+            body: JSON.stringify({ filter: { and: [ { property: '학생 ID', rich_text: { equals: cleanId } }, { property: '비밀번호', rich_text: { equals: cleanPw } } ] } }) 
         }); 
 
         if (data.results.length > 0) { 
             const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || cleanId; 
             const token = generateToken({ userId: cleanId, role: 'student', name: name }); 
             res.json({ success: true, token }); 
-        } else { 
-            res.json({ success: false, message: '로그인 실패' }); 
-        } 
-    } catch (e) { 
-        console.error('[로그인 에러]', e);
-        res.status(500).json({ success: false, message: 'Error' }); 
-    } 
+        } else { res.json({ success: false, message: '로그인 실패' }); } 
+    } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } 
 });
 
 app.post('/save-progress', requireAuth, async (req, res) => {
@@ -563,37 +575,14 @@ app.post('/save-progress', requireAuth, async (req, res) => {
     const studentName = req.user.name;
     try {
         const ALLOWED_PROPS = { 
-            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", 
-            "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제", 
-            "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
-            "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", 
-            "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", 
-            "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기",
-            "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
-
-            "단어(맞은 개수)": "단어(맞은 개수)",
-            "단어(전체 개수)": "단어(전체 개수)",
-            "어휘유닛": "어휘유닛", 
-            "문법(전체 개수)": "문법(전체 개수)", 
-            "문법(틀린 개수)": "문법(틀린 개수)", 
-            "독해(틀린 개수)": "독해(틀린 개수)",
-            "독해 하브루타": "독해 하브루타",
-
-            "영어 더빙 학습": "영어 더빙 학습 완료",
-            "더빙 워크북": "더빙 워크북 완료",
-            "📖 영어독서": "📖 영어독서", 
-            "어휘학습": "어휘학습", 
-            "Writing": "Writing", 
-            "완료 여부": "📕 책 읽는 거인",
-
-            "오늘의 소감": "오늘의 학습 소감",
-            
-            "grammarImage": "문법 인증샷",
-            "summaryImage": "Summary 인증샷",
-            "readingImage": "독해서 인증샷",
-            "diaryImage": "부매일 인증샷"
+            "⭕ 지난 문법 숙제 검사": "⭕ 지난 문법 숙제 검사", "1️⃣ 어휘 클카 암기 숙제": "1️⃣ 어휘 클카 암기 숙제", "2️⃣ 독해 단어 클카 숙제": "2️⃣ 독해 단어 클카 숙제", 
+            "4️⃣ Summary 숙제": "4️⃣ Summary 숙제", "5️⃣ 매일 독해 숙제": "5️⃣ 독해서 풀기", "5️⃣ 독해서 풀기 숙제": "5️⃣ 독해서 풀기", "6️⃣ 영어일기 or 개인 독해서": "6️⃣ 부&매&일",
+            "단어(맞은 개수)": "단어(맞은 개수)", "단어(전체 개수)": "단어(전체 개수)", "어휘유닛": "어휘유닛", 
+            "문법(전체 개수)": "문법(전체 개수)", "문법(틀린 개수)": "문법(틀린 개수)", "독해(틀린 개수)": "독해(틀린 개수)", "독해 하브루타": "독해 하브루타",
+            "영어 더빙 학습": "영어 더빙 학습 완료", "더빙 워크북": "더빙 워크북 완료", "📖 영어독서": "📖 영어독서", 
+            "어휘학습": "어휘학습", "Writing": "Writing", "완료 여부": "📕 책 읽는 거인", "오늘의 소감": "오늘의 학습 소감",
+            "grammarImage": "문법 인증샷", "summaryImage": "Summary 인증샷", "readingImage": "독해서 인증샷", "diaryImage": "부매일 인증샷"
         };
-
         const valueMapping = { "해당없음": "숙제 없음", "안 해옴": "안 해옴", "숙제 함": "숙제 함", "진행하지 않음": "진행하지 않음", "완료": "완료", "미완료": "미완료", "원서독서로 대체": "원서독서로 대체", "듣기평가교재 완료": "듣기평가교재 완료", "못함": "못함", "완료함": "완료함", "SKIP": "SKIP", "안함": "안함", "숙제없음": "숙제없음", "못하고감": "못하고감", "시작함": "시작함", "절반": "절반", "거의다읽음": "거의다읽음" };
         const properties = {};
         
@@ -606,17 +595,14 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             const notionPropName = ALLOWED_PROPS[key]; 
             
             if (['단어(맞은 개수)', '단어(전체 개수)', '문법(전체 개수)', '문법(틀린 개수)', '독해(틀린 개수)'].includes(notionPropName)) { 
-                const numVal = Number(value); 
-                properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal }; 
+                const numVal = Number(value); properties[notionPropName] = { number: isNaN(numVal) ? 0 : numVal }; 
             } else if (['독해 하브루타', '📖 영어독서', '어휘학습', 'Writing', '📕 책 읽는 거인'].includes(notionPropName)) { 
                 properties[notionPropName] = { select: { name: value } }; 
             } else if (['어휘유닛', '오늘의 학습 소감'].includes(notionPropName)) { 
                 properties[notionPropName] = { rich_text: [{ text: { content: value } }] }; 
             } else if (['문법 인증샷', 'Summary 인증샷', '독해서 인증샷', '부매일 인증샷'].includes(notionPropName)) {
                 if (value) properties[notionPropName] = { files: [{ name: "인증샷", external: { url: value } }] };
-            } else { 
-                properties[notionPropName] = { status: { name: value } }; 
-            } 
+            } else { properties[notionPropName] = { status: { name: value } }; } 
         }
         
         if (formData.englishBooks && Array.isArray(formData.englishBooks)) { properties['오늘 읽은 영어 책'] = await processBookRelations(formData.englishBooks, ENG_BOOKS_ID, 'Title'); }
@@ -637,13 +623,12 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
         }
         res.json({ success: true, message: '저장 완료' });
-    } catch (error) { console.error('Save Error:', error); res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
 let reportTemplate = '';
-try {
-    reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8');
-} catch (e) { console.error('Template load error', e); }
+try { reportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'dailyreport.html'), 'utf-8'); } 
+catch (e) { console.error('Template load error', e); }
 
 function getReportColor(value, type) {
     const GREEN = '#10b981'; const RED = '#ef4444'; const GRAY = '#9ca3af';
@@ -663,45 +648,27 @@ app.get('/report', async (req, res) => {
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsed = await parseDailyReportData(page);
         let html = reportTemplate;
-        const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0
-            ? parsed.reading.englishBooks.map(b => b.title).join(', ')
-            : (parsed.reading.bookTitle || '읽은 책 없음');
-
+        const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0 ? parsed.reading.englishBooks.map(b => b.title).join(', ') : (parsed.reading.bookTitle || '읽은 책 없음');
         const formatTestScore = (val) => (val === 0 || val === null) ? '없음' : val + '점';
 
         const replacements = {
-            '{{STUDENT_NAME}}': parsed.studentName,
-            '{{REPORT_DATE}}': getKoreanDate(parsed.date),
+            '{{STUDENT_NAME}}': parsed.studentName, '{{REPORT_DATE}}': getKoreanDate(parsed.date),
             '{{TEACHER_COMMENT}}': parsed.comment.teacherComment.replace(/\n/g, '<br>'),
-            '{{HW_SCORE}}': parsed.completionRate === null ? '없음' : parsed.completionRate + '%',
-            '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
-            '{{GRAMMAR_SCORE}}': formatTestScore(parsed.tests.grammarScore),
-            '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'test_score'),
-            '{{VOCAB_SCORE}}': formatTestScore(parsed.tests.vocabScore),
-            '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'test_score'),
-            '{{READING_TEST_STATUS}}': parsed.tests.readingResult,
-            '{{READING_TEST_COLOR}}': getReportColor(parsed.tests.readingResult, 'result'),
-            '{{LISTENING_STATUS}}': parsed.listening.study,
-            '{{LISTENING_COLOR}}': getReportColor(parsed.listening.study, 'status'),
+            '{{HW_SCORE}}': parsed.completionRate === null ? '없음' : parsed.completionRate + '%', '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
+            '{{GRAMMAR_SCORE}}': formatTestScore(parsed.tests.grammarScore), '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'test_score'),
+            '{{VOCAB_SCORE}}': formatTestScore(parsed.tests.vocabScore), '{{VOCAB_SCORE_COLOR}}': getReportColor(parsed.tests.vocabScore, 'test_score'),
+            '{{READING_TEST_STATUS}}': parsed.tests.readingResult, '{{READING_TEST_COLOR}}': getReportColor(parsed.tests.readingResult, 'result'),
+            '{{LISTENING_STATUS}}': parsed.listening.study, '{{LISTENING_COLOR}}': getReportColor(parsed.listening.study, 'status'),
             '{{LISTENING_FONT_CLASS}}': (parsed.listening.study && parsed.listening.study.length > 5) ? 'text-lg' : 'text-4xl',
-            '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus,
-            '{{READING_BOOK_COLOR}}': getReportColor(parsed.reading.readingStatus, 'status'),
-            '{{HW_GRAMMAR_STATUS}}': parsed.homework.grammar,
-            '{{HW_GRAMMAR_COLOR}}': getReportColor(parsed.homework.grammar, 'hw_detail'),
-            '{{HW_VOCAB_STATUS}}': parsed.homework.vocabCards,
-            '{{HW_VOCAB_COLOR}}': getReportColor(parsed.homework.vocabCards, 'hw_detail'),
-            '{{HW_READING_CARD_STATUS}}': parsed.homework.readingCards,
-            '{{HW_READING_CARD_COLOR}}': getReportColor(parsed.homework.readingCards, 'hw_detail'),
-            '{{HW_SUMMARY_STATUS}}': parsed.homework.summary,
-            '{{HW_SUMMARY_COLOR}}': getReportColor(parsed.homework.summary, 'hw_detail'),
-            '{{HW_DIARY_STATUS}}': parsed.homework.diary,
-            '{{HW_DIARY_COLOR}}': getReportColor(parsed.homework.diary, 'hw_detail'),
-            '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic,
-            '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
-            '{{BOOK_TITLE}}': bookTitleStr, 
-            '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR || 'N/A'} / ${parsed.reading.bookLexile || 'N/A'}` : 'N/A',
-            '{{WRITING_STATUS}}': parsed.reading.writingStatus,
-            '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate !== null ? parsed.completionRate : '없음'
+            '{{READING_BOOK_STATUS}}': parsed.reading.readingStatus, '{{READING_BOOK_COLOR}}': getReportColor(parsed.reading.readingStatus, 'status'),
+            '{{HW_GRAMMAR_STATUS}}': parsed.homework.grammar, '{{HW_GRAMMAR_COLOR}}': getReportColor(parsed.homework.grammar, 'hw_detail'),
+            '{{HW_VOCAB_STATUS}}': parsed.homework.vocabCards, '{{HW_VOCAB_COLOR}}': getReportColor(parsed.homework.vocabCards, 'hw_detail'),
+            '{{HW_READING_CARD_STATUS}}': parsed.homework.readingCards, '{{HW_READING_CARD_COLOR}}': getReportColor(parsed.homework.readingCards, 'hw_detail'),
+            '{{HW_SUMMARY_STATUS}}': parsed.homework.summary, '{{HW_SUMMARY_COLOR}}': getReportColor(parsed.homework.summary, 'hw_detail'),
+            '{{HW_DIARY_STATUS}}': parsed.homework.diary, '{{HW_DIARY_COLOR}}': getReportColor(parsed.homework.diary, 'hw_detail'),
+            '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic, '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
+            '{{BOOK_TITLE}}': bookTitleStr, '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR || 'N/A'} / ${parsed.reading.bookLexile || 'N/A'}` : 'N/A',
+            '{{WRITING_STATUS}}': parsed.reading.writingStatus, '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate !== null ? parsed.completionRate : '없음'
         };
         
         for (const [key, val] of Object.entries(replacements)) {
@@ -709,55 +676,37 @@ app.get('/report', async (req, res) => {
             html = html.split(key).join(displayVal);
         }
         res.send(html);
-    } catch (e) { 
-        console.error('리포트 생성 중 오류:', e);
-        res.status(500).send('Report Error'); 
-    }
+    } catch (e) { res.status(500).send('Report Error'); }
 });
 
 app.get('/api/admin/regenerate-urls', requireAuth, async (req, res) => {
     if (req.user.role !== 'manager') return res.status(403).json({ success: false, message: '관리자 권한이 필요합니다.' });
-    
     const { date } = req.query; 
     if (!date) return res.status(400).json({ success: false, message: '날짜가 필요합니다.' });
 
     try {
-        console.log(`[Manual Trigger] Regenerating URLs for ${date}...`);
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
-        let hasMore = true;
-        let startCursor = undefined;
-        let processedCount = 0;
+        let hasMore = true; let startCursor = undefined; let processedCount = 0;
 
         while (hasMore) {
             const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { 
-                method: 'POST', 
-                body: JSON.stringify({ filter: filter, page_size: 100, start_cursor: startCursor }) 
+                method: 'POST', body: JSON.stringify({ filter: filter, page_size: 100, start_cursor: startCursor }) 
             });
 
             for (const page of data.results) {
                 const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
                 const url = `${cleanDomain}/report?pageId=${page.id}&date=${date}`;
-
                 if (page.properties['데일리리포트URL']?.url === url) continue;
-
-                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { 
-                    method: 'PATCH', 
-                    body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) 
-                });
+                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) });
                 processedCount++;
             }
-            hasMore = data.has_more;
-            startCursor = data.next_cursor;
+            hasMore = data.has_more; startCursor = data.next_cursor;
         }
         res.json({ success: true, message: `${date} 리포트 URL ${processedCount}개 업데이트 완료` });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
-    }
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 cron.schedule('0 22 * * *', async () => {
-    console.log('--- 데일리 리포트 URL 자동 생성 ---');
     try {
         const { start, end, dateString } = getKSTTodayRange();
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
@@ -765,7 +714,6 @@ cron.schedule('0 22 * * *', async () => {
         for (const page of data.results) {
             const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
             const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
-
             if (page.properties['데일리리포트URL']?.url === url) continue;
             await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) });
         }

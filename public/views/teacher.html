@@ -6,22 +6,19 @@
     <title>선생님 대시보드 - 리디튜드</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        /* --- 기본 스타일 & 레이아웃 --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "NanumSquareRound", sans-serif; }
         
-        /* [핵심] 화면 전체를 고정하고 내부 스크롤로 변경 */
         body { 
             background: #f8f9fa; 
             color: #2d3748; 
-            height: 100vh; /* 화면 전체 높이 사용 */
-            overflow: hidden; /* 윈도우 스크롤 제거 */
+            height: 100vh;
+            overflow: hidden; 
             display: flex;
-            flex-direction: column; /* 상단 고정영역 - 하단 테이블영역 수직 배치 */
+            flex-direction: column; 
         }
 
-        /* 1. 상단 고정 영역 (로고 + 탭 + 필터 + 공지) */
         .fixed-layout-top {
-            flex: 0 0 auto; /* 크기 자동 조절 (줄어들지 않음) */
+            flex: 0 0 auto; 
             background: #ffffff;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
             z-index: 2000;
@@ -29,12 +26,11 @@
             flex-direction: column;
         }
 
-        /* 2. 하단 데이터 영역 (남은 공간 모두 차지 + 스크롤) */
         .scrollable-layout-bottom {
-            flex: 1 1 auto; /* 남은 공간 채우기 */
-            overflow: hidden; /* 내부 컨테이너에서 스크롤 처리 */
+            flex: 1 1 auto; 
+            overflow: hidden; 
             position: relative;
-            padding: 0 20px 20px 20px; /* 좌우 하단 여백 */
+            padding: 0 20px 20px 20px; 
             display: flex;
             flex-direction: column;
             max-width: 1400px;
@@ -42,7 +38,6 @@
             margin: 0 auto;
         }
 
-        /* 메인 헤더 스타일 */
         .header { 
             padding: 15px 30px; 
             display: flex; 
@@ -51,13 +46,12 @@
             height: 70px; 
             border-bottom: 1px solid #e2e8f0;
         }
-        .header h1 { font-size: 1.8em; margin: 0; color: #6b46c1; } /* 타이틀도 살짝 키움 */
+        .header h1 { font-size: 1.8em; margin: 0; color: #6b46c1; }
         .user-info { display: flex; align-items: center; gap: 15px; }
-        .user-name { font-weight: 600; font-size: 16px; } /* 이름 폰트 키움 */
-        .logout-btn { background: #6b46c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; transition: background 0.2s; } /* 13px -> 15px */
+        .user-name { font-weight: 600; font-size: 16px; } 
+        .logout-btn { background: #6b46c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; transition: background 0.2s; }
         .logout-btn:hover { background: #5a3eaa; }
 
-        /* 탭 메뉴 */
         .tab-menu { 
             display: flex; 
             padding: 0 20px; 
@@ -68,11 +62,10 @@
             background: white;
             flex-wrap: wrap;
         }
-        .tab-button { padding: 12px 16px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; white-space: nowrap; } /* 14px -> 16px */
+        .tab-button { padding: 12px 16px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: 600; color: #6b7280; position: relative; transition: color 0.3s; white-space: nowrap; } 
         .tab-button.active { color: #6b46c1; }
         .tab-button.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background-color: #8b5cf6; }
 
-        /* 필터 바 */
         .filter-bar {
             padding: 10px 20px;
             background: #f8f9fa;
@@ -84,50 +77,45 @@
             gap: 12px;
             justify-content: flex-start;
         }
-        .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px; display:flex; align-items:center; gap:4px; } /* 13px -> 15px */
+        .refresh-btn { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px; display:flex; align-items:center; gap:4px; } 
         .filter-group { display:flex; align-items:center; gap:6px; }
-        .filter-label { font-weight: 600; color: #4a5568; font-size: 15px; } /* 13px -> 15px */
-        .filter-select, .filter-input { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 15px; background: white; } /* 13px -> 15px */
+        .filter-label { font-weight: 600; color: #4a5568; font-size: 15px; } 
+        .filter-select, .filter-input { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; font-size: 15px; background: white; } 
 
-        /* 공지사항 (고정 영역에 포함) */
         .notice-wrapper {
             background: #fffbeb;
             border-bottom: 1px solid #e2e8f0;
             padding: 10px 20px;
-            font-size: 15px; /* 13px -> 15px */
+            font-size: 15px; 
             color: #744210;
             line-height: 1.4;
-            display: none; /* 기본 숨김 */
+            display: none; 
             text-align: center;
         }
         .notice-wrapper strong { color: #b7791f; }
 
-        /* 탭 컨텐츠 컨테이너 (스크롤의 주체) */
         .tab-content { 
             display: none; 
-            height: 100%; /* 부모 높이 꽉 채움 */
+            height: 100%; 
             flex-direction: column;
             padding-top: 15px;
         }
         .tab-content.active { display: flex; }
 
-        .section-title { font-size: 1.6em; font-weight: 700; color: #4a5568; margin-bottom: 10px; padding-left: 5px; flex: 0 0 auto; } /* 1.4em -> 1.6em */
+        .section-title { font-size: 1.6em; font-weight: 700; color: #4a5568; margin-bottom: 10px; padding-left: 5px; flex: 0 0 auto; }
 
-        /* 테이블 스크롤 컨테이너 (여기가 진짜 스크롤되는 곳) */
         .table-scroll-area {
-            flex: 1; /* 남은 높이 모두 사용 */
-            overflow: auto; /* 상하좌우 스크롤 */
+            flex: 1; 
+            overflow: auto; 
             background: white;
             border-radius: 10px;
             border: 1px solid #e2e8f0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-            position: relative; /* Sticky 기준점 */
+            position: relative; 
         }
 
-        /* 테이블 스타일 */
-        .styled-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; min-width: 1000px; } /* 13px -> 15px */
+        .styled-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; min-width: 1000px; } 
         
-        /* [3단 고정] 테이블 헤더 (top: 0으로 설정하면 스크롤 영역 맨 위에 붙음) */
         .styled-table th { 
             background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
             color: white; 
@@ -136,96 +124,88 @@
             font-weight: 600; 
             white-space: nowrap; 
             position: sticky;
-            top: 0; /* 스크롤 영역 최상단 고정 */
+            top: 0; 
             z-index: 100; 
             border-bottom: 1px solid #7c3aed;
         }
         
-        .styled-table td { padding: 10px 10px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } /* 패딩 살짝 증가 */
+        .styled-table td { padding: 10px 10px; text-align: center; border-bottom: 1px solid #f1f3f4; vertical-align: middle; } 
         .styled-table tr:last-child td { border-bottom: none; }
         
-        /* 학생 이름 가로 스크롤 시 고정 (왼쪽) */
         .student-name { 
             font-weight: 700; color: #2d3748; text-align: center; padding: 10px; 
-            min-width: 300px; /* [수정] 너비 넓힘 (버튼 포함 공간) */
+            min-width: 300px; 
             background-color: #fcf7ff; 
             position: sticky; 
             left: 0; 
-            z-index: 50; /* 헤더보단 낮게 */
+            z-index: 50; 
             border-right: 2px solid #e9ecef;
         }
-        /* 헤더의 첫 번째 셀(학생이름)은 z-index가 더 높아야 함 */
         .styled-table th:first-child { z-index: 110; left: 0; }
 
         .student-name-wrapper { 
             display: flex; 
-            flex-direction: row; /* [중요] 가로 배치 */
+            flex-direction: row; 
             align-items: center; 
             justify-content: center; 
             gap: 15px; 
             width: 100%; 
         }
         
-        .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; } /* 14px -> 16px */
+        .loading, .no-data { text-align: center; padding: 40px; color: #718096; font-size: 16px; } 
 
-        /* 기타 UI 컴포넌트 */
-        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 3px 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin: 2px; } /* 11px -> 13px */
-        .book-tag .remove-btn { cursor: pointer; color: #9333ea; font-size: 16px; font-weight: bold; } /* 14px -> 16px */
-        .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 8px; padding: 3px 10px; font-size: 13px; cursor: pointer; font-weight: bold; margin-left: 4px; } /* 11px -> 13px */
+        .book-tag { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; border-radius: 12px; padding: 3px 10px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin: 2px; }
+        .book-tag .remove-btn { cursor: pointer; color: #9333ea; font-size: 16px; font-weight: bold; } 
+        .book-add-btn { background: #e9d5ff; color: #6b46c1; border: 1px dashed #d8b4fe; border-radius: 8px; padding: 3px 10px; font-size: 13px; cursor: pointer; font-weight: bold; margin-left: 4px; }
 
-        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 50px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; } /* 11px -> 13px */
+        .status-badge { padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-block; min-width: 50px; text-align: center; border: 1px solid transparent; transition: all 0.2s; user-select: none; } 
         .status-complete { background-color: #dcfce7; color: #166534; border-color: #bbf7d0; }
         .status-incomplete { background-color: #fecaca; color: #991b1b; border-color: #fca5a5; }
         .status-none { background-color: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
         
         .batch-controls { display: flex; gap: 4px; margin-top: 0; justify-content: center; }
-        .batch-btn { font-size: 12px; padding: 3px 8px; border-radius: 4px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; background: white; white-space: nowrap; } /* 10px -> 12px */
+        .batch-btn { font-size: 12px; padding: 3px 8px; border-radius: 4px; border-width: 1px; border-style: solid; cursor: pointer; font-weight: 700; background: white; white-space: nowrap; } 
         .batch-ok { color: #15803d; border-color: #16a34a; }
         .batch-no { color: #b91c1c; border-color: #dc2626; }
         .batch-reset { color: #475569; border-color: #94a3b8; }
 
-        .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; background: white; width: 100%; max-width: 130px; } /* 11px -> 13px, max-width 증가 */
+        .homework-dropdown { padding: 6px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; background: white; width: 100%; max-width: 130px; } 
         .homework-dropdown.status-complete { background-color: #dcfce7; color: #166534; }
         .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; }
         .homework-dropdown.status-default { background-color: #f3f4f6; color: #6b7280; }
-        
-        /* [복구] 파란색 서식 추가 */
         .homework-dropdown.status-blue { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
 
-        .editable-input { padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 55px; font-size: 14px; } /* 12px -> 14px */
+        .editable-input { padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 55px; font-size: 14px; } 
         .editable-text-input { width: 110px; text-align: left; }
 
-        .score-circle { width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative; } /* 크기 약간 증가 */
+        .score-circle { width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative; } 
         .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
-        .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); } /* 10px -> 12px */
-        .score-none { font-size: 13px; font-weight: 600; color: #9ca3af; } /* 11px -> 13px */
-        .reading-result-badge { padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 12px; } /* 10px -> 12px */
+        .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); } 
+        .score-none { font-size: 13px; font-weight: 600; color: #9ca3af; } 
+        .reading-result-badge { padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 12px; } 
         .result-pass { background-color: #dcfce7; color: #166534; }
         .result-fail { background-color: #fecaca; color: #991b1b; }
 
-        /* 코멘트 입력창 100% 넓게 */
-        .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; } /* 12px -> 14px */
+        .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; }
         .report-btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
-        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; } /* 11px -> 13px */
+        .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
         .btn-save { background: #10b981; color: white; }
         .btn-daily-view { background: #e0f2fe; color: #0284c7; }
         .btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
         .btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
         .btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; }
 
-        /* 관리자 메뉴 스타일 */
         .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; }
-        .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 22px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: center; transition: all 0.2s; } /* 14px -> 16px */
+        .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 22px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: center; transition: all 0.2s; } 
         .admin-link-button:hover { border-color: #8b5cf6; background: #fcf7ff; transform: translateY(-2px); }
         .manager-only-link { display: none; background-color: #f8fafc; border-color: #cbd5e0; color: #4a5568; }
 
         .grammar-input-container { background: #f3e8ff; padding: 15px; border-radius: 8px; border: 1px solid #d8b4fe; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
         .grammar-group { display: flex; flex-direction: column; gap: 4px; }
-        .grammar-label { font-size: 14px; font-weight: 700; color: #6b46c1; } /* 12px -> 14px */
-        .grammar-input { padding: 8px 12px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 15px; } /* 13px -> 15px */
+        .grammar-label { font-size: 14px; font-weight: 700; color: #6b46c1; } 
+        .grammar-input { padding: 8px 12px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 15px; } 
         .grammar-btn { padding: 8px 18px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 14px; }
 
-        /* 유틸리티 */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; display: none; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
@@ -238,17 +218,34 @@
         .toast-message.show { opacity: 1; }
         
         .keyword-input-container { display: flex; gap: 4px; margin-bottom: 5px; }
-        .keyword-input { flex: 1; padding: 8px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 14px; } /* 12px -> 14px */
-        .btn-ai-generate { padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; } /* 11px -> 13px */
+        .keyword-input { flex: 1; padding: 8px; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 14px; } 
+        .btn-ai-generate { padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; } 
         
-        .report-modal-desc { margin-bottom: 15px; font-size: 15px; color: #4b5563; } /* 13px -> 15px */
-
+        .report-modal-desc { margin-bottom: 15px; font-size: 15px; color: #4b5563; } 
         .hidden { display: none !important; }
+
+        /* [신규] 코멘트 미니 팝업(플로팅 창) 스타일 */
+        .floating-window { 
+            position: fixed; bottom: 40px; right: 40px; width: 380px; background: #fff; 
+            border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); z-index: 9999; 
+            border: 1px solid #e2e8f0; overflow: hidden; 
+        }
+        .floating-header { 
+            background: #f59e0b; color: white; padding: 12px 18px; font-weight: bold; 
+            display: flex; justify-content: space-between; align-items: center; font-size: 15px; 
+        }
+        .floating-header button { 
+            background: none; border: none; color: white; cursor: pointer; 
+            font-size: 16px; transition: transform 0.2s; 
+        }
+        .floating-header button:hover { transform: scale(1.1); }
+        .floating-content { 
+            padding: 18px; max-height: 350px; overflow-y: auto; font-size: 14px; line-height: 1.6; 
+        }
     </style>
 </head>
 <body>
 
-    <!-- 1. 상단 고정 영역 (화면에서 절대 움직이지 않음) -->
     <div class="fixed-layout-top">
         <div class="header">
             <h1>📚 리디튜드 선생님</h1>
@@ -266,6 +263,8 @@
             <button class="tab-button" onclick="showTab('grammar')">📚 문법 관리</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
             <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">⚙️ 관리자</button>
+            <!-- [신규] 지난주 문법숙제 메뉴 (새 창 열림) -->
+            <button class="tab-button" onclick="openPastGrammarWindow()" style="color: #ea580c; font-weight: 700; margin-left: auto;">지난주 문법숙제</button>
         </div>
 
         <div class="filter-bar" id="commonFilterBar">
@@ -292,7 +291,6 @@
             <button class="refresh-btn batch-save-btn hidden" id="batchSaveBtn" onclick="saveAllComments(this)">💾 일괄 저장</button>
         </div>
 
-        <!-- 공지사항 (숙제 탭 전용) -->
         <div id="stickyNoticeWrapper" class="notice-wrapper">
             📢 매달 숙제 수행율과 성실도 점수, RT-Check point가 산출 됩니다. 
             <strong>RT 포인트 70점 이하를 2달 연속 맞게 되면 패널티 부과 및 조치가 있으니</strong> 
@@ -300,10 +298,7 @@
         </div>
     </div>
 
-    <!-- 2. 하단 데이터 영역 (여기만 스크롤 됨) -->
     <div class="scrollable-layout-bottom">
-        
-        <!-- 1. 숙제 현황 -->
         <div id="homework-view" class="tab-content active">
             <div class="section-title">📋 담당 학생 숙제 현황</div>
             <div class="table-scroll-area">
@@ -314,7 +309,6 @@
             </div>
         </div>
 
-        <!-- 2. 테스트 결과 -->
         <div id="tests-view" class="tab-content">
             <div class="section-title">📝 담당 학생 테스트 결과</div>
             <div class="table-scroll-area">
@@ -325,7 +319,6 @@
             </div>
         </div>
 
-        <!-- 3. 원서 독서 현황 -->
         <div id="reading-view" class="tab-content">
             <div class="section-title">📚 원서 독서 현황</div>
             <div class="table-scroll-area">
@@ -336,7 +329,6 @@
             </div>
         </div>
 
-        <!-- 4. 리스닝 현황 -->
         <div id="listening-view" class="tab-content">
             <div class="section-title">🎧 리스닝 & 책거 현황</div>
             <div class="table-scroll-area">
@@ -349,7 +341,6 @@
             </div>
         </div>
 
-        <!-- 5. 문법 관리 (Phase 2 개편) -->
         <div id="grammar-view" class="tab-content">
             <div class="section-title">📚 문법 숙제 관리</div>
             <div class="grammar-input-container">
@@ -363,7 +354,7 @@
                 </div>
                 <div class="grammar-group">
                     <label class="grammar-label">문법 테스트 내용</label>
-                    <input type="text" id="grammarTestInput" class="grammar-input" placeholder="예: 시제-과거형 (쉼표로 구분)">
+                    <input type="text" id="grammarTestInput" list="grammarTestOptionsList" class="grammar-input" placeholder="클릭하여 선택 또는 쉼표 입력">
                 </div>
                 <div class="grammar-group" style="flex-grow: 1;">
                     <label class="grammar-label">문법 과제 내용</label>
@@ -380,7 +371,6 @@
             </div>
         </div>
 
-        <!-- 6. 오늘의 코멘트 -->
         <div id="comments-view" class="tab-content">
             <div class="section-title">💬 오늘의 코멘트</div>
             <div class="table-scroll-area">
@@ -392,7 +382,6 @@
             </div>
         </div>
         
-        <!-- 7. 관리자 메뉴 -->
         <div id="admin-view" class="tab-content">
             <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
             <div class="table-scroll-area" style="padding: 20px; border:none; background: transparent; box-shadow: none;">
@@ -433,17 +422,13 @@
         </div>
     </div>
 
-    <!-- [신규 모달] 1주일 히스토리 모달 -->
-    <div id="historyModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px; width: 95%;">
-            <h2 class="section-title" id="historyModalTitle">⏳ 최근 1주일 학습 기록</h2>
-            <div id="historyModalContent" style="max-height: 450px; overflow-y: auto; margin-top: 15px; padding-right: 10px;">
-                <!-- 내용이 여기에 쏙 들어갑니다 -->
-            </div>
-            <div style="text-align: right; margin-top: 15px;">
-                <button onclick="document.getElementById('historyModal').classList.remove('show')" style="padding:8px 16px; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;">닫기</button>
-            </div>
+    <!-- [신규] 지난 코멘트 미니 팝업창 (화면 우측 하단 고정) -->
+    <div id="floatingCommentWindow" class="floating-window hidden">
+        <div class="floating-header">
+            <span id="floatingTitle">👀 지난 코멘트 보기</span>
+            <button onclick="closeFloatingWindow()">✖</button>
         </div>
+        <div id="floatingContent" class="floating-content"></div>
     </div>
 
     <script>
@@ -460,10 +445,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) { window.location.href='/teacher-login'; return; }
-            
             document.getElementById('commonPeriodFilter').value = 'today';
             document.getElementById('commonSpecificDate').style.display = 'none';
-
             loadUserInfo();
             showTab('homework');
             
@@ -577,20 +560,54 @@
             loadDataForCurrentTab();
         }
 
+        // --- [신규] 지난주 문법숙제 메뉴 동작 ---
+        function openPastGrammarWindow() {
+            window.open('/past-grammar', '_blank', 'width=1100,height=800,scrollbars=yes');
+        }
+
+        // --- [신규] 지난 코멘트 미니 팝업창 API 연결 ---
+        async function openLastCommentWindow(studentName, currentDate) {
+            const win = document.getElementById('floatingCommentWindow');
+            const title = document.getElementById('floatingTitle');
+            const content = document.getElementById('floatingContent');
+
+            title.textContent = `👀 ${studentName} 지난 코멘트`;
+            content.innerHTML = '<div class="loading" style="text-align:center; padding:20px;">불러오는 중...</div>';
+            win.classList.remove('hidden');
+
+            try {
+                // currentDate 기준으로 가장 최근 코멘트 1개만 불러오도록 백엔드 연결
+                const res = await fetch(`${API_BASE_URL}/api/last-comment?studentName=${encodeURIComponent(studentName)}&currentDate=${currentDate}`, { 
+                    headers: { 'Authorization': 'Bearer ' + authToken } 
+                });
+                const data = await res.json();
+                
+                if (data.success && data.record) {
+                    content.innerHTML = `
+                        <div style="font-weight:800; color:#4a5568; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:5px;">📅 ${data.record.date}</div>
+                        <div style="color:#2d3748; white-space:pre-wrap;">${data.record.comment || '작성된 코멘트가 없습니다.'}</div>
+                    `;
+                } else {
+                    content.innerHTML = '<div class="no-data" style="text-align:center; color:#a0aec0; padding:20px;">이전 기록이 없습니다.</div>';
+                }
+            } catch(e) {
+                content.innerHTML = '<div class="error" style="text-align:center; color:#e53e3e; padding:20px;">오류 발생</div>';
+            }
+        }
+
+        function closeFloatingWindow() { 
+            document.getElementById('floatingCommentWindow').classList.add('hidden'); 
+        }
+
         // --- 포맷팅 함수들 ---
         function formatSelect(pageId, propertyName, currentValue, options) {
-            const defaultStatus = 'status-default';
             let statusClass = 'status-default';
-            
             if (currentValue === '완료함' || currentValue === '완료') statusClass = 'status-complete';
             else if (currentValue === '못함' || currentValue === '미완료') statusClass = 'status-incomplete';
             else if (currentValue === 'skip' || currentValue === 'SKIP' || currentValue === '원서독서로 대체' || currentValue === '듣기평가교재 완료') statusClass = 'status-blue';
 
             return `<select class="homework-dropdown ${statusClass}" 
-                        data-page-id="${pageId}" 
-                        data-property-name="${propertyName}" 
-                        data-property-type="select" 
-                        onchange="updateField(this)">
+                        data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="select" onchange="updateField(this)">
                         <option value="">선택</option>
                         ${options.map(option => `<option value="${option}" ${option === currentValue ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
@@ -738,13 +755,31 @@
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
+             
+             // [신규] 입력된 모든 문법 태그를 모아서 자동완성 콤보박스(Datalist) 생성
+             let grammarTestOptions = new Set();
+             data.forEach(st => {
+                 if (st.comment?.grammarTest) {
+                     st.comment.grammarTest.split(',').forEach(tag => grammarTestOptions.add(tag.trim()));
+                 }
+             });
+             
+             let datalistHtml = `<datalist id="grammarTestOptionsList">
+                 ${Array.from(grammarTestOptions).filter(Boolean).map(opt => `<option value="${opt}"></option>`).join('')}
+             </datalist>`;
+             
+             if (!document.getElementById('grammarTestOptionsList')) {
+                 document.body.insertAdjacentHTML('beforeend', datalistHtml);
+             } else {
+                 document.getElementById('grammarTestOptionsList').innerHTML = Array.from(grammarTestOptions).filter(Boolean).map(opt => `<option value="${opt}"></option>`).join('');
+             }
+
              tbody.innerHTML = data.map(st => `
                 <tr>
                     <td class="student-name">${st.studentName}</td>
                     <td>${st.comment?.grammarClass || '-'}</td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <!-- [신규] 문법 테스트 내용 개별 업데이트 칸 (쉼표 구분시 서버가 배열로 처리) -->
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" placeholder="쉼표로 구분 입력" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="multi_select" onchange="updateField(this)"></td>
+                    <td><input type="text" list="grammarTestOptionsList" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTest || ''}" placeholder="클릭 선택 또는 쉼표 입력" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="multi_select" onchange="updateField(this)"></td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
                 </tr>
              `).join('');
@@ -757,8 +792,8 @@
                 <tr id="row-comment-${st.pageId}">
                     <td class="student-name">
                         <div style="font-size: 16px; margin-bottom: 5px;">${st.studentName}</div>
-                        <!-- [신규] 코멘트 작성 탭에서 지난 1주일 기록 보기 버튼 -->
-                        <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openHistoryModal('${st.studentName}')">⏳ 지난 1주일 기록</button>
+                        <!-- [개편] 코멘트 작성 탭에서 지난시간 코멘트 보기 (플로팅 창) -->
+                        <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
                     </td>
                     <td>${(st.teachers||[]).join(', ')}</td>
                     <td>${st.comment?.grammarClass||'-'}</td>
@@ -783,42 +818,12 @@
             document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el));
         }
 
-        // --- [신규 API 연결] 지난 1주일 히스토리 모달 열기 ---
-        async function openHistoryModal(studentName) {
-            document.getElementById('historyModalTitle').textContent = `⏳ ${studentName}의 최근 1주일 기록`;
-            const contentDiv = document.getElementById('historyModalContent');
-            contentDiv.innerHTML = '<div class="loading">데이터를 불러오는 중입니다...</div>';
-            document.getElementById('historyModal').classList.add('show');
-            
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/student-history?studentName=${encodeURIComponent(studentName)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
-                const data = await res.json();
-                
-                if (data.success && data.history.length > 0) {
-                    contentDiv.innerHTML = data.history.map(h => `
-                        <div style="border-left: 4px solid #8b5cf6; padding: 10px 15px; margin-bottom: 12px; background: #f8fafc; border-radius: 6px;">
-                            <div style="font-weight: 800; color: #4a5568; margin-bottom: 5px;">📅 ${h.date}</div>
-                            <div style="font-size: 14px; margin-bottom: 4px;"><strong>진도:</strong> ${h.grammarTopic} &nbsp; | &nbsp; <strong>과제:</strong> ${h.grammarHomework}</div>
-                            <div style="font-size: 14px; margin-bottom: 4px;"><strong>테스트:</strong> <span class="book-tag" style="padding:1px 6px;">${h.grammarTest}</span> &nbsp; | &nbsp; <strong>점수:</strong> ${h.grammarScore !== 'N/A' ? h.grammarScore + '점' : '-'}</div>
-                            <div style="font-size: 14px; color: #4b5563; background: white; padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px solid #e2e8f0; line-height:1.4;">${h.comment || '코멘트 없음'}</div>
-                        </div>
-                    `).join('');
-                } else {
-                    contentDiv.innerHTML = '<div class="no-data">최근 1주일간의 기록이 없습니다.</div>';
-                }
-            } catch (e) {
-                contentDiv.innerHTML = '<div class="error" style="color:red; text-align:center; padding: 30px;">기록을 불러오지 못했습니다.</div>';
-            }
-        }
-
-        // --- 기타 기능 함수들 ---
         async function updateField(el, pageId, prop, type, manualVal) {
             if (!pageId && el && el.dataset) {
                 pageId = el.dataset.pageId; prop = el.dataset.propertyName; type = el.dataset.propertyType;
             }
             let val = (manualVal !== undefined) ? manualVal : (el ? (type === 'checkbox' ? el.checked : el.value) : '');
             
-            // [신규] multi_select(다중선택) 처리 로직 - 쉼표로 입력하면 알아서 배열로 쪼개줍니다.
             if (type === 'multi_select' && typeof val === 'string') {
                 val = val.split(',').map(s => s.trim()).filter(Boolean);
             }
@@ -836,24 +841,43 @@
         async function updateGrammarByClass() {
             const className = document.getElementById('grammarClassSelect').value;
             const topic = document.getElementById('grammarTopicInput').value;
-            const testContent = document.getElementById('grammarTestInput').value; // 새로 추가됨
+            const testContent = document.getElementById('grammarTestInput').value; 
             const homework = document.getElementById('grammarHomeworkInput').value;
             const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
             
             if (!className) return alert('반을 선택하세요.');
             if (!confirm(`${className}반 전체 적용하시겠습니까?`)) return;
 
-            // ※ 주의: 기존 백엔드(server.js)의 update-grammar-by-class 로직에 testContent가 반영되도록 서버쪽 수정도 함께 필요할 수 있습니다!
             try {
+                // [신규] 로딩 상태 표시 (눈에 띄게!)
+                const tbody = document.getElementById('grammarTableBody');
+                tbody.innerHTML = `<tr><td colspan="5" class="loading" style="color:#8b5cf6; font-weight:bold; font-size:16px;">🚀 ${className}반 데이터 업데이트 중... 잠시만 기다려주세요!</td></tr>`;
+
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ className, topic, homework, testContent, date }) // testContent 추가 전송
+                    body: JSON.stringify({ className, topic, homework, testContent, date }) 
                 });
                 const result = await res.json();
-                if(result.success) { showToast(result.message); loadDataForCurrentTab(); }
-                else alert(result.message);
-            } catch(e) { alert('오류 발생'); }
+                if(result.success) { 
+                    showToast(result.message); 
+                    
+                    // [신규] 일괄 적용 성공 후 상단 입력칸 깔끔하게 비우기
+                    document.getElementById('grammarTopicInput').value = '';
+                    document.getElementById('grammarTestInput').value = '';
+                    document.getElementById('grammarHomeworkInput').value = '';
+                    
+                    // [신규] 테이블 리스트만 새로고침!
+                    loadDataForCurrentTab(); 
+                }
+                else {
+                    alert(result.message);
+                    loadDataForCurrentTab();
+                }
+            } catch(e) { 
+                alert('오류 발생'); 
+                loadDataForCurrentTab();
+            }
         }
 
         function updateGrammarClassList(data) {
