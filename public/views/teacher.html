@@ -203,7 +203,7 @@
         .result-pass { background-color: #dcfce7; color: #166534; }
         .result-fail { background-color: #fecaca; color: #991b1b; }
 
-        /* [복구] 코멘트 입력창 늘어나는 스타일은 JS로 처리하지만 기본 스타일 유지 */
+        /* 코멘트 입력창 100% 넓게 */
         .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; } /* 12px -> 14px */
         .report-btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
         .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; } /* 11px -> 13px */
@@ -349,7 +349,7 @@
             </div>
         </div>
 
-        <!-- 5. 문법 관리 -->
+        <!-- 5. 문법 관리 (Phase 2 개편) -->
         <div id="grammar-view" class="tab-content">
             <div class="section-title">📚 문법 숙제 관리</div>
             <div class="grammar-input-container">
@@ -361,6 +361,10 @@
                     <label class="grammar-label">오늘 문법 진도</label>
                     <input type="text" id="grammarTopicInput" class="grammar-input" placeholder="예: to부정사">
                 </div>
+                <div class="grammar-group">
+                    <label class="grammar-label">문법 테스트 내용</label>
+                    <input type="text" id="grammarTestInput" class="grammar-input" placeholder="예: 시제-과거형 (쉼표로 구분)">
+                </div>
                 <div class="grammar-group" style="flex-grow: 1;">
                     <label class="grammar-label">문법 과제 내용</label>
                     <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예: P.20~24 풀기">
@@ -369,9 +373,9 @@
             </div>
             <div class="table-scroll-area">
                 <table class="styled-table">
-                    <colgroup><col style="width:15%"><col style="width:10%"><col style="width:37%"><col style="width:38%"></colgroup>
-                    <thead><tr> <th>학생 이름</th> <th>문법 반</th> <th>오늘 문법 진도</th> <th>문법 과제 내용</th> </tr></thead>
-                    <tbody id="grammarTableBody"><tr><td colspan="4" class="loading">로딩중...</td></tr></tbody>
+                    <colgroup><col style="width:12%"><col style="width:10%"><col style="width:23%"><col style="width:25%"><col style="width:30%"></colgroup>
+                    <thead><tr> <th>학생 이름</th> <th>문법 반</th> <th>오늘 문법 진도</th> <th>문법 테스트 내용</th> <th>문법 과제 내용</th> </tr></thead>
+                    <tbody id="grammarTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -381,7 +385,7 @@
             <div class="section-title">💬 오늘의 코멘트</div>
             <div class="table-scroll-area">
                 <table class="styled-table">
-                    <colgroup><col style="width:10%"><col style="width:8%"><col style="width:8%"><col style="width:44%"><col style="width:30%"></colgroup>
+                    <colgroup><col style="width:12%"><col style="width:8%"><col style="width:8%"><col style="width:42%"><col style="width:30%"></colgroup>
                     <thead><tr> <th>학생 이름</th> <th>담당강사</th> <th>문법 클래스</th> <th>오늘의 코멘트</th> <th>관리</th> </tr></thead>
                     <tbody id="commentsTableBody"><tr><td colspan="5" class="loading">로딩중...</td></tr></tbody>
                 </table>
@@ -407,7 +411,7 @@
         </div>
     </div>
 
-    <!-- 모달 등 -->
+    <!-- 모달 창들 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="section-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -425,6 +429,19 @@
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
                 <button onclick="document.getElementById('reportModal').classList.remove('show')" style="padding:8px 16px; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;">닫기</button>
                 <button id="copyReportLinkBtn" onclick="copyReportLink()" style="padding:8px 16px; background:#6b46c1; color:white; border:none; border-radius:6px; cursor:pointer;">복사하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [신규 모달] 1주일 히스토리 모달 -->
+    <div id="historyModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; width: 95%;">
+            <h2 class="section-title" id="historyModalTitle">⏳ 최근 1주일 학습 기록</h2>
+            <div id="historyModalContent" style="max-height: 450px; overflow-y: auto; margin-top: 15px; padding-right: 10px;">
+                <!-- 내용이 여기에 쏙 들어갑니다 -->
+            </div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button onclick="document.getElementById('historyModal').classList.remove('show')" style="padding:8px 16px; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;">닫기</button>
             </div>
         </div>
     </div>
@@ -466,7 +483,6 @@
                 document.getElementById('userName').textContent = `${data.userName} (${data.userRole === 'manager' ? '관리자' : '선생님'})`;
                 loadTeachersList();
                 
-                // 관리자 메뉴 버튼 표시 제어
                 const managerLinks = document.querySelectorAll('.manager-only-link');
                 managerLinks.forEach(link => {
                     link.style.display = (currentUserRole === 'manager') ? 'block' : 'none';
@@ -563,13 +579,12 @@
 
         // --- 포맷팅 함수들 ---
         function formatSelect(pageId, propertyName, currentValue, options) {
-            // [복구] 상태에 따른 색상 클래스 적용
             const defaultStatus = 'status-default';
             let statusClass = 'status-default';
             
             if (currentValue === '완료함' || currentValue === '완료') statusClass = 'status-complete';
             else if (currentValue === '못함' || currentValue === '미완료') statusClass = 'status-incomplete';
-            else if (currentValue === 'skip' || currentValue === 'SKIP' || currentValue === '원서독서로 대체' || currentValue === '듣기평가교재 완료') statusClass = 'status-blue'; // 파란색
+            else if (currentValue === 'skip' || currentValue === 'SKIP' || currentValue === '원서독서로 대체' || currentValue === '듣기평가교재 완료') statusClass = 'status-blue';
 
             return `<select class="homework-dropdown ${statusClass}" 
                         data-page-id="${pageId}" 
@@ -585,11 +600,10 @@
             const defaultStatus = options.includes('진행하지 않음') ? '진행하지 않음' : (options.includes('해당 없음') ? '해당 없음' : '숙제 없음');
             let displayStatus = options.includes(currentStatus) ? currentStatus : defaultStatus;
             
-            // [복구] 색상 적용 로직
             let statusClass = 'status-default';
             if (displayStatus.includes('완료') || displayStatus.includes('숙제 함')) statusClass = 'status-complete';
             else if (displayStatus.includes('미완료') || displayStatus.includes('안 해옴') || displayStatus.includes('못함')) statusClass = 'status-incomplete';
-            else if (displayStatus.includes('원서독서로 대체') || displayStatus.includes('듣기평가교재 완료')) statusClass = 'status-blue'; // 파란색
+            else if (displayStatus.includes('원서독서로 대체') || displayStatus.includes('듣기평가교재 완료')) statusClass = 'status-blue';
 
             return `<select class="homework-dropdown ${statusClass}" data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="status" onchange="updateField(this)">
                         ${options.map(option => `<option value="${option}" ${option === displayStatus ? 'selected' : ''}>${option}</option>`).join('')}
@@ -605,7 +619,6 @@
             displayGrammarData(data);
         }
 
-        // --- 탭별 디스플레이 함수들 ---
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="10" class="no-data">데이터 없음</td></tr>'; return; }
@@ -706,7 +719,7 @@
             const tbody = document.getElementById('listeningTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
             const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
-            const giantOptions = ['진행하지 않음', '미완료', '완료',]; // [수정] 헤더님이 주신대로 유지하되, 요청하신 완료/미완료/못함 3가지 옵션만 사용하는 것으로 해석하여, 원래 쓰시던대로 모든 옵션 유지 (삭제하지 말라고 하셨으므로)
+            const giantOptions = ['진행하지 않음', '미완료', '완료',]; 
             
             tbody.innerHTML = data.map(st => {
                 const kBooks = st.listening.koreanBooks || [];
@@ -722,22 +735,41 @@
             }).join('');
         }
 
+        function displayGrammarData(data) {
+             const tbody = document.getElementById('grammarTableBody');
+             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
+             tbody.innerHTML = data.map(st => `
+                <tr>
+                    <td class="student-name">${st.studentName}</td>
+                    <td>${st.comment?.grammarClass || '-'}</td>
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
+                    <!-- [신규] 문법 테스트 내용 개별 업데이트 칸 (쉼표 구분시 서버가 배열로 처리) -->
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" placeholder="쉼표로 구분 입력" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="multi_select" onchange="updateField(this)"></td>
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
+                </tr>
+             `).join('');
+        }
+
         function displayCommentData(data) {
             const tbody = document.getElementById('commentsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `
                 <tr id="row-comment-${st.pageId}">
-                    <td class="student-name">${st.studentName}</td>
+                    <td class="student-name">
+                        <div style="font-size: 16px; margin-bottom: 5px;">${st.studentName}</div>
+                        <!-- [신규] 코멘트 작성 탭에서 지난 1주일 기록 보기 버튼 -->
+                        <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openHistoryModal('${st.studentName}')">⏳ 지난 1주일 기록</button>
+                    </td>
                     <td>${(st.teachers||[]).join(', ')}</td>
-                    <td>${st.comment.grammarClass||'-'}</td>
-                    <td style="vertical-align:top;">
+                    <td>${st.comment?.grammarClass||'-'}</td>
+                    <td style="vertical-align:top; padding: 15px;">
                         <div class="keyword-input-container">
                             <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
                             <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
                         </div>
-                        <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}">${st.comment.teacherComment || ''}</textarea>
+                        <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}">${st.comment?.teacherComment || ''}</textarea>
                     </td>
-                    <td style="vertical-align:top;">
+                    <td style="vertical-align:middle;">
                         <div class="report-btn-group">
                             <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
                             <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
@@ -748,21 +780,35 @@
                     </td>
                 </tr>`).join('');
             
-            // [복구] 로드 시 높이 조절
             document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el));
         }
 
-        function displayGrammarData(data) {
-             const tbody = document.getElementById('grammarTableBody');
-             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>'; return; }
-             tbody.innerHTML = data.map(st => `
-                <tr>
-                    <td class="student-name">${st.studentName}</td>
-                    <td>${st.comment.grammarClass || '-'}</td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment.grammarTopic === '진도 해당 없음' ? '' : st.comment.grammarTopic}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment.grammarHomework === '숙제 내용 없음' ? '' : st.comment.grammarHomework}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
-                </tr>
-             `).join('');
+        // --- [신규 API 연결] 지난 1주일 히스토리 모달 열기 ---
+        async function openHistoryModal(studentName) {
+            document.getElementById('historyModalTitle').textContent = `⏳ ${studentName}의 최근 1주일 기록`;
+            const contentDiv = document.getElementById('historyModalContent');
+            contentDiv.innerHTML = '<div class="loading">데이터를 불러오는 중입니다...</div>';
+            document.getElementById('historyModal').classList.add('show');
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/student-history?studentName=${encodeURIComponent(studentName)}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                
+                if (data.success && data.history.length > 0) {
+                    contentDiv.innerHTML = data.history.map(h => `
+                        <div style="border-left: 4px solid #8b5cf6; padding: 10px 15px; margin-bottom: 12px; background: #f8fafc; border-radius: 6px;">
+                            <div style="font-weight: 800; color: #4a5568; margin-bottom: 5px;">📅 ${h.date}</div>
+                            <div style="font-size: 14px; margin-bottom: 4px;"><strong>진도:</strong> ${h.grammarTopic} &nbsp; | &nbsp; <strong>과제:</strong> ${h.grammarHomework}</div>
+                            <div style="font-size: 14px; margin-bottom: 4px;"><strong>테스트:</strong> <span class="book-tag" style="padding:1px 6px;">${h.grammarTest}</span> &nbsp; | &nbsp; <strong>점수:</strong> ${h.grammarScore !== 'N/A' ? h.grammarScore + '점' : '-'}</div>
+                            <div style="font-size: 14px; color: #4b5563; background: white; padding: 8px; border-radius: 4px; margin-top: 5px; border: 1px solid #e2e8f0; line-height:1.4;">${h.comment || '코멘트 없음'}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    contentDiv.innerHTML = '<div class="no-data">최근 1주일간의 기록이 없습니다.</div>';
+                }
+            } catch (e) {
+                contentDiv.innerHTML = '<div class="error" style="color:red; text-align:center; padding: 30px;">기록을 불러오지 못했습니다.</div>';
+            }
         }
 
         // --- 기타 기능 함수들 ---
@@ -772,6 +818,11 @@
             }
             let val = (manualVal !== undefined) ? manualVal : (el ? (type === 'checkbox' ? el.checked : el.value) : '');
             
+            // [신규] multi_select(다중선택) 처리 로직 - 쉼표로 입력하면 알아서 배열로 쪼개줍니다.
+            if (type === 'multi_select' && typeof val === 'string') {
+                val = val.split(',').map(s => s.trim()).filter(Boolean);
+            }
+
             try { 
                 await fetch(`${API_BASE_URL}/api/update-homework`, { 
                     method: 'POST', 
@@ -785,17 +836,19 @@
         async function updateGrammarByClass() {
             const className = document.getElementById('grammarClassSelect').value;
             const topic = document.getElementById('grammarTopicInput').value;
+            const testContent = document.getElementById('grammarTestInput').value; // 새로 추가됨
             const homework = document.getElementById('grammarHomeworkInput').value;
             const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
             
             if (!className) return alert('반을 선택하세요.');
             if (!confirm(`${className}반 전체 적용하시겠습니까?`)) return;
 
+            // ※ 주의: 기존 백엔드(server.js)의 update-grammar-by-class 로직에 testContent가 반영되도록 서버쪽 수정도 함께 필요할 수 있습니다!
             try {
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ className, topic, homework, date })
+                    body: JSON.stringify({ className, topic, homework, testContent, date }) // testContent 추가 전송
                 });
                 const result = await res.json();
                 if(result.success) { showToast(result.message); loadDataForCurrentTab(); }
@@ -805,7 +858,7 @@
 
         function updateGrammarClassList(data) {
             const select = document.getElementById('grammarClassSelect');
-            const classes = new Set(data.map(st => st.comment.grammarClass).filter(c => c && c !== '진도 해당 없음'));
+            const classes = new Set(data.map(st => st.comment?.grammarClass).filter(c => c && c !== '진도 해당 없음'));
             select.innerHTML = '<option value="">반을 선택하세요</option>';
             classes.forEach(cls => {
                 const opt = document.createElement('option');
@@ -837,7 +890,7 @@
                     const area = document.getElementById(`comment-area-${pageId}`);
                     area.value = data.comment;
                     markCommentAsChanged(area);
-                    autoResizeTextarea(area); // [복구] 자동 높이 조절
+                    autoResizeTextarea(area);
                 }
             } catch(e) { alert('AI 생성 실패'); }
         }
@@ -847,7 +900,6 @@
             btn.textContent = '저장*'; btn.style.background = '#ef4444';
         }
 
-        // [복구] 텍스트 에어리어 자동 높이 조절 함수
         function autoResizeTextarea(el) {
             el.style.height = 'auto';
             el.style.height = (el.scrollHeight) + 'px';
@@ -915,7 +967,6 @@
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function openNotionWindow(url) { window.open(url, '_blank', 'width=1200,height=800'); }
         
-        // [누락 복구] 리포트/월간리포트 관련 함수들
         function copyText(text) {
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(text).then(() => showToast('복사 완료')).catch(() => alert('복사 실패'));

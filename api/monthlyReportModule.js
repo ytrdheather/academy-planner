@@ -21,11 +21,9 @@ let getKoreanDate;
 async function parseMonthlyStatsData(page) {
     const props = page.properties;
 
-    // 1. 숙제 수행율
     const performanceRateString = props['수행율']?.formula?.string || '0%';
     const completionRate = parseFloat(performanceRateString.replace('%', '')) || 0;
 
-    // 2. 시험 점수 (숫자 자석 정규식 적용)
     const getScoreFromFormula = (prop) => {
         if (!prop || !prop.formula) return 'N/A';
         if (prop.formula.type === 'number') return prop.formula.number !== null ? prop.formula.number : 'N/A';
@@ -55,7 +53,6 @@ async function parseMonthlyStatsData(page) {
     const grammarScore = getScoreFromFormula(grammarScoreProp);
     const readingResult = readingResultProp?.formula?.string || 'N/A';
 
-    // [핵심] 문법 테스트 내용(파트) 가져오기 (선택 or 다중선택 모두 호환)
     const grammarTopicProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
     let grammarTopics = [];
     if (grammarTopicProp) {
@@ -70,7 +67,6 @@ async function parseMonthlyStatsData(page) {
 
     const vocabCorrect = props['단어(맞은 개수)']?.number || props['단어 (맞은 개수)']?.number || 0;
 
-    // 3. 총 읽은 권수 (날짜 정보 추가)
     let books = [];
     const titleRollup = props['📖 책제목 (롤업)']?.rollup || getPropByKeywords(props, ['책제목', '롤업'])?.rollup;
     const arRollup = props['AR']?.rollup; 
@@ -110,15 +106,11 @@ async function parseMonthlyStatsData(page) {
     };
 }
 
-/**
- * [신규] 문법 세부 파트별 점수를 합치지 않고 낱개로 모두 반환하도록 수정 (날짜 포함)
- */
 function calculateGrammarDetails(monthPages) {
     const tests = [];
     monthPages.forEach(p => {
         if (p.grammarScore !== 'N/A' && p.grammarScore !== null && p.grammarScore !== 0) {
             const topics = (p.grammarTopics && p.grammarTopics.length > 0) ? p.grammarTopics.join(', ') : '종합/기본 문법';
-            
             let dateStr = '';
             if (p.date) {
                 const parts = p.date.split('-');
@@ -126,7 +118,6 @@ function calculateGrammarDetails(monthPages) {
                     dateStr = `[${parseInt(parts[1])}/${parseInt(parts[2])}] `;
                 }
             }
-
             tests.push({
                 topic: dateStr + topics,
                 score: p.grammarScore,
@@ -134,20 +125,15 @@ function calculateGrammarDetails(monthPages) {
             });
         }
     });
-    // 날짜 순으로 정렬
     return tests.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-/**
- * 월간 리포트 HTML 렌더링 헬퍼 
- */
 function renderMonthlyReportHTML(res, template, studentName, month, stats, monthPages, attendanceDays, grammarDetails) {
     const [year, monthNum] = month.split('-').map(Number);
     const firstDay = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
     const lastDay = new Date(year, monthNum, 0).toISOString().split('T')[0];
     const totalDaysInMonth = new Date(year, monthNum, 0).getDate();
 
-    // [신규] 책도 중복 제거(합치기) 없이 모두 날짜순으로 표시
     const allBooks = monthPages.flatMap(p => p.books || []);
     allBooks.sort((a, b) => new Date(a.date) - new Date(b.date));
     
@@ -265,9 +251,6 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
     res.send(html);
 }
 
-// ----------------------------------------------------------------------
-// [ 메인 모듈 초기화 함수 ]
-// ----------------------------------------------------------------------
 export function initializeMonthlyReportRoutes(dependencies) {
     const app = dependencies.app;
     fetchNotion = dependencies.fetchNotion;
@@ -284,6 +267,84 @@ export function initializeMonthlyReportRoutes(dependencies) {
     try {
         monthlyReportTemplate = fs.readFileSync(path.join(publicPath, 'views', 'monthlyreport.html'), 'utf-8');
     } catch (e) { console.error('Monthly Report Template Error', e); }
+
+    // [신규 API] 선생님 대시보드용 최근 1주일 히스토리 검색 (팝업용)
+    app.get('/api/student-history', async (req, res) => {
+        const { studentName } = req.query;
+        if (!studentName) return res.status(400).json({ message: 'Missing studentName' });
+        
+        try {
+            const today = new Date();
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(today.getDate() - 7);
+            
+            const firstDay = sevenDaysAgo.toISOString().split('T')[0];
+            const lastDay = today.toISOString().split('T')[0];
+
+            const progressQuery = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '이름', title: { equals: studentName } },
+                            { property: '🕐 날짜', date: { on_or_after: firstDay } },
+                            { property: '🕐 날짜', date: { on_or_before: lastDay } }
+                        ]
+                    },
+                    sorts: [ { property: '🕐 날짜', direction: 'descending' } ],
+                    page_size: 7
+                })
+            });
+
+            const history = await Promise.all(progressQuery.results.map(async (page) => {
+                const props = page.properties;
+                const date = props['🕐 날짜']?.date?.start || '';
+                
+                const getPropByKeywords = (propsObj, keywords) => {
+                    const keys = Object.keys(propsObj);
+                    for (const k of keys) {
+                        if (keywords.every(word => k.includes(word))) return propsObj[k];
+                    }
+                    return null;
+                };
+                
+                const grammarTopic = getSimpleText(props['오늘 문법 진도']) || '-';
+                const grammarHomework = getSimpleText(props['문법 숙제 내용']) || '-';
+                
+                const grammarTestProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
+                let grammarTestStr = '-';
+                if (grammarTestProp) {
+                    if (grammarTestProp.type === 'multi_select' && grammarTestProp.multi_select) {
+                        grammarTestStr = grammarTestProp.multi_select.map(i => i.name).join(', ');
+                    } else if (grammarTestProp.type === 'select' && grammarTestProp.select) {
+                        grammarTestStr = grammarTestProp.select.name;
+                    } else if (grammarTestProp.type === 'rich_text' && grammarTestProp.rich_text && grammarTestProp.rich_text.length > 0) {
+                        grammarTestStr = grammarTestProp.rich_text[0].plain_text;
+                    }
+                }
+
+                const grammarScoreProp = props['📑 문법 시험 점수'] || getPropByKeywords(props, ['문법', '점수']);
+                let grammarScore = 'N/A';
+                if (grammarScoreProp && grammarScoreProp.formula) {
+                    if (grammarScoreProp.formula.type === 'number') grammarScore = grammarScoreProp.formula.number !== null ? grammarScoreProp.formula.number : 'N/A';
+                    if (grammarScoreProp.formula.type === 'string') {
+                        const str = grammarScoreProp.formula.string;
+                        const match = str ? str.match(/-?\d+(\.\d+)?/) : null; 
+                        if (match) grammarScore = parseFloat(match[0]);
+                    }
+                }
+                
+                const comment = getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '';
+
+                return { date, grammarTopic, grammarHomework, grammarTest: grammarTestStr, grammarScore, comment };
+            }));
+
+            res.json({ success: true, history });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ success: false, message: 'History fetch failed' });
+        }
+    });
 
     app.get('/monthly-report', async (req, res) => {
         const { studentId, month } = req.query;
@@ -416,7 +477,6 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const grammarScores = monthPages.map(p => p.grammarScore).filter(s => s !== 'N/A' && s !== null && s !== 0);
             const readingResults = monthPages.map(p => p.readingResult).filter(r => r === 'PASS' || r === 'FAIL');
             
-            // [핵심 신규] 책 총합 계산 시 중복제거 안함
             const allBooks = monthPages.flatMap(p => p.books || []);
             allBooks.sort((a, b) => new Date(a.date) - new Date(b.date));
             
