@@ -124,6 +124,15 @@ const getSimpleText = (prop) => {
     return '';
 };
 
+// [신규 추가] 노션의 속성 이름이 살짝 달라도 키워드로 무조건 찾아오는 강력한 헬퍼
+const getPropByKeywords = (propsObj, keywords) => {
+    const keys = Object.keys(propsObj);
+    for (const k of keys) {
+        if (keywords.every(word => k.includes(word))) return propsObj[k];
+    }
+    return null;
+};
+
 async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
@@ -287,11 +296,11 @@ async function parseDailyReportData(page) {
     };
 
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
-    let grammarTopic = getSimpleText(props['오늘 문법 진도']);
-    let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
+    let grammarTopic = getSimpleText(props['오늘 문법 진도'] || getPropByKeywords(props, ['오늘', '문법', '진도']));
+    let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']) || getSimpleText(getPropByKeywords(props, ['문법', '과제']));
 
     // [신규] 프론트엔드로 보내주기 위해 문법 테스트 데이터도 꼼꼼히 파싱
-    const grammarTestProp = props['문법 테스트 내용'] || props['문법 파트'];
+    const grammarTestProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
     let grammarTestStr = '';
     if (grammarTestProp) {
         if (grammarTestProp.type === 'multi_select' && grammarTestProp.multi_select) {
@@ -304,10 +313,10 @@ async function parseDailyReportData(page) {
     }
 
     const comment = {
-        teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
+        teacherComment: getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '오늘의 코멘트가 없습니다.',
         grammarClass: grammarClassName || '진도 해당 없음',
         grammarTopic: grammarTopic || '진도 해당 없음', 
-        grammarTest: grammarTestStr, // [신규 추가]
+        grammarTest: grammarTestStr, // [신규 추가] 누락되었던 테스트 내용 전송!
         grammarHomework: grammarHomework || '숙제 내용 없음'
     };
 
@@ -430,12 +439,12 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
         
         const records = query.results.map(page => {
             const props = page.properties;
-            const className = getRollupValue(props['문법클래스']) || '미분류';
-            const topic = getSimpleText(props['오늘 문법 진도']) || '-';
-            const homework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']) || '-';
+            const className = getRollupValue(getPropByKeywords(props, ['문법클래스']) || props['문법클래스']) || '미분류';
+            const topic = getSimpleText(getPropByKeywords(props, ['오늘', '문법', '진도']) || props['오늘 문법 진도']) || '-';
+            const homework = getSimpleText(getPropByKeywords(props, ['문법', '숙제', '내용']) || getPropByKeywords(props, ['문법', '과제', '내용'])) || '-';
             
             let testStr = '-';
-            const testProp = props['문법 테스트 내용'] || props['문법 파트'];
+            const testProp = getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
             if (testProp) {
                 if (testProp.type === 'multi_select') testStr = testProp.multi_select.map(i=>i.name).join(', ');
                 else if (testProp.type === 'select') testStr = testProp.select?.name || '-';
@@ -443,7 +452,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             }
             
             let score = 'N/A';
-            const scoreProp = props['📑 문법 시험 점수'];
+            const scoreProp = getPropByKeywords(props, ['문법', '시험', '점수']) || props['📑 문법 시험 점수'];
             if (scoreProp?.formula?.type === 'number') score = scoreProp.formula.number !== null ? scoreProp.formula.number : 'N/A';
             else if (scoreProp?.formula?.type === 'string') {
                 const match = scoreProp.formula.string.match(/-?\d+(\.\d+)?/);
@@ -451,7 +460,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             }
             
             const date = props['🕐 날짜']?.date?.start || '';
-            const studentName = getSimpleText(props['이름']);
+            const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']);
             
             return { date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
