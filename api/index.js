@@ -133,7 +133,7 @@ const getSimpleText = (prop) => {
     return '';
 };
 
-// [핵심] 노션의 속성 이름이 살짝 달라도 키워드로 무조건 찾아오는 강력한 헬퍼 함수
+// 노션의 속성 이름이 살짝 달라도 키워드로 무조건 찾아오는 강력한 헬퍼 함수
 const getPropByKeywords = (propsObj, keywords) => {
     const keys = Object.keys(propsObj);
     for (const k of keys) {
@@ -221,8 +221,8 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 async function parseDailyReportData(page) {
     const props = page.properties;
     
-    // [버그 해결] 이름은 절대 키워드 탐색기를 쓰지 않고 '이름'으로만 정확히 가져옵니다.
-    const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']) || '학생';
+    // [완벽 롤백] 이름은 절대 키워드 탐색기를 쓰지 않고 '이름' 타이틀 칸에서 정확하게 가져옵니다.
+    const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
     const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
 
     let assignedTeachers = [];
@@ -451,8 +451,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
         const records = query.results.map(page => {
             const props = page.properties;
             
-            // [강력 방어] 키워드 탐색기를 총동원하여 놓치는 데이터가 없게 합니다.
-            const className = getRollupValue(getPropByKeywords(props, ['문법클래스']) || props['문법클래스']) || '미분류';
+            const className = getRollupValue(props['문법클래스']) || '미분류';
             const topic = getSimpleText(getPropByKeywords(props, ['오늘', '문법', '진도']) || props['오늘 문법 진도']) || '-';
             const homework = getSimpleText(getPropByKeywords(props, ['문법', '숙제', '내용']) || getPropByKeywords(props, ['문법', '과제', '내용'])) || '-';
             
@@ -473,13 +472,14 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
                 if (match) score = match[0];
             }
             
-            // [신규 로직] 0점일 경우 무조건 '시험 보지 않음' 텍스트로 치환합니다.
             if (Number(score) === 0 && score !== null && score !== '') {
                 score = '시험 보지 않음';
             }
             
             const date = props['🕐 날짜']?.date?.start || '';
-            const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']) || '이름없음';
+            
+            // [완벽 롤백] 시리즈이름이 아니라 오직 '이름' 칸에서만 정확히 뽑아오도록 롤백!
+            const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
             
             return { date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
