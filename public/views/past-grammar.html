@@ -116,7 +116,11 @@
 
                     // 점수 렌더링 (일의 자리까지만 절사)
                     let scoreHtml = '<span class="text-gray-400">-</span>';
-                    if (r.score !== 'N/A') {
+                    
+                    if (r.score === '시험 보지 않음') {
+                        // [신규] 시험 보지 않음일 경우 회색의 깔끔한 뱃지 표시
+                        scoreHtml = '<span class="text-gray-500 font-bold text-xs bg-gray-100 px-2 py-1 rounded border border-gray-200">시험 보지 않음</span>';
+                    } else if (r.score !== 'N/A') {
                         // 소수점 아래는 무조건 내림(절사) 처리합니다.
                         const s = Math.floor(Number(r.score)); 
                         let sClass = 'score-low';
