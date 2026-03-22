@@ -133,6 +133,15 @@ const getSimpleText = (prop) => {
     return '';
 };
 
+// [핵심] 노션의 속성 이름이 살짝 달라도 키워드로 무조건 찾아오는 강력한 헬퍼 함수
+const getPropByKeywords = (propsObj, keywords) => {
+    const keys = Object.keys(propsObj);
+    for (const k of keys) {
+        if (keywords.every(word => k.includes(word))) return propsObj[k];
+    }
+    return null;
+};
+
 async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
@@ -166,7 +175,6 @@ app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'p
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 
-// [신규 연결] 지난주 문법숙제 HTML 연결
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
@@ -213,8 +221,8 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 async function parseDailyReportData(page) {
     const props = page.properties;
     
-    // [버그 해결 1] 이름은 절대 키워드 탐색기를 쓰지 않고 '이름'으로만 정확히 가져옵니다.
-    const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
+    // [버그 해결] 이름은 절대 키워드 탐색기를 쓰지 않고 '이름'으로만 정확히 가져옵니다.
+    const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']) || '학생';
     const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
 
     let assignedTeachers = [];
@@ -253,8 +261,7 @@ async function parseDailyReportData(page) {
         return null;
     };
 
-    // [신규] 문법 시험 점수 0점 처리
-    let grammarScoreRaw = getFormulaValue(props['📑 문법 시험 점수']);
+    let grammarScoreRaw = getFormulaValue(getPropByKeywords(props, ['문법', '시험', '점수']) || props['📑 문법 시험 점수']);
     if (grammarScoreRaw === 0) grammarScoreRaw = '시험 보지 않음';
 
     const tests = {
@@ -267,7 +274,7 @@ async function parseDailyReportData(page) {
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
         grammarTotal: (props['문법(전체 개수)'] || props['문법 (전체 개수)'])?.number ?? null,
         grammarWrong: (props['문법(틀린 개수)'] || props['문법 (틀린 개수)'])?.number ?? null,
-        grammarScore: grammarScoreRaw // [업데이트] 0점일 경우 '시험 보지 않음' 적용
+        grammarScore: grammarScoreRaw 
     };
 
     const listening = {
@@ -305,8 +312,7 @@ async function parseDailyReportData(page) {
     let grammarTopic = getSimpleText(props['오늘 문법 진도']);
     let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
 
-    // [버그 해결 2] 대시보드 옵션창 생성을 위해 '문법 테스트 내용' 데이터를 프론트엔드로 쏴줍니다!
-    const grammarTestProp = props['문법 테스트 내용'] || props['문법 파트'];
+    const grammarTestProp = getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 테스트 내용'] || props['문법 파트'];
     let grammarTestStr = '';
     if (grammarTestProp) {
         if (grammarTestProp.type === 'multi_select' && grammarTestProp.multi_select) {
@@ -322,7 +328,7 @@ async function parseDailyReportData(page) {
         teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
         grammarClass: grammarClassName || '진도 해당 없음',
         grammarTopic: grammarTopic || '진도 해당 없음', 
-        grammarTest: grammarTestStr, // 👈 프론트엔드에 이 데이터가 도착해야 드롭다운 메뉴가 열립니다!
+        grammarTest: grammarTestStr,
         grammarHomework: grammarHomework || '숙제 내용 없음'
     };
 
@@ -421,10 +427,8 @@ app.get('/api/last-comment', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// [버그 해결 3] 지난주 데이터 API에서도 학생 '이름'과 '날짜(KST)' 버그를 완벽 해결했습니다.
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     try {
-        // [중요] 한국 시간(KST) 기준으로 7일치 날짜를 구하도록 수정
         const { start: kstTodayStr } = getKSTTodayRange();
         const today = new Date(kstTodayStr);
         const end = today.toISOString().split('T')[0];
@@ -446,12 +450,14 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
         
         const records = query.results.map(page => {
             const props = page.properties;
-            const className = getRollupValue(props['문법클래스']) || '미분류';
-            const topic = getSimpleText(props['오늘 문법 진도']) || '-';
-            const homework = getSimpleText(props['문법 숙제 내용'] || props['문법 과제 내용']) || '-';
+            
+            // [강력 방어] 키워드 탐색기를 총동원하여 놓치는 데이터가 없게 합니다.
+            const className = getRollupValue(getPropByKeywords(props, ['문법클래스']) || props['문법클래스']) || '미분류';
+            const topic = getSimpleText(getPropByKeywords(props, ['오늘', '문법', '진도']) || props['오늘 문법 진도']) || '-';
+            const homework = getSimpleText(getPropByKeywords(props, ['문법', '숙제', '내용']) || getPropByKeywords(props, ['문법', '과제', '내용'])) || '-';
             
             let testStr = '-';
-            const testProp = props['문법 테스트 내용'] || props['문법 파트'];
+            const testProp = getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 테스트 내용'] || props['문법 파트'];
             if (testProp) {
                 if (testProp.type === 'multi_select') testStr = testProp.multi_select.map(i=>i.name).join(', ');
                 else if (testProp.type === 'select') testStr = testProp.select?.name || '-';
@@ -460,22 +466,20 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             if(!testStr) testStr = '-';
             
             let score = 'N/A';
-            const scoreProp = props['📑 문법 시험 점수'];
+            const scoreProp = getPropByKeywords(props, ['문법', '시험', '점수']) || props['📑 문법 시험 점수'];
             if (scoreProp?.formula?.type === 'number') score = scoreProp.formula.number !== null ? scoreProp.formula.number : 'N/A';
             else if (scoreProp?.formula?.type === 'string') {
                 const match = scoreProp.formula.string.match(/-?\d+(\.\d+)?/);
                 if (match) score = match[0];
             }
             
-            // [신규] 0점일 경우 '시험 보지 않음'으로 치환!
-            if (Number(score) === 0) {
+            // [신규 로직] 0점일 경우 무조건 '시험 보지 않음' 텍스트로 치환합니다.
+            if (Number(score) === 0 && score !== null && score !== '') {
                 score = '시험 보지 않음';
             }
             
             const date = props['🕐 날짜']?.date?.start || '';
-            
-            // [버그 수정 1] 시리즈이름이 아니라 '이름' 칸에서만 정확히 뽑아오도록 원상복구!
-            const studentName = getSimpleText(props['이름']) || '이름없음';
+            const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']) || '이름없음';
             
             return { date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
@@ -485,7 +489,6 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
 });
 
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
-    // [버그 수정 2] 일괄 적용 시 testContent도 잊지 않고 받아서 업데이트합니다!
     const { className, topic, homework, testContent, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
     try {
@@ -503,7 +506,6 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
                     '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
                 };
 
-                // [신규] 다중선택 태그도 쉼표 기준으로 예쁘게 쪼개서 저장
                 if (testContent !== undefined) {
                     if (testContent.trim() === '') {
                         properties['문법 테스트 내용'] = { multi_select: [] };
@@ -663,7 +665,6 @@ catch (e) { console.error('Template load error', e); }
 
 function getReportColor(value, type) {
     const GREEN = '#10b981'; const RED = '#ef4444'; const GRAY = '#9ca3af';
-    // [신규] '시험 보지 않음' 도 회색으로 예외처리
     if (value === 'N/A' || value === '없음' || value === '시험 보지 않음' || value === null || value === undefined || value === '') return GRAY;
     if (type === 'score') { const num = parseInt(value); if (isNaN(num)) return GRAY; return (num >= 80) ? GREEN : RED; }
     if (type === 'test_score') { const num = parseInt(value); if (isNaN(num)) return GRAY; if (num === 0) return GRAY; return (num >= 80) ? GREEN : RED; }
@@ -682,7 +683,6 @@ app.get('/report', async (req, res) => {
         let html = reportTemplate;
         const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0 ? parsed.reading.englishBooks.map(b => b.title).join(', ') : (parsed.reading.bookTitle || '읽은 책 없음');
         
-        // [신규] '시험 보지 않음' 텍스트 예외처리 포맷터
         const formatTestScore = (val) => {
             if (val === '시험 보지 않음') return val;
             if (val === 0 || val === null) return '없음';

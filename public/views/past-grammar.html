@@ -67,7 +67,6 @@
         });
 
         function renderTables(records) {
-            // 반(className)별로 데이터 그룹화
             const grouped = {};
             records.forEach(r => {
                 if (!grouped[r.className]) grouped[r.className] = [];
@@ -80,11 +79,9 @@
             Object.keys(grouped).sort().forEach(className => {
                 const classRecords = grouped[className];
                 
-                // 해당 반의 가장 최근(유효한) 숙제 내용 찾기
                 const validHomeworks = classRecords.map(r => r.homework).filter(h => h && h !== '-');
                 const recentHomework = validHomeworks.length > 0 ? validHomeworks[0] : '숙제 내용 없음';
 
-                // 요구하신 헤더 포맷: [문법 반 이름 ] 지난 주 문법숙제 : 숙제내용
                 html += `
                     <div class="class-header">
                         <div class="class-title">
@@ -108,20 +105,17 @@
                 `;
 
                 classRecords.forEach(r => {
-                    // 태그 렌더링
                     const tags = r.test.split(',').map(t => t.trim()).filter(Boolean);
                     const tagHtml = tags.length > 0 && tags[0] !== '-' 
                         ? tags.map(t => `<span class="tag-badge">${t}</span>`).join('') 
                         : '<span class="text-gray-400">-</span>';
 
-                    // 점수 렌더링 (일의 자리까지만 절사)
                     let scoreHtml = '<span class="text-gray-400">-</span>';
                     
-                    if (r.score === '시험 보지 않음') {
-                        // [신규] 시험 보지 않음일 경우 회색의 깔끔한 뱃지 표시
+                    // [이중 방어] 서버가 0을 보내든, 문자를 보내든 무조건 잡아냅니다!
+                    if (r.score === '시험 보지 않음' || Number(r.score) === 0) {
                         scoreHtml = '<span class="text-gray-500 font-bold text-xs bg-gray-100 px-2 py-1 rounded border border-gray-200">시험 보지 않음</span>';
                     } else if (r.score !== 'N/A') {
-                        // 소수점 아래는 무조건 내림(절사) 처리합니다.
                         const s = Math.floor(Number(r.score)); 
                         let sClass = 'score-low';
                         if (s >= 80) sClass = 'score-high';
