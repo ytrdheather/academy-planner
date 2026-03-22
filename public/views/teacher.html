@@ -450,7 +450,11 @@
     <div id="grammarTagModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 600px; width: 95%;">
             <h2 class="section-title" style="font-size: 1.4em; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">🏷️ 문법 테스트 내용 선택</h2>
-            <p class="text-sm text-gray-500 mt-2 mb-1">노션 진도 DB에 등록된 태그들입니다. 여러 개 선택 가능합니다.</p>
+            <!-- [수정] 노션이 단일선택 속성이므로 안내 문구를 수정했습니다. -->
+            <p class="text-sm text-gray-500 mt-2 mb-1">노션 진도 DB에 등록된 태그들입니다. 1개만 선택 가능합니다.</p>
+            
+            <!-- [신규 추가] 실시간 검색창 -->
+            <input type="text" id="grammarTagSearchInput" class="modal-search-input" placeholder="🔍 검색어를 입력하세요... (예: 시제, 명사)" oninput="renderGrammarTagModal()" style="margin-top: 10px; margin-bottom: 5px;">
             
             <div id="grammarTagContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; max-height: 280px; overflow-y: auto; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
                 <!-- 자바스크립트로 태그 칩들이 렌더링 됩니다 -->
@@ -542,6 +546,10 @@
             currentTagTargetId = targetId;
             selectedTagsTemp.clear();
             
+            // [신규] 모달 열 때마다 이전 검색어 초기화
+            const searchInput = document.getElementById('grammarTagSearchInput');
+            if (searchInput) searchInput.value = '';
+            
             // 기존에 입력되어 있던 값이 있다면 임시 저장소에 세팅 (선택된 상태로 보이게)
             if (currentValString && currentValString.trim() !== '') {
                 currentValString.split(',').forEach(t => selectedTagsTemp.add(t.trim()));
@@ -553,12 +561,25 @@
 
         function renderGrammarTagModal() {
             const container = document.getElementById('grammarTagContainer');
+            const searchInput = document.getElementById('grammarTagSearchInput');
+            const filterText = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
             if (notionGrammarTags.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 w-full text-center py-5">노션 DB에서 등록된 태그를 찾지 못했습니다.</p>';
                 return;
             }
             
-            container.innerHTML = notionGrammarTags.map(tag => {
+            // [신규] 검색어가 있을 경우 태그를 걸러내는(필터링) 로직
+            const tagsToRender = filterText 
+                ? notionGrammarTags.filter(tag => tag.toLowerCase().includes(filterText)) 
+                : notionGrammarTags;
+
+            if (tagsToRender.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 w-full text-center py-5">검색 결과가 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = tagsToRender.map(tag => {
                 const isSelected = selectedTagsTemp.has(tag);
                 const chipClass = isSelected ? 'tag-chip selected' : 'tag-chip';
                 return `<div onclick="toggleGrammarTag('${tag}')" class="${chipClass}">${tag}</div>`;
@@ -569,6 +590,8 @@
             if (selectedTagsTemp.has(tag)) {
                 selectedTagsTemp.delete(tag);
             } else {
+                // [수정] 단일 선택(Select) 속성이므로, 새로운 걸 누르면 기존 선택을 지웁니다.
+                selectedTagsTemp.clear(); 
                 selectedTagsTemp.add(tag);
             }
             renderGrammarTagModal(); // UI 바로 갱신
@@ -884,7 +907,8 @@
                     <td class="student-name">${st.studentName}</td>
                     <td>${st.comment?.grammarClass || '-'}</td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%; cursor: pointer; background: white;" value="${st.comment?.grammarTest || ''}" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('${st.pageId}', this.value)" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="multi_select"></td>
+                    <!-- [수정] property-type을 노션 속성과 동일한 'select'로 변경했습니다. -->
+                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%; cursor: pointer; background: white;" value="${st.comment?.grammarTest || ''}" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('${st.pageId}', this.value)" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="select"></td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
                 </tr>
              `).join('');

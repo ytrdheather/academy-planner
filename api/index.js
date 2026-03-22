@@ -505,7 +505,6 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             
             const date = props['🕐 날짜']?.date?.start || '';
             
-            // [완벽 롤백] 시리즈이름이 아니라 오직 '이름' 칸에서만 정확히 뽑아오도록 롤백!
             const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
             
             return { date, className, studentName, topic, homework, test: testStr, score };
@@ -524,6 +523,14 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         
         const students = query.results;
         let updatedCount = 0;
+
+        // [신규 로직] 노션 DB 설정이 '단일 선택'인지 '다중 선택'인지 자동 감지!
+        let isMultiSelect = false;
+        if (students.length > 0) {
+            const testProp = students[0].properties['문법 테스트 내용'] || students[0].properties['문법 파트'];
+            if (testProp && testProp.type === 'multi_select') isMultiSelect = true;
+        }
+
         const updatePromises = students.map(async (page) => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
             if (studentClass && studentClass.trim() === className.trim()) {
@@ -533,12 +540,17 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
                     '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
                 };
 
+                // [신규 로직] 다중 선택이면 배열로, 단일 선택이면 단일 문자열로 노션 입맛에 맞게 보냅니다.
                 if (testContent !== undefined) {
                     if (testContent.trim() === '') {
-                        properties['문법 테스트 내용'] = { multi_select: [] };
+                        properties['문법 테스트 내용'] = isMultiSelect ? { multi_select: [] } : { select: null };
                     } else {
-                        const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
-                        properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
+                        if (isMultiSelect) {
+                            const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
+                            properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
+                        } else {
+                            properties['문법 테스트 내용'] = { select: { name: testContent.split(',')[0].trim() } };
+                        }
                     }
                 }
 
