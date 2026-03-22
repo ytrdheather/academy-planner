@@ -253,6 +253,10 @@ async function parseDailyReportData(page) {
         return null;
     };
 
+    // [신규] 문법 시험 점수 0점 처리
+    let grammarScoreRaw = getFormulaValue(props['📑 문법 시험 점수']);
+    if (grammarScoreRaw === 0) grammarScoreRaw = '시험 보지 않음';
+
     const tests = {
         vocabUnit: getSimpleText(props['어휘유닛']),
         vocabCorrect: (props['단어(맞은 개수)'] || props['단어 (맞은 개수)'])?.number ?? null,
@@ -263,7 +267,7 @@ async function parseDailyReportData(page) {
         havruta: props['독해 하브루타']?.select?.name || '숙제없음',
         grammarTotal: (props['문법(전체 개수)'] || props['문법 (전체 개수)'])?.number ?? null,
         grammarWrong: (props['문법(틀린 개수)'] || props['문법 (틀린 개수)'])?.number ?? null,
-        grammarScore: getFormulaValue(props['📑 문법 시험 점수'])
+        grammarScore: grammarScoreRaw // [업데이트] 0점일 경우 '시험 보지 않음' 적용
     };
 
     const listening = {
@@ -463,6 +467,11 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
                 if (match) score = match[0];
             }
             
+            // [신규] 0점일 경우 '시험 보지 않음'으로 치환!
+            if (Number(score) === 0) {
+                score = '시험 보지 않음';
+            }
+            
             const date = props['🕐 날짜']?.date?.start || '';
             
             // [버그 수정 1] 시리즈이름이 아니라 '이름' 칸에서만 정확히 뽑아오도록 원상복구!
@@ -654,7 +663,8 @@ catch (e) { console.error('Template load error', e); }
 
 function getReportColor(value, type) {
     const GREEN = '#10b981'; const RED = '#ef4444'; const GRAY = '#9ca3af';
-    if (value === 'N/A' || value === '없음' || value === null || value === undefined || value === '') return GRAY;
+    // [신규] '시험 보지 않음' 도 회색으로 예외처리
+    if (value === 'N/A' || value === '없음' || value === '시험 보지 않음' || value === null || value === undefined || value === '') return GRAY;
     if (type === 'score') { const num = parseInt(value); if (isNaN(num)) return GRAY; return (num >= 80) ? GREEN : RED; }
     if (type === 'test_score') { const num = parseInt(value); if (isNaN(num)) return GRAY; if (num === 0) return GRAY; return (num >= 80) ? GREEN : RED; }
     if (type === 'result') { if (value === 'PASS') return GREEN; if (value === 'FAIL') return RED; return GRAY; }
@@ -671,7 +681,13 @@ app.get('/report', async (req, res) => {
         const parsed = await parseDailyReportData(page);
         let html = reportTemplate;
         const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0 ? parsed.reading.englishBooks.map(b => b.title).join(', ') : (parsed.reading.bookTitle || '읽은 책 없음');
-        const formatTestScore = (val) => (val === 0 || val === null) ? '없음' : val + '점';
+        
+        // [신규] '시험 보지 않음' 텍스트 예외처리 포맷터
+        const formatTestScore = (val) => {
+            if (val === '시험 보지 않음') return val;
+            if (val === 0 || val === null) return '없음';
+            return val + '점';
+        };
 
         const replacements = {
             '{{STUDENT_NAME}}': parsed.studentName, '{{REPORT_DATE}}': getKoreanDate(parsed.date),
