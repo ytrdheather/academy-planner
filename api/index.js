@@ -24,6 +24,7 @@ const {
     GRAMMAR_DB_ID,
 } = process.env;
 
+// [핵심] HTTPS 강제
 const DOMAIN_URL = 'https://readitude.onrender.com';
 const PORT = process.env.PORT || 5001;
 
@@ -32,6 +33,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
+// Notion API 호출 헬퍼
 async function fetchNotion(url, options, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
@@ -41,20 +43,25 @@ async function fetchNotion(url, options, retries = 3) {
     
     try {
         const response = await fetch(url, { ...options, headers });
+
         if (response.status === 409 && retries > 0) {
             console.warn(`⚠️ Notion API Conflict (409). Retrying...`);
             await new Promise(resolve => setTimeout(resolve, 500)); 
             return fetchNotion(url, options, retries - 1);
         }
+
         if (!response.ok) {
             const errorData = await response.json();
             console.error(`Notion API Error (${url}):`, JSON.stringify(errorData, null, 2));
             throw new Error(errorData.message || `Notion API Error: ${response.status}`);
         }
         return response.json();
-    } catch (error) { throw error; }
+    } catch (error) {
+        throw error;
+    }
 }
 
+// Gemini AI 설정
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -62,6 +69,7 @@ if (GEMINI_API_KEY) {
     console.log('✅ Gemini AI 연결됨');
 }
 
+// 선생님 계정 정보
 const userAccounts = {
     'manager': { password: 'rdtd112!@', role: 'manager', name: '원장 헤더쌤' },
     'teacher1': { password: 'rdtd112!@', role: 'manager', name: '조이쌤' },
@@ -72,6 +80,7 @@ const userAccounts = {
     'teacher5': { password: 'rdtd112!@', role: 'manager', name: '앨리스쌤' }
 };
 
+// Helper Functions
 function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
@@ -122,15 +131,6 @@ const getSimpleText = (prop) => {
     if (prop.type === 'title') return prop.title[0]?.plain_text || '';
     if (prop.type === 'select') return prop.select?.name || '';
     return '';
-};
-
-// [신규 추가] 노션의 속성 이름이 살짝 달라도 키워드로 무조건 찾아오는 강력한 헬퍼
-const getPropByKeywords = (propsObj, keywords) => {
-    const keys = Object.keys(propsObj);
-    for (const k of keys) {
-        if (keywords.every(word => k.includes(word))) return propsObj[k];
-    }
-    return null;
 };
 
 async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title') {
@@ -212,6 +212,8 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 
 async function parseDailyReportData(page) {
     const props = page.properties;
+    
+    // [버그 해결 1] 이름은 절대 키워드 탐색기를 쓰지 않고 '이름'으로만 정확히 가져옵니다.
     const studentName = props['이름']?.title?.[0]?.plain_text || '학생';
     const pageDate = props['🕐 날짜']?.date?.start || getKSTTodayRange().dateString;
 
@@ -296,11 +298,11 @@ async function parseDailyReportData(page) {
     };
 
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
-    let grammarTopic = getSimpleText(props['오늘 문법 진도'] || getPropByKeywords(props, ['오늘', '문법', '진도']));
-    let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']) || getSimpleText(getPropByKeywords(props, ['문법', '과제']));
+    let grammarTopic = getSimpleText(props['오늘 문법 진도']);
+    let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
 
-    // [신규] 프론트엔드로 보내주기 위해 문법 테스트 데이터도 꼼꼼히 파싱
-    const grammarTestProp = props['문법 테스트 내용'] || getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
+    // [버그 해결 2] 대시보드 옵션창 생성을 위해 '문법 테스트 내용' 데이터를 프론트엔드로 쏴줍니다!
+    const grammarTestProp = props['문법 테스트 내용'] || props['문법 파트'];
     let grammarTestStr = '';
     if (grammarTestProp) {
         if (grammarTestProp.type === 'multi_select' && grammarTestProp.multi_select) {
@@ -313,10 +315,10 @@ async function parseDailyReportData(page) {
     }
 
     const comment = {
-        teacherComment: getSimpleText(props['❤ Today\'s Notice!'] || getPropByKeywords(props, ['Today', 'Notice'])) || '오늘의 코멘트가 없습니다.',
+        teacherComment: getSimpleText(props['❤ Today\'s Notice!']) || '오늘의 코멘트가 없습니다.',
         grammarClass: grammarClassName || '진도 해당 없음',
         grammarTopic: grammarTopic || '진도 해당 없음', 
-        grammarTest: grammarTestStr, // [신규 추가] 누락되었던 테스트 내용 전송!
+        grammarTest: grammarTestStr, // 👈 프론트엔드에 이 데이터가 도착해야 드롭다운 메뉴가 열립니다!
         grammarHomework: grammarHomework || '숙제 내용 없음'
     };
 
@@ -387,7 +389,6 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
-// [신규 API] 지난 1회 코멘트만 불러오기 (미니 팝업용)
 app.get('/api/last-comment', requireAuth, async (req, res) => {
     const { studentName, currentDate } = req.query;
     try {
@@ -416,14 +417,16 @@ app.get('/api/last-comment', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// [신규 API] 지난주 문법숙제 전체 데이터 불러오기 (새창용)
+// [버그 해결 3] 지난주 데이터 API에서도 학생 '이름'과 '날짜(KST)' 버그를 완벽 해결했습니다.
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     try {
-        const today = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(today.getDate() - 7);
-        const start = sevenDaysAgo.toISOString().split('T')[0];
+        // [중요] 한국 시간(KST) 기준으로 7일치 날짜를 구하도록 수정
+        const { start: kstTodayStr } = getKSTTodayRange();
+        const today = new Date(kstTodayStr);
         const end = today.toISOString().split('T')[0];
+
+        const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const start = sevenDaysAgo.toISOString().split('T')[0];
 
         const filter = {
             and: [
@@ -439,20 +442,21 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
         
         const records = query.results.map(page => {
             const props = page.properties;
-            const className = getRollupValue(getPropByKeywords(props, ['문법클래스']) || props['문법클래스']) || '미분류';
-            const topic = getSimpleText(getPropByKeywords(props, ['오늘', '문법', '진도']) || props['오늘 문법 진도']) || '-';
-            const homework = getSimpleText(getPropByKeywords(props, ['문법', '숙제', '내용']) || getPropByKeywords(props, ['문법', '과제', '내용'])) || '-';
+            const className = getRollupValue(props['문법클래스']) || '미분류';
+            const topic = getSimpleText(props['오늘 문법 진도']) || '-';
+            const homework = getSimpleText(props['문법 숙제 내용'] || props['문법 과제 내용']) || '-';
             
             let testStr = '-';
-            const testProp = getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 파트'];
+            const testProp = props['문법 테스트 내용'] || props['문법 파트'];
             if (testProp) {
                 if (testProp.type === 'multi_select') testStr = testProp.multi_select.map(i=>i.name).join(', ');
                 else if (testProp.type === 'select') testStr = testProp.select?.name || '-';
                 else if (testProp.type === 'rich_text') testStr = getSimpleText(testProp);
             }
+            if(!testStr) testStr = '-';
             
             let score = 'N/A';
-            const scoreProp = getPropByKeywords(props, ['문법', '시험', '점수']) || props['📑 문법 시험 점수'];
+            const scoreProp = props['📑 문법 시험 점수'];
             if (scoreProp?.formula?.type === 'number') score = scoreProp.formula.number !== null ? scoreProp.formula.number : 'N/A';
             else if (scoreProp?.formula?.type === 'string') {
                 const match = scoreProp.formula.string.match(/-?\d+(\.\d+)?/);
@@ -460,7 +464,9 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             }
             
             const date = props['🕐 날짜']?.date?.start || '';
-            const studentName = getSimpleText(getPropByKeywords(props, ['이름']) || props['이름']);
+            
+            // [버그 수정 1] 시리즈이름이 아니라 '이름' 칸에서만 정확히 뽑아오도록 원상복구!
+            const studentName = getSimpleText(props['이름']) || '이름없음';
             
             return { date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
@@ -470,6 +476,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
 });
 
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
+    // [버그 수정 2] 일괄 적용 시 testContent도 잊지 않고 받아서 업데이트합니다!
     const { className, topic, homework, testContent, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
     try {
@@ -481,26 +488,32 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         const updatePromises = students.map(async (page) => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
             if (studentClass && studentClass.trim() === className.trim()) {
+                
                 const properties = {
                     '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
                     '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
                 };
 
+                // [신규] 다중선택 태그도 쉼표 기준으로 예쁘게 쪼개서 저장
                 if (testContent !== undefined) {
-                    if (testContent.trim() === '') { properties['문법 테스트 내용'] = { multi_select: [] }; } 
-                    else {
+                    if (testContent.trim() === '') {
+                        properties['문법 테스트 내용'] = { multi_select: [] };
+                    } else {
                         const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
                         properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
                     }
                 }
 
-                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties }) });
+                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ properties })
+                });
                 updatedCount++;
             }
         });
         await Promise.all(updatePromises);
         res.json({ success: true, message: `Updated ${updatedCount} students` });
-    } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { console.error('Grammar Update Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
 
 app.post('/api/update-homework', requireAuth, async (req, res) => {
