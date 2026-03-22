@@ -8,27 +8,33 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
-        body { font-family: "NanumSquareRound", sans-serif; background-color: #f3f4f6; padding: 30px; }
-        .styled-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .styled-table th { background: #8b5cf6; color: white; padding: 12px; font-weight: 700; text-align: center; }
-        .styled-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center; vertical-align: middle; }
+        /* 대시보드 폰트와 유사하게 사이즈 축소 및 색상 조정 */
+        body { font-family: "NanumSquareRound", sans-serif; background-color: #f8f9fa; padding: 25px; color: #2d3748; }
+        
+        .styled-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-size: 14px; }
+        .styled-table th { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 10px 12px; font-weight: 600; text-align: center; border-bottom: 1px solid #7c3aed; }
+        .styled-table td { padding: 10px 12px; border-bottom: 1px solid #f1f3f4; text-align: center; vertical-align: middle; }
         .styled-table tr:hover { background-color: #f8fafc; }
-        .class-title { font-size: 1.5rem; font-weight: 800; color: #4c1d95; margin-bottom: 10px; margin-top: 30px; display: flex; align-items: center; }
-        .tag-badge { background: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 6px; font-size: 13px; font-weight: bold; display: inline-block; margin: 2px; }
-        .score-badge { font-weight: 800; padding: 4px 10px; border-radius: 6px; }
-        .score-high { color: #047857; background: #d1fae5; }
-        .score-mid { color: #b45309; background: #fef3c7; }
-        .score-low { color: #b91c1c; background: #fee2e2; }
+        
+        .class-header { margin-top: 25px; margin-bottom: 10px; border-bottom: 2px solid #d8b4fe; padding-bottom: 6px; }
+        .class-title { font-size: 16px; font-weight: 700; color: #6b46c1; display: flex; align-items: center; }
+        
+        .tag-badge { background: #f3e8ff; color: #6b46c1; border: 1px solid #d8b4fe; padding: 3px 8px; border-radius: 12px; font-size: 13px; font-weight: 600; display: inline-block; margin: 2px; }
+        
+        .score-badge { font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
+        .score-high { color: #166534; background: #dcfce7; border: 1px solid #bbf7d0; }
+        .score-mid { color: #9a3412; background: #fef3c7; border: 1px solid #fde68a; }
+        .score-low { color: #991b1b; background: #fecaca; border: 1px solid #fca5a5; }
     </style>
 </head>
 <body>
-    <div class="max-w-6xl mx-auto">
-        <div class="flex justify-between items-center border-b-2 border-purple-300 pb-4 mb-6">
-            <h1 class="text-3xl font-extrabold text-purple-800">📊 지난 1주일 문법숙제 통합 현황</h1>
-            <button onclick="window.close()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold transition">창 닫기</button>
+    <div class="max-w-4xl mx-auto">
+        <div class="flex justify-between items-center border-b border-gray-300 pb-3 mb-4">
+            <h1 class="text-xl font-bold text-gray-800">📊 지난 1주일 문법숙제 통합 현황</h1>
+            <button onclick="window.close()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md font-bold text-sm transition">창 닫기</button>
         </div>
 
-        <div id="loading" class="text-center py-20 text-gray-500 font-bold text-xl">데이터를 불러오는 중입니다...</div>
+        <div id="loading" class="text-center py-10 text-gray-500 font-bold text-sm">데이터를 불러오는 중입니다...</div>
         <div id="contentArea"></div>
     </div>
 
@@ -38,7 +44,7 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!authToken) {
-                document.getElementById('loading').innerHTML = '로그인이 필요합니다.<br><button onclick="window.close()" class="mt-4 bg-purple-600 text-white px-4 py-2 rounded">닫기</button>';
+                document.getElementById('loading').innerHTML = '로그인이 필요합니다.<br><button onclick="window.close()" class="mt-4 bg-purple-600 text-white px-4 py-2 rounded text-sm">닫기</button>';
                 return;
             }
 
@@ -53,10 +59,10 @@
                 if (data.success && data.data.length > 0) {
                     renderTables(data.data);
                 } else {
-                    document.getElementById('contentArea').innerHTML = '<div class="text-center py-20 text-gray-500 font-bold text-xl">최근 1주일간 등록된 문법 기록이 없습니다.</div>';
+                    document.getElementById('contentArea').innerHTML = '<div class="text-center py-10 text-gray-500 font-bold text-sm">최근 1주일간 등록된 문법 기록이 없습니다.</div>';
                 }
             } catch (error) {
-                document.getElementById('loading').innerHTML = '<span class="text-red-500">데이터를 불러오는데 실패했습니다.</span>';
+                document.getElementById('loading').innerHTML = '<span class="text-red-500 text-sm">데이터를 불러오는데 실패했습니다.</span>';
             }
         });
 
@@ -75,26 +81,23 @@
             Object.keys(grouped).sort().forEach(className => {
                 const classRecords = grouped[className];
                 
+                // 요구하신 헤더 포맷: [문법 반 이름 ] 지난 주 문법숙제 :
                 html += `
-                    <div class="class-title">
-                        <span class="mr-2">🏫</span> [${className}] 문법 클래스
+                    <div class="class-header">
+                        <div class="class-title">
+                            <span class="mr-2">🏫</span> [${className}] 지난 주 문법숙제 :
+                        </div>
                     </div>
-                    <table class="styled-table mb-8">
+                    <table class="styled-table mb-6">
                         <colgroup>
-                            <col style="width:12%">
-                            <col style="width:13%">
                             <col style="width:20%">
-                            <col style="width:25%">
+                            <col style="width:60%">
                             <col style="width:20%">
-                            <col style="width:10%">
                         </colgroup>
                         <thead>
                             <tr>
-                                <th>날짜</th>
-                                <th>학생 이름</th>
-                                <th>오늘 문법 진도</th>
-                                <th>문법 과제 내용</th>
-                                <th>문법 테스트 내용</th>
+                                <th>이름</th>
+                                <th>지난주 문법 테스트 내용</th>
                                 <th>점수</th>
                             </tr>
                         </thead>
@@ -102,14 +105,17 @@
                 `;
 
                 classRecords.forEach(r => {
-                    // 태그 배지 렌더링
+                    // 태그 렌더링
                     const tags = r.test.split(',').map(t => t.trim()).filter(Boolean);
-                    const tagHtml = tags.length > 0 && tags[0] !== '-' ? tags.map(t => `<span class="tag-badge">${t}</span>`).join('') : '-';
+                    const tagHtml = tags.length > 0 && tags[0] !== '-' 
+                        ? tags.map(t => `<span class="tag-badge">${t}</span>`).join('') 
+                        : '<span class="text-gray-400">-</span>';
 
-                    // 점수 색상
-                    let scoreHtml = '-';
+                    // 점수 렌더링 (일의 자리까지만 절사)
+                    let scoreHtml = '<span class="text-gray-400">-</span>';
                     if (r.score !== 'N/A') {
-                        const s = Number(r.score);
+                        // 소수점 아래는 무조건 내림(절사) 처리합니다.
+                        const s = Math.floor(Number(r.score)); 
                         let sClass = 'score-low';
                         if (s >= 80) sClass = 'score-high';
                         else if (s >= 60) sClass = 'score-mid';
@@ -118,10 +124,7 @@
 
                     html += `
                         <tr>
-                            <td class="text-gray-500 font-bold">${r.date}</td>
                             <td class="font-bold text-gray-800">${r.studentName}</td>
-                            <td class="text-left px-4">${r.topic}</td>
-                            <td class="text-left px-4">${r.homework}</td>
                             <td>${tagHtml}</td>
                             <td>${scoreHtml}</td>
                         </tr>
