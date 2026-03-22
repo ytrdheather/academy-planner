@@ -34,15 +34,21 @@ const app = express();
 const publicPath = path.join(__dirname, '../public');
 
 // Notion API 호출 헬퍼
-async function fetchNotion(url, options, retries = 3) {
+async function fetchNotion(url, options = {}, retries = 3) {
     const headers = {
         'Authorization': `Bearer ${NOTION_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
         'Notion-Version': '2022-06-28'
     };
     
+    // GET 요청일 때는 body를 제거하도록 방어코드 추가
+    const fetchOptions = { ...options, headers };
+    if (!fetchOptions.method || fetchOptions.method === 'GET') {
+        delete fetchOptions.body;
+    }
+
     try {
-        const response = await fetch(url, { ...options, headers });
+        const response = await fetch(url, fetchOptions);
 
         if (response.status === 409 && retries > 0) {
             console.warn(`⚠️ Notion API Conflict (409). Retrying...`);
@@ -425,6 +431,27 @@ app.get('/api/last-comment', requireAuth, async (req, res) => {
         
         res.json({ success: true, record: { date, comment } });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// [신규 API] 노션 진도 DB(PROGRESS_DATABASE_ID)의 '문법 테스트 내용' 원본 옵션값들을 싹 다 긁어옵니다!
+app.get('/api/notion-grammar-options', requireAuth, async (req, res) => {
+    try {
+        const dbInfo = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}`, { method: 'GET' });
+        
+        const testProp = dbInfo.properties['문법 테스트 내용'] || dbInfo.properties['문법 파트'];
+        let options = [];
+        
+        if (testProp && testProp.multi_select) {
+            options = testProp.multi_select.options.map(opt => opt.name);
+        } else if (testProp && testProp.select) {
+            options = testProp.select.options.map(opt => opt.name);
+        }
+        
+        res.json({ success: true, options });
+    } catch (error) {
+        console.error('Fetch Grammar Options Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
