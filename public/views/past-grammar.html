@@ -77,15 +77,18 @@
             const contentArea = document.getElementById('contentArea');
             let html = '';
 
-            // 각 반별로 테이블 생성
             Object.keys(grouped).sort().forEach(className => {
                 const classRecords = grouped[className];
                 
-                // 요구하신 헤더 포맷: [문법 반 이름 ] 지난 주 문법숙제 :
+                // 해당 반의 가장 최근(유효한) 숙제 내용 찾기
+                const validHomeworks = classRecords.map(r => r.homework).filter(h => h && h !== '-');
+                const recentHomework = validHomeworks.length > 0 ? validHomeworks[0] : '숙제 내용 없음';
+
+                // 요구하신 헤더 포맷: [문법 반 이름 ] 지난 주 문법숙제 : 숙제내용
                 html += `
                     <div class="class-header">
                         <div class="class-title">
-                            <span class="mr-2">🏫</span> [${className}] 지난 주 문법숙제 :
+                            <span class="mr-2">🏫</span> [${className}] 지난 주 문법숙제 : <span style="color:#4a5568; font-size:15px; font-weight:600; margin-left:8px;">${recentHomework}</span>
                         </div>
                     </div>
                     <table class="styled-table mb-6">

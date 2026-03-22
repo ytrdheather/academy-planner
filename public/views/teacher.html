@@ -266,6 +266,8 @@
             <button class="tab-button" onclick="showTab('grammar')">📚 문법 관리</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
             <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">⚙️ 관리자</button>
+            <!-- [신규] 지난주 문법숙제 메뉴 (새 창 열림) -->
+            <button class="tab-button" onclick="openPastGrammarWindow()" style="color: #ea580c; font-weight: 700; margin-left: auto;">지난주 문법숙제</button>
         </div>
 
         <div class="filter-bar" id="commonFilterBar">
@@ -349,7 +351,7 @@
             </div>
         </div>
 
-        <!-- 5. 문법 관리 (Phase 2 개편) -->
+        <!-- 5. 문법 관리 -->
         <div id="grammar-view" class="tab-content">
             <div class="section-title">📚 문법 숙제 관리</div>
             <div class="grammar-input-container">
@@ -544,7 +546,10 @@
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
                 
-                if (currentActiveTab === 'grammar') updateGrammarClassList(allReportData);
+                if (currentActiveTab === 'grammar') {
+                    updateGrammarClassList(allReportData);
+                    await loadGrammarTagsFromHistory(); // [신규] 과거 태그 가져오기
+                }
                 if (currentActiveTab === 'comments') updateCommentGrammarFilterList(allReportData);
                 
                 filterDataByTeacher();
@@ -574,6 +579,51 @@
             else notice.style.display = 'none';
             
             loadDataForCurrentTab();
+        }
+
+        // [신규] 지난주 문법숙제 메뉴 열기 기능 복구
+        function openPastGrammarWindow() {
+            window.open('/past-grammar', '_blank', 'width=1100,height=800,scrollbars=yes');
+        }
+
+        // [신규] 과거 문법 태그 로드 및 Datalist 업데이트 함수
+        async function loadGrammarTagsFromHistory() {
+            try {
+                let grammarTestOptions = new Set();
+                
+                // 1. 오늘의 데이터에서 수집
+                allReportData.forEach(st => {
+                     if (st.comment?.grammarTest) {
+                         st.comment.grammarTest.split(',').forEach(tag => grammarTestOptions.add(tag.trim()));
+                     }
+                });
+
+                // 2. 과거 1주일 데이터에서 수집 (API 호출)
+                const res = await fetch(`${API_BASE_URL}/api/past-grammar-data`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const json = await res.json();
+                
+                if (json.success && json.data) {
+                    json.data.forEach(r => {
+                        if (r.test && r.test !== '-') {
+                            r.test.split(',').forEach(tag => grammarTestOptions.add(tag.trim()));
+                        }
+                    });
+                }
+                
+                // 3. Datalist HTML 주입
+                let datalistHtml = Array.from(grammarTestOptions).filter(Boolean).map(opt => `<option value="${opt}"></option>`).join('');
+                
+                let datalist = document.getElementById('grammarTestOptionsList');
+                if (!datalist) {
+                    datalist = document.createElement('datalist');
+                    datalist.id = 'grammarTestOptionsList';
+                    document.body.appendChild(datalist);
+                }
+                datalist.innerHTML = datalistHtml;
+
+            } catch (e) {
+                console.error("문법 태그 로딩 실패:", e);
+            }
         }
 
         // --- 포맷팅 함수들 ---
@@ -737,24 +787,6 @@
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
-             
-             // [신규] 입력된 모든 문법 태그를 모아서 자동완성 콤보박스(Datalist) 생성
-             let grammarTestOptions = new Set();
-             data.forEach(st => {
-                 if (st.comment?.grammarTest) {
-                     st.comment.grammarTest.split(',').forEach(tag => grammarTestOptions.add(tag.trim()));
-                 }
-             });
-             
-             let datalistHtml = `<datalist id="grammarTestOptionsList">
-                 ${Array.from(grammarTestOptions).filter(Boolean).map(opt => `<option value="${opt}"></option>`).join('')}
-             </datalist>`;
-             
-             if (!document.getElementById('grammarTestOptionsList')) {
-                 document.body.insertAdjacentHTML('beforeend', datalistHtml);
-             } else {
-                 document.getElementById('grammarTestOptionsList').innerHTML = Array.from(grammarTestOptions).filter(Boolean).map(opt => `<option value="${opt}"></option>`).join('');
-             }
 
              tbody.innerHTML = data.map(st => `
                 <tr>
@@ -860,17 +892,36 @@
             if (!className) return alert('반을 선택하세요.');
             if (!confirm(`${className}반 전체 적용하시겠습니까?`)) return;
 
-            // ※ 주의: 기존 백엔드(server.js)의 update-grammar-by-class 로직에 testContent가 반영되도록 서버쪽 수정도 함께 필요할 수 있습니다!
             try {
+                // 로딩 상태 표시
+                const tbody = document.getElementById('grammarTableBody');
+                tbody.innerHTML = `<tr><td colspan="5" class="loading" style="color:#8b5cf6; font-weight:bold; font-size:16px;">🚀 ${className}반 데이터 업데이트 중... 잠시만 기다려주세요!</td></tr>`;
+
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ className, topic, homework, testContent, date }) // testContent 추가 전송
                 });
                 const result = await res.json();
-                if(result.success) { showToast(result.message); loadDataForCurrentTab(); }
-                else alert(result.message);
-            } catch(e) { alert('오류 발생'); }
+                if(result.success) { 
+                    showToast(result.message); 
+                    
+                    // 일괄 적용 성공 후 상단 입력칸 깔끔하게 비우기
+                    document.getElementById('grammarTopicInput').value = '';
+                    document.getElementById('grammarTestInput').value = '';
+                    document.getElementById('grammarHomeworkInput').value = '';
+                    
+                    // 테이블 리스트만 새로고침!
+                    loadDataForCurrentTab(); 
+                }
+                else {
+                    alert(result.message);
+                    loadDataForCurrentTab();
+                }
+            } catch(e) { 
+                alert('오류 발생'); 
+                loadDataForCurrentTab();
+            }
         }
 
         function updateGrammarClassList(data) {
