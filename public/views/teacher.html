@@ -10,8 +10,6 @@
 <body>
 
     <div class="fixed-layout-top">
-
-    <div class="fixed-layout-top">
         <div class="header">
             <h1>📚 리디튜드 선생님</h1>
             <div class="user-info">
@@ -32,7 +30,7 @@
         </div>
 
         <div class="filter-bar" id="commonFilterBar">
-            <button class="refresh-btn" onclick="loadDataForCurrentTab()">🔄 새로고침</button>
+            <button class="refresh-btn" onclick="loadDataForCurrentTab(true)">🔄 새로고침</button>
             
             <div class="filter-group">
                 <span class="filter-label">날짜:</span>
@@ -105,7 +103,6 @@
             </div>
         </div>
 
-        <!-- 5. 문법 관리 (입력창 모달 적용) -->
         <div id="grammar-view" class="tab-content">
             <div class="section-title">📚 문법 숙제 관리</div>
             <div class="grammar-input-container">
@@ -117,7 +114,6 @@
                     <label class="grammar-label">오늘 문법 진도</label>
                     <input type="text" id="grammarTopicInput" class="grammar-input" placeholder="예: to부정사">
                 </div>
-                <!-- [핵심 변경] 드롭다운 대신 모달을 띄우는 버튼형 인풋으로 변경 -->
                 <div class="grammar-group">
                     <label class="grammar-label">문법 테스트 내용</label>
                     <input type="text" id="grammarTestInput" class="grammar-input" style="cursor: pointer; background: white;" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('batch', this.value)">
@@ -166,7 +162,7 @@
         </div>
     </div>
 
-    <!-- 모달 등 -->
+    <!-- 각종 모달 팝업들 -->
     <div id="bookSearchModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="section-title" id="modalTitle">📚 책 제목 검색</h2>
@@ -188,18 +184,14 @@
         </div>
     </div>
 
-    <!-- [신규] 노션 문법 태그 선택용 모달 -->
     <div id="grammarTagModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 600px; width: 95%;">
             <h2 class="section-title" style="font-size: 1.4em; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">🏷️ 문법 테스트 내용 선택</h2>
-            <!-- [수정] 노션이 단일선택 속성이므로 안내 문구를 수정했습니다. -->
-            <p class="text-sm text-gray-500 mt-2 mb-1">노션 진도 DB에 등록된 태그들입니다. 1개만 선택 가능합니다.</p>
+            <p class="text-sm text-gray-500 mt-2 mb-1" style="font-size: 13px; color: #718096;">노션 진도 DB에 등록된 태그들입니다. 1개만 선택 가능합니다.</p>
             
-            <!-- [신규 추가] 실시간 검색창 -->
             <input type="text" id="grammarTagSearchInput" class="modal-search-input" placeholder="🔍 검색어를 입력하세요... (예: 시제, 명사)" oninput="renderGrammarTagModal()" style="margin-top: 10px; margin-bottom: 5px;">
             
             <div id="grammarTagContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; max-height: 280px; overflow-y: auto; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
-                <!-- 자바스크립트로 태그 칩들이 렌더링 됩니다 -->
             </div>
             
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -218,6 +210,19 @@
         <div id="floatingContent" class="floating-content"></div>
     </div>
 
+    <div id="progressModal" class="modal-overlay" style="z-index: 6000;">
+        <div class="modal-content" style="text-align: center; padding: 40px; max-width: 420px;">
+            <h3 style="margin-bottom: 15px; color: #6b46c1; font-size: 1.4em; font-weight: 800;">🚀 노션 동기화 진행 중...</h3>
+            <p style="font-size: 14px; color: #718096; margin-bottom: 25px; line-height: 1.5;">
+                에러 방지를 위해 노션 서버로<br>1명씩 순차적으로 안전하게 전송하고 있습니다.
+            </p>
+            <div style="background: #e2e8f0; border-radius: 12px; height: 18px; width: 100%; overflow: hidden; margin-bottom: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                <div id="progressBarFill" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); height: 100%; width: 0%; transition: width 0.3s ease-out;"></div>
+            </div>
+            <p id="progressText" style="font-weight: 800; color: #4a5568; font-size: 18px;">준비 중...</p>
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = window.location.origin;
         let authToken = localStorage.getItem('teacher_auth_token');
@@ -228,9 +233,7 @@
         let currentBookType = 'english';
         let currentUserRole = '';
         let currentUserName = '';
-        let currentSearchResults = [];
 
-        // [신규] 노션 문법 태그 관련 전역 변수
         let notionGrammarTags = [];
         let currentTagTargetId = null; 
         let selectedTagsTemp = new Set();
@@ -265,13 +268,11 @@
                     link.style.display = (currentUserRole === 'manager') ? 'block' : 'none';
                 });
 
-                // [신규] 선생님 로그인 시점에 노션 DB의 원본 태그 옵션들을 긁어옵니다.
                 loadNotionGrammarTags();
 
             } catch (e) { logout(); }
         }
 
-        // --- [신규] 노션 원본 문법 태그 불러오기 로직 ---
         async function loadNotionGrammarTags() {
             try {
                 const res = await fetch(`${API_BASE_URL}/api/notion-grammar-options`, { headers: { 'Authorization': 'Bearer ' + authToken } });
@@ -279,20 +280,16 @@
                 if (data.success && data.options) {
                     notionGrammarTags = data.options;
                 }
-            } catch (e) {
-                console.error("노션 문법 태그 로드 실패:", e);
-            }
+            } catch (e) { console.error("노션 문법 태그 로드 실패:", e); }
         }
 
         function openGrammarTagModal(targetId, currentValString) {
             currentTagTargetId = targetId;
             selectedTagsTemp.clear();
             
-            // [신규] 모달 열 때마다 이전 검색어 초기화
             const searchInput = document.getElementById('grammarTagSearchInput');
             if (searchInput) searchInput.value = '';
             
-            // 기존에 입력되어 있던 값이 있다면 임시 저장소에 세팅 (선택된 상태로 보이게)
             if (currentValString && currentValString.trim() !== '') {
                 currentValString.split(',').forEach(t => selectedTagsTemp.add(t.trim()));
             }
@@ -311,7 +308,6 @@
                 return;
             }
             
-            // [신규] 검색어가 있을 경우 태그를 걸러내는(필터링) 로직
             const tagsToRender = filterText 
                 ? notionGrammarTags.filter(tag => tag.toLowerCase().includes(filterText)) 
                 : notionGrammarTags;
@@ -332,16 +328,13 @@
             if (selectedTagsTemp.has(tag)) {
                 selectedTagsTemp.delete(tag);
             } else {
-                // [수정] 단일 선택(Select) 속성이므로, 새로운 걸 누르면 기존 선택을 지웁니다.
                 selectedTagsTemp.clear(); 
                 selectedTagsTemp.add(tag);
             }
-            renderGrammarTagModal(); // UI 바로 갱신
+            renderGrammarTagModal();
         }
 
-        function closeGrammarTagModal() {
-            document.getElementById('grammarTagModal').classList.remove('show');
-        }
+        function closeGrammarTagModal() { document.getElementById('grammarTagModal').classList.remove('show'); }
 
         function applyGrammarTags() {
             const resultStr = Array.from(selectedTagsTemp).join(', ');
@@ -349,11 +342,10 @@
             if (currentTagTargetId === 'batch') {
                 document.getElementById('grammarTestInput').value = resultStr;
             } else {
-                // 개별 학생 줄 업데이트
                 const inputEl = document.querySelector(`input[data-page-id="${currentTagTargetId}"][data-property-name="문법 테스트 내용"]`);
                 if (inputEl) {
                     inputEl.value = resultStr;
-                    updateField(inputEl); // 자동으로 노션에 저장 트리거
+                    updateField(inputEl);
                 }
             }
             closeGrammarTagModal();
@@ -403,13 +395,20 @@
             displayDataForAllTabs(filteredData);
         }
 
-        async function loadDataForCurrentTab() {
+        // [핵심 변경] force 파라미터가 true일 경우 노션의 최신 데이터를 강제로 불러옵니다. 스크롤 위치도 유지됩니다.
+        async function loadDataForCurrentTab(force = false) {
             const period = document.getElementById('commonPeriodFilter').value;
             const date = document.getElementById('commonSpecificDate').value;
             let url = `${API_BASE_URL}/api/daily-report-data?period=${period}`;
             if (period === 'specific_date' && date) url += `&date=${date}`;
+            if (force) url += `&force=true`;
+
+            const scrollArea = document.querySelector('.table-scroll-area');
+            const currentScroll = scrollArea ? scrollArea.scrollTop : 0;
 
             try {
+                if (force && allReportData.length > 0) showToast('최신 데이터를 불러오는 중...', 'success');
+                
                 const res = await fetch(url, { headers:{Authorization:'Bearer '+authToken} });
                 if (!res.ok) throw new Error('Load failed');
                 allReportData = await res.json();
@@ -418,7 +417,36 @@
                 if (currentActiveTab === 'comments') updateCommentGrammarFilterList(allReportData);
                 
                 filterDataByTeacher();
+
+                if (scrollArea) {
+                    setTimeout(() => scrollArea.scrollTop = currentScroll, 10);
+                }
             } catch (e) { console.error(e); showToast('데이터 로드 실패', 'error'); }
+        }
+
+        // [신규 기능] 학생 한 명의 데이터만 부분적으로 갱신
+        async function refreshSingleStudent(pageId) {
+            try {
+                showToast('이 학생의 최신 데이터를 불러오는 중...', 'success');
+                const res = await fetch(`${API_BASE_URL}/api/single-student-report?pageId=${pageId}`, { headers:{Authorization:'Bearer '+authToken} });
+                const result = await res.json();
+                
+                if (result.success) {
+                    const idx = allReportData.findIndex(d => d.pageId === pageId);
+                    if (idx !== -1) allReportData[idx] = result.data;
+                    else allReportData.push(result.data);
+                    
+                    const scrollArea = document.querySelector('.table-scroll-area');
+                    const currentScroll = scrollArea ? scrollArea.scrollTop : 0;
+                    
+                    filterDataByTeacher(); // 테이블 부분 다시 렌더링
+                    
+                    if (scrollArea) setTimeout(() => scrollArea.scrollTop = currentScroll, 10);
+                    showToast('개별 학생 데이터 동기화 완료!');
+                } else {
+                    showToast('새로고침 실패', 'error');
+                }
+            } catch(e) { showToast('오류 발생', 'error'); }
         }
 
         function showTab(tab) {
@@ -446,9 +474,7 @@
             loadDataForCurrentTab();
         }
 
-        function openPastGrammarWindow() {
-            window.open('/past-grammar', '_blank', 'width=1100,height=800,scrollbars=yes');
-        }
+        function openPastGrammarWindow() { window.open('/past-grammar', '_blank', 'width=1100,height=800,scrollbars=yes'); }
 
         async function openLastCommentWindow(studentName, currentDate) {
             const win = document.getElementById('floatingCommentWindow');
@@ -460,9 +486,7 @@
             win.classList.remove('hidden');
 
             try {
-                const res = await fetch(`${API_BASE_URL}/api/last-comment?studentName=${encodeURIComponent(studentName)}&currentDate=${currentDate}`, { 
-                    headers: { 'Authorization': 'Bearer ' + authToken } 
-                });
+                const res = await fetch(`${API_BASE_URL}/api/last-comment?studentName=${encodeURIComponent(studentName)}&currentDate=${currentDate}`, { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const data = await res.json();
                 
                 if (data.success && data.record) {
@@ -473,14 +497,10 @@
                 } else {
                     content.innerHTML = '<div class="no-data" style="text-align:center; color:#a0aec0; padding:20px;">이전 기록이 없습니다.</div>';
                 }
-            } catch(e) {
-                content.innerHTML = '<div class="error" style="text-align:center; color:#e53e3e; padding:20px;">오류 발생</div>';
-            }
+            } catch(e) { content.innerHTML = '<div class="error" style="text-align:center; color:#e53e3e; padding:20px;">오류 발생</div>'; }
         }
 
-        function closeFloatingWindow() { 
-            document.getElementById('floatingCommentWindow').classList.add('hidden'); 
-        }
+        function closeFloatingWindow() { document.getElementById('floatingCommentWindow').classList.add('hidden'); }
 
         function formatSelect(pageId, propertyName, currentValue, options) {
             const defaultStatus = 'status-default';
@@ -491,10 +511,7 @@
             else if (currentValue === 'skip' || currentValue === 'SKIP' || currentValue === '원서독서로 대체' || currentValue === '듣기평가교재 완료') statusClass = 'status-blue';
 
             return `<select class="homework-dropdown ${statusClass}" 
-                        data-page-id="${pageId}" 
-                        data-property-name="${propertyName}" 
-                        data-property-type="select" 
-                        onchange="updateField(this)">
+                        data-page-id="${pageId}" data-property-name="${propertyName}" data-property-type="select" onchange="updateField(this)">
                         <option value="">선택</option>
                         ${options.map(option => `<option value="${option}" ${option === currentValue ? 'selected' : ''}>${option}</option>`).join('')}
                     </select>`;
@@ -529,7 +546,11 @@
             tbody.innerHTML = data.map(st => `<tr id="row-hw-${st.pageId}">
                 <td class="student-name">
                     <div class="student-name-wrapper">
-                        <span>${st.studentName}</span>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <span>${st.studentName}</span>
+                            <!-- [신규] 개별 학생 새로고침 버튼 -->
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
                         <div class="batch-controls">
                             <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')">전체O</button>
                             <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')">전체X</button>
@@ -588,7 +609,13 @@
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">${st.studentName}</td>
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                        <span>${st.studentName}</span>
+                        <!-- [신규] 개별 학생 새로고침 버튼 -->
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                </td>
                 <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
                 <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
                 <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
@@ -609,7 +636,12 @@
                 const books = st.reading.englishBooks || [];
                 const bookTags = books.map(book => `<span class="book-tag">${book.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}', 'english')">×</span></span>`).join('');
                 return `<tr>
-                    <td class="student-name">${st.studentName}</td>
+                    <td class="student-name">
+                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                            <span>${st.studentName}</span>
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
+                    </td>
                     <td>${(st.teachers || []).join(', ')}</td>
                     <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함'])}</td>
                     <td>${formatSelect(st.pageId, '어휘학습', st.reading.vocabStatus, ['완료', 'SKIP', '미완료'])}</td>
@@ -629,7 +661,12 @@
                 const kBooks = st.listening.koreanBooks || [];
                 const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${b.id}', 'korean')">×</span></span>`).join('');
                 return `<tr>
-                    <td class="student-name">${st.studentName}</td>
+                    <td class="student-name">
+                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                            <span>${st.studentName}</span>
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
+                    </td>
                     <td>${(st.teachers||[]).join(', ')}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening.study, listeningOptions)}</td>
                     <td>${formatHomeworkDropdown(st.pageId, '더빙 워크북 완료', st.listening.workbook, listeningOptions)}</td>
@@ -639,17 +676,20 @@
             }).join('');
         }
 
-        // [신규] 개별 항목도 모달을 띄우도록 변경
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
 
              tbody.innerHTML = data.map(st => `
                 <tr>
-                    <td class="student-name">${st.studentName}</td>
+                    <td class="student-name">
+                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                            <span>${st.studentName}</span>
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
+                    </td>
                     <td>${st.comment?.grammarClass || '-'}</td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <!-- [수정] property-type을 노션 속성과 동일한 'select'로 변경했습니다. -->
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%; cursor: pointer; background: white;" value="${st.comment?.grammarTest || ''}" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('${st.pageId}', this.value)" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="select"></td>
                     <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
                 </tr>
@@ -662,7 +702,11 @@
             tbody.innerHTML = data.map(st => `
                 <tr id="row-comment-${st.pageId}">
                     <td class="student-name">
-                        <div style="font-size: 16px; margin-bottom: 5px;">${st.studentName}</div>
+                        <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size: 16px; margin-bottom: 5px;">
+                            <span>${st.studentName}</span>
+                            <!-- [신규] 개별 학생 새로고침 버튼 -->
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
                         <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
                     </td>
                     <td>${(st.teachers||[]).join(', ')}</td>
@@ -674,13 +718,21 @@
                         </div>
                         <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}">${st.comment?.teacherComment || ''}</textarea>
                     </td>
-                    <td style="vertical-align:middle;">
+                    <td style="vertical-align:middle; padding-bottom: 15px;">
                         <div class="report-btn-group">
                             <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
                             <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
                             <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
                             <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
                             <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                        </div>
+                        
+                        <!-- [신규 추가] 학생의 "오늘의 학습 소감" 영역 -->
+                        <div style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; width: 100%;">
+                            <div style="font-size: 12px; font-weight: 800; color: #4a5568; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                                <span>✏️ 오늘의 학습 소감 (학생 작성)</span>
+                            </div>
+                            <div style="font-size: 13px; color: #2d3748; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">${st.comment?.studentReflection ? st.comment.studentReflection : '<span style="color:#a0aec0; font-style:italic;">작성된 소감이 없습니다.</span>'}</div>
                         </div>
                     </td>
                 </tr>`).join('');
@@ -716,34 +768,59 @@
             const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
             
             if (!className) return alert('반을 선택하세요.');
-            if (!confirm(`${className}반 전체 적용하시겠습니까?`)) return;
+            if (!confirm(`[${className}반] 전체 학생 데이터를 노션에 반영하시겠습니까?\n\n(※ 노션 서버 오류 방지를 위해 1명씩 안전하게 저장하므로 5~10초 정도 소요됩니다)`)) return;
+
+            const progressModal = document.getElementById('progressModal');
+            const progressBarFill = document.getElementById('progressBarFill');
+            const progressText = document.getElementById('progressText');
+            
+            progressModal.classList.add('show');
+            progressBarFill.style.width = '0%';
+            progressText.textContent = `대상 학생 목록을 불러오는 중...`;
 
             try {
-                const tbody = document.getElementById('grammarTableBody');
-                tbody.innerHTML = `<tr><td colspan="5" class="loading" style="color:#8b5cf6; font-weight:bold; font-size:16px;">🚀 ${className}반 데이터 업데이트 중... 잠시만 기다려주세요!</td></tr>`;
-
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ className, topic, homework, testContent, date }) 
                 });
-                const result = await res.json();
-                if(result.success) { 
-                    showToast(result.message); 
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
                     
-                    document.getElementById('grammarTopicInput').value = '';
-                    document.getElementById('grammarTestInput').value = '';
-                    document.getElementById('grammarHomeworkInput').value = '';
+                    const chunks = decoder.decode(value).split('\n').filter(Boolean);
                     
-                    loadDataForCurrentTab(); 
-                }
-                else {
-                    alert(result.message);
-                    loadDataForCurrentTab();
+                    for (const chunk of chunks) {
+                        try {
+                            const data = JSON.parse(chunk);
+                            if (data.progress !== undefined) {
+                                const percent = Math.round((data.progress / data.total) * 100);
+                                progressBarFill.style.width = `${percent}%`;
+                                progressText.textContent = `진행 중: ${data.progress} / ${data.total} 명`;
+                            } 
+                            else if (data.success) {
+                                showToast(data.message); 
+                                document.getElementById('grammarTopicInput').value = '';
+                                document.getElementById('grammarTestInput').value = '';
+                                document.getElementById('grammarHomeworkInput').value = '';
+                                loadDataForCurrentTab(true); 
+                            } 
+                            else if (data.success === false) {
+                                alert('실패: ' + data.message);
+                                loadDataForCurrentTab(true);
+                            }
+                        } catch (e) { console.error('청크 파싱 에러:', e, chunk); }
+                    }
                 }
             } catch(e) { 
-                alert('오류 발생'); 
-                loadDataForCurrentTab();
+                alert('네트워크 오류가 발생했습니다: ' + e.message); 
+                loadDataForCurrentTab(true);
+            } finally {
+                setTimeout(() => { progressModal.classList.remove('show'); }, 800);
             }
         }
 
@@ -796,10 +873,16 @@
             el.style.height = (el.scrollHeight) + 'px';
         }
 
+        // [핵심 변경] 개별 코멘트 저장 버튼을 누르면 다른 선생님이 작업한 것도 동기화되도록 전체를 새로고침합니다.
         async function updateComment(btn, pageId) {
             const comment = document.getElementById(`comment-area-${pageId}`).value;
+            btn.textContent = '저장 중...'; // 버튼 상태 변경
             await updateField(null, pageId, "Today's Notice!", "rich_text", comment);
-            btn.textContent = '저장'; btn.style.background = '#10b981';
+            btn.textContent = '저장'; 
+            btn.style.background = '#10b981';
+
+            // 노션 동기화 충돌 방지를 위해 저장 후 즉시 최신 데이터로 전체 화면을 리프레시합니다. (스크롤 유지)
+            loadDataForCurrentTab(true); 
         }
 
         function openAddBookModal(pageId, type) { 
@@ -840,7 +923,7 @@
                  method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+authToken},
                  body: JSON.stringify({pageId:pid, propertyName:prop, newValue:ids, propertyType:'relation'})
              });
-             loadDataForCurrentTab();
+             loadDataForCurrentTab(true);
         }
 
         function getReadingResultClass(res) { if(res==='PASS') return 'result-pass'; if(res==='FAIL') return 'result-fail'; return 'result-none'; }
@@ -911,6 +994,7 @@
             showToast("링크가 복사되었습니다!");
         }
 
+        // [핵심 변경] 일괄 저장 후에도 전체 화면이 리프레시 되도록 수정했습니다.
         async function saveAllComments(btn) {
             const textareas = document.querySelectorAll('.comment-textarea');
             let updatedCount = 0;
@@ -945,6 +1029,8 @@
             try {
                 await Promise.all(promises);
                 showToast(`${updatedCount}개의 코멘트가 저장되었습니다.`);
+                // 노션 동기화 충돌 방지를 위해 일괄 저장 후 전체를 새로고침합니다.
+                loadDataForCurrentTab(true);
             } catch (error) {
                 alert('일부 저장 실패');
             } finally {

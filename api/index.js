@@ -346,7 +346,8 @@ async function parseDailyReportData(page) {
         grammarClass: grammarClassName || '진도 해당 없음',
         grammarTopic: grammarTopic || '진도 해당 없음', 
         grammarTest: grammarTestStr,
-        grammarHomework: grammarHomework || '숙제 내용 없음'
+        grammarHomework: grammarHomework || '숙제 내용 없음',
+        studentReflection: getSimpleText(props['오늘의 학습 소감']) // [신규 추가] 학생의 학습 소감 
     };
 
     return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
@@ -380,14 +381,13 @@ async function fetchProgressData(req, res, parseFunction) {
     return await Promise.all(pages.map(parseFunction));
 }
 
-// [수정됨] 대시보드 속도 최적화: 서버 캐싱 적용
 app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, force } = req.query;
         const targetDate = date || getKSTTodayRange().dateString;
 
-        // 캐시가 유효하면 노션 API 호출 없이 즉시 응답
-        if (dashboardCache.dailyReport.date === targetDate && 
+        // [수정됨] force(강제 새로고침)가 'true'가 아닐 때만 캐시를 사용합니다.
+        if (force !== 'true' && dashboardCache.dailyReport.date === targetDate && 
             (Date.now() - dashboardCache.dailyReport.lastFetch < CACHE_DURATION)) {
             return res.json(dashboardCache.dailyReport.data);
         }
@@ -399,6 +399,20 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
         
         res.json(data);
     } catch (error) { res.status(500).json({ message: error.message }); }
+});
+
+// [신규 추가] 특정 학생 1명의 데이터만 노션에서 새로 긁어오는 API
+app.get('/api/single-student-report', requireAuth, async (req, res) => {
+    const { pageId } = req.query;
+    if (!pageId) return res.status(400).json({ success: false, message: 'Page ID missing' });
+    try {
+        const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
+        const parsedData = await parseDailyReportData(page);
+        res.json({ success: true, data: parsedData });
+    } catch (error) {
+        console.error('Single fetch error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.get('/api/get-today-progress', requireAuth, async (req, res) => {
@@ -479,7 +493,6 @@ app.get('/api/notion-grammar-options', requireAuth, async (req, res) => {
     }
 });
 
-// [수정됨] 대시보드 속도 최적화: 서버 캐싱 적용
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     try {
         // 캐시가 유효하면 노션 API 호출 없이 즉시 응답 (5분 캐시)
@@ -544,7 +557,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
 
         // 새로 가져온 데이터 캐싱 저장
         dashboardCache.pastGrammar = { data: records, lastFetch: Date.now() };
-        
+
         res.json({ success: true, data: records });
     } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -552,13 +565,17 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, testContent, date } = req.body; 
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
+    
+    // [핵심] 진행률을 실시간으로 쪼개서 보내기 위한 청크(Chunk) 스트리밍 설정
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
     try {
         const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
         const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
         
         const students = query.results;
-        let updatedCount = 0;
-
+        
         // [신규 로직] 노션 DB 설정이 '단일 선택'인지 '다중 선택'인지 자동 감지!
         let isMultiSelect = false;
         if (students.length > 0) {
@@ -566,44 +583,67 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
             if (testProp && testProp.type === 'multi_select') isMultiSelect = true;
         }
 
-        const updatePromises = students.map(async (page) => {
+        // 대상 반 학생만 추출
+        const targetStudents = students.filter(page => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
-            if (studentClass && studentClass.trim() === className.trim()) {
-                
-                const properties = {
-                    '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
-                    '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
-                };
+            return studentClass && studentClass.trim() === className.trim();
+        });
 
-                // [신규 로직] 다중 선택이면 배열로, 단일 선택이면 단일 문자열로 노션 입맛에 맞게 보냅니다.
-                if (testContent !== undefined) {
-                    if (testContent.trim() === '') {
-                        properties['문법 테스트 내용'] = isMultiSelect ? { multi_select: [] } : { select: null };
+        if (targetStudents.length === 0) {
+            res.write(JSON.stringify({ success: false, message: '해당 반의 학생 데이터를 찾을 수 없습니다.' }) + '\n');
+            return res.end();
+        }
+
+        let updatedCount = 0;
+
+        // Promise.all 대신 for...of 루프를 사용하여 순차 처리 및 딜레이 추가 (노션 속도 제한 방지)
+        for (const page of targetStudents) {
+            const properties = {
+                '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
+                '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
+            };
+
+            if (testContent !== undefined) {
+                if (testContent.trim() === '') {
+                    properties['문법 테스트 내용'] = isMultiSelect ? { multi_select: [] } : { select: null };
+                } else {
+                    if (isMultiSelect) {
+                        const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
+                        properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
                     } else {
-                        if (isMultiSelect) {
-                            const tags = testContent.split(',').map(s => s.trim()).filter(Boolean);
-                            properties['문법 테스트 내용'] = { multi_select: tags.map(tag => ({ name: tag })) };
-                        } else {
-                            properties['문법 테스트 내용'] = { select: { name: testContent.split(',')[0].trim() } };
-                        }
+                        properties['문법 테스트 내용'] = { select: { name: testContent.split(',')[0].trim() } };
                     }
                 }
-
-                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ properties })
-                });
-                updatedCount++;
             }
-        });
-        await Promise.all(updatePromises);
+
+            // 개별 학생 업데이트
+            await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties })
+            });
+
+            updatedCount++;
+            
+            // 프론트엔드로 현재 진행 상황(예: 3/15) 실시간 전송
+            res.write(JSON.stringify({ progress: updatedCount, total: targetStudents.length }) + '\n');
+            
+            // 노션 API 속도 제한(Rate Limit)을 피하기 위해 300ms 딜레이 부여
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
         
-        // [추가됨] 데이터 수정 시 대시보드 캐시 무효화
-        dashboardCache.dailyReport.lastFetch = 0;
-        dashboardCache.pastGrammar.lastFetch = 0;
-        
-        res.json({ success: true, message: `Updated ${updatedCount} students` });
-    } catch (error) { console.error('Grammar Update Error:', error); res.status(500).json({ success: false, message: error.message }); }
+        // 데이터 수정 시 대시보드 캐시 무효화 (이전에 추가한 캐시가 있을 경우)
+        if (typeof dashboardCache !== 'undefined') {
+            dashboardCache.dailyReport.lastFetch = 0;
+            dashboardCache.pastGrammar.lastFetch = 0;
+        }
+
+        res.write(JSON.stringify({ success: true, message: `총 ${updatedCount}명 업데이트 완료!` }) + '\n');
+        res.end();
+    } catch (error) { 
+        console.error('Grammar Update Error:', error); 
+        res.write(JSON.stringify({ success: false, message: error.message }) + '\n');
+        res.end();
+    }
 });
 
 app.post('/api/update-homework', requireAuth, async (req, res) => {
