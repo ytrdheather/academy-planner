@@ -33,6 +33,17 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const publicPath = path.join(__dirname, '../public');
 
+// ------------------------------------------------------------------
+// [캐시 저장소] 선생님 대시보드 로딩 속도 대폭 개선용
+// ------------------------------------------------------------------
+const dashboardCache = {
+    dailyReport: { data: null, lastFetch: 0, date: null },
+    pastGrammar: { data: null, lastFetch: 0 }
+};
+const CACHE_DURATION = 1000 * 60; // 일일 리포트 1분 캐시
+const GRAMMAR_CACHE_DURATION = 1000 * 60 * 5; // 과거 문법 5분 캐시
+// ------------------------------------------------------------------
+
 // Notion API 호출 헬퍼
 async function fetchNotion(url, options = {}, retries = 3) {
     const headers = {
@@ -369,9 +380,23 @@ async function fetchProgressData(req, res, parseFunction) {
     return await Promise.all(pages.map(parseFunction));
 }
 
+// [수정됨] 대시보드 속도 최적화: 서버 캐싱 적용
 app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
+        const { date } = req.query;
+        const targetDate = date || getKSTTodayRange().dateString;
+
+        // 캐시가 유효하면 노션 API 호출 없이 즉시 응답
+        if (dashboardCache.dailyReport.date === targetDate && 
+            (Date.now() - dashboardCache.dailyReport.lastFetch < CACHE_DURATION)) {
+            return res.json(dashboardCache.dailyReport.data);
+        }
+
         const data = await fetchProgressData(req, res, parseDailyReportData);
+        
+        // 새로 가져온 데이터 캐싱 저장
+        dashboardCache.dailyReport = { data, lastFetch: Date.now(), date: targetDate };
+        
         res.json(data);
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -454,8 +479,15 @@ app.get('/api/notion-grammar-options', requireAuth, async (req, res) => {
     }
 });
 
+// [수정됨] 대시보드 속도 최적화: 서버 캐싱 적용
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     try {
+        // 캐시가 유효하면 노션 API 호출 없이 즉시 응답 (5분 캐시)
+        if (dashboardCache.pastGrammar.data && 
+            (Date.now() - dashboardCache.pastGrammar.lastFetch < GRAMMAR_CACHE_DURATION)) {
+            return res.json({ success: true, data: dashboardCache.pastGrammar.data });
+        }
+
         const { start: kstTodayStr } = getKSTTodayRange();
         const today = new Date(kstTodayStr);
         const end = today.toISOString().split('T')[0];
@@ -510,6 +542,9 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             return { date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
 
+        // 새로 가져온 데이터 캐싱 저장
+        dashboardCache.pastGrammar = { data: records, lastFetch: Date.now() };
+        
         res.json({ success: true, data: records });
     } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -562,6 +597,11 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
             }
         });
         await Promise.all(updatePromises);
+        
+        // [추가됨] 데이터 수정 시 대시보드 캐시 무효화
+        dashboardCache.dailyReport.lastFetch = 0;
+        dashboardCache.pastGrammar.lastFetch = 0;
+        
         res.json({ success: true, message: `Updated ${updatedCount} students` });
     } catch (error) { console.error('Grammar Update Error:', error); res.status(500).json({ success: false, message: error.message }); }
 });
@@ -614,6 +654,11 @@ app.post('/api/update-homework', requireAuth, async (req, res) => {
         } else { return res.status(400).json({ success: false, message: 'No update data provided' }); }
         
         await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: propertiesToUpdate }) });
+        
+        // [추가됨] 데이터 수정 시 대시보드 캐시 무효화
+        dashboardCache.dailyReport.lastFetch = 0;
+        dashboardCache.pastGrammar.lastFetch = 0;
+
         res.json({ success: true });
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
@@ -694,6 +739,11 @@ app.post('/save-progress', requireAuth, async (req, res) => {
             if (studentPageId) properties['학생'] = { relation: [{ id: studentPageId }] }; 
             await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
         }
+
+        // [추가됨] 학생이 진도를 저장하면 대시보드 캐시 무효화
+        dashboardCache.dailyReport.lastFetch = 0;
+        dashboardCache.pastGrammar.lastFetch = 0;
+
         res.json({ success: true, message: '저장 완료' });
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
