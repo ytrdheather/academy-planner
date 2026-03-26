@@ -30,7 +30,7 @@
         </div>
 
         <div class="filter-bar" id="commonFilterBar">
-            <button class="refresh-btn" onclick="loadDataForCurrentTab(true)">🔄 새로고침</button>
+            <button class="refresh-btn" onclick="loadDataForCurrentTab(true)">🔄 전체 새로고침</button>
             
             <div class="filter-group">
                 <span class="filter-label">날짜:</span>
@@ -210,6 +210,7 @@
         <div id="floatingContent" class="floating-content"></div>
     </div>
 
+    <!-- 실시간 동기화 진행률 모달 -->
     <div id="progressModal" class="modal-overlay" style="z-index: 6000;">
         <div class="modal-content" style="text-align: center; padding: 40px; max-width: 420px;">
             <h3 style="margin-bottom: 15px; color: #6b46c1; font-size: 1.4em; font-weight: 800;">🚀 노션 동기화 진행 중...</h3>
@@ -269,7 +270,6 @@
                 });
 
                 loadNotionGrammarTags();
-
             } catch (e) { logout(); }
         }
 
@@ -395,7 +395,6 @@
             displayDataForAllTabs(filteredData);
         }
 
-        // [핵심 변경] force 파라미터가 true일 경우 노션의 최신 데이터를 강제로 불러옵니다. 스크롤 위치도 유지됩니다.
         async function loadDataForCurrentTab(force = false) {
             const period = document.getElementById('commonPeriodFilter').value;
             const date = document.getElementById('commonSpecificDate').value;
@@ -424,10 +423,184 @@
             } catch (e) { console.error(e); showToast('데이터 로드 실패', 'error'); }
         }
 
-        // [신규 기능] 학생 한 명의 데이터만 부분적으로 갱신
+        // ==========================================
+        // [핵심 로직] 각 탭별로 '1줄(Row)'만 렌더링하는 함수들
+        // 전체 테이블을 엎어버리지 않고 이 함수를 통해 줄만 갈아끼웁니다.
+        // ==========================================
+        function getHomeworkRow(st) {
+            return `<tr id="row-hw-${st.pageId}">
+                <td class="student-name">
+                    <div class="student-name-wrapper">
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <span>${st.studentName}</span>
+                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                        </div>
+                        <div class="batch-controls">
+                            <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')">전체O</button>
+                            <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')">전체X</button>
+                            <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '숙제 없음')">초기화</button>
+                        </div>
+                    </div>
+                </td>
+                <td>${(st.teachers||[]).join(', ')}</td>
+                <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
+                <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
+                <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
+                <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
+                <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
+                <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
+                <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
+                <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
+            </tr>`;
+        }
+
+        function getTestRow(st) {
+            return `<tr id="row-test-${st.pageId}">
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                        <span>${st.studentName}</span>
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                </td>
+                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
+                <td>${formatScoreCircle(st.tests.vocabScore)}</td>
+                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td>
+                <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
+                <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td>
+                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td>
+                <td>${formatScoreCircle(st.tests.grammarScore)}</td>
+            </tr>`;
+        }
+
+        function getReadingRow(st) {
+            const books = st.reading.englishBooks || [];
+            const bookTags = books.map(book => `<span class="book-tag">${book.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}', 'english')">×</span></span>`).join('');
+            return `<tr id="row-read-${st.pageId}">
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                        <span>${st.studentName}</span>
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                </td>
+                <td>${(st.teachers || []).join(', ')}</td>
+                <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함'])}</td>
+                <td>${formatSelect(st.pageId, '어휘학습', st.reading.vocabStatus, ['완료', 'SKIP', '미완료'])}</td>
+                <td class="book-list-cell">${bookTags}<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'english')">+추가</button></td>
+                <td>${formatSelect(st.pageId, 'Writing', st.reading.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'])}</td>
+            </tr>`;
+        }
+
+        function getListenRow(st) {
+            const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
+            const giantOptions = ['진행하지 않음', '미완료', '완료']; 
+            const kBooks = st.listening.koreanBooks || [];
+            const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${b.id}', 'korean')">×</span></span>`).join('');
+            
+            return `<tr id="row-listen-${st.pageId}">
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                        <span>${st.studentName}</span>
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                </td>
+                <td>${(st.teachers||[]).join(', ')}</td>
+                <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening.study, listeningOptions)}</td>
+                <td>${formatHomeworkDropdown(st.pageId, '더빙 워크북 완료', st.listening.workbook, listeningOptions)}</td>
+                <td class="book-list-cell">${kBookTags}<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'korean')">+추가</button></td>
+                <td>${formatSelect(st.pageId, '📕 책 읽는 거인', st.listening.giantStatus, giantOptions)}</td>
+            </tr>`;
+        }
+
+        function getGrammarRow(st) {
+            return `<tr id="row-grammar-${st.pageId}">
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
+                        <span>${st.studentName}</span>
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                </td>
+                <td>${st.comment?.grammarClass || '-'}</td>
+                <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
+                <td><input type="text" class="editable-input editable-text-input" style="width: 100%; cursor: pointer; background: white;" value="${st.comment?.grammarTest || ''}" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('${st.pageId}', this.value)" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="select"></td>
+                <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
+            </tr>`;
+        }
+
+        function getCommentRow(st) {
+            return `
+            <tr id="row-comment-${st.pageId}">
+                <td class="student-name">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size: 16px; margin-bottom: 5px;">
+                        <span>${st.studentName}</span>
+                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
+                    </div>
+                    <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
+                </td>
+                <td>${(st.teachers||[]).join(', ')}</td>
+                <td>${st.comment?.grammarClass||'-'}</td>
+                <td style="vertical-align:top; padding: 15px;">
+                    <div class="keyword-input-container">
+                        <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
+                        <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
+                    </div>
+                    <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}">${st.comment?.teacherComment || ''}</textarea>
+                </td>
+                <td style="vertical-align:middle; padding-bottom: 15px;">
+                    <div class="report-btn-group">
+                        <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
+                        <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
+                        <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
+                        <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
+                        <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
+                    </div>
+                    
+                    <div style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; width: 100%;">
+                        <div style="font-size: 12px; font-weight: 800; color: #4a5568; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                            <span>✏️ 오늘의 학습 소감 (학생 작성)</span>
+                        </div>
+                        <div style="font-size: 13px; color: #2d3748; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">${st.comment?.studentReflection ? st.comment.studentReflection : '<span style="color:#a0aec0; font-style:italic;">작성된 소감이 없습니다.</span>'}</div>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        // ==========================================
+        // [신규] 특정 1명의 데이터만 DOM 갈아끼우기
+        // ==========================================
+        function updateSingleRowDOM(pageId, st) {
+            const hwRow = document.getElementById(`row-hw-${pageId}`);
+            if (hwRow) hwRow.outerHTML = getHomeworkRow(st);
+
+            const testRow = document.getElementById(`row-test-${pageId}`);
+            if (testRow) testRow.outerHTML = getTestRow(st);
+
+            const readRow = document.getElementById(`row-read-${pageId}`);
+            if (readRow) readRow.outerHTML = getReadingRow(st);
+
+            const listenRow = document.getElementById(`row-listen-${pageId}`);
+            if (listenRow) listenRow.outerHTML = getListenRow(st);
+
+            const grammarRow = document.getElementById(`row-grammar-${pageId}`);
+            if (grammarRow) grammarRow.outerHTML = getGrammarRow(st);
+
+            const commentRow = document.getElementById(`row-comment-${pageId}`);
+            if (commentRow) {
+                // 기존에 입력해 둔 키워드가 날아가지 않도록 임시 저장 후 복원
+                const oldKeywords = document.getElementById(`keywords-${pageId}`)?.value || '';
+                commentRow.outerHTML = getCommentRow(st);
+                
+                document.getElementById(`keywords-${pageId}`).value = oldKeywords;
+                autoResizeTextarea(document.getElementById(`comment-area-${pageId}`));
+            }
+        }
+
+        // [신규] 개별 학생 1명만 노션에서 긁어와서 업데이트하는 함수 (전체 리프레시 방지)
         async function refreshSingleStudent(pageId) {
             try {
-                showToast('이 학생의 최신 데이터를 불러오는 중...', 'success');
+                showToast('해당 학생의 데이터를 불러오는 중...', 'success');
                 const res = await fetch(`${API_BASE_URL}/api/single-student-report?pageId=${pageId}`, { headers:{Authorization:'Bearer '+authToken} });
                 const result = await res.json();
                 
@@ -436,13 +609,9 @@
                     if (idx !== -1) allReportData[idx] = result.data;
                     else allReportData.push(result.data);
                     
-                    const scrollArea = document.querySelector('.table-scroll-area');
-                    const currentScroll = scrollArea ? scrollArea.scrollTop : 0;
-                    
-                    filterDataByTeacher(); // 테이블 부분 다시 렌더링
-                    
-                    if (scrollArea) setTimeout(() => scrollArea.scrollTop = currentScroll, 10);
-                    showToast('개별 학생 데이터 동기화 완료!');
+                    // 테이블 전체를 덮어쓰지 않고, 해당 줄만 업데이트!
+                    updateSingleRowDOM(pageId, result.data);
+                    showToast('동기화 완료!');
                 } else {
                     showToast('새로고침 실패', 'error');
                 }
@@ -543,31 +712,7 @@
         function displayHomeworkData(data) {
             const tbody = document.getElementById('homeworkTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="10" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr id="row-hw-${st.pageId}">
-                <td class="student-name">
-                    <div class="student-name-wrapper">
-                        <div style="display:flex; align-items:center; gap:5px;">
-                            <span>${st.studentName}</span>
-                            <!-- [신규] 개별 학생 새로고침 버튼 -->
-                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                        </div>
-                        <div class="batch-controls">
-                            <button class="batch-btn batch-ok" onclick="markAllHomework('${st.pageId}', '숙제 함')">전체O</button>
-                            <button class="batch-btn batch-no" onclick="markAllHomework('${st.pageId}', '안 해옴')">전체X</button>
-                            <button class="batch-btn batch-reset" onclick="markAllHomework('${st.pageId}', '숙제 없음')">초기화</button>
-                        </div>
-                    </div>
-                </td>
-                <td>${(st.teachers||[]).join(', ')}</td>
-                <td><input type="checkbox" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this, '${st.pageId}', '출석', 'checkbox', this.checked)"></td>
-                <td>${renderToggleBadge(st.pageId, '⭕ 지난 문법 숙제 검사', st.homework.grammar)}</td>
-                <td>${renderToggleBadge(st.pageId, '1️⃣ 어휘 클카 암기 숙제', st.homework.vocabCards)}</td>
-                <td>${renderToggleBadge(st.pageId, '2️⃣ 독해 단어 클카 숙제', st.homework.readingCards)}</td>
-                <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
-                <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
-                <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
-                <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
-            </tr>`).join('');
+            tbody.innerHTML = data.map(st => getHomeworkRow(st)).join('');
         }
 
         function renderToggleBadge(pageId, prop, val) {
@@ -601,142 +746,38 @@
                     body: JSON.stringify({ pageId: pageId, updates: updates })
                 });
                 showToast(`처리 완료`);
-                loadDataForCurrentTab();
+                refreshSingleStudent(pageId); // 전체 로딩 대신 해당 학생만 새로고침!
             } catch(e) { showToast('처리 실패', 'error'); }
         }
 
         function displayTestData(data) {
             const tbody = document.getElementById('testsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `<tr>
-                <td class="student-name">
-                    <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>
-                        <!-- [신규] 개별 학생 새로고침 버튼 -->
-                        <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                    </div>
-                </td>
-                <td><input class="editable-input editable-text-input" value="${st.tests.vocabUnit||''}" onchange="updateField(this, '${st.pageId}', '어휘유닛', 'rich_text')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabCorrect||''}" onchange="updateField(this, '${st.pageId}', '단어(맞은 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.vocabTotal||''}" onchange="updateField(this, '${st.pageId}', '단어(전체 개수)', 'number')"></td>
-                <td>${formatScoreCircle(st.tests.vocabScore)}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.readingWrong||''}" onchange="updateField(this, '${st.pageId}', '독해(틀린 개수)', 'number')"></td>
-                <td><span class="reading-result-badge ${getReadingResultClass(st.tests.readingResult)}">${st.tests.readingResult || '-'}</span></td>
-                <td>${formatSelect(st.pageId, '독해 하브루타', st.tests.havruta, ['완료함', '못하고감', '숙제없음'])}</td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarTotal||''}" onchange="updateField(this, '${st.pageId}', '문법(전체 개수)', 'number')"></td>
-                <td><input class="editable-input" type="number" value="${st.tests.grammarWrong||''}" onchange="updateField(this, '${st.pageId}', '문법(틀린 개수)', 'number')"></td>
-                <td>${formatScoreCircle(st.tests.grammarScore)}</td>
-            </tr>`).join('');
+            tbody.innerHTML = data.map(st => getTestRow(st)).join('');
         }
 
         function displayReadingData(data) {
             const tbody = document.getElementById('readingTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => {
-                const books = st.reading.englishBooks || [];
-                const bookTags = books.map(book => `<span class="book-tag">${book.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${book.id}', 'english')">×</span></span>`).join('');
-                return `<tr>
-                    <td class="student-name">
-                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                            <span>${st.studentName}</span>
-                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                        </div>
-                    </td>
-                    <td>${(st.teachers || []).join(', ')}</td>
-                    <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함'])}</td>
-                    <td>${formatSelect(st.pageId, '어휘학습', st.reading.vocabStatus, ['완료', 'SKIP', '미완료'])}</td>
-                    <td class="book-list-cell">${bookTags}<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'english')">+추가</button></td>
-                    <td>${formatSelect(st.pageId, 'Writing', st.reading.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'])}</td>
-                </tr>`;
-            }).join('');
+            tbody.innerHTML = data.map(st => getReadingRow(st)).join('');
         }
 
         function displayListeningData(data) {
             const tbody = document.getElementById('listeningTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-data">데이터 없음</td></tr>'; return; }
-            const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
-            const giantOptions = ['진행하지 않음', '미완료', '완료',]; 
-            
-            tbody.innerHTML = data.map(st => {
-                const kBooks = st.listening.koreanBooks || [];
-                const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${b.id}', 'korean')">×</span></span>`).join('');
-                return `<tr>
-                    <td class="student-name">
-                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                            <span>${st.studentName}</span>
-                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                        </div>
-                    </td>
-                    <td>${(st.teachers||[]).join(', ')}</td>
-                    <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening.study, listeningOptions)}</td>
-                    <td>${formatHomeworkDropdown(st.pageId, '더빙 워크북 완료', st.listening.workbook, listeningOptions)}</td>
-                    <td class="book-list-cell">${kBookTags}<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'korean')">+추가</button></td>
-                    <td>${formatSelect(st.pageId, '📕 책 읽는 거인', st.listening.giantStatus, giantOptions)}</td>
-                </tr>`;
-            }).join('');
+            tbody.innerHTML = data.map(st => getListenRow(st)).join('');
         }
 
         function displayGrammarData(data) {
              const tbody = document.getElementById('grammarTableBody');
              if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
-
-             tbody.innerHTML = data.map(st => `
-                <tr>
-                    <td class="student-name">
-                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                            <span>${st.studentName}</span>
-                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                        </div>
-                    </td>
-                    <td>${st.comment?.grammarClass || '-'}</td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarTopic === '진도 해당 없음' ? '' : (st.comment?.grammarTopic || '')}" placeholder="진도 해당 없음" data-page-id="${st.pageId}" data-property-name="오늘 문법 진도" data-property-type="rich_text" onchange="updateField(this)"></td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%; cursor: pointer; background: white;" value="${st.comment?.grammarTest || ''}" placeholder="▼ 클릭하여 노션 태그 선택" readonly onclick="openGrammarTagModal('${st.pageId}', this.value)" data-page-id="${st.pageId}" data-property-name="문법 테스트 내용" data-property-type="select"></td>
-                    <td><input type="text" class="editable-input editable-text-input" style="width: 100%;" value="${st.comment?.grammarHomework === '숙제 내용 없음' ? '' : (st.comment?.grammarHomework || '')}" placeholder="숙제 내용 없음" data-page-id="${st.pageId}" data-property-name="문법 숙제 내용" data-property-type="rich_text" onchange="updateField(this)"></td>
-                </tr>
-             `).join('');
+             tbody.innerHTML = data.map(st => getGrammarRow(st)).join('');
         }
 
         function displayCommentData(data) {
             const tbody = document.getElementById('commentsTableBody');
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>'; return; }
-            tbody.innerHTML = data.map(st => `
-                <tr id="row-comment-${st.pageId}">
-                    <td class="student-name">
-                        <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size: 16px; margin-bottom: 5px;">
-                            <span>${st.studentName}</span>
-                            <!-- [신규] 개별 학생 새로고침 버튼 -->
-                            <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
-                        </div>
-                        <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
-                    </td>
-                    <td>${(st.teachers||[]).join(', ')}</td>
-                    <td>${st.comment?.grammarClass||'-'}</td>
-                    <td style="vertical-align:top; padding: 15px;">
-                        <div class="keyword-input-container">
-                            <input type="text" class="keyword-input" id="keywords-${st.pageId}" placeholder="키워드 입력" onkeydown="if(event.key==='Enter') generateAIComment('${st.pageId}', '${st.studentName}')">
-                            <button class="btn-ai-generate" onclick="generateAIComment('${st.pageId}', '${st.studentName}')">✨ AI 생성</button>
-                        </div>
-                        <textarea class="comment-textarea" oninput="autoResizeTextarea(this); markCommentAsChanged(this)" data-page-id="${st.pageId}" id="comment-area-${st.pageId}">${st.comment?.teacherComment || ''}</textarea>
-                    </td>
-                    <td style="vertical-align:middle; padding-bottom: 15px;">
-                        <div class="report-btn-group">
-                            <button class="action-btn btn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">저장</button>
-                            <button class="action-btn btn-daily-view" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">데일리 보기</button>
-                            <button class="action-btn btn-daily-copy" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">데일리 복사</button>
-                            <button class="action-btn btn-monthly-view" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">월간 보기</button>
-                            <button class="action-btn btn-monthly-copy" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">월간 복사</button>
-                        </div>
-                        
-                        <!-- [신규 추가] 학생의 "오늘의 학습 소감" 영역 -->
-                        <div style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; width: 100%;">
-                            <div style="font-size: 12px; font-weight: 800; color: #4a5568; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
-                                <span>✏️ 오늘의 학습 소감 (학생 작성)</span>
-                            </div>
-                            <div style="font-size: 13px; color: #2d3748; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">${st.comment?.studentReflection ? st.comment.studentReflection : '<span style="color:#a0aec0; font-style:italic;">작성된 소감이 없습니다.</span>'}</div>
-                        </div>
-                    </td>
-                </tr>`).join('');
-            
+            tbody.innerHTML = data.map(st => getCommentRow(st)).join('');
             document.querySelectorAll('.comment-textarea').forEach(el => autoResizeTextarea(el));
         }
 
@@ -873,16 +914,75 @@
             el.style.height = (el.scrollHeight) + 'px';
         }
 
-        // [핵심 변경] 개별 코멘트 저장 버튼을 누르면 다른 선생님이 작업한 것도 동기화되도록 전체를 새로고침합니다.
+        // ============================================================
+        // [핵심 변경] 저장 시 전체 새로고침(loadDataForCurrentTab) 방지 로직!
+        // ============================================================
         async function updateComment(btn, pageId) {
-            const comment = document.getElementById(`comment-area-${pageId}`).value;
-            btn.textContent = '저장 중...'; // 버튼 상태 변경
+            const commentArea = document.getElementById(`comment-area-${pageId}`);
+            const comment = commentArea.value;
+            
+            btn.textContent = '저장 중...'; 
             await updateField(null, pageId, "Today's Notice!", "rich_text", comment);
+            
             btn.textContent = '저장'; 
             btn.style.background = '#10b981';
+            
+            // 변경 안된 상태(초기값)로 인식하도록 기준점 업데이트
+            commentArea.defaultValue = comment; 
+            
+            // 인메모리 데이터도 수동으로 업데이트 (탭 이동 시 유지 목적)
+            const rowData = allReportData.find(d => d.pageId === pageId);
+            if (rowData && rowData.comment) {
+                rowData.comment.teacherComment = comment;
+            }
+            
+            // [해결완료] 이제 전체 페이지를 새로고침하지 않으므로 다른 선생님이 입력하던 코멘트가 날아가지 않습니다!
+        }
 
-            // 노션 동기화 충돌 방지를 위해 저장 후 즉시 최신 데이터로 전체 화면을 리프레시합니다. (스크롤 유지)
-            loadDataForCurrentTab(true); 
+        // 일괄 저장 기능도 동일하게 최적화했습니다.
+        async function saveAllComments(btn) {
+            const textareas = document.querySelectorAll('.comment-textarea');
+            let updatedCount = 0;
+            const promises = [];
+            
+            btn.disabled = true;
+            btn.textContent = '저장 중...';
+
+            textareas.forEach(textarea => {
+                if (textarea.value !== textarea.defaultValue) {
+                    const pageId = textarea.dataset.pageId;
+                    const comment = textarea.value;
+                    promises.push(
+                        updateField(null, pageId, "Today's Notice!", "rich_text", comment).then(() => {
+                            textarea.defaultValue = comment;
+                            textarea.closest('tr').querySelector('.comment-save-btn').textContent = '저장';
+                            textarea.closest('tr').querySelector('.comment-save-btn').style.background = '#10b981';
+                            
+                            const rowData = allReportData.find(d => d.pageId === pageId);
+                            if (rowData && rowData.comment) rowData.comment.teacherComment = comment;
+                            
+                            updatedCount++;
+                        })
+                    );
+                }
+            });
+
+            if (promises.length === 0) {
+                alert('변경 사항이 없습니다.');
+                btn.disabled = false;
+                btn.textContent = '💾 일괄 저장';
+                return;
+            }
+
+            try {
+                await Promise.all(promises);
+                showToast(`${updatedCount}개의 코멘트가 저장되었습니다.`);
+            } catch (error) {
+                alert('일부 저장 실패');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 일괄 저장';
+            }
         }
 
         function openAddBookModal(pageId, type) { 
@@ -918,12 +1018,14 @@
              else { ids = row.listening.koreanBooks.map(b=>b.id); prop = '국어 독서 제목'; }
              await updateBookRelation(pid, ids.filter(id=>id!==rid), prop);
         }
+        
         async function updateBookRelation(pid, ids, prop) {
              await fetch(`${API_BASE_URL}/api/update-homework`, {
                  method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+authToken},
                  body: JSON.stringify({pageId:pid, propertyName:prop, newValue:ids, propertyType:'relation'})
              });
-             loadDataForCurrentTab(true);
+             // 책 추가/삭제 시에도 전체를 엎지 않고 해당 학생 1명만 리프레시합니다!
+             refreshSingleStudent(pid);
         }
 
         function getReadingResultClass(res) { if(res==='PASS') return 'result-pass'; if(res==='FAIL') return 'result-fail'; return 'result-none'; }
@@ -992,51 +1094,6 @@
             copyText.setSelectionRange(0, 99999);
             document.execCommand("copy");
             showToast("링크가 복사되었습니다!");
-        }
-
-        // [핵심 변경] 일괄 저장 후에도 전체 화면이 리프레시 되도록 수정했습니다.
-        async function saveAllComments(btn) {
-            const textareas = document.querySelectorAll('.comment-textarea');
-            let updatedCount = 0;
-            const promises = [];
-            
-            btn.disabled = true;
-            btn.textContent = '저장 중...';
-
-            textareas.forEach(textarea => {
-                if (textarea.value !== textarea.defaultValue) {
-                    const pageId = textarea.dataset.pageId;
-                    const comment = textarea.value;
-                    promises.push(
-                        updateField(null, pageId, "Today's Notice!", "rich_text", comment).then(() => {
-                            textarea.defaultValue = comment;
-                            textarea.closest('tr').querySelector('.comment-save-btn').textContent = '저장';
-                            textarea.closest('tr').querySelector('.comment-save-btn').style.background = '#10b981';
-                            textarea.style.backgroundColor = 'white';
-                            updatedCount++;
-                        })
-                    );
-                }
-            });
-
-            if (promises.length === 0) {
-                alert('변경 사항이 없습니다.');
-                btn.disabled = false;
-                btn.textContent = '💾 일괄 저장';
-                return;
-            }
-
-            try {
-                await Promise.all(promises);
-                showToast(`${updatedCount}개의 코멘트가 저장되었습니다.`);
-                // 노션 동기화 충돌 방지를 위해 일괄 저장 후 전체를 새로고침합니다.
-                loadDataForCurrentTab(true);
-            } catch (error) {
-                alert('일부 저장 실패');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '💾 일괄 저장';
-            }
         }
     </script>
 </body>
