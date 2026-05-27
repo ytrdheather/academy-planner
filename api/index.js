@@ -818,8 +818,13 @@ app.get('/report', async (req, res) => {
             return val + '점';
         };
 
+        // [신규] 담당 선생님 이름 추출 로직
+        const teacherNameStr = parsed.teachers && parsed.teachers.length > 0 ? parsed.teachers.join(', ') : '미배정';
+
         const replacements = {
-            '{{STUDENT_NAME}}': parsed.studentName, '{{REPORT_DATE}}': getKoreanDate(parsed.date),
+            '{{STUDENT_NAME}}': parsed.studentName, 
+            '{{REPORT_DATE}}': getKoreanDate(parsed.date),
+            '{{TEACHER_NAME}}': teacherNameStr, // [신규] 리포트 HTML에 들어갈 데이터 연동
             '{{TEACHER_COMMENT}}': parsed.comment.teacherComment.replace(/\n/g, '<br>'),
             '{{HW_SCORE}}': parsed.completionRate === null ? '없음' : parsed.completionRate + '%', '{{HW_SCORE_COLOR}}': getReportColor(parsed.completionRate, 'score'),
             '{{GRAMMAR_SCORE}}': formatTestScore(parsed.tests.grammarScore), '{{GRAMMAR_SCORE_COLOR}}': getReportColor(parsed.tests.grammarScore, 'test_score'),

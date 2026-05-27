@@ -17,16 +17,12 @@
         }
     </style>
 </head>
-<!-- [수정] body의 패딩(p-4)을 제거하여 모바일에서 이미지가 꽉 차게 보이도록 함 -->
 <body class="bg-custom-gray m-0 p-0">
 
-    <!-- [신규] 전체를 감싸는 컨테이너 (데스크탑에서는 중앙 정렬, 모바일에서는 꽉 참) -->
     <div class="max-w-2xl mx-auto min-h-screen flex flex-col shadow-xl bg-white">
         
         <!-- 1. 헤더 이미지 (화면 좌우 꽉 차게 설정) -->
         <header class="w-full relative">
-            <!-- [최종 수정] 파일명을 dailyheader.png로 깔끔하게 변경 -->
-            <!-- onerror: 이미지가 없으면 그냥 숨김 처리 (옛날 이미지 안 불러옴) -->
             <img src="/assets/dailyheader.png" 
                  alt="리디튜드 데일리 리포트 헤더" 
                  class="w-full h-auto object-cover block"
@@ -37,13 +33,24 @@
         <!-- 메인 컨텐츠 (여기에만 패딩을 줌) -->
         <main class="bg-white flex-1 p-6 sm:p-8 space-y-8">
             
-            <!-- 1. 제목 -->
-            <section class="text-center border-b border-gray-100 pb-6">
-                <h1 class="text-3xl font-extrabold text-gray-800 mb-2 leading-tight">
-                    <span class="text-teal-600">리디튜더<br> </span>{{STUDENT_NAME}}'s<br>
+            <!-- 1. 제목 (수정된 디자인 영역) -->
+            <section class="text-center border-b border-gray-200 pb-6 relative">
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 mb-4 leading-tight">
+                    <span class="text-teal-600 block text-lg sm:text-xl font-bold mb-1">리디튜더</span>
+                    {{STUDENT_NAME}}'s<br>
                     Daily Study Report
                 </h1>
-                <p class="text-base text-gray-500 font-medium">{{REPORT_DATE}}</p>
+                
+                <!-- [신규] 담당 선생님 & 작성일 정보 박스 -->
+                <div class="inline-flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 bg-teal-50 px-5 py-3 rounded-xl border border-teal-100 shadow-sm mt-2">
+                    <div class="flex items-center text-teal-800 font-bold">
+                        <span class="mr-2">👩‍🏫</span> 담당 : <span class="ml-1 text-teal-600">{{TEACHER_NAME}}</span> 선생님
+                    </div>
+                    <div class="hidden sm:block text-teal-300">|</div>
+                    <div class="flex items-center text-gray-600 font-medium text-sm sm:text-base">
+                        <span class="mr-2">📅</span> 작성일 : {{REPORT_DATE}}
+                    </div>
+                </div>
             </section>
             
             <!-- 2. 총평 -->
@@ -86,7 +93,6 @@
                     </div>
                     
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center">
-                        <!-- [폰트 크기 조절] -->
                         <div class="{{LISTENING_FONT_CLASS}} font-extrabold flex items-center justify-center h-12 w-full overflow-hidden leading-tight break-keep" style="color: {{LISTENING_COLOR}};">
                             {{LISTENING_STATUS}}
                         </div>
