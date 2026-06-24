@@ -578,12 +578,13 @@ export function initializeMonthlyReportRoutes(dependencies) {
         }
     });
 
-    cron.schedule('0 22 * * 6', async () => {
+    // 매주 토요일 오전 10시 실행, 이번 달 4번째 토요일인지 확인
+    cron.schedule('0 10 * * 6', async () => {
         const today = new Date();
-        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const weekOfMonth = Math.ceil(today.getDate() / 7);
 
-        if (today.getMonth() !== nextWeek.getMonth()) {
-            console.log('--- 🚀 이번 달 마지막 토요일: 월말 리포트 자동 생성 시작 ---');
+        if (weekOfMonth === 4) {
+            console.log('--- 🚀 이번 달 4번째 토요일: 월간 리포트 자동 생성 시작 ---');
 
             try {
                 const currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;

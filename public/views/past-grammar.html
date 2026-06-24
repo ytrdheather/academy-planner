@@ -78,15 +78,34 @@
 
             Object.keys(grouped).sort().forEach(className => {
                 const classRecords = grouped[className];
-                
-                const validHomeworks = classRecords.map(r => r.homework).filter(h => h && h !== '-');
-                const recentHomework = validHomeworks.length > 0 ? validHomeworks[0] : '숙제 내용 없음';
+
+                // 날짜+숙제 내용이 같은 것은 하나로 합쳐서 부여일 목록 생성
+                const hwMap = new Map();
+                classRecords.forEach(r => {
+                    if (r.homework && r.homework !== '-') {
+                        const key = r.date + '||' + r.homework;
+                        if (!hwMap.has(key)) hwMap.set(key, { date: r.date, homework: r.homework });
+                    }
+                });
+                // 날짜 오름차순 정렬
+                const hwList = Array.from(hwMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+                let hwHtml = '';
+                if (hwList.length === 0) {
+                    hwHtml = '<span style="color:#a0aec0">숙제 내용 없음</span>';
+                } else {
+                    hwList.forEach((hw, idx) => {
+                        const dateLabel = hw.date || '날짜 미상';
+                        hwHtml += `<div style="margin-bottom:4px"><span style="color:#6b46c1;font-weight:700">${idx + 1}.</span> <span style="color:#6b46c1;font-weight:700">문법 숙제 부여일 : ${dateLabel}</span>&nbsp;&nbsp;문법 숙제 내용 : <span style="color:#2d3748;font-weight:600">${hw.homework}</span></div>`;
+                    });
+                }
 
                 html += `
                     <div class="class-header">
                         <div class="class-title">
-                            <span class="mr-2">🏫</span> [${className}] 지난 주 문법숙제 : <span style="color:#4a5568; font-size:15px; font-weight:600; margin-left:8px;">${recentHomework}</span>
+                            <span class="mr-2">🏫</span> [${className}]
                         </div>
+                        <div style="margin-top:6px; font-size:14px; color:#4a5568; line-height:1.8;">${hwHtml}</div>
                     </div>
                     <table class="styled-table mb-6">
                         <colgroup>

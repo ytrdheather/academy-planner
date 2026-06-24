@@ -505,7 +505,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
         const today = new Date(kstTodayStr);
         const end = today.toISOString().split('T')[0];
 
-        const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000);
         const start = sevenDaysAgo.toISOString().split('T')[0];
 
         const filter = {
