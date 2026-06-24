@@ -347,7 +347,8 @@ async function parseDailyReportData(page) {
         grammarTopic: grammarTopic || '진도 해당 없음', 
         grammarTest: grammarTestStr,
         grammarHomework: grammarHomework || '숙제 내용 없음',
-        studentReflection: getSimpleText(props['오늘의 학습 소감']) // [신규 추가] 학생의 학습 소감 
+        studentReflection: getSimpleText(props['오늘의 학습 소감']), // [신규 추가] 학생의 학습 소감
+        writeCompleted: props['작성완료']?.checkbox === true // [신규] 코멘트 작성완료 여부
     };
 
     return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
@@ -891,6 +892,32 @@ cron.schedule('0 22 * * *', async () => {
         }
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
+
+// [신규] 코멘트 작성완료 체크/해제 + 작성완료시각 기록
+// completed=true  → 작성완료=true, 작성완료시각=현재 한국시간
+// completed=false → 작성완료=false, 작성완료시각=비움 (되돌리기)
+app.post('/api/set-write-complete', requireAuth, async (req, res) => {
+    const { pageId, completed } = req.body;
+    if (!pageId) return res.status(400).json({ success: false, message: 'Missing pageId' });
+
+    try {
+        const properties = { '작성완료': { checkbox: !!completed } };
+        if (completed) {
+            // UTC에 9시간 더해 한국시간 벽시계로 만든 뒤 +09:00 오프셋 부여 (정확한 시각)
+            const kstIso = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+            properties['작성완료시각'] = { date: { start: kstIso } };
+        } else {
+            properties['작성완료시각'] = { date: null };
+        }
+        await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ properties })
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
 

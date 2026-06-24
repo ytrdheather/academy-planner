@@ -180,13 +180,38 @@ body {
 .result-fail { background-color: #fecaca; color: #991b1b; }
 
 .comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; } 
-.report-btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
-.action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; } 
-.btn-save { background: #10b981; color: white; }
-.btn-daily-view { background: #e0f2fe; color: #0284c7; }
-.btn-daily-copy { background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; }
-.btn-monthly-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-.btn-monthly-copy { background: #fdf4ff; color: #a855f7; border: 1px solid #f0abfc; }
+.action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+/* ===== 통일된 리포트 액션 버튼 시스템 ===== */
+.report-btn-group { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 230px; margin: 0 auto; }
+.report-btn-group .rbtn-row { display: flex; gap: 6px; }
+.report-btn-group .rbtn-row .rbtn { flex: 1; }
+
+.rbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 100%;
+    border: 1px solid #e2e8f0; background: #ffffff; color: #475569;
+    padding: 7px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all .15s ease; line-height: 1.2;
+}
+.rbtn:hover { background: #f8fafc; border-color: #cbd5e0; }
+.rbtn:active { transform: translateY(1px); }
+
+/* 작성완료 (주요 액션) */
+.rbtn-primary { background: #0d9488; border-color: #0d9488; color: #ffffff; }
+.rbtn-primary:hover { background: #0f766e; border-color: #0f766e; }
+/* 작성완료 취소 */
+.rbtn-cancel { background: #ffffff; border-color: #fca5a5; color: #dc2626; }
+.rbtn-cancel:hover { background: #fef2f2; border-color: #f87171; }
+/* 저장 */
+.rbtn-save { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.rbtn-save:hover { background: #dcfce7; border-color: #86efac; }
+/* 저장 (변경됨 - 미저장 상태) */
+.rbtn-save-dirty { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+.rbtn-save-dirty:hover { background: #fee2e2; }
+
+/* 상단 일괄 작성완료 버튼 */
+.batch-wc-btn { background: #0d9488 !important; color: #fff !important; border-color: #0d9488 !important; }
+.batch-wc-cancel-btn { background: #fff !important; color: #dc2626 !important; border: 1px solid #fca5a5 !important; }
 
 .admin-links-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; }
 .admin-link-button { background: #ffffff; color: #6b46c1; border: 2px solid #e2e8f0; padding: 22px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; text-align: center; transition: all 0.2s; } 
