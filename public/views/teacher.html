@@ -9,6 +9,7 @@
     <style>
         /* 학생 이름 위 상태 배지 영역 */
         td.student-name .mc-badge-wrap { margin-bottom: 4px; text-align: center; }
+        .name-meta { font-size: 11px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
         #mcChips button:disabled { cursor: default; }
     </style>
 </head>
@@ -452,7 +453,7 @@
                 <td class="student-name">
                     <div class="student-name-wrapper">
                         <div style="display:flex; align-items:center; gap:5px;">
-                            <span>${st.studentName}</span>
+                            <span>${st.studentName}</span>${nameMetaHtml(st)}
                             <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                         </div>
                         <div class="batch-controls">
@@ -478,7 +479,7 @@
             return `<tr id="row-test-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>
+                        <span>${st.studentName}</span>${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -501,7 +502,7 @@
             return `<tr id="row-read-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>
+                        <span>${st.studentName}</span>${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -522,7 +523,7 @@
             return `<tr id="row-listen-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>
+                        <span>${st.studentName}</span>${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -538,7 +539,7 @@
             return `<tr id="row-grammar-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>
+                        <span>${st.studentName}</span>${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -554,7 +555,7 @@
             <tr id="row-comment-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size: 16px; margin-bottom: 5px;">
-                        <span>${st.studentName}</span>
+                        <span>${st.studentName}</span>${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                     <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
@@ -850,6 +851,16 @@
         //  - 셋 다(대상 항목 전부) 비어있음 → 회색 '미입력' 배지 하나
         //  - 셋 다(대상 항목 전부) 채워짐 → 녹색 'DONE!' 배지 하나
         // ==========================================
+        // 이름 옆 메타 표시: "| 5B | 월수" (문법반 | 등원요일)
+        function nameMetaHtml(st) {
+            const parts = [];
+            const gc = st.comment?.grammarClass;
+            if (gc && gc !== '진도 해당 없음' && gc !== '-') parts.push(gc);
+            if (st.attendanceDays) parts.push(st.attendanceDays);
+            if (parts.length === 0) return '';
+            return ` <span class="name-meta">| ${parts.join(' | ')}</span>`;
+        }
+
         function mcBadge(color, bg, text) {
             return `<span style="display:inline-block; font-size:10px; font-weight:800; padding:1px 7px; border-radius:999px; background:${bg}; color:${color}; margin:0 3px 3px 0; line-height:1.6; white-space:nowrap;">${text}</span>`;
         }

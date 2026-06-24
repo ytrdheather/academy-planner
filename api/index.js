@@ -247,6 +247,13 @@ async function parseDailyReportData(page) {
         assignedTeachers = [...new Set(props['담당쌤'].rollup.array.flatMap(item => item.multi_select?.map(t => t.name) || item.title?.[0]?.plain_text))].filter(Boolean);
     }
 
+    // [신규] 등원요일 (4.수업요일 롤업의 multi_select → '월수금')
+    let attendanceDays = '';
+    const dayRollup = props['4.수업요일']?.rollup?.array;
+    if (dayRollup && dayRollup[0]?.multi_select) {
+        attendanceDays = dayRollup[0].multi_select.map(d => d.name).join('');
+    }
+
     const homework = {
         attendance: props['출석']?.checkbox || false, 
         grammar: props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당 없음',
@@ -351,7 +358,7 @@ async function parseDailyReportData(page) {
         writeCompleted: props['작성완료']?.checkbox === true // [신규] 코멘트 작성완료 여부
     };
 
-    return { pageId: page.id, studentName, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
+    return { pageId: page.id, studentName, attendanceDays, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
 }
 
 async function fetchProgressData(req, res, parseFunction) {
