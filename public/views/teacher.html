@@ -108,7 +108,7 @@
             <div class="grammar-input-container">
                 <div class="grammar-group">
                     <label class="grammar-label">대상 반 선택</label>
-                    <select id="grammarClassSelect" class="grammar-input"><option value="">반을 선택하세요</option></select>
+                    <select id="grammarClassSelect" class="grammar-input" onchange="onGrammarClassChange()"><option value="">반을 선택하세요</option></select>
                 </div>
                 <div class="grammar-group">
                     <label class="grammar-label">오늘 문법 진도</label>
@@ -120,9 +120,15 @@
                 </div>
                 <div class="grammar-group" style="flex-grow: 1;">
                     <label class="grammar-label">문법 과제 내용</label>
-                    <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예: P.20~24 풀기">
+                    <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예) 6/24 수까지 본책 p.120~122, 6/27 수까지 워크북 p.50~56 처럼 마감일과 함께 각기 적어주세요">
                 </div>
                 <button class="grammar-btn" onclick="updateGrammarByClass()">반 전체 적용</button>
+            </div>
+            <div id="lastGrammarHomeworkBox" style="display:none; margin:-5px 0 15px 0; padding:10px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; font-size:13px; color:#92400e; line-height:1.6;">
+                <span style="font-weight:700;">📌 [<span id="lastGrammarHomeworkClass"></span>] 지난 시간 숙제를 입력창에 불러왔습니다</span>
+                (<span id="lastGrammarHomeworkDate"></span>) :
+                <span id="lastGrammarHomeworkText" style="color:#4a5568; font-weight:600;"></span>
+                <button type="button" onclick="copyLastGrammarHomework()" style="margin-left:8px; padding:3px 10px; background:#f59e0b; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer;">다시 불러오기</button>
             </div>
             <div class="table-scroll-area">
                 <table class="styled-table">
@@ -848,7 +854,8 @@
                                 document.getElementById('grammarTopicInput').value = '';
                                 document.getElementById('grammarTestInput').value = '';
                                 document.getElementById('grammarHomeworkInput').value = '';
-                                loadDataForCurrentTab(true); 
+                                pastGrammarCache = null; // 새 숙제 반영 위해 캐시 초기화
+                                loadDataForCurrentTab(true);
                             } 
                             else if (data.success === false) {
                                 alert('실패: ' + data.message);
@@ -869,12 +876,60 @@
             const select = document.getElementById('grammarClassSelect');
             const classes = new Set(data.map(st => st.comment?.grammarClass).filter(c => c && c !== '진도 해당 없음'));
             select.innerHTML = '<option value="">반을 선택하세요</option>';
+            document.getElementById('lastGrammarHomeworkBox').style.display = 'none';
             classes.forEach(cls => {
                 const opt = document.createElement('option');
                 opt.value = cls; opt.textContent = cls; select.appendChild(opt);
             });
         }
         
+        // [지난 문법 숙제] 캐시 및 표시 로직
+        let pastGrammarCache = null;
+
+        async function onGrammarClassChange() {
+            const className = document.getElementById('grammarClassSelect').value;
+            const box = document.getElementById('lastGrammarHomeworkBox');
+            if (!className) { box.style.display = 'none'; return; }
+
+            try {
+                if (!pastGrammarCache) {
+                    const res = await fetch(`${API_BASE_URL}/api/past-grammar-data`, {
+                        headers: { 'Authorization': 'Bearer ' + authToken }
+                    });
+                    const json = await res.json();
+                    pastGrammarCache = (json.success && json.data) ? json.data : [];
+                }
+
+                const today = new Date().toISOString().split('T')[0];
+                // 해당 반의 과거 숙제 중 오늘 이전(지난 시간) 기록만, 최신순으로
+                const records = pastGrammarCache
+                    .filter(r => r.className === className && r.homework && r.homework !== '-' && r.date && r.date < today)
+                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                if (records.length === 0) {
+                    box.style.display = 'none';
+                    return;
+                }
+
+                const last = records[0];
+                document.getElementById('lastGrammarHomeworkClass').textContent = className;
+                document.getElementById('lastGrammarHomeworkDate').textContent = last.date;
+                document.getElementById('lastGrammarHomeworkText').textContent = last.homework;
+                box.style.display = 'block';
+
+                // [요청] 반 선택 즉시 지난 숙제를 입력창에 바로 채움 (대부분 그대로 사용, 월·화·수만 수정)
+                document.getElementById('grammarHomeworkInput').value = last.homework;
+            } catch (e) {
+                console.error('지난 문법 숙제 로드 실패:', e);
+                box.style.display = 'none';
+            }
+        }
+
+        function copyLastGrammarHomework() {
+            const text = document.getElementById('lastGrammarHomeworkText').textContent;
+            document.getElementById('grammarHomeworkInput').value = text;
+        }
+
         function updateCommentGrammarFilterList(data) {
             const select = document.getElementById('grammarClassFilter');
             const classes = new Set(data.map(st => st.comment?.grammarClass).filter(c => c && c !== '진도 해당 없음'));
