@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>데일리 리포트</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS CDN --><script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
     <style>
@@ -19,8 +20,8 @@
 <body class="bg-custom-gray m-0 p-0">
 
     <div class="max-w-2xl mx-auto min-h-screen flex flex-col shadow-xl bg-white">
-        
-        <!-- 1. 헤더 이미지 -->
+
+        <!-- 1. 헤더 이미지 (화면 좌우 꽉 차게 설정) -->
         <header class="w-full relative">
             <img src="/assets/dailyheader.png" 
                  alt="리디튜드 데일리 리포트 헤더" 
@@ -28,31 +29,35 @@
                  style="min-height: 120px; background-color: #dbe7e6;" 
                  onerror="this.style.display='none';">
         </header>
-        
-        <!-- 메인 컨텐츠 -->
+
+        <!-- 메인 컨텐츠 (여기에만 패딩을 줌) -->
         <main class="bg-white flex-1 p-6 sm:p-8 space-y-8">
-            
+
+            <!-- 1. 제목 (수정된 디자인 영역) -->
             <section class="text-center border-b border-gray-200 pb-6 relative">
                 <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 mb-4 leading-tight">
                     <span class="text-teal-600 block text-lg sm:text-xl font-bold mb-1">리디튜더</span>
                     {{STUDENT_NAME}}'s<br>
                     Daily Study Report
                 </h1>
-                
+
+                <!-- [신규] 담당 선생님 & 작성일 정보 박스 -->
                 <div class="inline-flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 bg-teal-50 px-5 py-3 rounded-xl border border-teal-100 shadow-sm mt-2">
                     <div class="flex items-center text-teal-800 font-bold">
-                        <img src="/assets/teachericon.svg" class="w-6 h-6 mr-2" alt="선생님"> 담당 : <span class="ml-1 text-teal-600">{{TEACHER_NAME}}</span> 선생님
+                        <span class="mr-2">👩‍🏫</span> 담당 : <span class="ml-1 text-teal-600">{{TEACHER_NAME}}</span> 선생님
+                        <span class="mr-2">👩‍🏫</span> 담당 선생님 : <span class="ml-1 text-teal-600"> 리디튜드의 {{TEACHER_NAME}}</span> 
                     </div>
                     <div class="hidden sm:block text-teal-300">|</div>
                     <div class="flex items-center text-gray-600 font-medium text-sm sm:text-base">
-                        <img src="/assets/calendaricon.svg" class="w-5 h-5 mr-2" alt="날짜"> 작성일 : {{REPORT_DATE}}
+                        <span class="mr-2">📅</span> 작성일 : {{REPORT_DATE}}
                     </div>
                 </div>
             </section>
-            
+
+            <!-- 2. 총평 -->
             <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-3 flex items-center">
-                    <img src="/assets/commenticon.svg" class="w-8 h-8 mr-2" alt="총평"> Today's Daily comments!
+                    <span class="text-3xl mr-2">💬</span> Today's Daily comments!
                 </h2>
                 <div class="bg-teal-50 border-l-4 border-teal-500 p-5 rounded-r-lg shadow-sm">
                     <p class="text-gray-700 text-base leading-relaxed whitespace-pre-line">
@@ -60,34 +65,41 @@
                     </p>
                 </div>
             </section>
-        
+
+            <!-- 3. 오늘의 학습 한눈에 보기 -->
             <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <img src="/assets/graphicon.svg" class="w-8 h-8 mr-2" alt="학습통계"> 오늘의 학습 한눈에 보기
+                    <span class="text-3xl mr-2">📊</span> 오늘의 학습 한눈에 보기
                 </h2>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center">
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
                         <div class="text-4xl font-extrabold mb-1" style="color: {{HW_SCORE_COLOR}};">{{HW_SCORE}}</div>
                         <div class="text-sm font-bold text-gray-600">숙제 수행율</div>
                     </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
                         <div class="text-4xl font-extrabold mb-1" style="color: {{GRAMMAR_SCORE_COLOR}};">{{GRAMMAR_SCORE}}</div>
                         <div class="text-sm font-bold text-gray-600">문법 테스트</div>
                     </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
                         <div class="text-4xl font-extrabold mb-1" style="color: {{VOCAB_SCORE_COLOR}};">{{VOCAB_SCORE}}</div>
                         <div class="text-sm font-bold text-gray-600">어휘 테스트</div>
                     </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
                         <div class="text-4xl font-extrabold mb-1" style="color: {{READING_TEST_COLOR}};">{{READING_TEST_STATUS}}</div>
                         <div class="text-sm font-bold text-gray-600">독해 테스트</div>
                     </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col items-center justify-center">
                         <div class="{{LISTENING_FONT_CLASS}} font-extrabold flex items-center justify-center h-12 w-full overflow-hidden leading-tight break-keep" style="color: {{LISTENING_COLOR}};">
                             {{LISTENING_STATUS}}
                         </div>
                         <div class="text-sm font-bold text-gray-600 mt-1">리스닝/더빙</div>
                     </div>
+
                     <div class="bg-gray-50 p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-center items-center">
                         <div class="text-4xl font-extrabold mb-1" style="color: {{READING_BOOK_COLOR}};">{{READING_BOOK_STATUS}}</div>
                         <div class="text-sm font-bold text-gray-600">원서 독서</div>
@@ -95,9 +107,10 @@
                 </div>
             </section>
 
+            <!-- 4. 문법 숙제 -->
             <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <img src="/assets/homeworkicon.svg" class="w-8 h-8 mr-2" alt="문법"> 문법 숙제
+                    <span class="text-3xl mr-2">📑</span> 문법 숙제
                 </h2>
                 <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
                     <dl class="space-y-3 text-gray-600">
@@ -113,7 +126,8 @@
                     </dl>
                 </div>
             </section>
-            
+
+            <!-- 5. RD-Check Point 점수 -->
             <section>
                 <div class="bg-indigo-50 border-l-4 border-indigo-400 p-6 rounded-r-lg shadow-sm text-center">
                     <h3 class="text-xl font-bold text-indigo-900 mb-3">🎯 오늘의 RD - Check Point!</h3>
@@ -121,38 +135,90 @@
                         <span class="text-6xl font-extrabold text-indigo-600 tracking-tight">{{RD_CHECK_POINT_SCORE}}</span>
                         <span class="text-2xl text-indigo-400 font-bold">점</span>
                     </div>
-                </div>
-            </section>
-            
-            <section>
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm">
-                    <h3 class="font-bold text-yellow-900 mb-1 flex items-center">
-                        <img src="/assets/checkicon.svg" class="w-6 h-6 mr-2" alt="공지"> RT-Check Point 안내
-                    </h3>
-                    <p class="text-sm text-yellow-800 leading-relaxed">
-                        매달 숙제 수행율과 성실도 점수로 RT-Check point가 산출됩니다. 
+                    <p class="text-sm text-indigo-700 mt-2 font-medium">
+                        (숙제 완성도 점수 / 100점 만점)
                     </p>
                 </div>
             </section>
-            
+
+            <!-- 6. RT-Check Point 안내 -->
+            <section>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-sm">
+                    <h3 class="font-bold text-yellow-900 mb-1 flex items-center">
+                        <span class="mr-2">📢</span> RT-Check Point 안내
+                    </h3>
+                    <p class="text-sm text-yellow-800 leading-relaxed">
+                        매달 숙제 수행율과 성실도 점수로 RT-Check point가 산출됩니다. 
+                        <strong class="font-bold text-red-600 block mt-1">RT 포인트 70점 이하를 2달 연속 받게 되면 패널티 및 조치가 있으니,</strong> 
+                        매일의 성실함을 지킬 수 있도록 가정에서도 격려 부탁드립니다!
+                    </p>
+                </div>
+            </section>
+
+            <!-- 7. Today's RD - Check! (상세 내역) -->
             <section>
                 <h2 class="text-2xl font-bold text-teal-700 mb-4 flex items-center">
-                    <img src="/assets/checkicon.svg" class="w-8 h-8 mr-2" alt="체크"> Today's RD - Check!
+                    <span class="text-3xl mr-2">📝</span> Today's RD - Check!
                 </h2>
                 <div class="space-y-6">
+
                     <div class="bg-white p-0 sm:p-5 rounded-xl border-0 sm:border border-gray-200">
                         <h3 class="font-bold text-lg text-gray-800 mb-4 border-b pb-2 px-2 sm:px-0">1. 숙제 수행 현황</h3>
                         <div class="space-y-3 px-2 sm:px-0">
-                            <!-- 생략 (위와 동일한 방식으로 icon_check 등 적용) -->
+                            <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                <span class="text-gray-600 font-medium">문법 숙제</span>
+                                <span class="font-bold px-3 py-1 rounded-full bg-gray-50" style="color: {{HW_GRAMMAR_COLOR}};">{{HW_GRAMMAR_STATUS}}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                <span class="text-gray-600 font-medium">어휘 클래스 카드</span>
+                                <span class="font-bold px-3 py-1 rounded-full bg-gray-50" style="color: {{HW_VOCAB_COLOR}};">{{HW_VOCAB_STATUS}}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                <span class="text-gray-600 font-medium">독해 클래스 카드</span>
+                                <span class="font-bold px-3 py-1 rounded-full bg-gray-50" style="color: {{HW_READING_CARD_COLOR}};">{{HW_READING_CARD_STATUS}}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                <span class="text-gray-600 font-medium">Summary</span>
+                                <span class="font-bold px-3 py-1 rounded-full bg-gray-50" style="color: {{HW_SUMMARY_COLOR}};">{{HW_SUMMARY_STATUS}}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                <span class="text-gray-600 font-medium">부교재 독해서</span>
+                                <span class="font-bold px-3 py-1 rounded-full bg-gray-50" style="color: {{HW_DIARY_COLOR}};">{{HW_DIARY_STATUS}}</span>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="bg-white p-0 sm:p-5 rounded-xl border-0 sm:border border-gray-200">
+                        <h3 class="font-bold text-lg text-gray-800 mb-4 border-b pb-2 px-2 sm:px-0">2. 원서 독서 현황</h3>
+                        <dl class="space-y-4 px-2 sm:px-0 text-gray-600">
+                            <div class="flex flex-col">
+                                <dt class="font-bold text-teal-600 text-sm mb-1">오늘 읽은 책</dt>
+                                <dd class="text-gray-800 font-semibold text-lg">{{BOOK_TITLE}}</dd>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-gray-50 pt-3">
+                                <dt class="font-medium text-gray-500">레벨 (AR/Lex)</dt>
+                                <dd class="text-gray-800 font-bold bg-gray-100 px-3 py-1 rounded-lg">{{BOOK_LEVEL}}</dd>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-gray-50 pt-3">
+                                <dt class="font-medium text-gray-500">Writing</dt>
+                                <dd class="text-gray-800 font-bold">{{WRITING_STATUS}}</dd>
+                            </div>
+                        </dl>
                     </div>
                 </div>
             </section>
+
         </main>
-        
+
         <footer class="p-8 text-center bg-gray-50 border-t border-gray-200">
-            <p class="text-xs text-gray-400 font-light mb-2">본 리포트는 리디튜드 학원의 학습 관리 시스템에 의해 생성되었습니다.</p>
+            <p class="text-xs text-gray-400 font-light mb-2">
+                본 리포트는 리디튜드 학원의 학습 관리 시스템에 의해<br>자동 생성되었습니다.
+            </p>
+            <p class="text-sm text-gray-500 font-medium">
+                © 2025 Readitude. All rights reserved.
+            </p>
         </footer>
+
     </div>
+
 </body>
-</html>
