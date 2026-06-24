@@ -199,6 +199,9 @@ body {
 /* 작성완료 (주요 액션) */
 .rbtn-primary { background: #0d9488; border-color: #0d9488; color: #ffffff; }
 .rbtn-primary:hover { background: #0f766e; border-color: #0f766e; }
+/* 작성완료된 상태 (체크됨) */
+.rbtn-primary-done { background: #0f766e; border-color: #0f766e; color: #ffffff; box-shadow: inset 0 0 0 2px #5eead4; }
+.rbtn-primary-done:hover { background: #115e59; }
 /* 작성완료 취소 */
 .rbtn-cancel { background: #ffffff; border-color: #fca5a5; color: #dc2626; }
 .rbtn-cancel:hover { background: #fef2f2; border-color: #f87171; }

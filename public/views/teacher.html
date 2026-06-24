@@ -571,15 +571,16 @@
                 </td>
                 <td style="vertical-align:middle; padding-bottom: 15px;">
                     <div class="report-btn-group">
-                        <button id="wc-btn-${st.pageId}" class="rbtn ${st.comment?.writeCompleted ? 'rbtn-cancel' : 'rbtn-primary'}" onclick="toggleWriteComplete('${st.pageId}')">${st.comment?.writeCompleted ? '↩ 작성완료 취소' : '✅ 작성완료'}</button>
+                        <button id="wc-btn-${st.pageId}" class="rbtn ${st.comment?.writeCompleted ? 'rbtn-primary-done' : 'rbtn-primary'}" onclick="setWriteCompleteClick('${st.pageId}', true)">${st.comment?.writeCompleted ? '✅ 작성완료됨' : '✅ 작성완료'}</button>
+                        <button id="wcx-btn-${st.pageId}" class="rbtn rbtn-cancel" onclick="setWriteCompleteClick('${st.pageId}', false)">↩ 작성취소</button>
                         <button class="rbtn rbtn-save comment-save-btn" onclick="updateComment(this, '${st.pageId}')">💾 저장</button>
                         <div class="rbtn-row">
                             <button class="rbtn" onclick="window.open('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}', '_blank')">📄 데일리</button>
-                            <button class="rbtn" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">📋 복사</button>
+                            <button class="rbtn" onclick="copyText('${API_BASE_URL}/report?pageId=${st.pageId}&date=${st.date}')">📋 데일리복사</button>
                         </div>
                         <div class="rbtn-row">
                             <button class="rbtn" onclick="viewMonthlyReport('${st.studentName}', '${st.date}')">📅 월간</button>
-                            <button class="rbtn" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">📋 복사</button>
+                            <button class="rbtn" onclick="openMonthlyReportModal('${st.studentName}', '${st.date}')">📋 월간복사</button>
                         </div>
                     </div>
                     
@@ -1202,9 +1203,11 @@
         // ==========================================
         function updateWriteCompleteBtn(pageId, completed) {
             const btn = document.getElementById('wc-btn-' + pageId);
-            if (!btn) return;
-            btn.className = 'rbtn ' + (completed ? 'rbtn-cancel' : 'rbtn-primary');
-            btn.innerHTML = completed ? '↩ 작성완료 취소' : '✅ 작성완료';
+            if (btn) {
+                btn.className = 'rbtn ' + (completed ? 'rbtn-primary-done' : 'rbtn-primary');
+                btn.innerHTML = completed ? '✅ 작성완료됨' : '✅ 작성완료';
+                btn.disabled = false;
+            }
             const st = allReportData.find(d => d.pageId === pageId);
             if (st && st.comment) st.comment.writeCompleted = completed;
         }
@@ -1220,19 +1223,26 @@
             updateWriteCompleteBtn(pageId, completed);
         }
 
-        async function toggleWriteComplete(pageId) {
+        // 개별 작성완료(true) / 작성취소(false) 버튼 클릭 핸들러
+        async function setWriteCompleteClick(pageId, completed) {
             const st = allReportData.find(d => d.pageId === pageId);
             const current = !!(st?.comment?.writeCompleted);
-            const btn = document.getElementById('wc-btn-' + pageId);
-            if (btn) { btn.disabled = true; btn.innerHTML = '처리 중...'; }
+            if (current === completed) {
+                showToast(completed ? '이미 작성완료 상태입니다.' : '작성완료된 상태가 아닙니다.');
+                return;
+            }
+            const doneBtn = document.getElementById('wc-btn-' + pageId);
+            const cancelBtn = document.getElementById('wcx-btn-' + pageId);
+            const activeBtn = completed ? doneBtn : cancelBtn;
+            if (activeBtn) { activeBtn.disabled = true; activeBtn.innerHTML = '처리 중...'; }
             try {
-                await setWriteComplete(pageId, !current);
-                showToast(!current ? '작성완료 처리되었습니다.' : '작성완료를 취소했습니다.');
+                await setWriteComplete(pageId, completed);
+                showToast(completed ? '작성완료 처리되었습니다.' : '작성완료를 취소했습니다.');
             } catch (e) {
                 showToast('처리 실패: ' + e.message, 'error');
                 updateWriteCompleteBtn(pageId, current); // 원상복구
             } finally {
-                if (btn) btn.disabled = false;
+                if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.innerHTML = '↩ 작성취소'; }
             }
         }
 
