@@ -253,6 +253,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
 
 export function initializeMonthlyReportRoutes(dependencies) {
     const app = dependencies.app;
+    const requireAuth = dependencies.requireAuth || ((req, res, next) => next()); // 인증 미들웨어
     fetchNotion = dependencies.fetchNotion;
     geminiModel = dependencies.geminiModel;
     dbIds = dependencies.dbIds;
@@ -440,8 +441,9 @@ export function initializeMonthlyReportRoutes(dependencies) {
         } catch (e) { res.status(500).json({ message: e.message }); }
     });
 
-    app.get('/api/manual-monthly-report-gen', async (req, res) => {
+    app.get('/api/manual-monthly-report-gen', requireAuth, async (req, res) => {
         const { studentName, month } = req.query;
+        const force = req.query.force === 'true'; // ?force=true 일 때만 기존 리포트 강제 재생성
         if (!studentName || !month) return res.status(400).json({ message: 'Missing info' });
 
         try {
@@ -494,40 +496,10 @@ export function initializeMonthlyReportRoutes(dependencies) {
             const grammarDetails = calculateGrammarDetails(monthPages);
             const grammarDetailsString = grammarDetails.map(g => `${g.topic}(${g.score}점)`).join(', ') || '상세 기록 없음';
 
-            let aiSummary = 'AI 요약 불가';
-            if (geminiModel) {
-                try {
-                    const prompt = `
-                    당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
-                    학생 이름: ${studentName}
-                    이번 달: ${month}
-                    [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
-                    [문법 파트별 세부 점수] ${grammarDetailsString}
-                    [책목록] ${stats.bookListString}
-                    [일일코멘트] ${comments}
-                    
-                    위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요. 
-                    선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요. 
-                    대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
-                    
-                    특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
-                    
-                    반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
-                    ### 🌟 월간 성취도 종합 평가
-                    ### 💪 발견된 강점 (Strengths)
-                    ### 🎯 보완할 점 및 약점 (Weaknesses)
-                    ### 👩‍🏫 선생님 종합 코멘트
-                    
-                    단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
-                    `;
-                    const result = await geminiModel.generateContent(prompt);
-                    aiSummary = (await result.response).text();
-                } catch (e) { console.error(e); }
-            }
-
             const cleanDomain = domainUrl.replace(/^https?:\/\//, '');
             const reportUrl = `${cleanDomain}/monthly-report?studentId=${studentPageId}&month=${month}`;
-            
+
+            // [비용 절감] 기존 리포트가 있으면(force 아님) AI 재생성을 건너뜀
             const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -539,6 +511,43 @@ export function initializeMonthlyReportRoutes(dependencies) {
                     }
                 })
             });
+            const alreadyExists = existingReport.results.length > 0;
+
+            let aiSummary = null; // null이면 'AI 요약' 속성을 덮어쓰지 않음
+            if (geminiModel && (!alreadyExists || force)) {
+                try {
+                    // [비용 절감] 일일코멘트는 최근 1500자만 사용
+                    const trimmedComments = comments.length > 1500 ? comments.slice(-1500) : comments;
+                    const prompt = `
+                    당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
+                    학생 이름: ${studentName}
+                    이번 달: ${month}
+                    [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                    [문법 파트별 세부 점수] ${grammarDetailsString}
+                    [책목록] ${stats.bookListString}
+                    [일일코멘트] ${trimmedComments}
+
+                    위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요.
+                    선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요.
+                    대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
+
+                    특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
+
+                    반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                    ### 🌟 월간 성취도 종합 평가
+                    ### 💪 발견된 강점 (Strengths)
+                    ### 🎯 보완할 점 및 약점 (Weaknesses)
+                    ### 👩‍🏫 선생님 종합 코멘트
+
+                    단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
+                    `;
+                    const result = await geminiModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+                    });
+                    aiSummary = (await result.response).text();
+                } catch (e) { console.error(e); }
+            }
 
             const props = {
                 '월간리포트URL': { url: `https://${reportUrl}` },
@@ -547,11 +556,11 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 '문법점수(평균)': { number: stats.grammarAvg },
                 '총 읽은 권수': { number: stats.totalBooks },
                 '읽은 책 목록': { rich_text: [{ text: { content: stats.bookListString.substring(0, 2000) } }] },
-                'AI 요약': { rich_text: [{ text: { content: aiSummary.substring(0, 2000) } }] },
                 '독해 통과율(%)': { number: stats.readingPassRate }
             };
+            if (aiSummary !== null) props['AI 요약'] = { rich_text: [{ text: { content: aiSummary.substring(0, 2000) } }] };
 
-            if (existingReport.results.length > 0) {
+            if (alreadyExists) {
                 await fetchNotion(`https://api.notion.com/v1/pages/${existingReport.results[0].id}`, {
                     method: 'PATCH', body: JSON.stringify({ properties: props })
                 });
@@ -570,7 +579,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
                 });
             }
 
-            res.json({ success: true, message: 'Generated', url: `https://${reportUrl}` });
+            res.json({ success: true, message: (alreadyExists && !force) ? 'Updated (AI 재생성 생략)' : 'Generated', url: `https://${reportUrl}` });
 
         } catch (e) {
             console.error(e);
@@ -643,41 +652,10 @@ export function initializeMonthlyReportRoutes(dependencies) {
                     const grammarDetails = calculateGrammarDetails(monthPages);
                     const grammarDetailsString = grammarDetails.map(g => `${g.topic}(${g.score}점)`).join(', ') || '상세 기록 없음';
 
-                    let aiSummary = 'AI 요약 불가';
-                    if (geminiModel) {
-                        try {
-                            const prompt = `
-                            당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
-                            학생 이름: ${studentName}
-                            이번 달: ${currentMonth}
-                            [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
-                            [문법 파트별 세부 점수] ${grammarDetailsString}
-                            [책목록] ${stats.bookListString}
-                            [일일코멘트] ${comments}
-                            
-                            위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요. 
-                            선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요. 
-                            대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
-                            
-                            특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
-                            
-                            반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
-                            ### 🌟 월간 성취도 종합 평가
-                            ### 💪 발견된 강점 (Strengths)
-                            ### 🎯 보완할 점 및 약점 (Weaknesses)
-                            ### 👩‍🏫 선생님 종합 코멘트
-                            
-                            단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
-                            `;
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            const result = await geminiModel.generateContent(prompt);
-                            aiSummary = (await result.response).text();
-                        } catch (e) { console.error('Gemini Error:', e); }
-                    }
-
                     const cleanDomain = domainUrl.replace(/^https?:\/\//, '');
                     const reportUrl = `${cleanDomain}/monthly-report?studentId=${studentPageId}&month=${currentMonth}`;
-                    
+
+                    // [비용 절감] 이미 이번 달 리포트가 있으면 AI 재생성 건너뜀
                     const existingReport = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.MONTHLY_REPORT_DB_ID}/query`, {
                         method: 'POST',
                         body: JSON.stringify({
@@ -689,6 +667,49 @@ export function initializeMonthlyReportRoutes(dependencies) {
                             }
                         })
                     });
+                    const alreadyExists = existingReport.results.length > 0;
+
+                    if (alreadyExists) {
+                        console.log(`   -> ${studentName} 학생은 이미 ${currentMonth} 리포트가 있어 AI 재생성을 건너뜁니다.`);
+                        continue;
+                    }
+
+                    let aiSummary = null;
+                    if (geminiModel) {
+                        try {
+                            // [비용 절감] 일일코멘트는 최근 1500자만 사용
+                            const trimmedComments = comments.length > 1500 ? comments.slice(-1500) : comments;
+                            const prompt = `
+                            당신은 '리디튜드(Readitude)' 영어 학원의 전문 학습 분석 AI입니다.
+                            학생 이름: ${studentName}
+                            이번 달: ${currentMonth}
+                            [통계] 숙제:${stats.hwAvg}%, 어휘:${stats.vocabAvg}점, 문법(평균):${stats.grammarAvg}점, 독해통과:${stats.readingPassRate}%, 독서:${stats.totalBooks}권.
+                            [문법 파트별 세부 점수] ${grammarDetailsString}
+                            [책목록] ${stats.bookListString}
+                            [일일코멘트] ${trimmedComments}
+
+                            위 데이터를 바탕으로 학부모님께 제공할 월간 학습 분석 리포트를 작성해주세요.
+                            선생님이 학부모님께 직접 보내는 편지 형식(예: "안녕하세요, 담당 강사입니다", "보내드립니다")은 절대 사용하지 마세요.
+                            대신 객관적이고 전문적인 어조(예: "~했습니다", "~보입니다", "~가 필요합니다")로 학생의 한 달 성취를 평가하는 '리포트 문서' 형식으로 작성해주세요.
+
+                            특히 [문법 파트별 세부 점수]를 심층 분석하여, 학생이 어느 파트(예: to부정사, 수동태 등)에 확실한 강점이 있고, 어느 파트에서 오답이 발생하여 보완이 필요한지 '💡 독해 및 문법' 섹션에 구체적으로 언급해주세요.
+
+                            반드시 다음 4개의 소제목을 포함하여 영역별로 작성해주세요. 소제목 앞에는 반드시 '### '을 붙여야 합니다.
+                            ### 🌟 월간 성취도 종합 평가
+                            ### 💪 발견된 강점 (Strengths)
+                            ### 🎯 보완할 점 및 약점 (Weaknesses)
+                            ### 👩‍🏫 선생님 종합 코멘트
+
+                            단순한 사실 나열보다는 통계를 기반으로 한 전문가다운 분석을 제공하고, 중요한 부분은 **강조표시**를 해주세요.
+                            `;
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            const result = await geminiModel.generateContent({
+                                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                                generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+                            });
+                            aiSummary = (await result.response).text();
+                        } catch (e) { console.error('Gemini Error:', e); }
+                    }
 
                     const props = {
                         '월간리포트URL': { url: `https://${reportUrl}` },
@@ -697,28 +718,22 @@ export function initializeMonthlyReportRoutes(dependencies) {
                         '문법점수(평균)': { number: stats.grammarAvg },
                         '총 읽은 권수': { number: stats.totalBooks },
                         '읽은 책 목록': { rich_text: [{ text: { content: stats.bookListString.substring(0, 2000) } }] },
-                        'AI 요약': { rich_text: [{ text: { content: aiSummary.substring(0, 2000) } }] },
                         '독해 통과율(%)': { number: stats.readingPassRate }
                     };
+                    if (aiSummary !== null) props['AI 요약'] = { rich_text: [{ text: { content: aiSummary.substring(0, 2000) } }] };
 
-                    if (existingReport.results.length > 0) {
-                        await fetchNotion(`https://api.notion.com/v1/pages/${existingReport.results[0].id}`, {
-                            method: 'PATCH', body: JSON.stringify({ properties: props })
-                        });
-                    } else {
-                        await fetchNotion('https://api.notion.com/v1/pages', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                parent: { database_id: dbIds.MONTHLY_REPORT_DB_ID },
-                                properties: {
-                                    ...props,
-                                    '이름': { title: [{ text: { content: `${studentName} - ${currentMonth} 리포트` } }] },
-                                    '학생': { relation: [{ id: studentPageId }] },
-                                    '리포트 월': { rich_text: [{ text: { content: currentMonth } }] }
-                                }
-                            })
-                        });
-                    }
+                    await fetchNotion('https://api.notion.com/v1/pages', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            parent: { database_id: dbIds.MONTHLY_REPORT_DB_ID },
+                            properties: {
+                                ...props,
+                                '이름': { title: [{ text: { content: `${studentName} - ${currentMonth} 리포트` } }] },
+                                '학생': { relation: [{ id: studentPageId }] },
+                                '리포트 월': { rich_text: [{ text: { content: currentMonth } }] }
+                            }
+                        })
+                    });
                     console.log(`   -> ${studentName} 리포트 발행 완료`);
                 }
                 console.log('--- 🎉 이번 달 리포트 자동 생성 완료 ---');

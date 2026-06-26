@@ -82,7 +82,10 @@ async function fetchNotion(url, options = {}, retries = 3) {
 let genAI, geminiModel;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    geminiModel = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    geminiModel = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 } // 출력 토큰 상한(비용 캡)
+    });
     console.log('✅ Gemini AI 연결됨');
 }
 
@@ -199,7 +202,7 @@ app.use('/assets', express.static(path.join(publicPath, 'assets')));
 initializeBookRoutes(app, fetchNotion, process.env);
 try {
     initializeMonthlyReportRoutes({
-        app, fetchNotion, geminiModel,
+        app, fetchNotion, geminiModel, requireAuth,
         dbIds: { STUDENT_DATABASE_ID, PROGRESS_DATABASE_ID, KOR_BOOKS_ID, ENG_BOOKS_ID, MONTHLY_REPORT_DB_ID, GRAMMAR_DB_ID },
         domainUrl: DOMAIN_URL, publicPath,
         getRollupValue, getSimpleText, getKSTTodayRange, getKoreanDate
@@ -226,7 +229,10 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
         [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
         `;
 
-        const result = await geminiModel.generateContent(prompt);
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+        });
         const commentText = result.response.text();
         res.json({ success: true, comment: commentText });
     } catch (error) {
