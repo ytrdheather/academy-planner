@@ -80,8 +80,8 @@
             <div class="section-title">📋 담당 학생 숙제 현황</div>
             <div class="table-scroll-area">
                 <table class="styled-table">
-                    <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>수행율</th> </tr></thead>
-                    <tbody id="homeworkTableBody"><tr><td colspan="10" class="loading">로딩중...</td></tr></tbody>
+                    <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>📖 영어독서</th> <th>🎧 영어더빙</th> <th>수행율</th> </tr></thead>
+                    <tbody id="homeworkTableBody"><tr><td colspan="12" class="loading">로딩중...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -471,6 +471,8 @@
                 <td>${renderToggleBadge(st.pageId, '4️⃣ Summary 숙제', st.homework.summary)}</td>
                 <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
                 <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
+                <td>${formatSelect(st.pageId, '📖 영어독서', st.reading?.readingStatus, ['완료함', '못함', '내신대비'])}</td>
+                <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening?.study, ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료', '내신대비'])}</td>
                 <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
             </tr>`;
         }
@@ -507,7 +509,7 @@
                     </div>
                 </td>
                 <td>${(st.teachers || []).join(', ')}</td>
-                <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함'])}</td>
+                <td>${formatSelect(st.pageId, '📖 영어독서', st.reading.readingStatus, ['완료함', '못함', '내신대비'])}</td>
                 <td>${formatSelect(st.pageId, '어휘학습', st.reading.vocabStatus, ['완료', 'SKIP', '미완료'])}</td>
                 <td class="book-list-cell">${bookTags}<button class="book-add-btn" onclick="openAddBookModal('${st.pageId}', 'english')">+추가</button></td>
                 <td>${formatSelect(st.pageId, 'Writing', st.reading.writingStatus, ['SKIP', '북리포트', '3 SENTENCE'])}</td>
@@ -515,7 +517,7 @@
         }
 
         function getListenRow(st) {
-            const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료'];
+            const listeningOptions = ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료', '내신대비'];
             const giantOptions = ['진행하지 않음', '미완료', '완료']; 
             const kBooks = st.listening.koreanBooks || [];
             const kBookTags = kBooks.map(b => `<span class="book-tag">${b.title} <span class="remove-btn" onclick="removeBook('${st.pageId}', '${b.id}', 'korean')">×</span></span>`).join('');
