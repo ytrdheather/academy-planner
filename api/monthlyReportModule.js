@@ -543,7 +543,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
                     `;
                     const result = await geminiModel.generateContent({
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
                     });
                     aiSummary = (await result.response).text();
                 } catch (e) { console.error(e); }
@@ -705,7 +705,7 @@ export function initializeMonthlyReportRoutes(dependencies) {
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             const result = await geminiModel.generateContent({
                                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                                generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+                                generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
                             });
                             aiSummary = (await result.response).text();
                         } catch (e) { console.error('Gemini Error:', e); }

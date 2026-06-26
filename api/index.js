@@ -84,7 +84,8 @@ if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     geminiModel = genAI.getGenerativeModel({
         model: 'gemini-2.5-flash',
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 } // 출력 토큰 상한(비용 캡)
+        // thinking(추론) 토큰 비활성화 + 출력 상한 → 비용 캡 & 답변 잘림 방지
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
     });
     console.log('✅ Gemini AI 연결됨');
 }
@@ -231,7 +232,7 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
 
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
         });
         const commentText = result.response.text();
         res.json({ success: true, comment: commentText });
