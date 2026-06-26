@@ -168,6 +168,8 @@ body {
 .homework-dropdown.status-incomplete { background-color: #fecaca; color: #991b1b; }
 .homework-dropdown.status-default { background-color: #f3f4f6; color: #6b7280; }
 .homework-dropdown.status-blue { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+/* 영어더빙 칸만: 긴 옵션 텍스트로 인해 넓어지는 것 방지 (영어독서와 비슷한 너비로) */
+.hw-dubbing-cell .homework-dropdown { font-size: 11px; max-width: 95px; padding: 6px 4px; }
 
 .editable-input { padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; width: 55px; font-size: 14px; } 
 .editable-text-input { width: 110px; text-align: left; }

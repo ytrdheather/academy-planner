@@ -472,7 +472,7 @@
                 <td>${renderToggleBadge(st.pageId, '5️⃣ 독해서 풀기', st.homework.dailyReading)}</td>
                 <td>${renderToggleBadge(st.pageId, '6️⃣ 부&매&일', st.homework.diary)}</td>
                 <td>${formatSelect(st.pageId, '📖 영어독서', st.reading?.readingStatus, ['완료함', '못함', '내신대비'])}</td>
-                <td>${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening?.study, ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료', '내신대비'])}</td>
+                <td class="hw-dubbing-cell">${formatHomeworkDropdown(st.pageId, '영어 더빙 학습 완료', st.listening?.study, ['완료', '미완료', '진행하지 않음', '원서독서로 대체', '듣기평가교재 완료', '내신대비'])}</td>
                 <td style="font-weight:bold; color:${(st.completionRate === null || st.completionRate === 'N/A') ? '#9ca3af' : (st.completionRate >= 80 ? '#10b981' : '#ef4444')}">${st.completionRate === null ? 'N/A' : st.completionRate + '%'}</td>
             </tr>`;
         }
