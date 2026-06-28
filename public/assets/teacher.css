@@ -182,7 +182,15 @@ body {
 .result-pass { background-color: #dcfce7; color: #166534; }
 .result-fail { background-color: #fecaca; color: #991b1b; }
 
-.comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; } 
+.comment-textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-height: 55px; resize: none; overflow: hidden; line-height: 1.5; }
+
+/* === 진도 관리 탭 컴팩트 (창 밖으로 안 넘치게, 이름·담당 한 줄) === */
+#progress-view td, #progress-view th { white-space: nowrap; padding: 8px 6px; }
+#progress-view .student-name { min-width: 64px; font-size: 14px; padding: 8px; }
+#progress-view .editable-text-input { width: 100px; font-size: 13px; }
+#progress-view .editable-input { width: 48px; font-size: 13px; }
+#progress-view .homework-dropdown { max-width: 92px; font-size: 12px; }
+#progress-view .comment-textarea { min-height: 36px; width: 140px; font-size: 13px; padding: 6px; } 
 .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
 /* ===== 통일된 리포트 액션 버튼 시스템 ===== */
