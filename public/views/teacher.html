@@ -31,6 +31,7 @@
             <button class="tab-button" onclick="showTab('listening')">리스닝 현황</button>
             <button class="tab-button" onclick="showTab('grammar')">📚 문법 관리</button>
             <button class="tab-button" onclick="showTab('comments')">오늘의 코멘트</button>
+            <button class="tab-button" onclick="showTab('progress')" style="color:#0d9488; font-weight:700;">📈 진도 관리</button>
             <button class="tab-button" id="tab-admin" onclick="showTab('admin')" style="color: #d946ef; font-weight: 700;">⚙️ 관리자</button>
             <button class="tab-button" onclick="openPastGrammarWindow()" style="color: #ea580c; font-weight: 700; margin-left: auto;">지난주 문법숙제</button>
         </div>
@@ -165,6 +166,25 @@
             </div>
         </div>
         
+        <div id="progress-view" class="tab-content">
+            <div class="section-title">📈 학생 진도 관리</div>
+            <div style="font-size:13px; color:#64748b; margin-bottom:8px;">교재 칸은 이름 일부만 입력하면 검색됩니다. 학습상태가 '정상'이 아니면 숙제 생성이 정지됩니다.</div>
+            <div class="table-scroll-area">
+                <table class="styled-table">
+                    <thead><tr>
+                        <th>학생</th><th>담당</th><th>요일</th><th>학습상태</th>
+                        <th>어휘교재</th><th>유닛</th><th>량</th>
+                        <th>주독해교재</th><th>유닛</th><th>량</th>
+                        <th>부독해교재</th><th>유닛</th><th>량</th>
+                        <th>📌 고정숙제</th>
+                    </tr></thead>
+                    <tbody id="progressTableBody"><tr><td colspan="14" class="loading">로딩중...</td></tr></tbody>
+                </table>
+            </div>
+            <datalist id="dl-vocab"></datalist>
+            <datalist id="dl-reading"></datalist>
+        </div>
+
         <div id="admin-view" class="tab-content">
             <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
             <div class="table-scroll-area" style="padding: 20px; border:none; background: transparent; box-shadow: none;">
@@ -398,6 +418,7 @@
         }
 
         function filterDataByTeacher() {
+            if (currentActiveTab === 'progress') { renderProgressConfig(); return; }
             const teacherSelect = document.getElementById('commonTeacherFilter');
             let filteredData = allReportData;
 
@@ -677,7 +698,8 @@
 
             if (tab === 'homework') notice.style.display = 'block';
             else notice.style.display = 'none';
-            
+
+            if (tab === 'progress') { loadProgressConfig(); return; }
             loadDataForCurrentTab();
         }
 
@@ -1162,6 +1184,134 @@
                     autoResizeTextarea(area);
                 }
             } catch(e) { alert('AI 생성 실패'); }
+        }
+
+        // ==========================================
+        // [진도 관리] 학생별 진도 설정 로드/렌더/저장
+        // ==========================================
+        let progressData = [];
+        let textbookList = [];
+        let textbookByName = {};
+        const STATUS_OPTIONS = ['정상', '내신대비', '여행·휴가', '휴원', '병결'];
+
+        function escAttr(s) {
+            return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        async function loadProgressConfig() {
+            const tbody = document.getElementById('progressTableBody');
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">로딩중...</td></tr>';
+            try {
+                if (textbookList.length === 0) {
+                    const tRes = await fetch(`${API_BASE_URL}/api/textbooks`, { headers: { Authorization: 'Bearer ' + authToken } });
+                    const tJson = await tRes.json();
+                    textbookList = tJson.textbooks || [];
+                    buildTextbookDatalists();
+                }
+                const res = await fetch(`${API_BASE_URL}/api/progress-config-data`, { headers: { Authorization: 'Bearer ' + authToken } });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message || '로드 실패');
+                progressData = json.students || [];
+                renderProgressConfig();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="14" class="no-data">로드 실패: ${e.message}</td></tr>`;
+            }
+        }
+
+        function buildTextbookDatalists() {
+            textbookByName = {};
+            const vocab = [], reading = [];
+            textbookList.forEach(t => {
+                textbookByName[t.name] = t.id;
+                if (t.subject === '어휘서') vocab.push(t.name);
+                else if (t.subject === '독해서') reading.push(t.name);
+            });
+            document.getElementById('dl-vocab').innerHTML = vocab.map(n => `<option value="${escAttr(n)}">`).join('');
+            document.getElementById('dl-reading').innerHTML = reading.map(n => `<option value="${escAttr(n)}">`).join('');
+        }
+
+        function renderProgressConfig() {
+            const teacher = document.getElementById('commonTeacherFilter')?.value;
+            let rows = progressData;
+            if (teacher) rows = rows.filter(s => (s.teachers || []).includes(teacher));
+            const tbody = document.getElementById('progressTableBody');
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="14" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = rows.map(getProgressRow).join('');
+        }
+
+        function getProgressRow(s) {
+            const status = s.status || '정상';
+            const paused = status !== '정상';
+            const statusSel = `<select onchange="saveStudentField('${s.pageId}','학습상태',this.value,'select')" style="font-weight:700; ${paused ? 'color:#dc2626;' : 'color:#15803d;'}">` +
+                STATUS_OPTIONS.map(o => `<option value="${o}" ${o === status ? 'selected' : ''}>${o}</option>`).join('') + `</select>`;
+            const book = (prop, val, list) => `<input list="${list}" value="${escAttr(val)}" placeholder="검색…" data-prop="${prop}" data-pid="${s.pageId}" onchange="saveTextbook(this)" style="width:130px; font-size:12px;">`;
+            const num = (prop, val) => `<input type="number" value="${val === '' ? '' : val}" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')" style="width:46px; text-align:center;">`;
+            const fixed = `<textarea onchange="saveStudentField('${s.pageId}','고정숙제',this.value,'rich_text')" style="width:150px; height:38px; font-size:12px; resize:vertical;">${escAttr(s.fixed)}</textarea>`;
+            return `<tr ${paused ? 'style="background:#fff7ed;"' : ''}>
+                <td class="student-name" style="min-width:80px;">${s.name}</td>
+                <td style="font-size:12px;">${(s.teachers || []).join(', ')}</td>
+                <td style="font-size:12px;">${s.days || ''}</td>
+                <td>${statusSel}</td>
+                <td>${book('어휘교재', s.vocab.bookName, 'dl-vocab')}</td>
+                <td>${num('어휘현재유닛', s.vocab.unit)}</td>
+                <td>${num('어휘진도량', s.vocab.amount)}</td>
+                <td>${book('주독해교재', s.mainR.bookName, 'dl-reading')}</td>
+                <td>${num('주독해현재유닛', s.mainR.unit)}</td>
+                <td>${num('주독해진도량', s.mainR.amount)}</td>
+                <td>${book('부독해교재', s.subR.bookName, 'dl-reading')}</td>
+                <td>${num('부독해현재유닛', s.subR.unit)}</td>
+                <td>${num('부독해진도량', s.subR.amount)}</td>
+                <td>${fixed}</td>
+            </tr>`;
+        }
+
+        function updateLocalProgress(pageId, propertyName, value) {
+            const s = progressData.find(x => x.pageId === pageId);
+            if (!s) return;
+            const map = {
+                '학습상태': ['status'], '고정숙제': ['fixed'],
+                '어휘현재유닛': ['vocab', 'unit'], '어휘진도량': ['vocab', 'amount'],
+                '주독해현재유닛': ['mainR', 'unit'], '주독해진도량': ['mainR', 'amount'],
+                '부독해현재유닛': ['subR', 'unit'], '부독해진도량': ['subR', 'amount'],
+            };
+            const path = map[propertyName];
+            if (!path) return;
+            if (path.length === 1) s[path[0]] = value;
+            else s[path[0]][path[1]] = value;
+        }
+
+        async function saveStudentField(pageId, propertyName, value, type) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/update-student-progress`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, propertyName, value, propertyType: type })
+                });
+                const j = await res.json();
+                if (!j.success) throw new Error(j.message || '저장 실패');
+                updateLocalProgress(pageId, propertyName, value);
+                showToast('저장됨');
+                if (propertyName === '학습상태') renderProgressConfig(); // 정지 표시 갱신
+            } catch (e) { showToast('저장 실패: ' + e.message, 'error'); }
+        }
+
+        async function saveTextbook(el) {
+            const name = el.value.trim();
+            const prop = el.dataset.prop, pid = el.dataset.pid;
+            if (name === '') { // 교재 비우기
+                await saveStudentField(pid, prop, '', 'relation');
+                const s = progressData.find(x => x.pageId === pid); if (s) setBook(s, prop, '', '');
+                return;
+            }
+            const id = textbookByName[name];
+            if (!id) { showToast('교재 목록에 없는 이름입니다. 목록에서 선택해 주세요.', 'error'); return; }
+            await saveStudentField(pid, prop, id, 'relation');
+            const s = progressData.find(x => x.pageId === pid); if (s) setBook(s, prop, id, name);
+        }
+
+        function setBook(s, prop, id, name) {
+            const key = prop === '어휘교재' ? 'vocab' : (prop === '주독해교재' ? 'mainR' : 'subR');
+            s[key].bookId = id; s[key].bookName = name;
         }
 
         function markCommentAsChanged(el) {

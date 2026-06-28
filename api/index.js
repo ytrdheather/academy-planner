@@ -22,6 +22,7 @@ const {
     GEMINI_API_KEY,
     MONTHLY_REPORT_DB_ID,
     GRAMMAR_DB_ID,
+    TEXTBOOK_DB_ID,
 } = process.env;
 
 // [핵심] HTTPS 강제
@@ -931,6 +932,106 @@ app.post('/api/set-write-complete', requireAuth, async (req, res) => {
     } catch (e) {
         res.status(500).json({ success: false, message: e.message });
     }
+});
+
+// ============================================================
+// [진도 관리] 교재 목록 캐시 + 진도설정 읽기/쓰기
+// ============================================================
+let textbookCache = { list: null, byId: {}, lastFetch: 0 };
+const TEXTBOOK_CACHE_MS = 10 * 60 * 1000; // 10분 (교재는 거의 안 바뀌는 정적 데이터)
+
+async function loadTextbooks(force = false) {
+    if (!force && textbookCache.list && (Date.now() - textbookCache.lastFetch < TEXTBOOK_CACHE_MS)) {
+        return textbookCache;
+    }
+    const list = [];
+    const byId = {};
+    let cursor = undefined, hasMore = true;
+    while (hasMore) {
+        const body = cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 };
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify(body)
+        });
+        for (const page of data.results) {
+            const props = page.properties;
+            const nameProp = Object.values(props).find(p => p.type === 'title');
+            const name = nameProp?.title?.[0]?.plain_text || '';
+            if (!name) continue;
+            const subject = props['과목']?.select?.name || '';
+            const item = { id: page.id, name, subject };
+            list.push(item);
+            byId[page.id] = item;
+        }
+        hasMore = data.has_more; cursor = data.next_cursor;
+    }
+    textbookCache = { list, byId, lastFetch: Date.now() };
+    return textbookCache;
+}
+
+// 교재 목록 (드롭다운용)
+app.get('/api/textbooks', requireAuth, async (req, res) => {
+    try {
+        if (!TEXTBOOK_DB_ID) return res.status(500).json({ success: false, message: 'TEXTBOOK_DB_ID 미설정' });
+        const { list } = await loadTextbooks(req.query.force === 'true');
+        res.json({ success: true, textbooks: list });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 학생별 진도 설정 읽기 (학생 명부 DB)
+app.get('/api/progress-config-data', requireAuth, async (req, res) => {
+    try {
+        let byId = {};
+        try { byId = (await loadTextbooks()).byId; } catch (e) { /* 교재 못 읽어도 진행 */ }
+        const relName = (prop) => (prop?.relation?.map(r => byId[r.id]?.name || '').filter(Boolean).join(', ')) || '';
+        const relId = (prop) => prop?.relation?.[0]?.id || '';
+
+        const students = [];
+        let cursor = undefined, hasMore = true;
+        while (hasMore) {
+            const body = cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 };
+            const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+                method: 'POST', body: JSON.stringify(body)
+            });
+            for (const page of data.results) {
+                const p = page.properties;
+                students.push({
+                    pageId: page.id,
+                    name: p['이름']?.title?.[0]?.plain_text || '이름없음',
+                    teachers: p['담당쌤']?.multi_select?.map(t => t.name) || [],
+                    days: p['수강요일']?.multi_select?.map(d => d.name).join('') || '',
+                    status: p['학습상태']?.select?.name || '',
+                    fixed: p['고정숙제']?.rich_text?.map(t => t.plain_text).join('') || '',
+                    vocab: { bookId: relId(p['어휘교재']),   bookName: relName(p['어휘교재']),   unit: p['어휘현재유닛']?.number ?? '',   amount: p['어휘진도량']?.number ?? '' },
+                    mainR: { bookId: relId(p['주독해교재']), bookName: relName(p['주독해교재']), unit: p['주독해현재유닛']?.number ?? '', amount: p['주독해진도량']?.number ?? '' },
+                    subR:  { bookId: relId(p['부독해교재']), bookName: relName(p['부독해교재']), unit: p['부독해현재유닛']?.number ?? '', amount: p['부독해진도량']?.number ?? '' },
+                });
+            }
+            hasMore = data.has_more; cursor = data.next_cursor;
+        }
+        res.json({ success: true, students });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 학생 진도 설정 1개 항목 수정 (학생 명부 DB 페이지 PATCH)
+app.post('/api/update-student-progress', requireAuth, async (req, res) => {
+    const { pageId, propertyName, value, propertyType } = req.body;
+    if (!pageId || !propertyName) return res.status(400).json({ success: false, message: 'Missing info' });
+    try {
+        let propValue;
+        if (propertyType === 'relation') {
+            propValue = { relation: value ? [{ id: value }] : [] };
+        } else if (propertyType === 'number') {
+            propValue = { number: (value === '' || value === null || value === undefined) ? null : Number(value) };
+        } else if (propertyType === 'select') {
+            propValue = { select: value ? { name: value } : null };
+        } else { // rich_text
+            propValue = { rich_text: value ? [{ text: { content: String(value).substring(0, 2000) } }] : [] };
+        }
+        await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, {
+            method: 'PATCH', body: JSON.stringify({ properties: { [propertyName]: propValue } })
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
