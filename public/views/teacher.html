@@ -1245,7 +1245,10 @@
             const statusCls = paused ? 'status-incomplete' : 'status-complete';
             const statusSel = `<select class="homework-dropdown ${statusCls}" onchange="saveStudentField('${s.pageId}','학습상태',this.value,'select')">` +
                 STATUS_OPTIONS.map(o => `<option value="${o}" ${o === status ? 'selected' : ''}>${o}</option>`).join('') + `</select>`;
-            const book = (prop, val, list) => `<input class="editable-input editable-text-input" list="${list}" value="${escAttr(val)}" placeholder="검색…" data-prop="${prop}" data-pid="${s.pageId}" onchange="saveTextbook(this)">`;
+            const book = (prop, val, list) => `<div class="book-cell">
+                <div class="book-name">${val ? escAttr(val) : '<span class="book-none">미지정</span>'}</div>
+                <input class="editable-input book-search" list="${list}" placeholder="🔍 검색해 변경" data-prop="${prop}" data-pid="${s.pageId}" onchange="saveTextbook(this)">
+            </div>`;
             const num = (prop, val) => `<input class="editable-input" type="number" value="${val === '' ? '' : val}" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')">`;
             const fixed = `<textarea class="comment-textarea" style="min-height:40px; width:150px;" onchange="saveStudentField('${s.pageId}','고정숙제',this.value,'rich_text')">${escAttr(s.fixed)}</textarea>`;
             return `<tr ${paused ? 'style="background:#fff7ed;"' : ''}>
@@ -1299,15 +1302,15 @@
         async function saveTextbook(el) {
             const name = el.value.trim();
             const prop = el.dataset.prop, pid = el.dataset.pid;
-            if (name === '') { // 교재 비우기
-                await saveStudentField(pid, prop, '', 'relation');
-                const s = progressData.find(x => x.pageId === pid); if (s) setBook(s, prop, '', '');
-                return;
-            }
+            if (name === '') { el.value = ''; return; } // 빈 입력은 무시(변경 안 함)
             const id = textbookByName[name];
-            if (!id) { showToast('교재 목록에 없는 이름입니다. 목록에서 선택해 주세요.', 'error'); return; }
+            if (!id) { showToast('교재 목록에 없는 이름입니다. 목록에서 골라주세요.', 'error'); return; }
             await saveStudentField(pid, prop, id, 'relation');
             const s = progressData.find(x => x.pageId === pid); if (s) setBook(s, prop, id, name);
+            // 라벨 갱신 + 검색칸 비우기
+            const label = el.closest('.book-cell')?.querySelector('.book-name');
+            if (label) label.textContent = name;
+            el.value = '';
         }
 
         function setBook(s, prop, id, name) {

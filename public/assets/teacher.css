@@ -187,8 +187,12 @@ body {
 /* === 진도 관리 탭 컴팩트 (창 밖으로 안 넘치게, 이름·담당 한 줄) === */
 #progress-view td, #progress-view th { white-space: nowrap; padding: 8px 6px; }
 #progress-view .student-name { min-width: 64px; font-size: 14px; padding: 8px; }
-#progress-view .editable-text-input { width: 100px; font-size: 13px; }
 #progress-view .editable-input { width: 48px; font-size: 13px; }
+/* 교재 칸: 현재 교재명(줄바꿈) + 변경 검색칸 */
+#progress-view .book-cell { display: flex; flex-direction: column; gap: 3px; width: 150px; }
+#progress-view .book-name { font-size: 12.5px; font-weight: 600; color: #2d3748; white-space: normal; word-break: break-word; line-height: 1.25; min-height: 16px; text-align: left; }
+#progress-view .book-none { color: #cbd5e0; font-weight: 500; }
+#progress-view .book-search { width: 100%; font-size: 12px; text-align: left; }
 #progress-view .homework-dropdown { max-width: 92px; font-size: 12px; }
 #progress-view .comment-textarea { min-height: 36px; width: 140px; font-size: 13px; padding: 6px; } 
 .action-btn { border: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
