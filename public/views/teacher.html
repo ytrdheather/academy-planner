@@ -1242,15 +1242,16 @@
         function getProgressRow(s) {
             const status = s.status || '정상';
             const paused = status !== '정상';
-            const statusSel = `<select onchange="saveStudentField('${s.pageId}','학습상태',this.value,'select')" style="font-weight:700; ${paused ? 'color:#dc2626;' : 'color:#15803d;'}">` +
+            const statusCls = paused ? 'status-incomplete' : 'status-complete';
+            const statusSel = `<select class="homework-dropdown ${statusCls}" onchange="saveStudentField('${s.pageId}','학습상태',this.value,'select')">` +
                 STATUS_OPTIONS.map(o => `<option value="${o}" ${o === status ? 'selected' : ''}>${o}</option>`).join('') + `</select>`;
-            const book = (prop, val, list) => `<input list="${list}" value="${escAttr(val)}" placeholder="검색…" data-prop="${prop}" data-pid="${s.pageId}" onchange="saveTextbook(this)" style="width:130px; font-size:12px;">`;
-            const num = (prop, val) => `<input type="number" value="${val === '' ? '' : val}" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')" style="width:46px; text-align:center;">`;
-            const fixed = `<textarea onchange="saveStudentField('${s.pageId}','고정숙제',this.value,'rich_text')" style="width:150px; height:38px; font-size:12px; resize:vertical;">${escAttr(s.fixed)}</textarea>`;
+            const book = (prop, val, list) => `<input class="editable-input editable-text-input" list="${list}" value="${escAttr(val)}" placeholder="검색…" data-prop="${prop}" data-pid="${s.pageId}" onchange="saveTextbook(this)">`;
+            const num = (prop, val) => `<input class="editable-input" type="number" value="${val === '' ? '' : val}" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')">`;
+            const fixed = `<textarea class="comment-textarea" style="min-height:40px; width:150px;" onchange="saveStudentField('${s.pageId}','고정숙제',this.value,'rich_text')">${escAttr(s.fixed)}</textarea>`;
             return `<tr ${paused ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name" style="min-width:80px;">${s.name}</td>
-                <td style="font-size:12px;">${(s.teachers || []).join(', ')}</td>
-                <td style="font-size:12px;">${s.days || ''}</td>
+                <td class="student-name">${s.name}</td>
+                <td>${(s.teachers || []).join(', ')}</td>
+                <td>${s.days || ''}</td>
                 <td>${statusSel}</td>
                 <td>${book('어휘교재', s.vocab.bookName, 'dl-vocab')}</td>
                 <td>${num('어휘현재유닛', s.vocab.unit)}</td>
