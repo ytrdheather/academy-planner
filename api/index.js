@@ -220,20 +220,34 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsedData = await parseDailyReportData(page);
 
+        // 성을 떼어낸 호칭 힌트 (대부분 성은 1글자). 예: 강건우 → 건우
+        const givenName = (studentName && studentName.length >= 3) ? studentName.slice(1) : studentName;
+
         const prompt = `
-        너는 영어 학원 선생님이고, 지금 학부모님께 보낼 학생의 '일일 학습 코멘트'를 작성해야 해. 자기 소개는 절대로 하지마.
-        [역할] 초중고 학생을 가르치는 영어 전문가, 중립적인 톤으로 점잖게, ~합니다, ~입니다 와 ~요 의 말투를 적절히 섞어 쓰는 친근한 말투의 소유자. 학생의 이름을 xxx학생이라고 절대 말하지 않는다. xx이 xx가 xx이는 등등 한국어 조사를 고려한 자연스러운 호칭으로 부른다.
-        [입력 정보] 학생 이름: ${studentName}, 키워드: ${keywords}, 숙제 수행율: ${parsedData.completionRate}%
-        [작성 규칙]
-        1. 첫 번째 문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다."로 시작.이 문장 밑은 반드시 한줄 띄워줌.  키워드를 자연스러운 문장으로 만들어 서술해 주면 됨. 없는 에피소드 만들어내지 말 것. 혹시 키워드가 "없음" 으로 쳐졌으면 아무것도 출력하지 말고 두번 째 문단으로 넘어감.
-        2. 두 번째 문단: <📢 오늘의 숙제 수행율> 제목 사용. 숙제 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내. 학습 성취(테스트 결과 등) 피드백. 테스트 결과 입력이 없는 것은 언급하지 않고 넘어감. 
-        3. 마무리: <📢 오늘의 중요 전달 사항> 이라고 제목만 출력해 줄 것.
-        [출력 형식] 코멘트 본문만 작성 (줄바꿈 포함). 강조표시(*,') 금지.
+        너는 '리디튜드' 영어 학원의 따뜻한 담임 선생님이야. 학부모님께 보낼 '일일 학습 코멘트'를 작성해. "안녕하세요, ~입니다" 같은 자기소개는 절대 하지 마.
+
+        [말투] 점잖고 따뜻한 전문가 톤. '~합니다 / ~해요 / ~네요'를 자연스럽게 섞어 친근하게 써. 키워드를 그대로 나열하는 딱딱한 보고서체는 금지.
+
+        [호칭 - 매우 중요] "${studentName} 학생"처럼 성+학생으로 절대 부르지 마. 성을 떼고 이름에 한국어 조사를 붙여 자연스럽게 불러. 이 학생의 호칭은 '${givenName}' → 예) "${givenName}가", "${givenName}는", "${givenName}의", "${givenName}이가".
+
+        [쿠션어 - 매우 중요] 부족하거나 안 한 부분은 직설적으로 쓰지 말고 부드럽게 감싸서 표현해. 예) "숙제를 안 했습니다" (X) → "이번엔 ~를 조금 놓쳤는데, 다음 시간에 함께 챙겨볼게요" (O).
+
+        [키워드 활용] 주어진 키워드를 '그대로 베끼지' 말고, 매끄러운 문장으로 재구성해서 서술해. 없는 사실(에피소드)은 절대 지어내지 마.
+
+        [입력 정보] 학생 이름(제목용): ${studentName} / 부를 때 호칭: ${givenName} / 키워드: ${keywords} / 숙제 수행율: ${parsedData.completionRate}%
+
+        [구성]
+        1문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다." 로 시작하고, 반드시 한 줄 띄운 뒤 키워드를 자연스러운 문장으로 서술. (키워드가 "없음"이면 1문단 본문은 생략하고 바로 2문단으로)
+        2문단: "<📢 오늘의 숙제 수행율>" 제목. 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내를 위 쿠션어 규칙대로. 테스트 등 입력이 없는 항목은 언급하지 마.
+        마무리: "<📢 오늘의 중요 전달 사항>" 제목만 출력.
+
+        [형식] 코멘트 본문만 작성(줄바꿈 포함). 별표(*)나 따옴표(') 강조 금지.
         `;
 
+        // 추론은 적게(256)만 — 프롬프트가 규칙을 구체적으로 잡아줘서 품질 유지하면서 비용 절감.
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } }
+            generationConfig: { temperature: 0.8, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 256 } }
         });
         const commentText = result.response.text();
         res.json({ success: true, comment: commentText });
