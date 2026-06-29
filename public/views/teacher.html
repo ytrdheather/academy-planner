@@ -782,6 +782,13 @@
 
         const MISSING_ORDER = ['grammarHw', 'grammarScore', 'vocabScore', 'readingTest'];
         const MISSING_LABELS = { grammarHw: '문법숙제', grammarScore: '문법점수', vocabScore: '단어점수', readingTest: '독해테스트' };
+        // 카테고리별 색상 (문법숙제=빨강 / 문법점수=보라 / 단어=주황 / 독해=노랑)
+        const MISSING_COLORS = {
+            grammarHw:    { bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
+            grammarScore: { bg: '#f3e8ff', color: '#7e22ce', border: '#d8b4fe' },
+            vocabScore:   { bg: '#ffedd5', color: '#ea580c', border: '#fed7aa' },
+            readingTest:  { bg: '#fef9c3', color: '#ca8a04', border: '#fde68a' },
+        };
         // 문법 비대상(점검 제외) 문법반 값
         const NON_GRAMMAR_CLASSES = ['NN', 'P2', '진도 해당 없음', '-', ''];
 
@@ -830,9 +837,10 @@
                 const n = cats[key].names.length;
                 total += n;
                 const active = n > 0;
-                const bg = active ? '#fee2e2' : '#f1f5f9';
-                const color = active ? '#b91c1c' : '#94a3b8';
-                const border = active ? '#fca5a5' : '#e2e8f0';
+                const c = MISSING_COLORS[key] || { bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' };
+                const bg = active ? c.bg : '#f1f5f9';
+                const color = active ? c.color : '#94a3b8';
+                const border = active ? c.border : '#e2e8f0';
                 return `<button type="button" ${active ? '' : 'disabled'} onclick="toggleMissingNames('${key}')"
                     style="padding:3px 11px; border-radius:999px; border:1px solid ${border}; background:${bg}; color:${color}; font-weight:700; font-size:12px; cursor:${active ? 'pointer' : 'default'};">
                     ${cats[key].label} ${n}</button>`;
@@ -894,27 +902,27 @@
             const gClass = st.comment?.grammarClass;
             const grammarTarget = gClass && !NON_GRAMMAR_CLASSES.includes(gClass);
 
-            // 문법: 숙제 검사 또는 점수 중 하나라도 비면 누락 (대상 학생만)
-            let grammarMissing = false;
+            // 문법: 숙제 검사 / 점수를 각각 따로 점검 (대상 학생만)
+            let hwMissing = false, gradeMissing = false;
             if (grammarTarget) {
                 const g = st.homework?.grammar;
-                const hwMissing = (g !== '숙제 함' && g !== '안 해옴');
-                const scoreMissing = isScoreMissing(st.tests?.grammarScore);
-                grammarMissing = hwMissing || scoreMissing;
+                hwMissing = (g !== '숙제 함' && g !== '안 해옴');
+                gradeMissing = isScoreMissing(st.tests?.grammarScore);
             }
             const vocabMissing = isScoreMissing(st.tests?.vocabScore);
             const rr = st.tests?.readingResult;
             const readingMissing = (rr !== 'PASS' && rr !== 'FAIL');
 
-            // 점검 대상 항목 수 (문법 비대상이면 독해·단어 2개만)
-            const applicable = (grammarTarget ? 1 : 0) + 2;
-            const missingCount = (grammarMissing ? 1 : 0) + (vocabMissing ? 1 : 0) + (readingMissing ? 1 : 0);
+            // 점검 대상 항목 수 (문법대상이면 문법숙제+문법점수 2개 추가, 비대상이면 독해·단어 2개만)
+            const applicable = (grammarTarget ? 2 : 0) + 2;
+            const missingCount = (hwMissing ? 1 : 0) + (gradeMissing ? 1 : 0) + (vocabMissing ? 1 : 0) + (readingMissing ? 1 : 0);
 
             if (missingCount === 0) return mcBadge('#15803d', '#dcfce7', '✅ DONE!');
             if (missingCount === applicable) return mcBadge('#64748b', '#f1f5f9', '미입력');
 
             let html = '';
-            if (grammarMissing) html += mcBadge('#dc2626', '#fee2e2', '문법');
+            if (hwMissing)      html += mcBadge('#b91c1c', '#fee2e2', '문법숙제');
+            if (gradeMissing)   html += mcBadge('#7e22ce', '#f3e8ff', '문법점수');
             if (readingMissing) html += mcBadge('#ca8a04', '#fef9c3', '독해');
             if (vocabMissing)   html += mcBadge('#ea580c', '#ffedd5', '단어');
             return html;
