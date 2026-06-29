@@ -796,6 +796,11 @@
             // 0점(시험 안 봄 포함)은 '입력됨'으로 인정. 진짜 빈값(null/undefined/NaN)만 누락.
             return score === null || score === undefined || score === '' || isNaN(score);
         }
+        // [중요] 점수(수식)는 입력이 비어도 0%/PASS로 계산되어 버려서, '실제 입력칸(개수)'이 비었는지로 판정한다.
+        // 단어 시험 미입력: 맞은개수·전체개수 둘 다 비어있음 (0은 입력으로 인정)
+        function isVocabTestMissing(t) { return (t?.vocabCorrect === null || t?.vocabCorrect === undefined || t?.vocabCorrect === '') && (t?.vocabTotal === null || t?.vocabTotal === undefined || t?.vocabTotal === ''); }
+        // 독해 시험 미입력: 독해 오답 개수가 비어있음 (0개 오답 = 시험 본 것이므로 입력으로 인정)
+        function isReadingTestMissing(t) { return t?.readingWrong === null || t?.readingWrong === undefined || t?.readingWrong === ''; }
 
         function computeMissing(data) {
             const cats = {
@@ -816,11 +821,10 @@
                     // 문법 시험 점수
                     if (isScoreMissing(st.tests?.grammarScore)) cats.grammarScore.names.push(entry);
                 }
-                // 단어 점수 (전체 학생 공통)
-                if (isScoreMissing(st.tests?.vocabScore)) cats.vocabScore.names.push(entry);
-                // 독해 테스트 결과 (전체 학생 공통): PASS/FAIL 둘 다 아니면 누락
-                const rr = st.tests?.readingResult;
-                if (rr !== 'PASS' && rr !== 'FAIL') cats.readingTest.names.push(entry);
+                // 단어 시험 (전체 학생 공통): 맞은/전체 개수 입력이 아예 없으면 누락
+                if (isVocabTestMissing(st.tests)) cats.vocabScore.names.push(entry);
+                // 독해 시험 (전체 학생 공통): 독해 오답 개수 입력이 없으면 누락
+                if (isReadingTestMissing(st.tests)) cats.readingTest.names.push(entry);
             });
             return cats;
         }
@@ -909,9 +913,8 @@
                 hwMissing = (g !== '숙제 함' && g !== '안 해옴');
                 gradeMissing = isScoreMissing(st.tests?.grammarScore);
             }
-            const vocabMissing = isScoreMissing(st.tests?.vocabScore);
-            const rr = st.tests?.readingResult;
-            const readingMissing = (rr !== 'PASS' && rr !== 'FAIL');
+            const vocabMissing = isVocabTestMissing(st.tests);
+            const readingMissing = isReadingTestMissing(st.tests);
 
             // 점검 대상 항목 수 (문법대상이면 문법숙제+문법점수 2개 추가, 비대상이면 독해·단어 2개만)
             const applicable = (grammarTarget ? 2 : 0) + 2;
