@@ -220,34 +220,59 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsedData = await parseDailyReportData(page);
 
-        // 성을 떼어낸 호칭 힌트 (대부분 성은 1글자). 예: 강건우 → 건우
+        // 성을 떼어낸 호칭 (대부분 성은 1글자). 예: 강건우 → 건우
         const givenName = (studentName && studentName.length >= 3) ? studentName.slice(1) : studentName;
 
+        // [한국어 조사 정확도] 이름 끝글자 받침(종성) 유무로 호칭 형태를 미리 확정.
+        // 받침 있으면 '이'를 붙여 부름: 재은 → 재은이는/재은이가, 없으면: 시우 → 시우는/시우가
+        const lastCh = givenName.charCodeAt(givenName.length - 1);
+        const hasBatchim = (lastCh >= 0xAC00 && lastCh <= 0xD7A3) && ((lastCh - 0xAC00) % 28 !== 0);
+        const callName = hasBatchim ? givenName + '이' : givenName;     // 부를 때 (예: 재은이 / 시우)
+        const nameTopic = hasBatchim ? givenName + '이는' : givenName + '는';  // ~는
+        const nameSubj  = hasBatchim ? givenName + '이가' : givenName + '가';  // ~가
+        const namePoss  = hasBatchim ? givenName + '이의' : givenName + '의';  // ~의
+
         const prompt = `
-        너는 '리디튜드' 영어 학원의 따뜻한 담임 선생님이야. 학부모님께 보낼 '일일 학습 코멘트'를 작성해. "안녕하세요, ~입니다" 같은 자기소개는 절대 하지 마.
+        너는 '리디튜드' 영어학원의 따뜻하고 다정한 담임 선생님이야. 학부모님께 아이의 하루를 정답게 들려주는 '일일 학습 코멘트'를 쓴다. "안녕하세요, ~입니다" 같은 자기소개는 절대 금지.
 
-        [말투] 점잖고 따뜻한 전문가 톤. '~합니다 / ~해요 / ~네요'를 자연스럽게 섞어 친근하게 써. 키워드를 그대로 나열하는 딱딱한 보고서체는 금지.
+        [가장 중요 — 말투]
+        - 학부모님께 아이의 하루를 따뜻하게 들려주듯, 다정한 구어체로 써. ('~했어요 / ~하더라고요 / ~한답니다 / ~네요'를 자연스럽게 섞어서)
+        - "수행율은 100%입니다" 같은 딱딱한 보고체나 키워드 단순 나열은 절대 금지.
+        - 아이의 노력·태도·성장을 칭찬하고 응원하는 마음이 문장에 묻어나게 써.
 
-        [호칭 - 매우 중요] "${studentName} 학생"처럼 성+학생으로 절대 부르지 마. 성을 떼고 이름에 한국어 조사를 붙여 자연스럽게 불러. 이 학생의 호칭은 '${givenName}' → 예) "${givenName}가", "${givenName}는", "${givenName}의", "${givenName}이가".
+        [호칭 - 반드시 이 형태 그대로 사용] "${studentName} 학생"처럼 성+학생 금지. 아래 정확한 호칭만 쓰고, 임의로 다른 조사 형태로 바꾸지 마(특히 받침 처리 틀리지 말 것):
+        - 부를 때: "${callName}"
+        - ~는: "${nameTopic}"   /   ~가: "${nameSubj}"   /   ~의: "${namePoss}"
+        (예시: 이 형태들을 문장에 자연스럽게 녹여 써. "${nameTopic} 오늘 ~", "${nameSubj} ~를 ~했어요", "${namePoss} 수행율은 ~")
 
-        [쿠션어 - 매우 중요] 부족하거나 안 한 부분은 직설적으로 쓰지 말고 부드럽게 감싸서 표현해. 예) "숙제를 안 했습니다" (X) → "이번엔 ~를 조금 놓쳤는데, 다음 시간에 함께 챙겨볼게요" (O).
+        [쿠션어] 부족한 점은 직설적으로 쓰지 말고 부드럽게: "안 했어요"(X) → "이번엔 ~를 조금 놓쳤는데, 다음 시간에 같이 챙겨볼게요"(O).
 
-        [키워드 활용] 주어진 키워드를 '그대로 베끼지' 말고, 매끄러운 문장으로 재구성해서 서술해. 없는 사실(에피소드)은 절대 지어내지 마.
+        [사실 범위] 주어진 키워드만 따뜻하게 풀어 써. 없는 일(에피소드)은 절대 지어내지 마.
 
-        [입력 정보] 학생 이름(제목용): ${studentName} / 부를 때 호칭: ${givenName} / 키워드: ${keywords} / 숙제 수행율: ${parsedData.completionRate}%
+        [입력] 이름(제목용): ${studentName} / 호칭: ${givenName} / 키워드: ${keywords} / 숙제 수행율: ${parsedData.completionRate}%
 
         [구성]
-        1문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다." 로 시작하고, 반드시 한 줄 띄운 뒤 키워드를 자연스러운 문장으로 서술. (키워드가 "없음"이면 1문단 본문은 생략하고 바로 2문단으로)
-        2문단: "<📢 오늘의 숙제 수행율>" 제목. 수행율(${parsedData.completionRate}%)에 따른 칭찬/격려/보강 안내를 위 쿠션어 규칙대로. 테스트 등 입력이 없는 항목은 언급하지 마.
+        1문단: "오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다." 로 시작 → 한 줄 띄우고 → 키워드를 따뜻한 이야기로 풀어 서술. (키워드가 "없음"이면 본문은 생략하고 바로 2문단으로)
+        2문단: "<📢 오늘의 숙제 수행율>" 제목 후, 수행율(${parsedData.completionRate}%)을 숫자만 던지지 말고 따뜻한 칭찬/격려/보강을 한두 문장으로 풀어서. (100%면 성실함을 구체적으로 칭찬, 낮으면 쿠션어로 다독이며 함께 챙기자고)
         마무리: "<📢 오늘의 중요 전달 사항>" 제목만 출력.
 
-        [형식] 코멘트 본문만 작성(줄바꿈 포함). 별표(*)나 따옴표(') 강조 금지.
+        [형식] 본문만 작성. 별표(*)·따옴표(') 강조 금지.
+
+        [참고용 좋은 예시 — 이 따뜻함과 결만 참고하고 내용은 절대 베끼지 말 것]
+        오늘의 리디튜더 지민의 일일 학습 리포트📑를 보내드립니다.
+
+        오늘 지민이는 다가오는 시험을 앞두고 변형 문제들을 하나하나 꼼꼼히 풀어내며 집중하는 모습을 보여주었어요. 어려운 문제도 끝까지 붙잡고 고민하는 태도가 참 기특하답니다.
+
+        <📢 오늘의 숙제 수행율>
+        오늘 지민이의 숙제 수행율은 100%예요. 맡은 것을 늘 성실히 해내는 모습이 정말 대견하고, 이런 꾸준함이 분명 좋은 결과로 이어질 거예요.
+
+        <📢 오늘의 중요 전달 사항>
         `;
 
-        // 추론은 적게(256)만 — 프롬프트가 규칙을 구체적으로 잡아줘서 품질 유지하면서 비용 절감.
+        // 따뜻한 말투·nuance를 살리려면 추론이 어느 정도 필요 → 1024 (옛 무제한보다는 훨씬 저렴)
         const result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.8, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 256 } }
+            generationConfig: { temperature: 0.85, maxOutputTokens: 2500, thinkingConfig: { thinkingBudget: 1024 } }
         });
         const commentText = result.response.text();
         res.json({ success: true, comment: commentText });
