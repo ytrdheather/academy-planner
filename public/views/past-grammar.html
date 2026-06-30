@@ -103,6 +103,31 @@
             }
         }
 
+        // 문법 문항/오답 개수 저장 + 점수 미리보기 갱신
+        async function saveGrammarNum(el) {
+            if (el.value === '') return; // 빈칸은 저장 안 함
+            const pid = el.dataset.pid, prop = el.dataset.prop;
+            try {
+                el.style.borderColor = '#a855f7';
+                await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId: pid, propertyName: prop, newValue: Number(el.value), propertyType: 'number' })
+                });
+                el.style.borderColor = '#16a34a';
+                // 점수 미리보기 (정답/전체*100). 정확한 값은 새로고침 시 노션 수식으로 확정
+                const row = el.closest('tr');
+                const total = parseFloat(row.querySelector('.js-gtotal')?.value);
+                const wrong = parseFloat(row.querySelector('.js-gwrong')?.value);
+                const cell = row.querySelector('.js-score');
+                if (cell && !isNaN(total) && total > 0 && !isNaN(wrong)) {
+                    const s = Math.round((total - wrong) / total * 100);
+                    const cls = s >= 80 ? 'score-high' : (s >= 60 ? 'score-mid' : 'score-low');
+                    cell.innerHTML = `<span class="score-badge ${cls}">${s}점</span>`;
+                }
+            } catch (e) { el.style.borderColor = '#dc2626'; }
+        }
+
         function renderTables(records) {
             const grouped = {};
             records.forEach(r => {
@@ -146,16 +171,20 @@
                     </div>
                     <table class="styled-table mb-6">
                         <colgroup>
-                            <col style="width:14%">
-                            <col style="width:14%">
-                            <col style="width:52%">
-                            <col style="width:20%">
+                            <col style="width:11%">
+                            <col style="width:11%">
+                            <col style="width:38%">
+                            <col style="width:9%">
+                            <col style="width:9%">
+                            <col style="width:22%">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th>이름</th>
                                 <th>시험일</th>
                                 <th>지난주 문법 테스트 내용 (입력 가능)</th>
+                                <th>문항</th>
+                                <th>오답</th>
                                 <th>점수</th>
                             </tr>
                         </thead>
@@ -166,6 +195,9 @@
                     const testVal = (r.test && r.test !== '-') ? r.test.replace(/"/g, '&quot;') : '';
                     const testInput = `<input list="grammarTagList" value="${testVal}" data-pid="${r.pageId}" onchange="saveTest(this)" placeholder="태그 입력 (여러 개는 쉼표로)" style="width:100%; border:1px solid #d8b4fe; border-radius:6px; padding:5px 8px; font-size:13px;">`;
                     const dateHtml = r.date ? `<span style="color:#6b46c1; font-weight:600; font-size:13px;">${r.date}</span>` : '<span class="text-gray-400">-</span>';
+                    const numStyle = 'width:52px; border:1px solid #cbd5e0; border-radius:6px; padding:5px 4px; font-size:13px; text-align:center;';
+                    const totalInput = `<input type="number" min="0" class="js-gtotal" value="${r.grammarTotal ?? ''}" data-pid="${r.pageId}" data-prop="문법(전체 개수)" onchange="saveGrammarNum(this)" style="${numStyle}">`;
+                    const wrongInput = `<input type="number" min="0" class="js-gwrong" value="${r.grammarWrong ?? ''}" data-pid="${r.pageId}" data-prop="문법(틀린 개수)" onchange="saveGrammarNum(this)" style="${numStyle}">`;
 
                     let scoreHtml = '<span class="text-gray-400">-</span>';
                     
@@ -185,7 +217,9 @@
                             <td class="font-bold text-gray-800">${r.studentName}</td>
                             <td>${dateHtml}</td>
                             <td>${testInput}</td>
-                            <td>${scoreHtml}</td>
+                            <td>${totalInput}</td>
+                            <td>${wrongInput}</td>
+                            <td class="js-score">${scoreHtml}</td>
                         </tr>
                     `;
                 });

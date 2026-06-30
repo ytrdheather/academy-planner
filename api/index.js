@@ -588,10 +588,13 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             }
             
             const date = props['🕐 날짜']?.date?.start || '';
-            
+
             const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
-            
-            return { pageId: page.id, date, className, studentName, topic, homework, test: testStr, score };
+
+            const grammarTotal = (props['문법(전체 개수)'] || props['문법 (전체 개수)'])?.number ?? null;
+            const grammarWrong = (props['문법(틀린 개수)'] || props['문법 (틀린 개수)'])?.number ?? null;
+
+            return { pageId: page.id, date, className, studentName, topic, homework, test: testStr, score, grammarTotal, grammarWrong };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
 
         // 새로 가져온 데이터 캐싱 저장
