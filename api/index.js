@@ -277,13 +277,22 @@ async function parseDailyReportData(page) {
     }
 
     const homework = {
-        attendance: props['출석']?.checkbox || false, 
+        attendance: props['출석']?.checkbox || false,
+        absenceReason: getSimpleText(props['결석 사유']), // [신규] 결석 사유 (있으면 결석으로 간주)
         grammar: props['⭕ 지난 문법 숙제 검사']?.status?.name || '해당 없음',
         vocabCards: props['1️⃣ 어휘 클카 암기 숙제']?.status?.name || '해당 없음',
         readingCards: props['2️⃣ 독해 단어 클카 숙제']?.status?.name || '해당 없음',
         summary: props['4️⃣ Summary 숙제']?.status?.name || '해당 없음',
-        dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음', 
+        dailyReading: props['5️⃣ 독해서 풀기']?.status?.name || '해당 없음',
         diary: props['6️⃣ 부&매&일']?.status?.name || '해당 없음'
+    };
+
+    // [신규] 출결·숙제 관리 탭용: 생성된(또는 수동 입력한) 숙제 내용
+    const assignedHw = {
+        vocab: getSimpleText(props['어휘숙제']),
+        mainR: getSimpleText(props['주독해숙제']),
+        subR: getSimpleText(props['부독해숙제']),
+        grammar: getSimpleText(props['문법 숙제 내용'])
     };
 
     const checkList = [
@@ -380,7 +389,7 @@ async function parseDailyReportData(page) {
         writeCompleted: props['작성완료']?.checkbox === true // [신규] 코멘트 작성완료 여부
     };
 
-    return { pageId: page.id, studentName, attendanceDays, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, tests, listening, reading, comment };
+    return { pageId: page.id, studentName, attendanceDays, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, assignedHw, tests, listening, reading, comment };
 }
 
 async function fetchProgressData(req, res, parseFunction) {
@@ -525,8 +534,8 @@ app.get('/api/notion-grammar-options', requireAuth, async (req, res) => {
 
 app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     try {
-        // 캐시가 유효하면 노션 API 호출 없이 즉시 응답 (5분 캐시)
-        if (dashboardCache.pastGrammar.data && 
+        // 캐시가 유효하면 노션 API 호출 없이 즉시 응답 (5분 캐시). ?force=true면 캐시 무시
+        if (req.query.force !== 'true' && dashboardCache.pastGrammar.data &&
             (Date.now() - dashboardCache.pastGrammar.lastFetch < GRAMMAR_CACHE_DURATION)) {
             return res.json({ success: true, data: dashboardCache.pastGrammar.data });
         }
@@ -582,7 +591,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             
             const studentName = props['이름']?.title?.[0]?.plain_text || '이름없음';
             
-            return { date, className, studentName, topic, homework, test: testStr, score };
+            return { pageId: page.id, date, className, studentName, topic, homework, test: testStr, score };
         }).filter(r => r.topic !== '-' || r.homework !== '-' || r.test !== '-');
 
         // 새로 가져온 데이터 캐싱 저장

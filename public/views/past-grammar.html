@@ -31,40 +31,77 @@
     <div class="max-w-4xl mx-auto">
         <div class="flex justify-between items-center border-b border-gray-300 pb-3 mb-4">
             <h1 class="text-xl font-bold text-gray-800">📊 지난 1주일 문법숙제 통합 현황</h1>
-            <button onclick="window.close()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md font-bold text-sm transition">창 닫기</button>
+            <div class="flex gap-2">
+                <button onclick="loadData(true)" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md font-bold text-sm transition">🔄 새로고침</button>
+                <button onclick="window.close()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md font-bold text-sm transition">창 닫기</button>
+            </div>
         </div>
 
         <div id="loading" class="text-center py-10 text-gray-500 font-bold text-sm">데이터를 불러오는 중입니다...</div>
         <div id="contentArea"></div>
+        <datalist id="grammarTagList"></datalist>
     </div>
 
     <script>
         const API_BASE_URL = window.location.origin;
         const authToken = localStorage.getItem('teacher_auth_token');
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', () => {
             if (!authToken) {
                 document.getElementById('loading').innerHTML = '로그인이 필요합니다.<br><button onclick="window.close()" class="mt-4 bg-purple-600 text-white px-4 py-2 rounded text-sm">닫기</button>';
                 return;
             }
+            loadTagOptions();
+            loadData();
+        });
 
+        // 문법 테스트 내용 자동완성용 태그 목록
+        async function loadTagOptions() {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/past-grammar-data`, {
+                const res = await fetch(`${API_BASE_URL}/api/notion-grammar-options`, { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const j = await res.json();
+                const opts = j.options || j.data || [];
+                document.getElementById('grammarTagList').innerHTML = opts.map(o => `<option value="${o}">`).join('');
+            } catch (e) { /* 자동완성 없어도 입력은 가능 */ }
+        }
+
+        async function loadData(force = false) {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            loading.textContent = '데이터를 불러오는 중입니다...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/past-grammar-data${force ? '?force=true' : ''}`, {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 const data = await res.json();
-                
-                document.getElementById('loading').style.display = 'none';
-
+                loading.style.display = 'none';
                 if (data.success && data.data.length > 0) {
                     renderTables(data.data);
                 } else {
                     document.getElementById('contentArea').innerHTML = '<div class="text-center py-10 text-gray-500 font-bold text-sm">최근 1주일간 등록된 문법 기록이 없습니다.</div>';
                 }
             } catch (error) {
-                document.getElementById('loading').innerHTML = '<span class="text-red-500 text-sm">데이터를 불러오는데 실패했습니다.</span>';
+                loading.innerHTML = '<span class="text-red-500 text-sm">데이터를 불러오는데 실패했습니다.</span>';
             }
-        });
+        }
+
+        // 문법 테스트 내용(태그) 저장
+        async function saveTest(el) {
+            const pid = el.dataset.pid;
+            try {
+                el.style.borderColor = '#a855f7';
+                await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId: pid, propertyName: '문법 테스트 내용', newValue: el.value, propertyType: 'multi_select' })
+                });
+                el.style.borderColor = '#16a34a';
+                el.title = '저장됨';
+            } catch (e) {
+                el.style.borderColor = '#dc2626';
+                el.title = '저장 실패';
+            }
+        }
 
         function renderTables(records) {
             const grouped = {};
@@ -109,14 +146,16 @@
                     </div>
                     <table class="styled-table mb-6">
                         <colgroup>
-                            <col style="width:20%">
-                            <col style="width:60%">
+                            <col style="width:14%">
+                            <col style="width:14%">
+                            <col style="width:52%">
                             <col style="width:20%">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th>이름</th>
-                                <th>지난주 문법 테스트 내용</th>
+                                <th>시험일</th>
+                                <th>지난주 문법 테스트 내용 (입력 가능)</th>
                                 <th>점수</th>
                             </tr>
                         </thead>
@@ -124,10 +163,9 @@
                 `;
 
                 classRecords.forEach(r => {
-                    const tags = r.test.split(',').map(t => t.trim()).filter(Boolean);
-                    const tagHtml = tags.length > 0 && tags[0] !== '-' 
-                        ? tags.map(t => `<span class="tag-badge">${t}</span>`).join('') 
-                        : '<span class="text-gray-400">-</span>';
+                    const testVal = (r.test && r.test !== '-') ? r.test.replace(/"/g, '&quot;') : '';
+                    const testInput = `<input list="grammarTagList" value="${testVal}" data-pid="${r.pageId}" onchange="saveTest(this)" placeholder="태그 입력 (여러 개는 쉼표로)" style="width:100%; border:1px solid #d8b4fe; border-radius:6px; padding:5px 8px; font-size:13px;">`;
+                    const dateHtml = r.date ? `<span style="color:#6b46c1; font-weight:600; font-size:13px;">${r.date}</span>` : '<span class="text-gray-400">-</span>';
 
                     let scoreHtml = '<span class="text-gray-400">-</span>';
                     
@@ -145,7 +183,8 @@
                     html += `
                         <tr>
                             <td class="font-bold text-gray-800">${r.studentName}</td>
-                            <td>${tagHtml}</td>
+                            <td>${dateHtml}</td>
+                            <td>${testInput}</td>
                             <td>${scoreHtml}</td>
                         </tr>
                     `;

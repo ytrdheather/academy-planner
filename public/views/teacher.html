@@ -26,6 +26,7 @@
 
         <div class="tab-menu">
             <button class="tab-button active" onclick="showTab('homework')">숙제 현황</button>
+            <button class="tab-button" onclick="showTab('attendance')" style="color:#0d9488; font-weight:700;">📋 출결·숙제</button>
             <button class="tab-button" onclick="showTab('tests')">테스트 결과</button>
             <button class="tab-button" onclick="showTab('reading')">원서 독서 현황</button>
             <button class="tab-button" onclick="showTab('listening')">리스닝 현황</button>
@@ -83,6 +84,23 @@
                 <table class="styled-table">
                     <thead><tr> <th>학생이름</th> <th>담당강사</th> <th>출석</th> <th>⭕ 문법숙제</th> <th>1️⃣ 어휘클카</th> <th>2️⃣ 독해클카</th> <th>4️⃣ Summary</th> <th>5️⃣ 독해서 풀기</th> <th>6️⃣ 부&매&일</th> <th>📖 영어독서</th> <th>🎧 영어더빙</th> <th>수행율</th> </tr></thead>
                     <tbody id="homeworkTableBody"><tr><td colspan="12" class="loading">로딩중...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="attendance-view" class="tab-content">
+            <div class="section-title">📋 출결 및 숙제 관리</div>
+            <div style="margin-bottom:8px;">
+                <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
+                <span style="font-size:13px; color:#64748b; margin-left:8px;">결석사유를 입력하면 결석 처리됩니다(이름 옆 🚫결석 배지 + 누락점검 제외).</span>
+            </div>
+            <div class="table-scroll-area">
+                <table class="styled-table">
+                    <thead><tr>
+                        <th>학생</th><th>담당</th><th>출석</th><th>결석사유</th>
+                        <th>📘 어휘숙제</th><th>📗 주독해숙제</th><th>📙 부독해숙제</th><th>📕 문법숙제</th>
+                    </tr></thead>
+                    <tbody id="attendanceTableBody"><tr><td colspan="8" class="loading">로딩중...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -768,10 +786,58 @@
             displayCommentData(data);
             displayGrammarData(data);
 
+            displayAttendanceHwData(data);
+
             // [누락 점검] 현재 표시된 데이터 기준으로 누락 학생 계산 → 점검바 + 빨간 테두리
             const cats = computeMissing(data);
             renderMissingBar(cats);
             applyStatusBadges(data);
+        }
+
+        // ==========================================
+        // [출결 및 숙제 관리]
+        // ==========================================
+        function isAbsent(st) { return ((st.homework?.absenceReason) || '').trim() !== ''; }
+
+        function displayAttendanceHwData(data) {
+            const tbody = document.getElementById('attendanceTableBody');
+            if (!tbody) return;
+            if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">데이터 없음</td></tr>'; return; }
+            tbody.innerHTML = data.map(getAttendanceHwRow).join('');
+        }
+
+        function getAttendanceHwRow(st) {
+            const absent = isAbsent(st);
+            const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
+            return `<tr ${absent ? 'style="background:#fff7ed;"' : ''}>
+                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
+                <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
+                <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
+                <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" onchange="updateField(this)"></td>
+                <td>${hwInput('어휘숙제', st.assignedHw?.vocab)}</td>
+                <td>${hwInput('주독해숙제', st.assignedHw?.mainR)}</td>
+                <td>${hwInput('부독해숙제', st.assignedHw?.subR)}</td>
+                <td>${hwInput('문법 숙제 내용', st.assignedHw?.grammar)}</td>
+            </tr>`;
+        }
+
+        async function markAllPresent() {
+            const cbs = [...document.querySelectorAll('#attendanceTableBody input.att-check')];
+            if (!cbs.length) { alert('대상 학생이 없습니다.'); return; }
+            if (!confirm(`현재 화면의 ${cbs.length}명을 전체 출석 처리할까요?`)) return;
+            showToast(`${cbs.length}명 출석 처리 중...`);
+            let ok = 0, fail = 0;
+            for (const cb of cbs) {
+                try {
+                    await fetch(`${API_BASE_URL}/api/update-homework`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                        body: JSON.stringify({ pageId: cb.dataset.pid, propertyName: '출석', newValue: true, propertyType: 'checkbox' })
+                    });
+                    cb.checked = true; ok++;
+                } catch (e) { fail++; }
+            }
+            showToast(`출석 처리 완료: ${ok}명${fail ? ` / 실패 ${fail}` : ''}`, fail ? 'error' : 'success');
         }
 
         // ==========================================
@@ -810,6 +876,7 @@
                 readingTest:  { label: MISSING_LABELS.readingTest,  names: [] },
             };
             (data || []).forEach(st => {
+                if (isAbsent(st)) return; // 결석 학생은 누락 점검에서 제외
                 const entry = { name: st.studentName, pageId: st.pageId };
                 const gClass = st.comment?.grammarClass;
                 const isGrammarTarget = gClass && !NON_GRAMMAR_CLASSES.includes(gClass);
@@ -903,6 +970,7 @@
         }
 
         function buildStatusBadges(st) {
+            if (isAbsent(st)) return mcBadge('#475569', '#e2e8f0', '🚫 결석'); // 결석이면 결석 배지만
             const gClass = st.comment?.grammarClass;
             const grammarTarget = gClass && !NON_GRAMMAR_CLASSES.includes(gClass);
 
