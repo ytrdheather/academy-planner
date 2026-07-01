@@ -6,14 +6,19 @@
     <title>시험지 분석기 - 리디튜드</title>
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <link rel="stylesheet" href="/assets/teacher.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        .ea-wrap { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+        .ea-wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px; flex: 1 1 auto; overflow-y: auto; width: 100%; }
         .ea-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .ea-drop { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 28px; text-align: center; color: #64748b; }
         .ea-drop.dragover { border-color: #0d9488; background: #f0fdfa; }
         .ea-files { margin-top: 12px; font-size: 13px; color: #475569; }
         .ea-btn { background: #0d9488; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; cursor: pointer; margin-top: 12px; }
         .ea-btn:disabled { background: #94a3b8; cursor: default; }
+        .ea-result-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+        .ea-download-group { display: flex; gap: 8px; }
+        .ea-download-btn { background: #fff; color: #0d9488; border: 1px solid #0d9488; border-radius: 8px; padding: 7px 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
+        .ea-download-btn:hover { background: #f0fdfa; }
         table.ea-table { width: 100%; border-collapse: collapse; font-size: 14px; }
         table.ea-table th, table.ea-table td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; vertical-align: top; }
         table.ea-table th { background: #f1f5f9; }
@@ -50,15 +55,23 @@
         </div>
 
         <div class="ea-card" id="eaResultCard" style="display:none;">
-            <h3>분석 결과</h3>
-            <table class="ea-table">
-                <thead>
-                    <tr>
-                        <th>번호</th><th>유형</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
-                    </tr>
-                </thead>
-                <tbody id="eaResultBody"></tbody>
-            </table>
+            <div class="ea-result-head">
+                <h3>분석 결과</h3>
+                <div class="ea-download-group">
+                    <button class="ea-download-btn" onclick="downloadCsv()">📊 표로 다운로드</button>
+                    <button class="ea-download-btn" onclick="downloadImage()">🖼️ 그림으로 다운로드</button>
+                </div>
+            </div>
+            <div id="eaResultTableWrap">
+                <table class="ea-table" id="eaResultTable">
+                    <thead>
+                        <tr>
+                            <th>번호</th><th>유형</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eaResultBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -67,6 +80,7 @@
         if (!authToken) window.location.href = '/teacher-login';
 
         let selectedFiles = [];
+        let lastQuestions = [];
 
         async function init() {
             try {
@@ -154,6 +168,7 @@
         }
 
         function renderResults(questions) {
+            lastQuestions = questions;
             const body = document.getElementById('eaResultBody');
             body.innerHTML = questions.map(q => `
                 <tr>
@@ -172,6 +187,56 @@
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
+        }
+
+        function todayStamp() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+        }
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function csvEscape(value) {
+            const str = String(value ?? '');
+            if (/[",\n]/.test(str)) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }
+
+        function downloadCsv() {
+            if (lastQuestions.length === 0) return;
+            const header = ['번호', '유형', '문법 포인트', '배점', '난이도', '모범답안(서술형)'];
+            const rows = lastQuestions.map(q => [
+                q.number, q.type, q.grammar_point || '', q.score ?? '', q.difficulty || '', q.model_answer || ''
+            ]);
+            const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
+            // UTF-8 BOM so Excel opens Korean text without mojibake
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+            triggerDownload(blob, `시험지분석_${todayStamp()}.csv`);
+        }
+
+        async function downloadImage() {
+            const target = document.getElementById('eaResultCard');
+            const btnGroup = document.querySelector('.ea-download-group');
+            btnGroup.style.visibility = 'hidden';
+            try {
+                const canvas = await html2canvas(target, { backgroundColor: '#ffffff', scale: 2 });
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                if (blob) triggerDownload(blob, `시험지분석_${todayStamp()}.png`);
+            } finally {
+                btnGroup.style.visibility = 'visible';
+            }
         }
     </script>
 </body>
