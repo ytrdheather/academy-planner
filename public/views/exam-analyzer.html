@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시험지 분석기 - 리디튜드</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/teacher.css">
+    <style>
+        .ea-wrap { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+        .ea-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .ea-drop { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 28px; text-align: center; color: #64748b; }
+        .ea-drop.dragover { border-color: #0d9488; background: #f0fdfa; }
+        .ea-files { margin-top: 12px; font-size: 13px; color: #475569; }
+        .ea-btn { background: #0d9488; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+        .ea-btn:disabled { background: #94a3b8; cursor: default; }
+        table.ea-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        table.ea-table th, table.ea-table td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; vertical-align: top; }
+        table.ea-table th { background: #f1f5f9; }
+        .ea-diff-상 { color: #dc2626; font-weight: 700; }
+        .ea-diff-중 { color: #d97706; font-weight: 700; }
+        .ea-diff-하 { color: #16a34a; font-weight: 700; }
+        .ea-status { font-size: 13px; color: #64748b; margin-top: 10px; }
+        .ea-error { color: #dc2626; font-size: 13px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="fixed-layout-top">
+        <div class="header">
+            <h1>🔎 시험지 분석기</h1>
+            <div class="user-info">
+                <span class="user-name" id="userName">로딩중...</span>
+                <a href="/teacher" style="margin-right:12px; color:#0d9488; font-weight:700; text-decoration:none;">← 대시보드</a>
+                <button class="logout-btn" onclick="logout()">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ea-wrap">
+        <div class="ea-card">
+            <h3>시험지 이미지 업로드</h3>
+            <p style="color:#64748b; font-size:13px;">한 시험지의 페이지 이미지를 여러 장 올릴 수 있어요. 업로드 후 분석하기를 누르면 문항별로 유형·문법포인트·배점·난이도를 표로 정리해줍니다.</p>
+            <div class="ea-drop" id="eaDrop">이미지를 여기로 끌어놓거나 클릭해서 선택하세요</div>
+            <input type="file" id="eaFileInput" accept="image/*" multiple style="display:none;">
+            <div class="ea-files" id="eaFileList"></div>
+            <button class="ea-btn" id="eaAnalyzeBtn" onclick="analyzeExam()">분석하기</button>
+            <div class="ea-status" id="eaStatus"></div>
+            <div class="ea-error" id="eaError"></div>
+        </div>
+
+        <div class="ea-card" id="eaResultCard" style="display:none;">
+            <h3>분석 결과</h3>
+            <table class="ea-table">
+                <thead>
+                    <tr>
+                        <th>번호</th><th>유형</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
+                    </tr>
+                </thead>
+                <tbody id="eaResultBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('teacher_auth_token');
+        if (!authToken) window.location.href = '/teacher-login';
+
+        let selectedFiles = [];
+
+        async function init() {
+            try {
+                const res = await fetch('/api/teacher/user-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error('auth failed');
+                const info = await res.json();
+                if (info.loginId !== 'manager') {
+                    window.location.href = '/teacher';
+                    return;
+                }
+                document.getElementById('userName').textContent = info.userName || '';
+            } catch (e) {
+                window.location.href = '/teacher-login';
+            }
+        }
+        init();
+
+        function logout() {
+            localStorage.removeItem('teacher_auth_token');
+            window.location.href = '/teacher-login';
+        }
+
+        const dropZone = document.getElementById('eaDrop');
+        const fileInput = document.getElementById('eaFileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            addFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+        function addFiles(fileListObj) {
+            selectedFiles = selectedFiles.concat(Array.from(fileListObj));
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const el = document.getElementById('eaFileList');
+            if (selectedFiles.length === 0) { el.textContent = ''; return; }
+            el.textContent = `선택된 이미지 ${selectedFiles.length}장: ` + selectedFiles.map(f => f.name).join(', ');
+        }
+
+        async function analyzeExam() {
+            const errorEl = document.getElementById('eaError');
+            const statusEl = document.getElementById('eaStatus');
+            errorEl.textContent = '';
+            if (selectedFiles.length === 0) {
+                errorEl.textContent = '이미지를 최소 1장 업로드해주세요.';
+                return;
+            }
+
+            const btn = document.getElementById('eaAnalyzeBtn');
+            btn.disabled = true;
+            statusEl.textContent = '분석 중입니다... (몇십 초 걸릴 수 있어요)';
+
+            try {
+                const formData = new FormData();
+                selectedFiles.forEach(f => formData.append('images', f));
+
+                const res = await fetch('/api/analyze-exam', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    errorEl.textContent = data.message || '분석에 실패했습니다.';
+                    statusEl.textContent = '';
+                    return;
+                }
+
+                renderResults(data.questions);
+                statusEl.textContent = `분석 완료 (${data.questions.length}문항)`;
+            } catch (e) {
+                errorEl.textContent = '분석 중 오류가 발생했습니다: ' + e.message;
+                statusEl.textContent = '';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function renderResults(questions) {
+            const body = document.getElementById('eaResultBody');
+            body.innerHTML = questions.map(q => `
+                <tr>
+                    <td>${escapeHtml(q.number)}</td>
+                    <td>${escapeHtml(q.type)}</td>
+                    <td>${escapeHtml(q.grammar_point || '')}</td>
+                    <td>${escapeHtml(String(q.score ?? ''))}</td>
+                    <td class="ea-diff-${escapeHtml(q.difficulty || '')}">${escapeHtml(q.difficulty || '')}</td>
+                    <td>${escapeHtml(q.model_answer || '')}</td>
+                </tr>
+            `).join('');
+            document.getElementById('eaResultCard').style.display = 'block';
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

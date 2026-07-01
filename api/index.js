@@ -11,6 +11,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // [모듈 Import]
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
+import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
 
 const {
     JWT_SECRET = 'dev-only-secret-readitude-2025',
@@ -198,6 +199,7 @@ app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'view
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
+app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
@@ -210,6 +212,10 @@ try {
         getRollupValue, getSimpleText, getKSTTodayRange, getKoreanDate
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
+
+try {
+    initializeExamAnalyzerRoutes({ app, requireAuth });
+} catch(e) { console.error('Exam Analyzer Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;
