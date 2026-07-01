@@ -66,7 +66,7 @@
                 <table class="ea-table" id="eaResultTable">
                     <thead>
                         <tr>
-                            <th>번호</th><th>유형</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
+                            <th>번호</th><th>유형</th><th>출제범위</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
                         </tr>
                     </thead>
                     <tbody id="eaResultBody"></tbody>
@@ -174,6 +174,7 @@
                 <tr>
                     <td>${escapeHtml(q.number)}</td>
                     <td>${escapeHtml(q.type)}</td>
+                    <td>${escapeHtml(q.source_type || '')}</td>
                     <td>${escapeHtml(q.grammar_point || '')}</td>
                     <td>${escapeHtml(String(q.score ?? ''))}</td>
                     <td class="ea-diff-${escapeHtml(q.difficulty || '')}">${escapeHtml(q.difficulty || '')}</td>
@@ -216,9 +217,9 @@
 
         function downloadCsv() {
             if (lastQuestions.length === 0) return;
-            const header = ['번호', '유형', '문법 포인트', '배점', '난이도', '모범답안(서술형)'];
+            const header = ['번호', '유형', '출제범위', '문법 포인트', '배점', '난이도', '모범답안(서술형)'];
             const rows = lastQuestions.map(q => [
-                q.number, q.type, q.grammar_point || '', q.score ?? '', q.difficulty || '', q.model_answer || ''
+                q.number, q.type, q.source_type || '', q.grammar_point || '', q.score ?? '', q.difficulty || '', q.model_answer || ''
             ]);
             const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
             // UTF-8 BOM so Excel opens Korean text without mojibake
