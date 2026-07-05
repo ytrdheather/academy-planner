@@ -58,7 +58,16 @@ function requireOwner(req, res, next) {
     next();
 }
 
-export function initializeExamAnalyzerRoutes({ app, requireAuth }) {
+// Notion rich_text 하나당 2000자 제한 -> 긴 JSON을 여러 조각으로 나눠 담는다
+function chunkToRichText(str, size = 1900) {
+    const chunks = [];
+    for (let i = 0; i < str.length; i += size) {
+        chunks.push({ type: 'text', text: { content: str.slice(i, i + size) } });
+    }
+    return chunks.length > 0 ? chunks : [{ type: 'text', text: { content: '' } }];
+}
+
+export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
         anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -107,6 +116,47 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth }) {
             res.json({ success: true, questions: toolUse.input.questions });
         } catch (error) {
             console.error('시험지 분석 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    app.post('/api/save-exam-analysis', requireAuth, requireOwner, async (req, res) => {
+        const { school, grade, year, semester, examType, questions } = req.body;
+
+        if (!school || !grade || !year || !semester || !examType) {
+            return res.status(400).json({ success: false, message: '학교/학년/시험년도/학기/시험종류를 모두 입력해주세요.' });
+        }
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ success: false, message: '저장할 문항이 없습니다.' });
+        }
+        if (!dbIds?.EXAM_DB_ID) {
+            return res.status(500).json({ success: false, message: 'EXAM_DB_ID가 설정되지 않았습니다.' });
+        }
+
+        const examTitle = `${school} ${grade} ${year} ${semester} ${examType}`;
+
+        try {
+            const result = await fetchNotion('https://api.notion.com/v1/pages', {
+                method: 'POST',
+                body: JSON.stringify({
+                    parent: { database_id: dbIds.EXAM_DB_ID },
+                    properties: {
+                        '시험명': { title: [{ text: { content: examTitle } }] },
+                        '학교': { select: { name: school } },
+                        '학년': { select: { name: grade } },
+                        '시험년도': { number: Number(year) },
+                        '학기': { select: { name: semester } },
+                        '시험종류': { select: { name: examType } },
+                        '문항수': { number: questions.length },
+                        '문항데이터': { rich_text: chunkToRichText(JSON.stringify(questions)) },
+                        '등록자': { rich_text: [{ text: { content: req.user.name || req.user.loginId } }] }
+                    }
+                })
+            });
+
+            res.json({ success: true, pageId: result.id, examTitle });
+        } catch (error) {
+            console.error('시험지 분석 저장 오류:', error);
             res.status(500).json({ success: false, message: error.message });
         }
     });

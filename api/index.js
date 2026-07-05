@@ -24,6 +24,7 @@ const {
     MONTHLY_REPORT_DB_ID,
     GRAMMAR_DB_ID,
     TEXTBOOK_DB_ID,
+    EXAM_DB_ID,
 } = process.env;
 
 // [핵심] HTTPS 강제
@@ -214,7 +215,7 @@ try {
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
 try {
-    initializeExamAnalyzerRoutes({ app, requireAuth });
+    initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds: { EXAM_DB_ID } });
 } catch(e) { console.error('Exam Analyzer Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {

@@ -27,6 +27,14 @@
         .ea-diff-하 { color: #16a34a; font-weight: 700; }
         .ea-status { font-size: 13px; color: #64748b; margin-top: 10px; }
         .ea-error { color: #dc2626; font-size: 13px; margin-top: 10px; }
+        .ea-meta-form { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ea-meta-field { display: flex; flex-direction: column; gap: 4px; }
+        .ea-meta-field label { font-size: 12px; color: #64748b; font-weight: 700; }
+        .ea-meta-field input, .ea-meta-field select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+        table.ea-table input, table.ea-table select { width: 100%; border: 1px solid transparent; background: transparent; font-size: 13px; padding: 4px; border-radius: 4px; font-family: inherit; }
+        table.ea-table input:hover, table.ea-table select:hover, table.ea-table input:focus, table.ea-table select:focus { border-color: #cbd5e1; background: #fff; }
+        .ea-save-btn { background: #7c3aed; }
+        .ea-save-status { font-size: 13px; margin-top: 10px; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -62,16 +70,53 @@
                     <button class="ea-download-btn" onclick="downloadImage()">🖼️ 그림으로 다운로드</button>
                 </div>
             </div>
+
+            <div class="ea-meta-form">
+                <div class="ea-meta-field">
+                    <label>학교</label>
+                    <input type="text" id="eaSchool" placeholder="예: OO중학교">
+                </div>
+                <div class="ea-meta-field">
+                    <label>학년</label>
+                    <select id="eaGrade">
+                        <option value="1학년">1학년</option>
+                        <option value="2학년">2학년</option>
+                        <option value="3학년">3학년</option>
+                    </select>
+                </div>
+                <div class="ea-meta-field">
+                    <label>시험년도</label>
+                    <input type="number" id="eaYear" value="2026">
+                </div>
+                <div class="ea-meta-field">
+                    <label>학기</label>
+                    <select id="eaSemester">
+                        <option value="1학기">1학기</option>
+                        <option value="2학기">2학기</option>
+                    </select>
+                </div>
+                <div class="ea-meta-field">
+                    <label>시험종류</label>
+                    <select id="eaExamType">
+                        <option value="중간고사">중간고사</option>
+                        <option value="기말고사">기말고사</option>
+                    </select>
+                </div>
+            </div>
+
             <div id="eaResultTableWrap">
                 <table class="ea-table" id="eaResultTable">
                     <thead>
                         <tr>
-                            <th>번호</th><th>유형</th><th>출제범위</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>모범답안(서술형)</th>
+                            <th>번호</th><th>유형</th><th>출제범위</th><th>문법 포인트</th><th>배점</th><th>난이도</th><th>정답 / 모범답안</th>
                         </tr>
                     </thead>
                     <tbody id="eaResultBody"></tbody>
                 </table>
             </div>
+
+            <button class="ea-btn ea-save-btn" id="eaSaveBtn" onclick="saveExamAnalysis()">💾 저장하기</button>
+            <div class="ea-save-status" id="eaSaveStatus"></div>
         </div>
     </div>
 
@@ -81,6 +126,14 @@
 
         let selectedFiles = [];
         let lastQuestions = [];
+
+        const QUESTION_TYPES = ['어휘추론', '영영풀이', '어구추론', '내용일치', '어법이해', '서술형', '알맞은 대화 응답 찾기', '주제찾기', '기타'];
+        const SOURCE_TYPES = ['대화문', '지문', '해당없음'];
+        const DIFFICULTIES = ['상', '중', '하'];
+
+        function selectHtml(options, selected) {
+            return options.map(opt => `<option value="${escapeHtml(opt)}" ${opt === selected ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('');
+        }
 
         async function init() {
             try {
@@ -170,18 +223,76 @@
         function renderResults(questions) {
             lastQuestions = questions;
             const body = document.getElementById('eaResultBody');
-            body.innerHTML = questions.map(q => `
-                <tr>
-                    <td>${escapeHtml(q.number)}</td>
-                    <td>${escapeHtml(q.type)}</td>
-                    <td>${escapeHtml(q.source_type || '')}</td>
-                    <td>${escapeHtml(q.grammar_point || '')}</td>
-                    <td>${escapeHtml(String(q.score ?? ''))}</td>
-                    <td class="ea-diff-${escapeHtml(q.difficulty || '')}">${escapeHtml(q.difficulty || '')}</td>
-                    <td>${escapeHtml(q.model_answer || '')}</td>
+            body.innerHTML = questions.map((q, i) => `
+                <tr data-idx="${i}">
+                    <td><input type="text" data-field="number" value="${escapeHtml(q.number)}"></td>
+                    <td><select data-field="type">${selectHtml(QUESTION_TYPES, q.type)}</select></td>
+                    <td><select data-field="source_type">${selectHtml(SOURCE_TYPES, q.source_type || '해당없음')}</select></td>
+                    <td><input type="text" data-field="grammar_point" value="${escapeHtml(q.grammar_point || '')}"></td>
+                    <td><input type="number" data-field="score" value="${escapeHtml(String(q.score ?? ''))}"></td>
+                    <td><select data-field="difficulty">${selectHtml(DIFFICULTIES, q.difficulty || '중')}</select></td>
+                    <td><input type="text" data-field="answer" value="${escapeHtml(q.model_answer || '')}"></td>
                 </tr>
             `).join('');
             document.getElementById('eaResultCard').style.display = 'block';
+            document.getElementById('eaSaveStatus').textContent = '';
+        }
+
+        function collectEditedQuestions() {
+            return Array.from(document.querySelectorAll('#eaResultBody tr')).map(row => {
+                const get = field => row.querySelector(`[data-field="${field}"]`).value;
+                return {
+                    number: get('number'),
+                    type: get('type'),
+                    source_type: get('source_type'),
+                    grammar_point: get('grammar_point'),
+                    score: Number(get('score')) || 0,
+                    difficulty: get('difficulty'),
+                    answer: get('answer')
+                };
+            });
+        }
+
+        async function saveExamAnalysis() {
+            const statusEl = document.getElementById('eaSaveStatus');
+            const school = document.getElementById('eaSchool').value.trim();
+            const grade = document.getElementById('eaGrade').value;
+            const year = document.getElementById('eaYear').value;
+            const semester = document.getElementById('eaSemester').value;
+            const examType = document.getElementById('eaExamType').value;
+
+            if (!school) {
+                statusEl.style.color = '#dc2626';
+                statusEl.textContent = '학교명을 입력해주세요.';
+                return;
+            }
+
+            const questions = collectEditedQuestions();
+            const btn = document.getElementById('eaSaveBtn');
+            btn.disabled = true;
+            statusEl.style.color = '#64748b';
+            statusEl.textContent = '저장 중...';
+
+            try {
+                const res = await fetch('/api/save-exam-analysis', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ school, grade, year, semester, examType, questions })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    statusEl.style.color = '#dc2626';
+                    statusEl.textContent = data.message || '저장에 실패했습니다.';
+                    return;
+                }
+                statusEl.style.color = '#16a34a';
+                statusEl.textContent = `저장 완료: ${data.examTitle}`;
+            } catch (e) {
+                statusEl.style.color = '#dc2626';
+                statusEl.textContent = '저장 중 오류가 발생했습니다: ' + e.message;
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         function escapeHtml(str) {
@@ -217,9 +328,9 @@
 
         function downloadCsv() {
             if (lastQuestions.length === 0) return;
-            const header = ['번호', '유형', '출제범위', '문법 포인트', '배점', '난이도', '모범답안(서술형)'];
-            const rows = lastQuestions.map(q => [
-                q.number, q.type, q.source_type || '', q.grammar_point || '', q.score ?? '', q.difficulty || '', q.model_answer || ''
+            const header = ['번호', '유형', '출제범위', '문법 포인트', '배점', '난이도', '정답/모범답안'];
+            const rows = collectEditedQuestions().map(q => [
+                q.number, q.type, q.source_type || '', q.grammar_point || '', q.score ?? '', q.difficulty || '', q.answer || ''
             ]);
             const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
             // UTF-8 BOM so Excel opens Korean text without mojibake
