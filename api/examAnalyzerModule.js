@@ -58,15 +58,6 @@ function requireOwner(req, res, next) {
     next();
 }
 
-// Notion rich_text 하나당 2000자 제한 -> 긴 JSON을 여러 조각으로 나눠 담는다
-function chunkToRichText(str, size = 1900) {
-    const chunks = [];
-    for (let i = 0; i < str.length; i += size) {
-        chunks.push({ type: 'text', text: { content: str.slice(i, i + size) } });
-    }
-    return chunks.length > 0 ? chunks : [{ type: 'text', text: { content: '' } }];
-}
-
 export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
@@ -129,14 +120,15 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
         if (!Array.isArray(questions) || questions.length === 0) {
             return res.status(400).json({ success: false, message: '저장할 문항이 없습니다.' });
         }
-        if (!dbIds?.EXAM_DB_ID) {
-            return res.status(500).json({ success: false, message: 'EXAM_DB_ID가 설정되지 않았습니다.' });
+        if (!dbIds?.EXAM_DB_ID || !dbIds?.QUESTION_DB_ID) {
+            return res.status(500).json({ success: false, message: 'EXAM_DB_ID / QUESTION_DB_ID가 설정되지 않았습니다.' });
         }
 
         const examTitle = `${school} ${grade} ${year} ${semester} ${examType}`;
 
         try {
-            const result = await fetchNotion('https://api.notion.com/v1/pages', {
+            // 1) 부모 시험 페이지 생성 (시험 1개 = 1줄)
+            const examPage = await fetchNotion('https://api.notion.com/v1/pages', {
                 method: 'POST',
                 body: JSON.stringify({
                     parent: { database_id: dbIds.EXAM_DB_ID },
@@ -148,13 +140,32 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
                         '학기': { select: { name: semester } },
                         '시험종류': { select: { name: examType } },
                         '문항수': { number: questions.length },
-                        '문항데이터': { rich_text: chunkToRichText(JSON.stringify(questions)) },
                         '등록자': { rich_text: [{ text: { content: req.user.name || req.user.loginId } }] }
                     }
                 })
             });
 
-            res.json({ success: true, pageId: result.id, examTitle });
+            // 2) 문항별 페이지 생성 (문항 1개 = 1줄, 시험 relation으로 연결)
+            //    Notion 페이지 생성은 개별 요청이라 순차 처리(속도보다 안정성 우선)
+            for (const q of questions) {
+                const props = {
+                    '번호': { title: [{ text: { content: String(q.number ?? '') } }] },
+                    '시험': { relation: [{ id: examPage.id }] },
+                    '배점': { number: Number(q.score) || 0 },
+                    '문법포인트': { rich_text: [{ text: { content: String(q.grammar_point ?? '') } }] },
+                    '정답': { rich_text: [{ text: { content: String(q.answer ?? '') } }] }
+                };
+                if (q.type) props['유형'] = { select: { name: q.type } };
+                if (q.source_type) props['출제범위'] = { select: { name: q.source_type } };
+                if (q.difficulty) props['난이도'] = { select: { name: q.difficulty } };
+
+                await fetchNotion('https://api.notion.com/v1/pages', {
+                    method: 'POST',
+                    body: JSON.stringify({ parent: { database_id: dbIds.QUESTION_DB_ID }, properties: props })
+                });
+            }
+
+            res.json({ success: true, pageId: examPage.id, examTitle, savedCount: questions.length });
         } catch (error) {
             console.error('시험지 분석 저장 오류:', error);
             res.status(500).json({ success: false, message: error.message });
