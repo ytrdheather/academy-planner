@@ -26,6 +26,8 @@ const {
     TEXTBOOK_DB_ID,
     EXAM_DB_ID,
     QUESTION_DB_ID,
+    STUDENT_RESULT_DB_ID,
+    STUDENT_ANSWER_DB_ID,
 } = process.env;
 
 // [핵심] HTTPS 강제
@@ -202,6 +204,7 @@ app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 't
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
+app.get('/student-grader', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-grader.html')));
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
@@ -216,7 +219,7 @@ try {
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
 try {
-    initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds: { EXAM_DB_ID, QUESTION_DB_ID } });
+    initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds: { EXAM_DB_ID, QUESTION_DB_ID, STUDENT_RESULT_DB_ID, STUDENT_ANSWER_DB_ID } });
 } catch(e) { console.error('Exam Analyzer Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {

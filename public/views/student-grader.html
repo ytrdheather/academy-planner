@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 답안 채점기 - 리디튜드</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/teacher.css">
+    <style>
+        .sg-wrap { max-width: 1050px; margin: 0 auto; padding: 24px 16px; flex: 1 1 auto; overflow-y: auto; width: 100%; }
+        .sg-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .sg-meta-form { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: flex-end; }
+        .sg-field { display: flex; flex-direction: column; gap: 4px; }
+        .sg-field label { font-size: 12px; color: #64748b; font-weight: 700; }
+        .sg-field input, .sg-field select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: inherit; }
+        .sg-field select.wide { min-width: 320px; }
+        .sg-drop { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 24px; text-align: center; color: #64748b; }
+        .sg-drop.dragover { border-color: #7c3aed; background: #faf5ff; }
+        .sg-files { margin-top: 10px; font-size: 13px; color: #475569; }
+        .sg-btn { background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+        .sg-btn:disabled { background: #94a3b8; cursor: default; }
+        .sg-btn.save { background: #0d9488; }
+        .sg-status { font-size: 13px; color: #64748b; margin-top: 10px; }
+        .sg-error { color: #dc2626; font-size: 13px; margin-top: 10px; }
+        table.sg-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table.sg-table th, table.sg-table td { border: 1px solid #e2e8f0; padding: 7px 9px; text-align: left; vertical-align: top; }
+        table.sg-table th { background: #f1f5f9; }
+        table.sg-table select, table.sg-table input { width: 100%; border: 1px solid transparent; background: transparent; font-size: 13px; padding: 4px; border-radius: 4px; font-family: inherit; }
+        table.sg-table select:hover, table.sg-table input:hover, table.sg-table select:focus, table.sg-table input:focus { border-color: #cbd5e1; background: #fff; }
+        tr.v-정답 { background: #f0fdf4; }
+        tr.v-오답 { background: #fef2f2; }
+        tr.v-채점대기 { background: #fffbeb; }
+        .sg-summary { font-size: 15px; font-weight: 700; margin: 14px 0 4px; }
+        .sg-summary .pts { color: #7c3aed; }
+    </style>
+</head>
+<body>
+
+    <div class="fixed-layout-top">
+        <div class="header">
+            <h1>📝 학생 답안 채점기</h1>
+            <div class="user-info">
+                <span class="user-name" id="userName">로딩중...</span>
+                <a href="/teacher" style="margin-right:12px; color:#0d9488; font-weight:700; text-decoration:none;">← 대시보드</a>
+                <a href="/exam-analyzer" style="margin-right:12px; color:#7c3aed; font-weight:700; text-decoration:none;">🔎 시험지 분석기</a>
+                <button class="logout-btn" onclick="logout()">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sg-wrap">
+        <div class="sg-card">
+            <h3>학생 답안 업로드</h3>
+            <p style="color:#64748b; font-size:13px;">먼저 채점할 시험(저장된 정답지)을 고르고, 학생 이름을 입력한 뒤 답안 이미지를 올리세요. 채점하기를 누르면 정답지와 대조해 문항별 정오·점수를 계산합니다. (서술형은 자동 채점하지 않고 선생님이 O/X를 정합니다.)</p>
+
+            <div class="sg-meta-form">
+                <div class="sg-field">
+                    <label>시험(정답지)</label>
+                    <select id="sgExam" class="wide"><option value="">— 저장된 시험 불러오는 중 —</option></select>
+                </div>
+                <div class="sg-field">
+                    <label>학생 이름</label>
+                    <input type="text" id="sgStudent" placeholder="예: 김재은">
+                </div>
+            </div>
+
+            <div class="sg-drop" id="sgDrop">답안 이미지를 여기로 끌어놓거나 클릭해서 선택하세요</div>
+            <input type="file" id="sgFileInput" accept="image/*" multiple style="display:none;">
+            <div class="sg-files" id="sgFileList"></div>
+            <button class="sg-btn" id="sgGradeBtn" onclick="gradeStudent()">채점하기</button>
+            <div class="sg-status" id="sgStatus"></div>
+            <div class="sg-error" id="sgError"></div>
+        </div>
+
+        <div class="sg-card" id="sgResultCard" style="display:none;">
+            <h3>채점 결과</h3>
+            <div class="sg-summary" id="sgSummary"></div>
+            <p style="color:#64748b; font-size:12px; margin-top:0;">정오는 직접 수정할 수 있어요. 특히 <b>서술형(채점대기)</b>은 학생답과 정답을 비교해 정답/오답으로 바꿔주세요.</p>
+            <table class="sg-table">
+                <thead>
+                    <tr>
+                        <th style="width:48px;">번호</th><th style="width:110px;">유형</th><th>문법 포인트</th><th style="width:90px;">정답</th><th>학생답</th><th style="width:90px;">정오</th><th style="width:56px;">배점</th>
+                    </tr>
+                </thead>
+                <tbody id="sgResultBody"></tbody>
+            </table>
+            <button class="sg-btn save" id="sgSaveBtn" onclick="saveResult()">💾 저장하기</button>
+            <div class="sg-status" id="sgSaveStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('teacher_auth_token');
+        if (!authToken) window.location.href = '/teacher-login';
+
+        let selectedFiles = [];
+        let examList = [];
+        const VERDICTS = ['정답', '오답', '채점대기'];
+
+        async function init() {
+            try {
+                const res = await fetch('/api/teacher/user-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error('auth failed');
+                const info = await res.json();
+                if (info.loginId !== 'manager') { window.location.href = '/teacher'; return; }
+                document.getElementById('userName').textContent = info.userName || '';
+                loadExams();
+            } catch (e) {
+                window.location.href = '/teacher-login';
+            }
+        }
+        init();
+
+        function logout() {
+            localStorage.removeItem('teacher_auth_token');
+            window.location.href = '/teacher-login';
+        }
+
+        async function loadExams() {
+            const sel = document.getElementById('sgExam');
+            try {
+                const res = await fetch('/api/exam-list', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const data = await res.json();
+                if (!data.success || !data.exams.length) {
+                    sel.innerHTML = '<option value="">저장된 시험이 없습니다 — 먼저 시험지 분석기에서 저장하세요</option>';
+                    return;
+                }
+                examList = data.exams;
+                sel.innerHTML = '<option value="">— 시험을 선택하세요 —</option>' +
+                    data.exams.map(e => `<option value="${e.pageId}">${escapeHtml(e.examTitle)} (${e.questionCount}문항)</option>`).join('');
+            } catch (e) {
+                sel.innerHTML = '<option value="">시험 목록을 불러오지 못했습니다</option>';
+            }
+        }
+
+        const dropZone = document.getElementById('sgDrop');
+        const fileInput = document.getElementById('sgFileInput');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+        function addFiles(list) {
+            selectedFiles = selectedFiles.concat(Array.from(list));
+            const el = document.getElementById('sgFileList');
+            el.textContent = selectedFiles.length ? `선택된 이미지 ${selectedFiles.length}장: ` + selectedFiles.map(f => f.name).join(', ') : '';
+        }
+
+        async function gradeStudent() {
+            const errorEl = document.getElementById('sgError');
+            const statusEl = document.getElementById('sgStatus');
+            errorEl.textContent = '';
+            const examPageId = document.getElementById('sgExam').value;
+            const studentName = document.getElementById('sgStudent').value.trim();
+
+            if (!examPageId) { errorEl.textContent = '채점할 시험을 선택해주세요.'; return; }
+            if (!studentName) { errorEl.textContent = '학생 이름을 입력해주세요.'; return; }
+            if (selectedFiles.length === 0) { errorEl.textContent = '답안 이미지를 최소 1장 올려주세요.'; return; }
+
+            const btn = document.getElementById('sgGradeBtn');
+            btn.disabled = true;
+            statusEl.textContent = '채점 중입니다... (몇십 초 걸릴 수 있어요)';
+
+            try {
+                const formData = new FormData();
+                formData.append('examPageId', examPageId);
+                formData.append('studentName', studentName);
+                selectedFiles.forEach(f => formData.append('images', f));
+
+                const res = await fetch('/api/grade-student', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+                const data = await res.json();
+                if (!data.success) { errorEl.textContent = data.message || '채점에 실패했습니다.'; statusEl.textContent = ''; return; }
+
+                renderGraded(data.graded);
+                statusEl.textContent = `채점 완료 (${data.graded.length}문항). 아래에서 확인·수정 후 저장하세요.`;
+            } catch (e) {
+                errorEl.textContent = '채점 중 오류가 발생했습니다: ' + e.message;
+                statusEl.textContent = '';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function renderGraded(graded) {
+            window.__gradedBase = graded;
+            const body = document.getElementById('sgResultBody');
+            body.innerHTML = graded.map((g, i) => `
+                <tr class="v-${escapeHtml(g.verdict)}" data-idx="${i}">
+                    <td>${escapeHtml(g.number)}</td>
+                    <td>${escapeHtml(g.type || '')}</td>
+                    <td>${escapeHtml(g.grammar_point || '')}</td>
+                    <td>${escapeHtml(g.answer || '')}</td>
+                    <td><input type="text" data-field="student_answer" value="${escapeHtml(g.student_answer || '')}"></td>
+                    <td><select data-field="verdict" onchange="onVerdictChange(this)">${VERDICTS.map(v => `<option value="${v}" ${v === g.verdict ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+                    <td>${escapeHtml(String(g.score ?? ''))}</td>
+                </tr>
+            `).join('');
+            document.getElementById('sgResultCard').style.display = 'block';
+            document.getElementById('sgSaveStatus').textContent = '';
+            updateSummary();
+        }
+
+        function onVerdictChange(sel) {
+            const tr = sel.closest('tr');
+            tr.className = 'v-' + sel.value;
+            updateSummary();
+        }
+
+        function collectGraded() {
+            const rows = document.querySelectorAll('#sgResultBody tr');
+            return Array.from(rows).map((row, i) => {
+                const g = window.__gradedBase[i];
+                return {
+                    ...g,
+                    student_answer: row.querySelector('[data-field="student_answer"]').value,
+                    verdict: row.querySelector('[data-field="verdict"]').value
+                };
+            });
+        }
+
+        function updateSummary() {
+            const rows = document.querySelectorAll('#sgResultBody tr');
+            let score = 0, full = 0, correct = 0, wrong = 0, pending = 0;
+            rows.forEach((row, i) => {
+                const g = window.__gradedBase[i];
+                const verdict = row.querySelector('[data-field="verdict"]').value;
+                full += Number(g.score) || 0;
+                if (verdict === '정답') { score += Number(g.score) || 0; correct++; }
+                else if (verdict === '오답') wrong++;
+                else pending++;
+            });
+            const el = document.getElementById('sgSummary');
+            el.innerHTML = `총점 <span class="pts">${score} / ${full}</span> &nbsp;·&nbsp; 정답 ${correct} · 오답 ${wrong}` + (pending ? ` · 채점대기 ${pending}` : '');
+        }
+
+        async function saveResult() {
+            const statusEl = document.getElementById('sgSaveStatus');
+            const examSel = document.getElementById('sgExam');
+            const examPageId = examSel.value;
+            const studentName = document.getElementById('sgStudent').value.trim();
+            const exam = examList.find(e => e.pageId === examPageId) || {};
+
+            const graded = collectGraded();
+            const btn = document.getElementById('sgSaveBtn');
+            btn.disabled = true;
+            statusEl.style.color = '#64748b';
+            statusEl.textContent = '저장 중...';
+
+            try {
+                const res = await fetch('/api/save-student-result', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        examPageId, studentName,
+                        school: exam.school, grade: exam.grade, examType: exam.examType,
+                        graded
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) { statusEl.style.color = '#dc2626'; statusEl.textContent = data.message || '저장 실패'; return; }
+                statusEl.style.color = '#16a34a';
+                statusEl.textContent = `저장 완료 — ${data.report}`;
+            } catch (e) {
+                statusEl.style.color = '#dc2626';
+                statusEl.textContent = '저장 중 오류: ' + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
