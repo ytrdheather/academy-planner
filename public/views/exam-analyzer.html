@@ -231,7 +231,7 @@
                     <td><input type="text" data-field="grammar_point" value="${escapeHtml(q.grammar_point || '')}"></td>
                     <td><input type="number" data-field="score" value="${escapeHtml(String(q.score ?? ''))}"></td>
                     <td><select data-field="difficulty">${selectHtml(DIFFICULTIES, q.difficulty || '중')}</select></td>
-                    <td><input type="text" data-field="answer" value="${escapeHtml(q.model_answer || '')}"></td>
+                    <td><input type="text" data-field="answer" value="${escapeHtml(q.answer || '')}"></td>
                 </tr>
             `).join('');
             document.getElementById('eaResultCard').style.display = 'block';
