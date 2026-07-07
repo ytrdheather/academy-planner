@@ -128,7 +128,7 @@
         let lastQuestions = [];
 
         const QUESTION_TYPES = ['어휘추론', '영영풀이', '어구추론', '내용일치', '어법이해', '서술형', '알맞은 대화 응답 찾기', '주제찾기', '기타'];
-        const SOURCE_TYPES = ['대화문', '지문', '해당없음'];
+        const SOURCE_TYPES = ['교과서본문', '외부지문', '대화문', '학습지'];
         const DIFFICULTIES = ['상', '중', '하'];
 
         function selectHtml(options, selected) {
@@ -227,7 +227,7 @@
                 <tr data-idx="${i}">
                     <td><input type="text" data-field="number" value="${escapeHtml(q.number)}"></td>
                     <td><select data-field="type">${selectHtml(QUESTION_TYPES, q.type)}</select></td>
-                    <td><select data-field="source_type">${selectHtml(SOURCE_TYPES, q.source_type || '해당없음')}</select></td>
+                    <td><select data-field="source_type">${selectHtml(SOURCE_TYPES, q.source_type || '교과서본문')}</select></td>
                     <td><input type="text" data-field="grammar_point" value="${escapeHtml(q.grammar_point || '')}"></td>
                     <td><input type="number" data-field="score" value="${escapeHtml(String(q.score ?? ''))}"></td>
                     <td><select data-field="difficulty">${selectHtml(DIFFICULTIES, q.difficulty || '중')}</select></td>
