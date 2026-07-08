@@ -75,7 +75,10 @@
         <div class="rv-card" id="rvDetailCard" style="display:none;">
             <div class="rv-detail-head">
                 <h3 id="rvDetailTitle" style="margin:0;">문항별 상세</h3>
-                <span class="rv-score" id="rvDetailScore"></span>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button class="rv-btn" style="background:#7c3aed;" id="rvReportBtn" onclick="openReport()">📄 분석 리포트</button>
+                    <span class="rv-score" id="rvDetailScore"></span>
+                </div>
             </div>
             <div class="rv-muted" id="rvDetailReport" style="margin:6px 0 10px;"></div>
             <table class="rv-table">
@@ -94,6 +97,7 @@
         let mode = 'exam';
         let examMap = {}; // pageId -> examTitle
         let resultMeta = {}; // resultId -> { title, score, fullScore, report }
+        let currentResultId = null;
 
         async function init() {
             try {
@@ -207,7 +211,12 @@
             else area.innerHTML = table;
         }
 
+        function openReport() {
+            if (currentResultId) window.open('/student-report?resultId=' + encodeURIComponent(currentResultId), '_blank');
+        }
+
         async function openDetail(resultId) {
+            currentResultId = resultId;
             const meta = resultMeta[resultId] || { title: '', score: '', fullScore: '', report: '' };
             const card = document.getElementById('rvDetailCard');
             card.style.display = 'block';

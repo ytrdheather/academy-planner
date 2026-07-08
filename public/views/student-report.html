@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시험 분석 리포트 - 리디튜드</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'NanumSquareRound', -apple-system, sans-serif; background: #f1f5f9; color: #1e293b; }
+        .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+        .toolbar .left { margin-right: auto; font-weight: 800; color: #7c3aed; }
+        .btn { border: none; border-radius: 8px; padding: 9px 18px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px; }
+        .btn.print { background: #7c3aed; color: #fff; }
+        .btn.back { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+        .page { max-width: 800px; margin: 20px auto; background: #fff; padding: 40px 44px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .rep-head { text-align: center; border-bottom: 3px solid #7c3aed; padding-bottom: 16px; margin-bottom: 22px; }
+        .rep-head .brand { color: #7c3aed; font-weight: 800; letter-spacing: 1px; }
+        .rep-head h1 { font-size: 24px; margin: 8px 0 4px; }
+        .rep-head .meta { color: #64748b; font-size: 14px; }
+        .score-row { display: flex; gap: 14px; margin: 20px 0; flex-wrap: wrap; }
+        .score-box { flex: 1 1 0; min-width: 120px; text-align: center; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+        .score-box .num { font-size: 26px; font-weight: 800; color: #7c3aed; }
+        .score-box .lab { font-size: 13px; color: #64748b; margin-top: 2px; }
+        section { margin: 22px 0; }
+        section h2 { font-size: 17px; border-left: 4px solid #7c3aed; padding-left: 10px; margin-bottom: 10px; }
+        .chips span { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; margin: 2px 4px 2px 0; }
+        .chip-good { background: #dcfce7; color: #15803d; }
+        .chip-weak { background: #fee2e2; color: #b91c1c; }
+        .comment { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 16px; line-height: 1.7; white-space: pre-wrap; }
+        ol.recs { margin: 0; padding-left: 20px; line-height: 1.9; }
+        table.wrongs { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+        table.wrongs th, table.wrongs td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+        table.wrongs th { background: #f8fafc; }
+        .muted { color: #64748b; }
+        .foot { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 26px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .page { box-shadow: none; margin: 0; max-width: none; padding: 0 10px; }
+            section { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <span class="left">📄 시험 분석 리포트</span>
+        <button class="btn back" onclick="window.close()">닫기</button>
+        <button class="btn print" onclick="window.print()">🖨️ 인쇄 / PDF로 저장</button>
+    </div>
+
+    <div class="page" id="page">
+        <p class="muted" style="text-align:center; padding:60px 0;">리포트를 불러오는 중입니다...</p>
+    </div>
+
+    <script>
+        const authToken = localStorage.getItem('teacher_auth_token');
+        const resultId = new URLSearchParams(location.search).get('resultId');
+
+        function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+
+        async function load() {
+            if (!authToken) { location.href = '/teacher-login'; return; }
+            if (!resultId) { document.getElementById('page').innerHTML = '<p class="muted">resultId가 없습니다.</p>'; return; }
+            try {
+                const res = await fetch('/api/student-report-data?resultId=' + encodeURIComponent(resultId), { headers: { 'Authorization': 'Bearer ' + authToken } });
+                const data = await res.json();
+                if (!data.success) { document.getElementById('page').innerHTML = `<p class="muted">오류: ${escapeHtml(data.message)}</p>`; return; }
+                render(data);
+            } catch (e) {
+                document.getElementById('page').innerHTML = `<p class="muted">불러오기 오류: ${escapeHtml(e.message)}</p>`;
+            }
+        }
+
+        function render(d) {
+            const s = d.student;
+            const sum = d.summary;
+            const title = s.examTitle || `${s.school} ${s.grade} ${s.examType}`;
+
+            const strengthChips = d.strengths.length
+                ? d.strengths.map(t => `<span class="chip-good">${escapeHtml(t)}</span>`).join('')
+                : '<span class="muted">이번 시험에서 특별히 두드러진 강점 유형은 집계되지 않았어요.</span>';
+
+            const weakChips = d.weaknesses.types.length
+                ? d.weaknesses.types.map(w => `<span class="chip-weak">${escapeHtml(w.type)} (${w.wrong}문항)</span>`).join('')
+                : '<span class="muted">약점으로 분류된 유형이 없어요. 훌륭합니다!</span>';
+
+            const grammarLine = d.weaknesses.grammar.length
+                ? `<div style="margin-top:6px;"><b>보완할 문법:</b> ${d.weaknesses.grammar.map(g => `<span class="chip-weak">${escapeHtml(g)}</span>`).join('')}</div>`
+                : '';
+
+            const recs = d.recommendations.length
+                ? `<ol class="recs">${d.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ol>`
+                : '<p class="muted">모든 문항을 잘 풀어 특별한 보완 대책이 필요하지 않아요.</p>';
+
+            const wrongsRows = d.wrongQuestions.length
+                ? d.wrongQuestions.map(q => `<tr>
+                        <td>${escapeHtml(q.number)}</td>
+                        <td>${escapeHtml(q.type)}</td>
+                        <td>${escapeHtml(q.source_type)}</td>
+                        <td>${escapeHtml(q.grammar_point)}</td>
+                        <td>${escapeHtml(q.answer)}</td>
+                        <td>${escapeHtml(q.student_answer)}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="6" class="muted">틀린 문항이 없습니다.</td></tr>';
+
+            const pendingNote = sum.essayStatus === '대기'
+                ? '<p class="muted" style="margin-top:4px;">※ 서술형은 아직 채점 대기 중인 문항이 있어 점수가 달라질 수 있어요.</p>' : '';
+
+            document.getElementById('page').innerHTML = `
+                <div class="rep-head">
+                    <div class="brand">READITUDE 리디튜드 영어학원</div>
+                    <h1>${escapeHtml(s.name)} 학생 시험 분석 리포트</h1>
+                    <div class="meta">${escapeHtml(title)}${s.date ? ' · ' + escapeHtml(s.date) : ''}</div>
+                </div>
+
+                <div class="score-row">
+                    <div class="score-box"><div class="num">${sum.score}<span style="font-size:15px;color:#94a3b8;"> / ${sum.fullScore}</span></div><div class="lab">점수</div></div>
+                    <div class="score-box"><div class="num">${sum.percent}%</div><div class="lab">득점률</div></div>
+                    <div class="score-box"><div class="num">${sum.correctCount}</div><div class="lab">맞은 문항</div></div>
+                    <div class="score-box"><div class="num">${sum.wrongCount}</div><div class="lab">틀린 문항</div></div>
+                </div>
+                ${pendingNote}
+
+                <section>
+                    <h2>💬 종합 코멘트</h2>
+                    <div class="comment">${escapeHtml(d.overallComment)}</div>
+                </section>
+
+                <section>
+                    <h2>✅ 강점</h2>
+                    <div class="chips">${strengthChips}</div>
+                </section>
+
+                <section>
+                    <h2>⚠️ 약점</h2>
+                    <div class="chips">${weakChips}</div>
+                    ${grammarLine}
+                </section>
+
+                <section>
+                    <h2>📌 다음 시험 대비 학습 대책</h2>
+                    ${recs}
+                </section>
+
+                <section>
+                    <h2>📝 틀린 문항 요약</h2>
+                    <table class="wrongs">
+                        <thead><tr><th>번호</th><th>유형</th><th>출제범위</th><th>문법</th><th>정답</th><th>학생답</th></tr></thead>
+                        <tbody>${wrongsRows}</tbody>
+                    </table>
+                </section>
+
+                <div class="foot">본 리포트는 리디튜드 영어학원 시험 분석 시스템으로 자동 생성되었습니다.</div>
+            `;
+        }
+
+        load();
+    </script>
+</body>
+</html>

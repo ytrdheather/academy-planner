@@ -143,12 +143,32 @@ async function loadAnswerKey(fetchNotion, questionDbId, examPageId) {
         return {
             number: P['번호']?.title?.[0]?.plain_text || '',
             type: P['유형']?.select?.name || '',
+            source_type: P['출제범위']?.select?.name || '',
             grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
             answer: P['정답']?.rich_text?.[0]?.plain_text || '',
             score: P['배점']?.number || 0
         };
     }).sort((a, b) => naturalNumberSort(a.number, b.number));
 }
+
+// 규칙 기반 대책 매핑 (선생님이 지정한 유형·출제범위별 학습 처방)
+const TYPE_ADVICE = {
+    '어휘추론': '교과서 본문 어휘와 학습지 단어를 정확히 암기하고, 문맥 속 의미를 추론하는 연습을 하세요.',
+    '영영풀이': '학교 학습지의 영영풀이(영어 정의) 어휘를 반복해서 확인·암기하세요.',
+    '어구추론': '지문 속 표현·숙어의 문맥상 의미를 파악하는 연습이 필요합니다.',
+    '내용일치': '지문을 꼼꼼히 읽고 선택지와 세부 정보를 하나씩 대조하는 연습을 하세요.',
+    '어법이해': '틀린 문항의 오답 풀이를 확실히 하고, 해당 문법 포인트를 개념부터 다시 복습하세요.',
+    '서술형': '문법 포인트를 정확히 이해하고, 모범답안과 비교하며 직접 영작하는 연습을 하세요.',
+    '알맞은 대화 응답 찾기': '교과서·학습지의 대화문을 반복 암기해 상황별 표현에 익숙해지세요.',
+    '주제찾기': '글의 중심 내용과 요지를 파악하는 독해 연습이 필요합니다.',
+    '기타': '틀린 문항의 유형을 확인하고 관련 개념을 복습하세요.'
+};
+const SOURCE_ADVICE = {
+    '대화문': '학습지 및 교과서의 대화문을 잘 암기할 필요가 있습니다.',
+    '교과서본문': '교과서 본문을 반복해서 읽고 내용을 확실히 숙지하세요.',
+    '외부지문': '다양한 외부 지문 독해 연습으로 처음 보는 글에 대한 적응력을 높이세요.',
+    '학습지': '학교에서 나눠준 학습지를 한 번 더 꼼꼼히 확인·복습하세요.'
+};
 
 // 이 기능은 원장(manager 계정) 전용 — 다른 선생님 계정(teacher1/teacher2 등, role은 같은 'manager'라도 loginId가 다름)은 접근 불가
 function requireOwner(req, res, next) {
@@ -158,7 +178,7 @@ function requireOwner(req, res, next) {
     next();
 }
 
-export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, dbIds }) {
+export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, dbIds }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
         anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -566,6 +586,145 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
             res.json({ success: true, questions });
         } catch (error) {
             console.error('학생 결과 상세 조회 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // 학생·학부모용 분석 리포트 데이터 (규칙 기반 대책 + AI 종합 코멘트)
+    app.get('/api/student-report-data', requireAuth, requireOwner, async (req, res) => {
+        const { resultId } = req.query;
+        if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
+        if (!dbIds?.STUDENT_ANSWER_DB_ID || !dbIds?.QUESTION_DB_ID) {
+            return res.status(500).json({ success: false, message: 'DB ID가 설정되지 않았습니다.' });
+        }
+
+        try {
+            // 1) 결과 페이지
+            const resultPage = await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`);
+            const RP = resultPage.properties;
+            const studentName = RP['학생명']?.title?.[0]?.plain_text || '';
+            const examPageId = RP['시험']?.relation?.[0]?.id || '';
+            const summary = {
+                score: RP['점수']?.number ?? 0,
+                fullScore: RP['만점']?.number ?? 0,
+                correctCount: RP['정답수']?.number ?? 0,
+                wrongCount: RP['오답수']?.number ?? 0,
+                essayStatus: RP['서술형채점']?.select?.name || ''
+            };
+            summary.percent = summary.fullScore > 0 ? Math.round((summary.score / summary.fullScore) * 100) : 0;
+
+            // 2) 시험 정보(제목 등)
+            let examInfo = {
+                school: RP['학교']?.select?.name || '',
+                grade: RP['학년']?.select?.name || '',
+                examType: RP['시험종류']?.select?.name || '',
+                examTitle: '', semester: '', year: null
+            };
+            if (examPageId) {
+                try {
+                    const examPage = await fetchNotion(`https://api.notion.com/v1/pages/${examPageId}`);
+                    const EP = examPage.properties;
+                    examInfo.examTitle = EP['시험명']?.title?.[0]?.plain_text || '';
+                    examInfo.semester = EP['학기']?.select?.name || '';
+                    examInfo.year = EP['시험년도']?.number || null;
+                } catch (e) { /* 시험 페이지 없으면 결과행 정보로 대체 */ }
+            }
+
+            // 3) 학생 문항 응답 + 정답지 출제범위 조인
+            let ansRows = [];
+            let cursor;
+            do {
+                const body = { filter: { property: '학생결과', relation: { contains: resultId } }, page_size: 100 };
+                if (cursor) body.start_cursor = cursor;
+                const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_ANSWER_DB_ID}/query`, {
+                    method: 'POST', body: JSON.stringify(body)
+                });
+                ansRows = ansRows.concat(data.results);
+                cursor = data.has_more ? data.next_cursor : undefined;
+            } while (cursor);
+
+            const sourceByNumber = {};
+            if (examPageId) {
+                const key = await loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId);
+                key.forEach(k => { sourceByNumber[k.number] = k.source_type; });
+            }
+
+            const questions = ansRows.map(p => {
+                const P = p.properties;
+                const number = P['번호']?.title?.[0]?.plain_text || '';
+                return {
+                    number,
+                    type: P['유형']?.select?.name || '',
+                    source_type: sourceByNumber[number] || '',
+                    grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
+                    answer: P['정답']?.rich_text?.[0]?.plain_text || '',
+                    student_answer: P['학생답']?.rich_text?.[0]?.plain_text || '',
+                    verdict: P['정오']?.select?.name || '',
+                    score: P['배점']?.number ?? 0,
+                    earned: P['획득점수']?.number ?? 0
+                };
+            }).sort((a, b) => naturalNumberSort(a.number, b.number));
+
+            // 4) 강점/약점 집계
+            const perType = {};
+            questions.forEach(q => {
+                if (!q.type) return;
+                perType[q.type] = perType[q.type] || { correct: 0, wrong: 0, total: 0 };
+                perType[q.type].total++;
+                if (q.verdict === '정답') perType[q.type].correct++;
+                else if (q.verdict === '오답') perType[q.type].wrong++;
+            });
+            const strengths = Object.entries(perType).filter(([, v]) => v.wrong === 0 && v.correct > 0).map(([type]) => type);
+            const weakTypes = Object.entries(perType).filter(([, v]) => v.wrong > 0).map(([type, v]) => ({ type, wrong: v.wrong, total: v.total }));
+            const wrongQuestions = questions.filter(q => q.verdict === '오답');
+            const weakSources = [...new Set(wrongQuestions.map(q => q.source_type).filter(Boolean))];
+            const weakGrammar = [...new Set(wrongQuestions.map(q => q.grammar_point).filter(Boolean))];
+
+            // 5) 규칙 기반 대책
+            const recommendations = [];
+            weakTypes.forEach(w => { if (TYPE_ADVICE[w.type]) recommendations.push(TYPE_ADVICE[w.type]); });
+            weakSources.forEach(s => { if (SOURCE_ADVICE[s]) recommendations.push(SOURCE_ADVICE[s]); });
+            if (weakGrammar.length) recommendations.push(`특히 다음 문법을 집중 복습하세요: ${weakGrammar.join(', ')}.`);
+            const dedupRecs = [...new Set(recommendations)];
+
+            // 6) AI 종합 코멘트 (Gemini) — 실패 시 규칙 기반 폴백
+            let overallComment = '';
+            const brief = `학생: ${studentName} / 시험: ${examInfo.examTitle || (examInfo.school + ' ' + examInfo.grade)} `
+                + `/ 점수: ${summary.score}점(만점 ${summary.fullScore}, ${summary.percent}%) `
+                + `/ 강점 유형: ${strengths.join(', ') || '없음'} `
+                + `/ 약점 유형: ${weakTypes.map(w => w.type).join(', ') || '없음'} `
+                + `/ 약점 문법: ${weakGrammar.join(', ') || '없음'}`;
+            if (geminiModel) {
+                try {
+                    const prompt = `너는 '리디튜드' 영어학원의 따뜻한 담임 선생님이다. 아래 시험 결과 요약을 보고 학부모님께 드리는 종합 코멘트를 3~4문장으로 써라.\n`
+                        + `- 다정한 구어체(~했어요/~한답니다)로, 아이의 강점을 먼저 칭찬하고 보완할 점을 부드럽게 제안하며 격려로 마무리.\n`
+                        + `- 자기소개("안녕하세요~입니다") 금지, 별표/따옴표 강조 금지, 점수 숫자를 딱딱하게 나열하지 말 것.\n`
+                        + `- 구체적 학습 대책은 아래에 따로 표로 들어가니 여기선 큰 방향만 따뜻하게.\n\n[요약]\n${brief}`;
+                    const result = await geminiModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.8, maxOutputTokens: 800, thinkingConfig: { thinkingBudget: 512 } }
+                    });
+                    overallComment = result.response.text().trim();
+                } catch (e) { console.error('리포트 AI 코멘트 오류:', e.message); }
+            }
+            if (!overallComment) {
+                overallComment = `${studentName} 학생은 ${strengths.length ? strengths.join(', ') + ' 유형에서 좋은 모습을 보였어요. ' : ''}`
+                    + `${weakTypes.length ? weakTypes.map(w => w.type).join(', ') + ' 부분을 보완하면 다음 시험에서 더 좋은 결과가 기대됩니다. ' : '전반적으로 안정적인 결과예요. '}`
+                    + `꾸준히 노력하면 분명 성장할 거예요.`;
+            }
+
+            res.json({
+                success: true,
+                student: { name: studentName, ...examInfo, date: (resultPage.created_time || '').slice(0, 10) },
+                summary,
+                strengths,
+                weaknesses: { types: weakTypes, sources: weakSources, grammar: weakGrammar },
+                wrongQuestions,
+                recommendations: dedupRecs,
+                overallComment
+            });
+        } catch (error) {
+            console.error('학생 리포트 데이터 오류:', error);
             res.status(500).json({ success: false, message: error.message });
         }
     });
