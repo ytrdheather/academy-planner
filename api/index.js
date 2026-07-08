@@ -205,6 +205,7 @@ app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 't
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
 app.get('/student-grader', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-grader.html')));
+app.get('/results-viewer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'results-viewer.html')));
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 

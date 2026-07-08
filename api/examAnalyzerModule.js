@@ -476,4 +476,97 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
             res.status(500).json({ success: false, message: error.message });
         }
     });
+
+    // 저장된 학생 응시 결과 목록 (시험/이름으로 필터)
+    app.get('/api/student-results', requireAuth, requireOwner, async (req, res) => {
+        if (!dbIds?.STUDENT_RESULT_DB_ID) {
+            return res.status(500).json({ success: false, message: 'STUDENT_RESULT_DB_ID가 설정되지 않았습니다.' });
+        }
+        const { examPageId, name } = req.query;
+        try {
+            const conditions = [];
+            if (examPageId) conditions.push({ property: '시험', relation: { contains: examPageId } });
+            if (name) conditions.push({ property: '학생명', title: { contains: name } });
+
+            let results = [];
+            let cursor;
+            do {
+                const body = { page_size: 100, sorts: [{ timestamp: 'created_time', direction: 'descending' }] };
+                if (conditions.length === 1) body.filter = conditions[0];
+                else if (conditions.length > 1) body.filter = { and: conditions };
+                if (cursor) body.start_cursor = cursor;
+                const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_RESULT_DB_ID}/query`, {
+                    method: 'POST', body: JSON.stringify(body)
+                });
+                results = results.concat(data.results);
+                cursor = data.has_more ? data.next_cursor : undefined;
+            } while (cursor);
+
+            const list = results.map(p => {
+                const P = p.properties;
+                return {
+                    resultId: p.id,
+                    studentName: P['학생명']?.title?.[0]?.plain_text || '',
+                    examPageId: P['시험']?.relation?.[0]?.id || '',
+                    school: P['학교']?.select?.name || '',
+                    grade: P['학년']?.select?.name || '',
+                    examType: P['시험종류']?.select?.name || '',
+                    score: P['점수']?.number ?? 0,
+                    fullScore: P['만점']?.number ?? 0,
+                    correctCount: P['정답수']?.number ?? 0,
+                    wrongCount: P['오답수']?.number ?? 0,
+                    weakTypes: (P['취약유형']?.multi_select || []).map(x => x.name),
+                    weakGrammar: P['취약문법']?.rich_text?.[0]?.plain_text || '',
+                    essayStatus: P['서술형채점']?.select?.name || '',
+                    report: P['리포트']?.rich_text?.[0]?.plain_text || '',
+                    createdTime: p.created_time
+                };
+            });
+            res.json({ success: true, results: list });
+        } catch (error) {
+            console.error('학생 결과 목록 조회 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // 한 학생 결과의 문항별 상세
+    app.get('/api/student-result-detail', requireAuth, requireOwner, async (req, res) => {
+        if (!dbIds?.STUDENT_ANSWER_DB_ID) {
+            return res.status(500).json({ success: false, message: 'STUDENT_ANSWER_DB_ID가 설정되지 않았습니다.' });
+        }
+        const { resultId } = req.query;
+        if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
+        try {
+            let rows = [];
+            let cursor;
+            do {
+                const body = { filter: { property: '학생결과', relation: { contains: resultId } }, page_size: 100 };
+                if (cursor) body.start_cursor = cursor;
+                const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_ANSWER_DB_ID}/query`, {
+                    method: 'POST', body: JSON.stringify(body)
+                });
+                rows = rows.concat(data.results);
+                cursor = data.has_more ? data.next_cursor : undefined;
+            } while (cursor);
+
+            const questions = rows.map(p => {
+                const P = p.properties;
+                return {
+                    number: P['번호']?.title?.[0]?.plain_text || '',
+                    type: P['유형']?.select?.name || '',
+                    grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
+                    answer: P['정답']?.rich_text?.[0]?.plain_text || '',
+                    student_answer: P['학생답']?.rich_text?.[0]?.plain_text || '',
+                    verdict: P['정오']?.select?.name || '',
+                    score: P['배점']?.number ?? 0,
+                    earned: P['획득점수']?.number ?? 0
+                };
+            }).sort((a, b) => naturalNumberSort(a.number, b.number));
+
+            res.json({ success: true, questions });
+        } catch (error) {
+            console.error('학생 결과 상세 조회 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
 }

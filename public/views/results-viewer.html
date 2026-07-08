@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 결과 조회 - 리디튜드</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/teacher.css">
+    <style>
+        .rv-wrap { max-width: 1050px; margin: 0 auto; padding: 24px 16px; flex: 1 1 auto; overflow-y: auto; width: 100%; }
+        .rv-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .rv-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .rv-tab { padding: 9px 18px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px; color: #475569; }
+        .rv-tab.active { background: #0d9488; color: #fff; border-color: #0d9488; }
+        .rv-field { display: inline-flex; flex-direction: column; gap: 4px; margin-right: 12px; }
+        .rv-field label { font-size: 12px; color: #64748b; font-weight: 700; }
+        .rv-field input, .rv-field select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: inherit; }
+        .rv-field select.wide { min-width: 340px; }
+        .rv-btn { background: #0d9488; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        table.rv-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        table.rv-table th, table.rv-table td { border: 1px solid #e2e8f0; padding: 7px 9px; text-align: left; }
+        table.rv-table th { background: #f1f5f9; }
+        tr.rv-clickable { cursor: pointer; }
+        tr.rv-clickable:hover { background: #f0fdfa; }
+        tr.v-정답 { background: #f0fdf4; }
+        tr.v-오답 { background: #fef2f2; }
+        tr.v-채점대기 { background: #fffbeb; }
+        .rv-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 700; margin: 1px 3px 1px 0; background: #e2e8f0; color: #334155; }
+        .rv-badge.weak { background: #fee2e2; color: #b91c1c; }
+        .rv-muted { color: #64748b; font-size: 13px; }
+        .rv-detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        .rv-score { font-size: 17px; font-weight: 800; color: #0d9488; }
+        .rv-cum { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 12px 14px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="fixed-layout-top">
+        <div class="header">
+            <h1>📊 학생 결과 조회</h1>
+            <div class="user-info">
+                <span class="user-name" id="userName">로딩중...</span>
+                <a href="/teacher" style="margin-right:12px; color:#0d9488; font-weight:700; text-decoration:none;">← 대시보드</a>
+                <a href="/student-grader" style="margin-right:12px; color:#7c3aed; font-weight:700; text-decoration:none;">📝 채점기</a>
+                <button class="logout-btn" onclick="logout()">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="rv-wrap">
+        <div class="rv-card">
+            <div class="rv-tabs">
+                <button class="rv-tab active" id="tabExam" onclick="switchMode('exam')">시험별 조회</button>
+                <button class="rv-tab" id="tabStudent" onclick="switchMode('student')">학생별 조회</button>
+            </div>
+
+            <div id="examControls">
+                <div class="rv-field">
+                    <label>시험 선택</label>
+                    <select id="rvExam" class="wide" onchange="loadByExam()"><option value="">— 시험 불러오는 중 —</option></select>
+                </div>
+            </div>
+
+            <div id="studentControls" style="display:none;">
+                <div class="rv-field">
+                    <label>학생 이름</label>
+                    <input type="text" id="rvName" placeholder="이름 입력 후 Enter" onkeydown="if(event.key==='Enter')loadByStudent()">
+                </div>
+                <button class="rv-btn" onclick="loadByStudent()">조회</button>
+            </div>
+
+            <div id="rvListArea"></div>
+        </div>
+
+        <div class="rv-card" id="rvDetailCard" style="display:none;">
+            <div class="rv-detail-head">
+                <h3 id="rvDetailTitle" style="margin:0;">문항별 상세</h3>
+                <span class="rv-score" id="rvDetailScore"></span>
+            </div>
+            <div class="rv-muted" id="rvDetailReport" style="margin:6px 0 10px;"></div>
+            <table class="rv-table">
+                <thead>
+                    <tr><th style="width:48px;">번호</th><th style="width:110px;">유형</th><th>문법 포인트</th><th style="width:90px;">정답</th><th>학생답</th><th style="width:80px;">정오</th><th style="width:70px;">획득/배점</th></tr>
+                </thead>
+                <tbody id="rvDetailBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('teacher_auth_token');
+        if (!authToken) window.location.href = '/teacher-login';
+
+        let mode = 'exam';
+        let examMap = {}; // pageId -> examTitle
+        let resultMeta = {}; // resultId -> { title, score, fullScore, report }
+
+        async function init() {
+            try {
+                const res = await fetch('/api/teacher/user-info', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error('auth');
+                const info = await res.json();
+                if (info.loginId !== 'manager') { window.location.href = '/teacher'; return; }
+                document.getElementById('userName').textContent = info.userName || '';
+                loadExams();
+            } catch (e) { window.location.href = '/teacher-login'; }
+        }
+        init();
+
+        function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href = '/teacher-login'; }
+
+        function authHeaders() { return { 'Authorization': `Bearer ${authToken}` }; }
+
+        async function loadExams() {
+            const sel = document.getElementById('rvExam');
+            try {
+                const res = await fetch('/api/exam-list', { headers: authHeaders() });
+                const data = await res.json();
+                if (!data.success || !data.exams.length) { sel.innerHTML = '<option value="">저장된 시험이 없습니다</option>'; return; }
+                data.exams.forEach(e => { examMap[e.pageId] = e.examTitle; });
+                sel.innerHTML = '<option value="">— 시험을 선택하세요 —</option>' +
+                    data.exams.map(e => `<option value="${e.pageId}">${escapeHtml(e.examTitle)}</option>`).join('');
+            } catch (e) { sel.innerHTML = '<option value="">시험 목록 로드 실패</option>'; }
+        }
+
+        function switchMode(m) {
+            mode = m;
+            document.getElementById('tabExam').classList.toggle('active', m === 'exam');
+            document.getElementById('tabStudent').classList.toggle('active', m === 'student');
+            document.getElementById('examControls').style.display = m === 'exam' ? 'block' : 'none';
+            document.getElementById('studentControls').style.display = m === 'student' ? 'block' : 'none';
+            document.getElementById('rvListArea').innerHTML = '';
+            document.getElementById('rvDetailCard').style.display = 'none';
+        }
+
+        async function fetchResults(params) {
+            const qs = new URLSearchParams(params).toString();
+            const res = await fetch('/api/student-results?' + qs, { headers: authHeaders() });
+            return res.json();
+        }
+
+        async function loadByExam() {
+            const examPageId = document.getElementById('rvExam').value;
+            document.getElementById('rvDetailCard').style.display = 'none';
+            if (!examPageId) { document.getElementById('rvListArea').innerHTML = ''; return; }
+            document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">불러오는 중...</p>';
+            const data = await fetchResults({ examPageId });
+            if (!data.success) { document.getElementById('rvListArea').innerHTML = `<p class="rv-muted">오류: ${escapeHtml(data.message)}</p>`; return; }
+            if (!data.results.length) { document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">이 시험에 저장된 학생 결과가 없습니다.</p>'; return; }
+            renderResultTable(data.results, 'exam');
+        }
+
+        async function loadByStudent() {
+            const name = document.getElementById('rvName').value.trim();
+            document.getElementById('rvDetailCard').style.display = 'none';
+            if (!name) { document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">학생 이름을 입력하세요.</p>'; return; }
+            document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">불러오는 중...</p>';
+            const data = await fetchResults({ name });
+            if (!data.success) { document.getElementById('rvListArea').innerHTML = `<p class="rv-muted">오류: ${escapeHtml(data.message)}</p>`; return; }
+            if (!data.results.length) { document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">해당 이름의 결과가 없습니다.</p>'; return; }
+            renderCumulative(data.results);
+            renderResultTable(data.results, 'student');
+        }
+
+        function renderCumulative(results) {
+            // 여러 시험에 걸친 누적 취약점 집계
+            const grammarFreq = {};
+            const typeFreq = {};
+            results.forEach(r => {
+                (r.weakTypes || []).forEach(t => { typeFreq[t] = (typeFreq[t] || 0) + 1; });
+                (r.weakGrammar || '').split(',').map(s => s.trim()).filter(Boolean).forEach(g => { grammarFreq[g] = (grammarFreq[g] || 0) + 1; });
+            });
+            const sortDesc = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+            const gEntries = sortDesc(grammarFreq);
+            const tEntries = sortDesc(typeFreq);
+            const badge = ([k, v]) => `<span class="rv-badge weak">${escapeHtml(k)} ×${v}</span>`;
+
+            const area = document.getElementById('rvListArea');
+            const html = `<div class="rv-cum">
+                <b>📌 누적 취약점</b> (응시 ${results.length}회 기준)<br>
+                <div style="margin-top:6px;">유형: ${tEntries.length ? tEntries.map(badge).join(' ') : '<span class="rv-muted">없음</span>'}</div>
+                <div style="margin-top:4px;">문법: ${gEntries.length ? gEntries.map(badge).join(' ') : '<span class="rv-muted">없음</span>'}</div>
+            </div>`;
+            area.innerHTML = html;
+        }
+
+        function renderResultTable(results, m) {
+            const rows = results.map(r => {
+                const labelRaw = m === 'exam' ? r.studentName
+                    : (examMap[r.examPageId] || `${r.school} ${r.grade} ${r.examType}`);
+                const label = escapeHtml(labelRaw);
+                resultMeta[r.resultId] = { title: labelRaw, score: r.score, fullScore: r.fullScore, report: r.report };
+                const weak = (r.weakTypes || []).map(t => `<span class="rv-badge">${escapeHtml(t)}</span>`).join(' ');
+                return `<tr class="rv-clickable" onclick="openDetail('${r.resultId}')">
+                    <td><b>${label}</b></td>
+                    <td>${r.score} / ${r.fullScore}</td>
+                    <td>정답 ${r.correctCount} · 오답 ${r.wrongCount}${r.essayStatus === '대기' ? ' · <span style="color:#d97706;">서술형대기</span>' : ''}</td>
+                    <td>${weak || '<span class="rv-muted">-</span>'}</td>
+                </tr>`;
+            }).join('');
+            const head = m === 'exam' ? '학생' : '시험';
+            const table = `<table class="rv-table"><thead><tr><th>${head}</th><th style="width:90px;">점수</th><th style="width:220px;">정오</th><th>취약유형</th></tr></thead><tbody>${rows}</tbody></table>
+                <p class="rv-muted" style="margin-top:6px;">행을 클릭하면 문항별 상세가 아래에 나옵니다.</p>`;
+            const area = document.getElementById('rvListArea');
+            // 학생별 모드에서는 누적 패널 아래에 붙임
+            if (m === 'student') area.innerHTML += table;
+            else area.innerHTML = table;
+        }
+
+        async function openDetail(resultId) {
+            const meta = resultMeta[resultId] || { title: '', score: '', fullScore: '', report: '' };
+            const card = document.getElementById('rvDetailCard');
+            card.style.display = 'block';
+            document.getElementById('rvDetailTitle').textContent = meta.title + ' — 문항별 상세';
+            document.getElementById('rvDetailScore').textContent = `${meta.score} / ${meta.fullScore}점`;
+            document.getElementById('rvDetailReport').textContent = meta.report || '';
+            document.getElementById('rvDetailBody').innerHTML = '<tr><td colspan="7" class="rv-muted">불러오는 중...</td></tr>';
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const res = await fetch('/api/student-result-detail?resultId=' + encodeURIComponent(resultId), { headers: authHeaders() });
+            const data = await res.json();
+            if (!data.success) { document.getElementById('rvDetailBody').innerHTML = `<tr><td colspan="7">오류: ${escapeHtml(data.message)}</td></tr>`; return; }
+            document.getElementById('rvDetailBody').innerHTML = data.questions.map(q => `
+                <tr class="v-${escapeHtml(q.verdict)}">
+                    <td>${escapeHtml(q.number)}</td>
+                    <td>${escapeHtml(q.type)}</td>
+                    <td>${escapeHtml(q.grammar_point)}</td>
+                    <td>${escapeHtml(q.answer)}</td>
+                    <td>${escapeHtml(q.student_answer)}</td>
+                    <td>${escapeHtml(q.verdict)}</td>
+                    <td>${q.earned} / ${q.score}</td>
+                </tr>`).join('');
+        }
+
+        function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+    </script>
+</body>
+</html>
