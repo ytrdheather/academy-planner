@@ -3,8 +3,36 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 15 * 1024 * 1024, files: 10 }
+    limits: { fileSize: 32 * 1024 * 1024, files: 10 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('이미지 또는 PDF 파일만 올릴 수 있습니다.'));
+    }
 });
+
+// multer 오류(형식/용량)를 500 HTML 대신 JSON으로 반환하는 래퍼
+function uploadImages(req, res, next) {
+    upload.array('images', 10)(req, res, err => {
+        if (err) return res.status(400).json({ success: false, message: err.message });
+        next();
+    });
+}
+
+// 업로드된 파일을 Claude 메시지 블록으로 변환 (PDF는 document, 그 외는 image)
+function filesToContentBlocks(files) {
+    return files.map(file => {
+        if (file.mimetype === 'application/pdf') {
+            return {
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: file.buffer.toString('base64') }
+            };
+        }
+        return {
+            type: 'image',
+            source: { type: 'base64', media_type: file.mimetype, data: file.buffer.toString('base64') }
+        };
+    });
+}
 
 const QUESTION_TYPES = [
     '어휘추론', '영영풀이', '어구추론', '내용일치', '어법이해',
@@ -138,7 +166,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
         console.warn('⚠️ ANTHROPIC_API_KEY가 설정되지 않아 시험지 분석 기능이 비활성화됩니다.');
     }
 
-    app.post('/api/analyze-exam', requireAuth, requireOwner, upload.array('images', 10), async (req, res) => {
+    app.post('/api/analyze-exam', requireAuth, requireOwner, uploadImages, async (req, res) => {
         if (!anthropic) {
             return res.status(500).json({ success: false, message: 'ANTHROPIC_API_KEY가 설정되지 않았습니다.' });
         }
@@ -147,14 +175,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
         }
 
         try {
-            const imageBlocks = req.files.map(file => ({
-                type: 'image',
-                source: {
-                    type: 'base64',
-                    media_type: file.mimetype,
-                    data: file.buffer.toString('base64')
-                }
-            }));
+            const contentBlocks = filesToContentBlocks(req.files);
 
             const message = await anthropic.messages.create({
                 model: 'claude-sonnet-4-6',
@@ -165,7 +186,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
                 messages: [{
                     role: 'user',
                     content: [
-                        ...imageBlocks,
+                        ...contentBlocks,
                         { type: 'text', text: '이 시험지의 모든 문항을 분석해줘.' }
                     ]
                 }]
@@ -283,7 +304,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
     });
 
     // 학생 답안 채점 — 정답지와 대조해 문항별 정오/점수 산출(서술형은 채점대기)
-    app.post('/api/grade-student', requireAuth, requireOwner, upload.array('images', 10), async (req, res) => {
+    app.post('/api/grade-student', requireAuth, requireOwner, uploadImages, async (req, res) => {
         if (!anthropic) {
             return res.status(500).json({ success: false, message: 'ANTHROPIC_API_KEY가 설정되지 않았습니다.' });
         }
@@ -302,10 +323,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
                 return res.status(400).json({ success: false, message: '이 시험의 정답지 문항을 찾을 수 없습니다. 먼저 시험지 분석을 저장했는지 확인해주세요.' });
             }
 
-            const imageBlocks = req.files.map(file => ({
-                type: 'image',
-                source: { type: 'base64', media_type: file.mimetype, data: file.buffer.toString('base64') }
-            }));
+            const contentBlocks = filesToContentBlocks(req.files);
             const numbers = answerKey.map(q => q.number).join(', ');
 
             const message = await anthropic.messages.create({
@@ -317,7 +335,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, db
                 messages: [{
                     role: 'user',
                     content: [
-                        ...imageBlocks,
+                        ...contentBlocks,
                         { type: 'text', text: `이 답안지의 문항 번호는 다음과 같다: ${numbers}. 각 번호에 학생이 표기/작성한 답을 읽어줘.` }
                     ]
                 }]

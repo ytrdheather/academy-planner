@@ -53,9 +53,9 @@
     <div class="ea-wrap">
         <div class="ea-card">
             <h3>시험지 이미지 업로드</h3>
-            <p style="color:#64748b; font-size:13px;">한 시험지의 페이지 이미지를 여러 장 올릴 수 있어요. 업로드 후 분석하기를 누르면 문항별로 유형·문법포인트·배점·난이도를 표로 정리해줍니다.</p>
-            <div class="ea-drop" id="eaDrop">이미지를 여기로 끌어놓거나 클릭해서 선택하세요</div>
-            <input type="file" id="eaFileInput" accept="image/*" multiple style="display:none;">
+            <p style="color:#64748b; font-size:13px;">한 시험지의 페이지를 이미지나 PDF로 올릴 수 있어요(여러 장 가능). 업로드 후 분석하기를 누르면 문항별로 유형·문법포인트·배점·난이도를 표로 정리해줍니다.</p>
+            <div class="ea-drop" id="eaDrop">이미지 또는 PDF를 여기로 끌어놓거나 클릭해서 선택하세요</div>
+            <input type="file" id="eaFileInput" accept="image/*,application/pdf" multiple style="display:none;">
             <div class="ea-files" id="eaFileList"></div>
             <button class="ea-btn" id="eaAnalyzeBtn" onclick="analyzeExam()">분석하기</button>
             <div class="ea-status" id="eaStatus"></div>
@@ -177,7 +177,7 @@
         function renderFileList() {
             const el = document.getElementById('eaFileList');
             if (selectedFiles.length === 0) { el.textContent = ''; return; }
-            el.textContent = `선택된 이미지 ${selectedFiles.length}장: ` + selectedFiles.map(f => f.name).join(', ');
+            el.textContent = `선택된 파일 ${selectedFiles.length}개: ` + selectedFiles.map(f => f.name).join(', ');
         }
 
         async function analyzeExam() {
@@ -185,7 +185,7 @@
             const statusEl = document.getElementById('eaStatus');
             errorEl.textContent = '';
             if (selectedFiles.length === 0) {
-                errorEl.textContent = '이미지를 최소 1장 업로드해주세요.';
+                errorEl.textContent = '이미지나 PDF를 최소 1개 업로드해주세요.';
                 return;
             }
 

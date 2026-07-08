@@ -51,7 +51,7 @@
     <div class="sg-wrap">
         <div class="sg-card">
             <h3>학생 답안 업로드</h3>
-            <p style="color:#64748b; font-size:13px;">먼저 채점할 시험(저장된 정답지)을 고르고, 학생 이름을 입력한 뒤 답안 이미지를 올리세요. 채점하기를 누르면 정답지와 대조해 문항별 정오·점수를 계산합니다. (서술형은 자동 채점하지 않고 선생님이 O/X를 정합니다.)</p>
+            <p style="color:#64748b; font-size:13px;">먼저 채점할 시험(저장된 정답지)을 고르고, 학생 이름을 입력한 뒤 답안을 이미지나 PDF로 올리세요. 채점하기를 누르면 정답지와 대조해 문항별 정오·점수를 계산합니다. (서술형은 자동 채점하지 않고 선생님이 O/X를 정합니다.)</p>
 
             <div class="sg-meta-form">
                 <div class="sg-field">
@@ -64,8 +64,8 @@
                 </div>
             </div>
 
-            <div class="sg-drop" id="sgDrop">답안 이미지를 여기로 끌어놓거나 클릭해서 선택하세요</div>
-            <input type="file" id="sgFileInput" accept="image/*" multiple style="display:none;">
+            <div class="sg-drop" id="sgDrop">답안 이미지나 PDF를 여기로 끌어놓거나 클릭해서 선택하세요</div>
+            <input type="file" id="sgFileInput" accept="image/*,application/pdf" multiple style="display:none;">
             <div class="sg-files" id="sgFileList"></div>
             <button class="sg-btn" id="sgGradeBtn" onclick="gradeStudent()">채점하기</button>
             <div class="sg-status" id="sgStatus"></div>
@@ -144,7 +144,7 @@
         function addFiles(list) {
             selectedFiles = selectedFiles.concat(Array.from(list));
             const el = document.getElementById('sgFileList');
-            el.textContent = selectedFiles.length ? `선택된 이미지 ${selectedFiles.length}장: ` + selectedFiles.map(f => f.name).join(', ') : '';
+            el.textContent = selectedFiles.length ? `선택된 파일 ${selectedFiles.length}개: ` + selectedFiles.map(f => f.name).join(', ') : '';
         }
 
         async function gradeStudent() {
@@ -156,7 +156,7 @@
 
             if (!examPageId) { errorEl.textContent = '채점할 시험을 선택해주세요.'; return; }
             if (!studentName) { errorEl.textContent = '학생 이름을 입력해주세요.'; return; }
-            if (selectedFiles.length === 0) { errorEl.textContent = '답안 이미지를 최소 1장 올려주세요.'; return; }
+            if (selectedFiles.length === 0) { errorEl.textContent = '답안 이미지나 PDF를 최소 1개 올려주세요.'; return; }
 
             const btn = document.getElementById('sgGradeBtn');
             btn.disabled = true;
