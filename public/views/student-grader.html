@@ -29,7 +29,10 @@
         table.sg-table select:hover, table.sg-table input:hover, table.sg-table select:focus, table.sg-table input:focus { border-color: #cbd5e1; background: #fff; }
         tr.v-정답 { background: #f0fdf4; }
         tr.v-오답 { background: #fef2f2; }
+        tr.v-부분 { background: #eff6ff; }
         tr.v-채점대기 { background: #fffbeb; }
+        td.sg-earned-cell input { width: 46px !important; display: inline-block; text-align: right; }
+        td.sg-earned-cell .max { color: #94a3b8; }
         .sg-summary { font-size: 15px; font-weight: 700; margin: 14px 0 4px; }
         .sg-summary .pts { color: #7c3aed; }
     </style>
@@ -76,11 +79,11 @@
         <div class="sg-card" id="sgResultCard" style="display:none;">
             <h3>채점 결과</h3>
             <div class="sg-summary" id="sgSummary"></div>
-            <p style="color:#64748b; font-size:12px; margin-top:0;">정오는 직접 수정할 수 있어요. 특히 <b>서술형(채점대기)</b>은 학생답과 정답을 비교해 정답/오답으로 바꿔주세요.</p>
+            <p style="color:#64748b; font-size:12px; margin-top:0;">정오는 직접 수정할 수 있어요. 특히 <b>서술형(채점대기)</b>은 학생답과 정답을 비교해 채점하세요. 부분적으로 맞았으면 <b>획득점수</b>칸에 점수를 직접 입력하면 정오가 '부분'으로 바뀝니다.</p>
             <table class="sg-table">
                 <thead>
                     <tr>
-                        <th style="width:48px;">번호</th><th style="width:110px;">유형</th><th>문법 포인트</th><th style="width:90px;">정답</th><th>학생답</th><th style="width:90px;">정오</th><th style="width:56px;">배점</th>
+                        <th style="width:48px;">번호</th><th style="width:110px;">유형</th><th>문법 포인트</th><th style="width:90px;">정답</th><th>학생답</th><th style="width:90px;">정오</th><th style="width:96px;">획득 / 배점</th>
                     </tr>
                 </thead>
                 <tbody id="sgResultBody"></tbody>
@@ -96,7 +99,16 @@
 
         let selectedFiles = [];
         let examList = [];
-        const VERDICTS = ['정답', '오답', '채점대기'];
+        const VERDICTS = ['정답', '오답', '부분', '채점대기'];
+
+        // 문항의 획득점수(부분점수 포함)를 계산: 채점대기는 0, 그 외는 저장된 earned를 0~배점으로 보정
+        function earnedOf(g) {
+            const max = Number(g.score) || 0;
+            if (g.verdict === '채점대기') return 0;
+            let e = Number(g.earned);
+            if (!Number.isFinite(e)) e = g.verdict === '정답' ? max : 0;
+            return Math.max(0, Math.min(max, e));
+        }
 
         async function init() {
             try {
@@ -198,7 +210,7 @@
                     <td>${escapeHtml(g.answer || '')}</td>
                     <td><input type="text" data-field="student_answer" value="${escapeHtml(g.student_answer || '')}"></td>
                     <td><select data-field="verdict" onchange="onVerdictChange(this)">${VERDICTS.map(v => `<option value="${v}" ${v === g.verdict ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
-                    <td>${escapeHtml(String(g.score ?? ''))}</td>
+                    <td class="sg-earned-cell"><input type="number" data-field="earned" min="0" max="${Number(g.score) || 0}" step="0.5" value="${earnedOf(g)}" oninput="onEarnedChange(this)"> <span class="max">/ ${escapeHtml(String(g.score ?? 0))}</span></td>
                 </tr>
             `).join('');
             document.getElementById('sgResultCard').style.display = 'block';
@@ -206,8 +218,36 @@
             updateSummary();
         }
 
+        // 정오(드롭다운)를 바꾸면 획득점수를 자동으로 맞춘다: 정답→만점, 오답/채점대기→0, 부분→그대로(0이면 반점 힌트)
         function onVerdictChange(sel) {
             const tr = sel.closest('tr');
+            const i = Number(tr.dataset.idx);
+            const max = Number(window.__gradedBase[i].score) || 0;
+            const earnedInput = tr.querySelector('[data-field="earned"]');
+            const v = sel.value;
+            if (v === '정답') earnedInput.value = max;
+            else if (v === '오답' || v === '채점대기') earnedInput.value = 0;
+            else if (v === '부분' && (Number(earnedInput.value) <= 0 || Number(earnedInput.value) >= max)) {
+                earnedInput.value = max / 2; // 반점을 기본 힌트로 (홀수 배점은 .5)
+            }
+            tr.className = 'v-' + v;
+            updateSummary();
+        }
+
+        // 획득점수를 직접 입력하면 정오를 자동 판정: 만점→정답, 0→오답, 그 사이→부분
+        function onEarnedChange(inp) {
+            const tr = inp.closest('tr');
+            const i = Number(tr.dataset.idx);
+            const max = Number(window.__gradedBase[i].score) || 0;
+            let e = Number(inp.value);
+            if (!Number.isFinite(e)) e = 0;
+            const clamped = Math.max(0, Math.min(max, e));
+            if (clamped !== e) inp.value = clamped; // 배점 범위를 벗어난 입력만 보정
+            e = clamped;
+            const sel = tr.querySelector('[data-field="verdict"]');
+            if (e >= max && max > 0) sel.value = '정답';
+            else if (e <= 0) sel.value = '오답';
+            else sel.value = '부분';
             tr.className = 'v-' + sel.value;
             updateSummary();
         }
@@ -216,27 +256,39 @@
             const rows = document.querySelectorAll('#sgResultBody tr');
             return Array.from(rows).map((row, i) => {
                 const g = window.__gradedBase[i];
+                const verdict = row.querySelector('[data-field="verdict"]').value;
+                const max = Number(g.score) || 0;
+                let earned = Number(row.querySelector('[data-field="earned"]').value);
+                if (!Number.isFinite(earned) || verdict === '채점대기') earned = 0;
+                earned = Math.max(0, Math.min(max, earned));
                 return {
                     ...g,
                     student_answer: row.querySelector('[data-field="student_answer"]').value,
-                    verdict: row.querySelector('[data-field="verdict"]').value
+                    verdict,
+                    earned
                 };
             });
         }
 
         function updateSummary() {
             const rows = document.querySelectorAll('#sgResultBody tr');
-            let score = 0, full = 0, correct = 0, wrong = 0, pending = 0;
+            let score = 0, full = 0, correct = 0, wrong = 0, partial = 0, pending = 0;
             rows.forEach((row, i) => {
                 const g = window.__gradedBase[i];
                 const verdict = row.querySelector('[data-field="verdict"]').value;
-                full += Number(g.score) || 0;
-                if (verdict === '정답') { score += Number(g.score) || 0; correct++; }
+                const max = Number(g.score) || 0;
+                full += max;
+                if (verdict === '채점대기') { pending++; return; }
+                let earned = Number(row.querySelector('[data-field="earned"]').value);
+                if (!Number.isFinite(earned)) earned = 0;
+                score += Math.max(0, Math.min(max, earned));
+                if (verdict === '정답') correct++;
                 else if (verdict === '오답') wrong++;
-                else pending++;
+                else if (verdict === '부분') partial++;
             });
             const el = document.getElementById('sgSummary');
-            el.innerHTML = `총점 <span class="pts">${score} / ${full}</span> &nbsp;·&nbsp; 정답 ${correct} · 오답 ${wrong}` + (pending ? ` · 채점대기 ${pending}` : '');
+            el.innerHTML = `총점 <span class="pts">${score} / ${full}</span> &nbsp;·&nbsp; 정답 ${correct} · 오답 ${wrong}`
+                + (partial ? ` · 부분 ${partial}` : '') + (pending ? ` · 채점대기 ${pending}` : '');
         }
 
         async function saveResult() {

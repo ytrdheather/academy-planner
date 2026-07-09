@@ -417,20 +417,36 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             return res.status(500).json({ success: false, message: 'STUDENT_RESULT_DB_ID / STUDENT_ANSWER_DB_ID가 설정되지 않았습니다.' });
         }
 
-        // 선생님이 검토한 verdict 기준으로 점수 재계산 (서술형 O/X 반영)
-        let score = 0, fullScore = 0, correctCount = 0, wrongCount = 0;
+        // 선생님이 검토한 verdict/획득점수 기준으로 점수 재계산 (서술형 부분점수 반영)
+        let score = 0, fullScore = 0, correctCount = 0, wrongCount = 0, partialCount = 0;
         const weakTypes = new Set();
         const weakGrammar = new Set();
         const wrongNumbers = [];
         let hasEssay = false, essayPending = false;
 
         const rows = graded.map(g => {
-            const earned = g.verdict === '정답' ? (Number(g.score) || 0) : 0;
+            const max = Number(g.score) || 0;
+            // 획득점수: 정답=만점, 오답/채점대기=0, 부분=입력값(0~배점으로 보정).
+            // 프런트가 보낸 earned가 유효하면 그대로 쓰고, 없으면 verdict로 유추.
+            let earned;
+            if (g.verdict === '채점대기') earned = 0;
+            else if (g.verdict === '정답') earned = max;
+            else if (g.verdict === '오답') earned = 0;
+            else { // '부분' 또는 기타
+                earned = Number(g.earned);
+                if (!Number.isFinite(earned)) earned = 0;
+            }
+            earned = Math.max(0, Math.min(max, earned));
             score += earned;
-            fullScore += Number(g.score) || 0;
+            fullScore += max;
             if (g.type === '서술형') { hasEssay = true; if (g.verdict === '채점대기') essayPending = true; }
             if (g.verdict === '정답') correctCount++;
-            else if (g.verdict === '오답') {
+            else if (g.verdict === '부분') {
+                partialCount++;
+                // 부분점수도 완전히 맞춘 게 아니므로 취약 유형/문법 집계에 포함
+                if (g.type) weakTypes.add(g.type);
+                if (g.grammar_point) weakGrammar.add(g.grammar_point);
+            } else if (g.verdict === '오답') {
                 wrongCount++;
                 wrongNumbers.push(g.number);
                 if (g.type) weakTypes.add(g.type);
@@ -441,6 +457,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
 
         const weakGrammarStr = [...weakGrammar].join(', ');
         const reportText = `총점 ${score}/${fullScore} (정답 ${correctCount}, 오답 ${wrongCount}`
+            + `${partialCount ? ', 부분 ' + partialCount : ''}`
             + `${essayPending ? ', 서술형 채점대기' : ''}). `
             + `${weakTypes.size ? '취약 유형: ' + [...weakTypes].join(', ') + '. ' : ''}`
             + `${weakGrammarStr ? '취약 문법: ' + weakGrammarStr + '. ' : ''}`
@@ -672,11 +689,12 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 perType[q.type] = perType[q.type] || { correct: 0, wrong: 0, total: 0 };
                 perType[q.type].total++;
                 if (q.verdict === '정답') perType[q.type].correct++;
-                else if (q.verdict === '오답') perType[q.type].wrong++;
+                // 부분점수는 완전히 맞춘 게 아니므로 약점 분석에서 오답과 함께 취급
+                else if (q.verdict === '오답' || q.verdict === '부분') perType[q.type].wrong++;
             });
             const strengths = Object.entries(perType).filter(([, v]) => v.wrong === 0 && v.correct > 0).map(([type]) => type);
             const weakTypes = Object.entries(perType).filter(([, v]) => v.wrong > 0).map(([type, v]) => ({ type, wrong: v.wrong, total: v.total }));
-            const wrongQuestions = questions.filter(q => q.verdict === '오답');
+            const wrongQuestions = questions.filter(q => q.verdict === '오답' || q.verdict === '부분');
             const weakSources = [...new Set(wrongQuestions.map(q => q.source_type).filter(Boolean))];
             const weakGrammar = [...new Set(wrongQuestions.map(q => q.grammar_point).filter(Boolean))];
 
