@@ -301,6 +301,14 @@ async function persistStudentResult(fetchNotion, dbIds, meta, graded) {
     return { pageId: resultPage.id, score, fullScore, report: reportText };
 }
 
+// Notion DB에 속성(칸)이 없으면 추가한다(있으면 무해한 no-op). AI 코멘트 캐시 저장용.
+async function ensureDbProperty(fetchNotion, dbId, propName, propConfig) {
+    await fetchNotion(`https://api.notion.com/v1/databases/${dbId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ properties: { [propName]: propConfig } })
+    });
+}
+
 // 규칙 기반 대책 매핑 (선생님이 지정한 유형·출제범위별 학습 처방)
 const TYPE_ADVICE = {
     '어휘추론': '교과서 본문 어휘와 학습지 단어를 정확히 암기하고, 문맥 속 의미를 추론하는 연습을 하세요.',
@@ -697,6 +705,17 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
         const { resultId } = req.query;
         if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
         try {
+            // 출제범위는 문항 응답 DB에 없으므로, 이 결과의 시험 정답지와 조인해서 번호별로 채운다
+            const sourceByNumber = {};
+            try {
+                const rp = await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`);
+                const examPageId = rp.properties['시험']?.relation?.[0]?.id || '';
+                if (examPageId && dbIds.QUESTION_DB_ID) {
+                    const key = await loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId);
+                    key.forEach(k => { sourceByNumber[k.number] = k.source_type; });
+                }
+            } catch (e) { /* 정답지 없으면 출제범위 생략 */ }
+
             let rows = [];
             let cursor;
             do {
@@ -711,9 +730,11 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
 
             const questions = rows.map(p => {
                 const P = p.properties;
+                const number = P['번호']?.title?.[0]?.plain_text || '';
                 return {
-                    number: P['번호']?.title?.[0]?.plain_text || '',
+                    number,
                     type: P['유형']?.select?.name || '',
+                    source_type: sourceByNumber[number] || '',
                     grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
                     answer: P['정답']?.rich_text?.[0]?.plain_text || '',
                     student_answer: P['학생답']?.rich_text?.[0]?.plain_text || '',
@@ -828,30 +849,50 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             if (weakGrammar.length) recommendations.push(`특히 다음 문법을 집중 복습하세요: ${weakGrammar.join(', ')}.`);
             const dedupRecs = [...new Set(recommendations)];
 
-            // 6) AI 종합 코멘트 (Gemini) — 실패 시 규칙 기반 폴백
-            let overallComment = '';
+            // 6) AI 종합 코멘트 — 처음 1번만 생성해 저장하고, 이후엔 캐시 재사용(AI 호출 비용 절감·문구 고정)
+            let overallComment = RP['AI코멘트']?.rich_text?.[0]?.plain_text || '';
             const brief = `학생: ${studentName} / 시험: ${examInfo.examTitle || (examInfo.school + ' ' + examInfo.grade)} `
                 + `/ 점수: ${summary.score}점(만점 ${summary.fullScore}, ${summary.percent}%) `
                 + `/ 강점 유형: ${strengths.join(', ') || '없음'} `
                 + `/ 약점 유형: ${weakTypes.map(w => w.type).join(', ') || '없음'} `
-                + `/ 약점 문법: ${weakGrammar.join(', ') || '없음'}`;
-            if (geminiModel) {
+                + `/ 약점 어법(문법): ${weakGrammar.join(', ') || '없음'} `
+                + `/ 약점 출제범위: ${weakSources.join(', ') || '없음'}`;
+            if (!overallComment && geminiModel) {
                 try {
-                    const prompt = `너는 '리디튜드' 영어학원의 따뜻한 담임 선생님이다. 아래 시험 결과 요약을 보고 학부모님께 드리는 종합 코멘트를 3~4문장으로 써라.\n`
-                        + `- 다정한 구어체(~했어요/~한답니다)로, 아이의 강점을 먼저 칭찬하고 보완할 점을 부드럽게 제안하며 격려로 마무리.\n`
-                        + `- 자기소개("안녕하세요~입니다") 금지, 별표/따옴표 강조 금지, 점수 숫자를 딱딱하게 나열하지 말 것.\n`
-                        + `- 구체적 학습 대책은 아래에 따로 표로 들어가니 여기선 큰 방향만 따뜻하게.\n\n[요약]\n${brief}`;
+                    const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이며, 학부모님께 보내는 시험 분석 코멘트를 작성한다. 아래 [요약]을 바탕으로 진지하고 전문적인 어조의 코멘트를 작성해라.\n`
+                        + `- 정중한 존댓말(~합니다/~됩니다체)로, 차분하고 신뢰감 있는 전문가의 어조를 유지한다. 과하게 경쾌한 표현·느낌표 남발·감탄사는 피한다.\n`
+                        + `- 인사말이나 자기소개("안녕하세요 ~어머님", "~입니다") 없이 분석 내용부터 시작한다.\n`
+                        + `- 강점이 있으면 한 문장으로 간단히 짚은 뒤 보완점으로 넘어간다.\n`
+                        + `- 약점 어법(문법)이 있으면 어떤 문법에서 어려움을 보였는지 구체적으로 언급하고, 그 부분을 다음 시험에서 헷갈리지 않도록 학원에서 어떻게 지도할지(반복 점검·개념 재정리 등)를 밝힌다.\n`
+                        + `- 약점 출제범위(교과서 본문/외부 지문/대화문/학습지)가 있으면 어느 영역의 학습이 부족한지 짚고 보완 방향을 제시한다.\n`
+                        + `- 학생이 해당 부분을 꾸준히 반복 학습하여 완전 학습에 이르도록 독려하는 내용을 포함한다.\n`
+                        + `- 점수 숫자를 단순 나열하지 말고, 별표(*)나 따옴표 강조는 쓰지 않는다.\n`
+                        + `- 5~7문장 분량의 자연스러운 문단으로 작성한다.\n\n[요약]\n${brief}`;
                     const result = await geminiModel.generateContent({
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.8, maxOutputTokens: 800, thinkingConfig: { thinkingBudget: 512 } }
+                        generationConfig: { temperature: 0.4, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 512 } }
                     });
                     overallComment = result.response.text().trim();
+
+                    // 생성 성공 시 결과 페이지에 저장 → 다음 조회부터 재사용(추가 AI 호출 없음)
+                    if (overallComment && dbIds.STUDENT_RESULT_DB_ID) {
+                        try {
+                            await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, 'AI코멘트', { rich_text: {} });
+                            await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                                method: 'PATCH',
+                                body: JSON.stringify({ properties: { 'AI코멘트': { rich_text: [{ text: { content: overallComment.slice(0, 1900) } }] } } })
+                            });
+                        } catch (saveErr) { console.error('AI 코멘트 저장 실패:', saveErr.message); }
+                    }
                 } catch (e) { console.error('리포트 AI 코멘트 오류:', e.message); }
             }
             if (!overallComment) {
-                overallComment = `${studentName} 학생은 ${strengths.length ? strengths.join(', ') + ' 유형에서 좋은 모습을 보였어요. ' : ''}`
-                    + `${weakTypes.length ? weakTypes.map(w => w.type).join(', ') + ' 부분을 보완하면 다음 시험에서 더 좋은 결과가 기대됩니다. ' : '전반적으로 안정적인 결과예요. '}`
-                    + `꾸준히 노력하면 분명 성장할 거예요.`;
+                // Gemini 미사용/실패 시 규칙 기반 폴백 (동일한 전문가 톤)
+                overallComment = `${studentName} 학생은 `
+                    + `${strengths.length ? strengths.join(', ') + ' 유형에서는 안정적인 이해를 보였습니다. ' : ''}`
+                    + `${weakGrammar.length ? '다만 ' + weakGrammar.join(', ') + ' 등의 어법에서 보완이 필요합니다. ' : ''}`
+                    + `${weakSources.length ? weakSources.join(', ') + ' 영역의 학습을 한 번 더 점검할 것을 권합니다. ' : ''}`
+                    + `${weakTypes.length ? weakTypes.map(w => w.type).join(', ') + ' 유형을 중심으로 반복 학습하여 완전한 이해에 이르도록 학원에서 지도하겠습니다.' : '전반적으로 안정적인 결과이며, 현재 수준을 꾸준히 유지하도록 지도하겠습니다.'}`;
             }
 
             res.json({
