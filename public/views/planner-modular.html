@@ -49,6 +49,12 @@
         .book-tags-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
         .book-tag { background: #f3e8ff; color: #6b46c1; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
         .book-tag .remove-btn { cursor: pointer; font-weight: bold; }
+        /* 시험 답안 입력 */
+        .exam-q { padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+        .exam-q-label { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+        .choice-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .choice-btn { width: 44px; height: 44px; border: 1.5px solid #cbd5e1; background: #fff; border-radius: 10px; font-size: 16px; font-weight: 700; color: #475569; cursor: pointer; }
+        .choice-btn.sel { background: #7c3aed; border-color: #7c3aed; color: #fff; }
     </style>
 </head>
 <body>
@@ -70,6 +76,25 @@
             <button class="menu-btn" onclick="goToView('homework')"><span class="menu-icon">📤</span> 숙제 제출하기</button>
             <button class="menu-btn" onclick="goToView('planner')"><span class="menu-icon">📝</span> 스터디 플래너 입력하기</button>
             <button class="menu-btn" onclick="goToView('history')"><span class="menu-icon">📅</span> 나의 스터디 로그 보기</button>
+            <button class="menu-btn" onclick="goToView('exam')"><span class="menu-icon">📄</span> 시험 답안 입력하기</button>
+        </div>
+
+        <!-- 5. 시험 답안 입력 -->
+        <div id="exam-view" class="sub-view">
+            <div class="view-header">
+                <div class="view-title">📄 시험 답안 입력</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <div class="section-card">
+                <p style="color:#64748b; font-size:13px; margin-top:0;">응시한 시험을 고르고 문항별로 답을 입력한 뒤 제출하세요. 객관식은 번호를 누르고, 서술형은 직접 적으면 됩니다. <b>한 번 제출하면 수정할 수 없어요.</b></p>
+                <div class="input-group">
+                    <label>시험 선택</label>
+                    <select id="examSelect" onchange="loadExamQuestions()"><option value="">— 시험을 불러오는 중 —</option></select>
+                </div>
+                <div id="examQuestions"></div>
+                <button type="button" class="submit-button" id="examSubmitBtn" onclick="submitExam()" style="display:none;">답안 제출하기</button>
+                <div id="examSubmitMsg" style="margin-top:12px; font-size:14px; font-weight:700;"></div>
+            </div>
         </div>
 
         <!-- 2. 숙제 제출 -->
@@ -326,6 +351,9 @@
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('historyDateInput').value = today;
                 loadHistoryData();
+            } else if (viewName === 'exam') {
+                document.getElementById('exam-view').classList.add('active');
+                loadStudentExams();
             }
             window.history.pushState({ view: viewName }, '', `#${viewName}`);
         }
@@ -357,6 +385,9 @@
                 loadTodayData('plannerForm');
             } else if (viewName === 'history') {
                 document.getElementById('history-view').classList.add('active');
+            } else if (viewName === 'exam') {
+                document.getElementById('exam-view').classList.add('active');
+                loadStudentExams();
             }
         }
 
@@ -423,6 +454,127 @@
                 }
 
             } catch (e) { console.error(e); }
+        }
+
+        // ── 시험 답안 입력 ─────────────────────────────────
+        let examQuestionsCache = [];
+
+        async function loadStudentExams() {
+            const sel = document.getElementById('examSelect');
+            document.getElementById('examQuestions').innerHTML = '';
+            document.getElementById('examSubmitBtn').style.display = 'none';
+            document.getElementById('examSubmitMsg').textContent = '';
+            try {
+                const res = await fetch('/api/student/exam-list', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const data = await res.json();
+                if (!data.success || !data.exams.length) {
+                    sel.innerHTML = '<option value="">등록된 시험이 없어요</option>';
+                    return;
+                }
+                sel.disabled = false;
+                sel.innerHTML = '<option value="">— 시험을 선택하세요 —</option>' +
+                    data.exams.map(e => `<option value="${e.pageId}">${escapeHtmlExam(e.examTitle)}</option>`).join('');
+            } catch (e) {
+                sel.innerHTML = '<option value="">시험 목록을 불러오지 못했어요</option>';
+            }
+        }
+
+        async function loadExamQuestions() {
+            const examPageId = document.getElementById('examSelect').value;
+            const wrap = document.getElementById('examQuestions');
+            const btn = document.getElementById('examSubmitBtn');
+            document.getElementById('examSubmitMsg').textContent = '';
+            examQuestionsCache = [];
+            if (!examPageId) { wrap.innerHTML = ''; btn.style.display = 'none'; return; }
+            wrap.innerHTML = '<p style="color:#64748b;">문항을 불러오는 중...</p>';
+            try {
+                const res = await fetch('/api/student/exam-questions?examPageId=' + encodeURIComponent(examPageId), { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const data = await res.json();
+                if (!data.success || !data.questions.length) {
+                    wrap.innerHTML = '<p style="color:#dc2626;">문항을 불러올 수 없어요. 선생님께 문의하세요.</p>';
+                    btn.style.display = 'none';
+                    return;
+                }
+                examQuestionsCache = data.questions;
+                wrap.innerHTML = data.questions.map((q, i) => renderExamQuestion(q, i)).join('');
+                btn.style.display = 'block';
+            } catch (e) {
+                wrap.innerHTML = '<p style="color:#dc2626;">오류가 발생했어요: ' + e.message + '</p>';
+            }
+        }
+
+        function renderExamQuestion(q, i) {
+            const isEssay = q.type === '서술형';
+            const label = `${escapeHtmlExam(q.number)}번 <span style="color:#94a3b8; font-weight:400;">(${escapeHtmlExam(q.type || '')}${q.score ? ' · ' + q.score + '점' : ''})</span>`;
+            let input;
+            if (isEssay) {
+                input = `<textarea data-qidx="${i}" rows="2" placeholder="답을 적어주세요" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; box-sizing:border-box;"></textarea>`;
+            } else {
+                const btns = [1, 2, 3, 4, 5].map(n => `<button type="button" class="choice-btn" data-qidx="${i}" data-val="${n}" onclick="pickChoice(this)">${n}</button>`).join('');
+                input = `<div class="choice-row">${btns}</div><input type="hidden" data-qval="${i}" value="">`;
+            }
+            return `<div class="exam-q"><div class="exam-q-label">${label}</div>${input}</div>`;
+        }
+
+        function pickChoice(btn) {
+            const i = btn.dataset.qidx;
+            document.querySelectorAll(`.choice-btn[data-qidx="${i}"]`).forEach(b => b.classList.remove('sel'));
+            btn.classList.add('sel');
+            document.querySelector(`input[data-qval="${i}"]`).value = btn.dataset.val;
+        }
+
+        async function submitExam() {
+            const examPageId = document.getElementById('examSelect').value;
+            if (!examPageId) return;
+            const msg = document.getElementById('examSubmitMsg');
+            const answers = examQuestionsCache.map((q, i) => {
+                let val = '';
+                if (q.type === '서술형') {
+                    const ta = document.querySelector(`textarea[data-qidx="${i}"]`);
+                    val = ta ? ta.value.trim() : '';
+                } else {
+                    const hidden = document.querySelector(`input[data-qval="${i}"]`);
+                    val = hidden ? hidden.value : '';
+                }
+                return { number: q.number, student_answer: val };
+            });
+            const blank = answers.filter(a => !a.student_answer).length;
+            if (!confirm(`제출하면 수정할 수 없어요.${blank ? ` 아직 답을 안 쓴 문항이 ${blank}개 있어요.` : ''} 제출할까요?`)) return;
+
+            const btn = document.getElementById('examSubmitBtn');
+            btn.disabled = true;
+            msg.style.color = '#64748b';
+            msg.textContent = '제출 중...';
+            try {
+                const res = await fetch('/api/student/submit-exam', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ examPageId, answers })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    msg.style.color = '#dc2626';
+                    msg.textContent = data.message || '제출에 실패했어요.';
+                    btn.disabled = false;
+                    return;
+                }
+                msg.style.color = '#16a34a';
+                msg.innerHTML = `✅ 제출 완료! 총 ${data.total}문항을 제출했어요.` + (data.essayPending ? ' 서술형은 선생님이 채점할 거예요.' : '');
+                btn.style.display = 'none';
+                btn.disabled = false;
+                document.getElementById('examQuestions').innerHTML = '';
+                document.getElementById('examSelect').value = '';
+            } catch (e) {
+                msg.style.color = '#dc2626';
+                msg.textContent = '오류가 발생했어요: ' + e.message;
+                btn.disabled = false;
+            }
+        }
+
+        function escapeHtmlExam(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
         }
 
         function showToast(msg, type) {

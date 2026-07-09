@@ -32,21 +32,23 @@
 
 ---
 
-## 합의된 방향 (아직 미구현)
+**Phase 1 — 학생 셀프 답안 입력** — 커밋됨 ✅
+- `examAnalyzerModule.js`: 공통 헬퍼 추출(`listExams`, `gradeAgainstKey`, `persistStudentResult`) 및 `grade-student`/`save-student-result` 리팩터. 학생용 가드 `requireStudent` 추가.
+- 신규 엔드포인트: `GET /api/student/exam-list`, `GET /api/student/exam-questions`(정답 미포함), `POST /api/student/submit-exam`(서버 채점+저장, 중복 제출 409 차단, 등록자 "이름 (학생제출)").
+- `planner-modular.html`: 메뉴 `📄 시험 답안 입력하기` + `exam-view` + JS(시험 선택→객관식 1~5 버튼/서술형 textarea→제출). `goToView`/`goToViewHelper`에 `exam` 분기.
+- 결정 반영: 중복 제출 막기 / 시험 전부 노출 / 이름으로 식별.
+- 검증: 채점·저장 로직 유닛테스트 통과. (※ 이 컨테이너의 `node_modules/@anthropic-ai/sdk` 설치가 불완전해 모듈 import 테스트는 불가 — 코드 문제 아님, Replit 배포본은 별도 설치. 로컬에서 돌릴 일 있으면 `npm install` 재실행 필요.)
+
+---
+
+## 합의된 방향
 
 원인 ①은 **AI 인식을 없애고 학생이 직접 답을 입력**하게 해서 제거하고,
 원인 ②는 **재채점 기능**으로 보완한다. 학생 로그인은 이미 존재(`POST /login`, JWT `role:'student'`, `req.user.userId`=학생ID(소문자), `req.user.name`=이름). 학생 플래너는 `planner-modular.html`(메뉴 버튼 → 서브뷰 전환).
 
-### Phase 1 — 학생 셀프 답안 입력 (플래너에 메뉴 추가)
-**백엔드** (`examAnalyzerModule.js`에 학생용 가드 추가: `requireAuth` + `req.user.role === 'student'`)
-- `GET /api/student/exam-list` — 학생이 고를 시험 목록.
-- `GET /api/student/exam-questions?examPageId=` — 문항 **번호·유형·배점만** 반환. ⚠️ **정답(정답지)은 절대 내려주지 말 것** (학생에게 답 유출 금지).
-- `POST /api/student/submit-exam` — 학생 답을 받아 **서버에서** 정답지와 대조 채점(객관식 자동, 서술형은 `채점대기`) 후 STUDENT_RESULT_DB/STUDENT_ANSWER_DB 저장. 로그인 학생 이름으로 기록. 기존 `loadAnswerKey` + `normalizeAnswer` 재사용.
+### Phase 1 — 학생 셀프 답안 입력 → **완료** (위 "완료된 작업" 참고)
 
-**프런트** (`planner-modular.html`)
-- 메뉴에 `📄 시험 답안 입력` 버튼 + 서브뷰 추가. 시험 선택 → 문항 렌더(객관식 1~5 선택 / 서술형 타이핑) → 제출.
-
-### Phase 2 — 정답지 수정 + 재채점
+### Phase 2 — 정답지 수정 + 재채점 (다음 작업)
 - `GET /api/exam-answer-key?examPageId=` + `POST /api/update-answer-key` — 저장된 정답지 불러와 정답/배점 수정(QUESTION_DB 페이지 업데이트). 현재 저장 후 정답지 수정 화면이 없으므로 필요.
 - `POST /api/regrade-exam` — 그 시험 응시 **학생 전원 재채점**. 저장된 `학생답`을 현재 정답지와 다시 대조해 **객관식만** 재계산하고, **선생님이 매긴 서술형 점수(부분점수 포함)는 보존**. STUDENT_ANSWER 행 + STUDENT_RESULT 총점 갱신.
 - 서술형 채점/수정을 위해 `results-viewer.html`에서 **저장된 결과를 열어 수정**하는 화면(학생 제출 서술형을 여기서 부분점수 채점). 로드/저장 엔드포인트 한 쌍(`result-answers` 로드 + `update-student-result` 저장) 추가.
