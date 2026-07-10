@@ -208,10 +208,9 @@ function gradeAgainstKey(answerKey, studentMap) {
     });
 }
 
-// 채점 결과(graded)를 STUDENT_RESULT_DB(1행) + STUDENT_ANSWER_DB(문항별)로 저장.
-// meta: { examPageId, studentName, school?, grade?, examType?, registeredBy? }
-// 교사 저장(save-student-result)과 학생 제출(submit-exam) 양쪽에서 재사용.
-async function persistStudentResult(fetchNotion, dbIds, meta, graded) {
+// 채점 결과(graded) → 점수/취약점 집계 + 저장용 rows·리포트 텍스트 계산 (순수 함수, DB 접근 없음).
+// 저장(persistStudentResult)과 재채점(regrade-exam)이 동일 계산을 쓰도록 공통화.
+function computeResultSummary(graded) {
     let score = 0, fullScore = 0, correctCount = 0, wrongCount = 0, partialCount = 0;
     const weakTypes = new Set();
     const weakGrammar = new Set();
@@ -255,23 +254,57 @@ async function persistStudentResult(fetchNotion, dbIds, meta, graded) {
         + `${weakGrammarStr ? '취약 문법: ' + weakGrammarStr + '. ' : ''}`
         + `${wrongNumbers.length ? '오답 문항: ' + wrongNumbers.join(', ') : ''}`;
 
-    // 1) 학생 응시 결과 1행
-    const resultProps = {
-        '학생명': { title: [{ text: { content: String(meta.studentName) } }] },
-        '시험': { relation: [{ id: meta.examPageId }] },
-        '점수': { number: score },
-        '만점': { number: fullScore },
-        '정답수': { number: correctCount },
-        '오답수': { number: wrongCount },
-        '취약유형': { multi_select: [...weakTypes].map(name => ({ name })) },
-        '취약문법': { rich_text: [{ text: { content: weakGrammarStr } }] },
-        '서술형채점': { select: { name: hasEssay ? (essayPending ? '대기' : '완료') : '없음' } },
-        '리포트': { rich_text: [{ text: { content: reportText } }] },
-        '등록자': { rich_text: [{ text: { content: String(meta.registeredBy || '') } }] }
+    return {
+        rows, score, fullScore, correctCount, wrongCount, partialCount,
+        weakTypes: [...weakTypes], weakGrammarStr, hasEssay, essayPending, reportText
     };
-    if (meta.school) resultProps['학교'] = { select: { name: meta.school } };
-    if (meta.grade) resultProps['학년'] = { select: { name: meta.grade } };
-    if (meta.examType) resultProps['시험종류'] = { select: { name: meta.examType } };
+}
+
+// STUDENT_RESULT_DB 1행 속성 빌더 (저장·재채점 공통). meta에서 학생/시험/등록자 등을 받는다.
+function buildResultProps(sum, meta) {
+    const props = {
+        '점수': { number: sum.score },
+        '만점': { number: sum.fullScore },
+        '정답수': { number: sum.correctCount },
+        '오답수': { number: sum.wrongCount },
+        '취약유형': { multi_select: sum.weakTypes.map(name => ({ name })) },
+        '취약문법': { rich_text: [{ text: { content: sum.weakGrammarStr } }] },
+        '서술형채점': { select: { name: sum.hasEssay ? (sum.essayPending ? '대기' : '완료') : '없음' } },
+        '리포트': { rich_text: [{ text: { content: sum.reportText } }] }
+    };
+    if (meta.studentName != null) props['학생명'] = { title: [{ text: { content: String(meta.studentName) } }] };
+    if (meta.examPageId) props['시험'] = { relation: [{ id: meta.examPageId }] };
+    if (meta.registeredBy != null) props['등록자'] = { rich_text: [{ text: { content: String(meta.registeredBy || '') } }] };
+    if (meta.school) props['학교'] = { select: { name: meta.school } };
+    if (meta.grade) props['학년'] = { select: { name: meta.grade } };
+    if (meta.examType) props['시험종류'] = { select: { name: meta.examType } };
+    return props;
+}
+
+// STUDENT_ANSWER_DB 문항 1행 속성 빌더. link가 있으면 학생결과 relation을 붙인다(신규 생성용).
+function buildAnswerProps(g, resultId) {
+    const props = {
+        '번호': { title: [{ text: { content: String(g.number ?? '') } }] },
+        '문법포인트': { rich_text: [{ text: { content: String(g.grammar_point ?? '') } }] },
+        '정답': { rich_text: [{ text: { content: String(g.answer ?? '') } }] },
+        '학생답': { rich_text: [{ text: { content: String(g.student_answer ?? '') } }] },
+        '배점': { number: Number(g.score) || 0 },
+        '획득점수': { number: g.earned }
+    };
+    if (resultId) props['학생결과'] = { relation: [{ id: resultId }] };
+    if (g.type) props['유형'] = { select: { name: g.type } };
+    if (g.verdict) props['정오'] = { select: { name: g.verdict } };
+    return props;
+}
+
+// 채점 결과(graded)를 STUDENT_RESULT_DB(1행) + STUDENT_ANSWER_DB(문항별)로 저장.
+// meta: { examPageId, studentName, school?, grade?, examType?, registeredBy? }
+// 교사 저장(save-student-result)과 학생 제출(submit-exam) 양쪽에서 재사용.
+async function persistStudentResult(fetchNotion, dbIds, meta, graded) {
+    const sum = computeResultSummary(graded);
+
+    // 1) 학생 응시 결과 1행
+    const resultProps = buildResultProps(sum, meta);
 
     const resultPage = await fetchNotion('https://api.notion.com/v1/pages', {
         method: 'POST',
@@ -279,26 +312,14 @@ async function persistStudentResult(fetchNotion, dbIds, meta, graded) {
     });
 
     // 2) 문항별 응답 행 (학생결과 relation으로 연결)
-    for (const g of rows) {
-        const props = {
-            '번호': { title: [{ text: { content: String(g.number ?? '') } }] },
-            '학생결과': { relation: [{ id: resultPage.id }] },
-            '문법포인트': { rich_text: [{ text: { content: String(g.grammar_point ?? '') } }] },
-            '정답': { rich_text: [{ text: { content: String(g.answer ?? '') } }] },
-            '학생답': { rich_text: [{ text: { content: String(g.student_answer ?? '') } }] },
-            '배점': { number: Number(g.score) || 0 },
-            '획득점수': { number: g.earned }
-        };
-        if (g.type) props['유형'] = { select: { name: g.type } };
-        if (g.verdict) props['정오'] = { select: { name: g.verdict } };
-
+    for (const g of sum.rows) {
         await fetchNotion('https://api.notion.com/v1/pages', {
             method: 'POST',
-            body: JSON.stringify({ parent: { database_id: dbIds.STUDENT_ANSWER_DB_ID }, properties: props })
+            body: JSON.stringify({ parent: { database_id: dbIds.STUDENT_ANSWER_DB_ID }, properties: buildAnswerProps(g, resultPage.id) })
         });
     }
 
-    return { pageId: resultPage.id, score, fullScore, report: reportText };
+    return { pageId: resultPage.id, score: sum.score, fullScore: sum.fullScore, report: sum.reportText };
 }
 
 // Notion DB에 속성(칸)이 없으면 추가한다(있으면 무해한 no-op). AI 코멘트 캐시 저장용.
@@ -747,6 +768,110 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             res.json({ success: true, questions });
         } catch (error) {
             console.error('학생 결과 상세 조회 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // 정답지 수정 후 재채점 — 그 시험 응시 학생 전원을 현재 정답지로 다시 채점.
+    // 객관식은 저장된 학생답으로 재계산, 서술형은 선생님이 매긴 점수(부분점수 포함) 보존.
+    app.post('/api/regrade-exam', requireAuth, requireOwner, async (req, res) => {
+        const { examPageId } = req.body;
+        if (!examPageId) return res.status(400).json({ success: false, message: '재채점할 시험을 선택해주세요.' });
+        if (!dbIds?.QUESTION_DB_ID || !dbIds?.STUDENT_RESULT_DB_ID || !dbIds?.STUDENT_ANSWER_DB_ID) {
+            return res.status(500).json({ success: false, message: 'DB ID가 설정되지 않았습니다.' });
+        }
+        try {
+            // 현재(수정된) 정답지
+            const key = await loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId);
+            if (key.length === 0) {
+                return res.status(400).json({ success: false, message: '이 시험의 정답지를 찾을 수 없습니다.' });
+            }
+            const keyByNum = {};
+            key.forEach(k => { keyByNum[normalizeAnswer(k.number)] = k; });
+
+            // 캐시된 AI 코멘트를 비울 수 있도록 속성 보장(없으면 추가). 권한 없으면 무시하고 진행.
+            try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, 'AI코멘트', { rich_text: {} }); } catch (e) { /* noop */ }
+
+            // 이 시험의 모든 학생 결과
+            let results = [];
+            let cursor;
+            do {
+                const body = { filter: { property: '시험', relation: { contains: examPageId } }, page_size: 100 };
+                if (cursor) body.start_cursor = cursor;
+                const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_RESULT_DB_ID}/query`, {
+                    method: 'POST', body: JSON.stringify(body)
+                });
+                results = results.concat(data.results);
+                cursor = data.has_more ? data.next_cursor : undefined;
+            } while (cursor);
+
+            let regradedCount = 0;
+            for (const rp of results) {
+                const resultId = rp.id;
+
+                // 학생 문항 응답 행
+                let ansRows = [];
+                let c2;
+                do {
+                    const body = { filter: { property: '학생결과', relation: { contains: resultId } }, page_size: 100 };
+                    if (c2) body.start_cursor = c2;
+                    const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_ANSWER_DB_ID}/query`, {
+                        method: 'POST', body: JSON.stringify(body)
+                    });
+                    ansRows = ansRows.concat(data.results);
+                    c2 = data.has_more ? data.next_cursor : undefined;
+                } while (c2);
+
+                // 저장된 학생답 + 현재 정답지로 재구성
+                const graded = ansRows.map(r => {
+                    const P = r.properties;
+                    const number = P['번호']?.title?.[0]?.plain_text || '';
+                    const studentAnswer = P['학생답']?.rich_text?.[0]?.plain_text || '';
+                    const prevVerdict = P['정오']?.select?.name || '';
+                    const prevEarned = P['획득점수']?.number ?? 0;
+                    const k = keyByNum[normalizeAnswer(number)];
+                    if (!k) {
+                        // 현재 정답지에 없는 번호 → 기존 값 유지
+                        return {
+                            _rowId: r.id, number,
+                            type: P['유형']?.select?.name || '',
+                            grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
+                            answer: P['정답']?.rich_text?.[0]?.plain_text || '',
+                            student_answer: studentAnswer, verdict: prevVerdict,
+                            score: P['배점']?.number ?? 0, earned: prevEarned
+                        };
+                    }
+                    const base = { _rowId: r.id, number, type: k.type, grammar_point: k.grammar_point, answer: k.answer, student_answer: studentAnswer, score: k.score };
+                    if (k.type === '서술형') {
+                        // 선생님이 매긴 정오·점수 보존 (배점 바뀌면 computeResultSummary가 보정)
+                        return { ...base, verdict: prevVerdict || '채점대기', earned: prevEarned };
+                    }
+                    const correct = studentAnswer && normalizeAnswer(studentAnswer) === normalizeAnswer(k.answer);
+                    return { ...base, verdict: correct ? '정답' : '오답', earned: correct ? k.score : 0 };
+                });
+
+                const sum = computeResultSummary(graded);
+
+                // 문항 행 업데이트 (정답·배점·유형·정오·획득점수 갱신)
+                for (const g of sum.rows) {
+                    await fetchNotion(`https://api.notion.com/v1/pages/${g._rowId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ properties: buildAnswerProps(g, null) })
+                    });
+                }
+                // 결과 총점 갱신 + 캐시된 AI 코멘트 비우기(정답지 바뀌었으니 리포트 재생성되도록)
+                const resultProps = buildResultProps(sum, {});
+                resultProps['AI코멘트'] = { rich_text: [] };
+                await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ properties: resultProps })
+                });
+                regradedCount++;
+            }
+
+            res.json({ success: true, regradedCount });
+        } catch (error) {
+            console.error('재채점 오류:', error);
             res.status(500).json({ success: false, message: error.message });
         }
     });

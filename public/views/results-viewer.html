@@ -60,6 +60,8 @@
                     <label>시험 선택</label>
                     <select id="rvExam" class="wide" onchange="loadByExam()"><option value="">— 시험 불러오는 중 —</option></select>
                 </div>
+                <button class="rv-btn" id="rvRegradeBtn" style="display:none; background:#dc2626; margin-top:8px;" onclick="regradeExam()">🔄 이 시험 전체 재채점</button>
+                <span class="rv-muted" id="rvRegradeMsg" style="margin-left:10px;"></span>
             </div>
 
             <div id="studentControls" style="display:none;">
@@ -147,12 +149,43 @@
         async function loadByExam() {
             const examPageId = document.getElementById('rvExam').value;
             document.getElementById('rvDetailCard').style.display = 'none';
-            if (!examPageId) { document.getElementById('rvListArea').innerHTML = ''; return; }
+            document.getElementById('rvRegradeMsg').textContent = '';
+            const regradeBtn = document.getElementById('rvRegradeBtn');
+            if (!examPageId) { document.getElementById('rvListArea').innerHTML = ''; regradeBtn.style.display = 'none'; return; }
             document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">불러오는 중...</p>';
             const data = await fetchResults({ examPageId });
-            if (!data.success) { document.getElementById('rvListArea').innerHTML = `<p class="rv-muted">오류: ${escapeHtml(data.message)}</p>`; return; }
-            if (!data.results.length) { document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">이 시험에 저장된 학생 결과가 없습니다.</p>'; return; }
+            if (!data.success) { document.getElementById('rvListArea').innerHTML = `<p class="rv-muted">오류: ${escapeHtml(data.message)}</p>`; regradeBtn.style.display = 'none'; return; }
+            if (!data.results.length) { document.getElementById('rvListArea').innerHTML = '<p class="rv-muted">이 시험에 저장된 학생 결과가 없습니다.</p>'; regradeBtn.style.display = 'none'; return; }
             renderResultTable(data.results, 'exam');
+            regradeBtn.style.display = 'inline-block'; // 결과가 있을 때만 재채점 버튼 노출
+        }
+
+        async function regradeExam() {
+            const examPageId = document.getElementById('rvExam').value;
+            if (!examPageId) return;
+            if (!confirm('이 시험을 응시한 모든 학생을 현재 정답지 기준으로 다시 채점합니다.\n· 객관식: 다시 계산\n· 서술형: 선생님이 매긴 점수 그대로 유지\n진행할까요?')) return;
+            const btn = document.getElementById('rvRegradeBtn');
+            const msg = document.getElementById('rvRegradeMsg');
+            btn.disabled = true;
+            msg.style.color = '#64748b';
+            msg.textContent = '재채점 중... (학생 수에 따라 시간이 걸릴 수 있어요)';
+            try {
+                const res = await fetch('/api/regrade-exam', {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ examPageId })
+                });
+                const data = await res.json();
+                if (!data.success) { msg.style.color = '#dc2626'; msg.textContent = data.message || '재채점 실패'; return; }
+                await loadByExam(); // 갱신된 점수로 목록 새로고침 (msg를 지우므로 그 뒤에 결과 표시)
+                msg.style.color = '#16a34a';
+                msg.textContent = `✅ 재채점 완료: ${data.regradedCount}명`;
+            } catch (e) {
+                msg.style.color = '#dc2626';
+                msg.textContent = '오류: ' + e.message;
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         async function loadByStudent() {
