@@ -80,7 +80,10 @@
       </tr></thead>
       <tbody id="tbody"></tbody>
     </table>
-    <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="addRow()">＋ 행 추가</button>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" onclick="addRow()">＋ 행 추가</button>
+      <button class="btn btn-ghost btn-sm" onclick="autofillEndPages()">🔢 끝p 자동 계산 (다음 유닛 −1)</button>
+    </div>
   </div>
 </div>
 
@@ -202,7 +205,8 @@
       const j = await res.json();
       if (j.success) {
         renderTable(j.units);
-        st.style.color = '#059669'; st.textContent = `✅ ${j.units.length}개 유닛 추출. 표를 확인하세요.`;
+        autofillEndPages(); // 끝페이지는 다음 유닛 시작 −1로 자동 보정
+        st.style.color = '#059669'; st.textContent = `✅ ${j.units.length}개 유닛 추출. 끝p는 자동 계산됨 — 표를 확인하세요.`;
       } else { st.style.color = '#dc2626'; st.textContent = '❌ ' + (j.message || '파싱 실패'); }
     } catch (e) { st.style.color = '#dc2626'; st.textContent = '❌ ' + e.message; }
     finally { btn.disabled = false; }
@@ -225,6 +229,16 @@
       <td class="col-pass"><input type="number" value="${u.passages ?? 1}"></td>
       <td class="col-del"><button class="btn btn-ghost btn-sm" onclick="this.closest('tr').remove()">✕</button></td>`;
     return tr;
+  }
+
+  // 끝페이지 = 다음 유닛 시작페이지 − 1 (마지막 유닛은 그대로 둠)
+  function autofillEndPages() {
+    const rows = [...document.querySelectorAll('#tbody tr')];
+    for (let i = 0; i < rows.length - 1; i++) {
+      const endInput = rows[i].querySelectorAll('input')[3];
+      const nextStart = rows[i + 1].querySelectorAll('input')[2].value;
+      if (nextStart !== '' && !isNaN(Number(nextStart))) endInput.value = Number(nextStart) - 1;
+    }
   }
 
   function addRow() {
