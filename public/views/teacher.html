@@ -57,6 +57,8 @@
                 <select id="commonTeacherFilter" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
             </div>
 
+            <button class="refresh-btn hidden" id="grammarCommentBtn" onclick="openGrammarCommentModal()" style="background:#8b5cf6; color:#fff;">📝 문법 코멘트 작성</button>
+
             <div class="filter-group hidden" id="grammarClassFilterGroup">
                 <span class="filter-label">문법반:</span>
                 <select id="grammarClassFilter" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 문법반</option></select>
@@ -158,10 +160,6 @@
                 <div class="grammar-group" style="flex-grow: 1;">
                     <label class="grammar-label">문법 과제 내용</label>
                     <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예) 6/24 수까지 본책 p.120~122, 6/27 수까지 워크북 p.50~56 처럼 마감일과 함께 각기 적어주세요">
-                </div>
-                <div class="grammar-group" style="flex-basis: 100%; width: 100%;">
-                    <label class="grammar-label">문법 코멘트 <span style="font-weight:400; color:#718096; font-size:12px;">(오늘의 코멘트 생성 시 학생별 리포트 맨 앞에 원문 그대로 들어갑니다)</span></label>
-                    <textarea id="grammarCommentInput" class="grammar-input" style="width: 100%; min-height: 70px; resize: vertical;" placeholder="예) 오늘은 to부정사의 명사적 용법을 배우고 예문에 적용하는 연습을 진행했습니다. 다음 시간에는 형용사적 용법으로 이어갈 예정입니다."></textarea>
                 </div>
                 <button class="grammar-btn" onclick="updateGrammarByClass()">반 전체 적용</button>
             </div>
@@ -287,6 +285,36 @@
                 <div id="progressBarFill" style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); height: 100%; width: 0%; transition: width 0.3s ease-out;"></div>
             </div>
             <p id="progressText" style="font-weight: 800; color: #4a5568; font-size: 18px;">준비 중...</p>
+        </div>
+    </div>
+
+    <!-- 문법 코멘트 작성 미니 모달 -->
+    <div id="grammarCommentModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 620px; width: 95%; text-align: left;">
+            <h2 class="section-title" style="font-size: 1.35em; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📝 문법 코멘트 작성</h2>
+            <p style="font-size: 13px; color: #718096; margin: 8px 0 16px;">여기 작성한 코멘트는 선택한 반 학생들의 <b>오늘의 코멘트 생성 시 인사말 뒤에 원문 그대로</b> 들어갑니다. (날짜: <b id="gcDateLabel"></b>)</p>
+
+            <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:12px;">
+                <div style="flex:0 0 180px;">
+                    <label class="grammar-label">대상 반</label>
+                    <select id="gcClassSelect" class="grammar-input" style="width:100%;" onchange="onGcClassChange()"><option value="">반 선택</option></select>
+                </div>
+                <div style="flex:1;">
+                    <label class="grammar-label">AI 생성 키워드 <span style="font-weight:400; color:#a0aec0; font-size:11px;">(메모만 넣으면 톤 맞춰 문장화)</span></label>
+                    <input type="text" id="gcKeywords" class="grammar-input" style="width:100%;" placeholder="예) to부정사 명사적 용법, 예문 적용 연습, 다음시간 형용사적 용법" onkeydown="if(event.key==='Enter') generateGrammarComment()">
+                </div>
+                <button class="grammar-btn" style="white-space:nowrap;" onclick="generateGrammarComment()" id="gcGenBtn">✨ AI 생성</button>
+            </div>
+
+            <label class="grammar-label">문법 코멘트</label>
+            <textarea id="gcCommentText" class="grammar-input" style="width:100%; min-height:150px; resize:vertical; margin-bottom:12px;" placeholder="직접 작성하거나 위에서 AI 생성 후 다듬으세요."></textarea>
+
+            <div id="gcStatus" style="min-height:20px; font-size:13px; font-weight:700; margin-bottom:10px;"></div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="closeGrammarCommentModal()" style="padding:10px 18px; border:1px solid #cbd5e0; background:white; border-radius:6px; cursor:pointer; font-weight:bold; color:#4a5568;">닫기</button>
+                <button id="gcSaveBtn" onclick="saveGrammarComment()" style="padding:10px 20px; background:#8b5cf6; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">💾 저장 (반 전체 반영)</button>
+            </div>
         </div>
     </div>
 
@@ -726,6 +754,9 @@
                 batchWcCancelBtn.classList.add('hidden');
             }
 
+            const grammarCommentBtn = document.getElementById('grammarCommentBtn');
+            if (grammarCommentBtn) grammarCommentBtn.classList.toggle('hidden', tab !== 'grammar');
+
             if (tab === 'homework') notice.style.display = 'block';
             else notice.style.display = 'none';
 
@@ -760,6 +791,124 @@
         }
 
         function closeFloatingWindow() { document.getElementById('floatingCommentWindow').classList.add('hidden'); }
+
+        // ==========================================
+        // [문법 코멘트 미니 모달]
+        // ==========================================
+        function gcResolveDate() {
+            return document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
+        }
+
+        function openGrammarCommentModal() {
+            const modal = document.getElementById('grammarCommentModal');
+            const select = document.getElementById('gcClassSelect');
+            // 인라인 반 선택창의 옵션을 그대로 복제 (라이브 반 목록)
+            const src = document.getElementById('grammarClassSelect');
+            select.innerHTML = '<option value="">반 선택</option>';
+            Array.from(src.options).forEach(o => {
+                if (!o.value) return;
+                const opt = document.createElement('option');
+                opt.value = o.value; opt.textContent = o.textContent;
+                select.appendChild(opt);
+            });
+            // 인라인에서 이미 반을 골라놨으면 그 반을 그대로 선택
+            if (src.value) select.value = src.value;
+            document.getElementById('gcDateLabel').textContent = gcResolveDate();
+            document.getElementById('gcKeywords').value = '';
+            document.getElementById('gcCommentText').value = '';
+            document.getElementById('gcStatus').textContent = '';
+            modal.classList.add('show');
+            if (select.value) onGcClassChange();
+        }
+
+        function closeGrammarCommentModal() {
+            document.getElementById('grammarCommentModal').classList.remove('show');
+        }
+
+        // 반 선택 시 그날 기존 코멘트 프리필
+        async function onGcClassChange() {
+            const className = document.getElementById('gcClassSelect').value;
+            const ta = document.getElementById('gcCommentText');
+            if (!className) { ta.value = ''; return; }
+            try {
+                const date = gcResolveDate();
+                const res = await fetch(`${API_BASE_URL}/api/grammar-record?className=${encodeURIComponent(className)}&date=${encodeURIComponent(date)}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const json = await res.json();
+                ta.value = (json.success && json.record && json.record.comment) ? json.record.comment : '';
+            } catch (e) { console.error('문법 코멘트 프리필 실패:', e); }
+        }
+
+        // AI 생성 (오늘의 코멘트와 동일 톤 로직, 반 공통)
+        async function generateGrammarComment() {
+            const keywords = document.getElementById('gcKeywords').value.trim();
+            const className = document.getElementById('gcClassSelect').value;
+            if (!keywords) return alert('AI 생성 키워드를 입력하세요.');
+            const btn = document.getElementById('gcGenBtn');
+            const orig = btn.textContent;
+            btn.disabled = true; btn.textContent = '생성 중...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/generate-grammar-comment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ keywords, className })
+                });
+                const data = await res.json();
+                if (data.success) { document.getElementById('gcCommentText').value = data.comment; }
+                else alert('AI 생성 실패: ' + (data.message || ''));
+            } catch (e) { alert('AI 생성 실패: ' + e.message); }
+            finally { btn.disabled = false; btn.textContent = orig; }
+        }
+
+        // 저장 (GRAMMAR_DB 코멘트 upsert + 반 전체 PROGRESS 투사, 스트리밍 진행률)
+        async function saveGrammarComment() {
+            const className = document.getElementById('gcClassSelect').value;
+            const comment = document.getElementById('gcCommentText').value;
+            const date = gcResolveDate();
+            const status = document.getElementById('gcStatus');
+            const saveBtn = document.getElementById('gcSaveBtn');
+            if (!className) return alert('대상 반을 선택하세요.');
+
+            saveBtn.disabled = true;
+            status.style.color = '#8b5cf6';
+            status.textContent = '⏳ 노션에 저장 중...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/update-grammar-comment-by-class`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ className, date, comment })
+                });
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunks = decoder.decode(value).split('\n').filter(Boolean);
+                    for (const chunk of chunks) {
+                        try {
+                            const data = JSON.parse(chunk);
+                            if (data.progress !== undefined) {
+                                status.style.color = '#8b5cf6';
+                                status.textContent = `⏳ 노션에 저장 중... (${data.progress} / ${data.total}명)`;
+                            } else if (data.success) {
+                                status.style.color = '#059669';
+                                status.textContent = '✅ ' + data.message;
+                                if (typeof loadDataForCurrentTab === 'function') loadDataForCurrentTab(true);
+                            } else if (data.success === false) {
+                                status.style.color = '#e53e3e';
+                                status.textContent = '❌ 실패: ' + data.message;
+                            }
+                        } catch (e) { console.error('청크 파싱 에러:', e, chunk); }
+                    }
+                }
+            } catch (e) {
+                status.style.color = '#e53e3e';
+                status.textContent = '❌ 네트워크 오류: ' + e.message;
+            } finally {
+                saveBtn.disabled = false;
+            }
+        }
 
         function formatSelect(pageId, propertyName, currentValue, options) {
             const defaultStatus = 'status-default';
@@ -1130,7 +1279,6 @@
             const topic = document.getElementById('grammarTopicInput').value;
             const testContent = document.getElementById('grammarTestInput').value;
             const homework = document.getElementById('grammarHomeworkInput').value;
-            const comment = document.getElementById('grammarCommentInput').value;
             const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
             
             if (!className) return alert('반을 선택하세요.');
@@ -1148,7 +1296,7 @@
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ className, topic, homework, testContent, comment, date })
+                    body: JSON.stringify({ className, topic, homework, testContent, date })
                 });
 
                 const reader = res.body.getReader();
@@ -1173,7 +1321,6 @@
                                 document.getElementById('grammarTopicInput').value = '';
                                 document.getElementById('grammarTestInput').value = '';
                                 document.getElementById('grammarHomeworkInput').value = '';
-                                document.getElementById('grammarCommentInput').value = '';
                                 pastGrammarCache = null; // 새 숙제 반영 위해 캐시 초기화
                                 loadDataForCurrentTab(true);
                             } 
@@ -1223,7 +1370,6 @@
                     document.getElementById('grammarTopicInput').value = rec.topic || '';
                     document.getElementById('grammarTestInput').value = rec.testContent || '';
                     document.getElementById('grammarHomeworkInput').value = rec.homework || '';
-                    document.getElementById('grammarCommentInput').value = rec.comment || '';
                     box.style.display = 'none';
                     return; // 오늘 기록을 불러왔으니 지난 숙제 프리필은 생략
                 }

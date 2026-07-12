@@ -358,6 +358,47 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     }
 });
 
+// [신규] 반 공통 문법 코멘트 생성 — 오늘의 코멘트와 동일한 전문가 톤 규칙.
+// 단, 반 전체에 공통으로 들어가므로 학생 이름/호칭/점수/숙제/인사말 없이 '문법 수업 서술'만 생성한다.
+app.post('/api/generate-grammar-comment', requireAuth, async (req, res) => {
+    const { keywords, className } = req.body;
+    if (!keywords) return res.status(400).json({ success: false, message: 'Missing keywords' });
+    if (!geminiModel) return res.status(500).json({ success: false, message: 'AI not configured' });
+
+    try {
+        const prompt = `
+        너는 '리디튜드' 영어학원의 경력 많은 담임 선생님이다. ${className ? `'${className}' 반의 ` : ''}오늘 문법 수업 내용을 학부모님께 전하는 '문법 코멘트' 한 단락을 작성한다. 이 글은 그 반 모든 학생의 일일 리포트 맨 앞(인사말 다음)에 공통으로 들어간다.
+
+        [말투 — 가장 중요]
+        - 학습 전문가(담임 교사)의 정중하고 담담한 문어체. 모든 문장을 '~습니다 / ~합니다 / ~였습니다 / ~예정입니다' 같은 '~니다' 체로 끝맺는다. '~요'로 끝나는 문장은 한 문장도 쓰지 않는다.
+        - 절대 금지(유치원 선생님·아기자기 말투): '~한답니다 / ~이에요 / ~거예요 / ~같아요!' 류 어미, 감탄사, 느낌표(!). 느낌표는 한 개도 쓰지 않는다.
+        - 감정 과잉·미화 금지. 사실에 근거한 관찰과 지도 계획을 담담하게 서술한다.
+
+        [내용 규칙]
+        - 아래 키워드에 담긴 내용을 하나도 빠뜨리지 말고 자연스럽게 이어지는 하나의 단락으로 풀어 쓴다. 접속어("그리고, ~하며, 이어서, 다만")로 부드럽게 연결한다.
+        - 사실 왜곡·과장 금지. 키워드에 없는 내용은 지어내지 않는다. "~까지 ~해오기"는 앞으로의 숙제 부여이지 완료된 일이 아니다.
+        - 이 코멘트는 '반 전체 공통'이다. 특정 학생 이름·호칭·개인 점수·개인 숙제 수행 여부는 절대 쓰지 않는다.
+        - 인사말("~리포트를 보내드립니다")·제목·머리말 없이, 문법 수업 서술 본문만 출력한다. 별표(*)·따옴표(') 강조 금지.
+
+        [입력 키워드(선생님 메모)]
+        ${keywords}
+
+        [좋은 예시]
+        오늘은 to부정사의 명사적 용법을 배우고, 배운 개념을 예문에 직접 적용해 보는 연습을 진행했습니다. 처음에는 주어 자리와 목적어 자리를 구분하는 데 시간이 다소 걸렸으나, 반복 연습을 통해 점차 익숙해지는 모습이었습니다. 다음 시간에는 형용사적 용법으로 이어가며 문장 속에서의 쓰임을 넓혀갈 예정입니다.
+        `;
+
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.72, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 1024 } }
+        });
+        const commentText = result.response.text().trim();
+        res.json({ success: true, comment: commentText });
+    } catch (error) {
+        console.error('Grammar Comment AI Error:', error);
+        res.status(500).json({ success: false, message: 'AI generation failed' });
+    }
+});
+
 async function parseDailyReportData(page) {
     const props = page.properties;
     
@@ -823,6 +864,73 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         res.end();
     } catch (error) { 
         console.error('Grammar Update Error:', error); 
+        res.write(JSON.stringify({ success: false, message: error.message }) + '\n');
+        res.end();
+    }
+});
+
+// [신규] 문법 코멘트만 저장 (진도/과제/테스트는 건드리지 않음) — 미니 모달용
+// GRAMMAR_DB 원장에 (반,날짜) upsert(코멘트 필드만) + 그 반 PROGRESS 전원에 코멘트 투사
+app.post('/api/update-grammar-comment-by-class', requireAuth, async (req, res) => {
+    const { className, date, comment } = req.body;
+    if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    try {
+        // ① GRAMMAR_DB 원장 upsert — 코멘트 필드만 (기존 진도/과제/테스트 보존)
+        if (GRAMMAR_DB_ID) {
+            const commentProp = { '문법 코멘트': { rich_text: [{ text: { content: comment || '' } }] } };
+            const gFilter = { "and": [
+                { property: '반이름', select: { equals: className } },
+                { property: '날짜', date: { equals: date } }
+            ]};
+            const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: gFilter, page_size: 1 }) });
+            if (existing.results.length > 0) {
+                await fetchNotion(`https://api.notion.com/v1/pages/${existing.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties: commentProp }) });
+            } else {
+                await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: GRAMMAR_DB_ID }, properties: {
+                    '이름': { title: [{ text: { content: `${className}-${date}` } }] },
+                    '반이름': { select: { name: className } },
+                    '날짜': { date: { start: date } },
+                    ...commentProp
+                } }) });
+            }
+        }
+
+        // ② 그 반 PROGRESS 그날 행 전원에 코멘트 투사
+        const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
+        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
+        const targetStudents = query.results.filter(page => {
+            const studentClass = getRollupValue(page.properties['문법클래스']);
+            return studentClass && studentClass.trim() === className.trim();
+        });
+
+        if (targetStudents.length === 0) {
+            res.write(JSON.stringify({ success: false, message: '해당 반의 학생 데이터를 찾을 수 없습니다.' }) + '\n');
+            return res.end();
+        }
+
+        let updatedCount = 0;
+        for (const page of targetStudents) {
+            await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties: { '문법 코멘트': { rich_text: [{ text: { content: comment || '' } }] } } })
+            });
+            updatedCount++;
+            res.write(JSON.stringify({ progress: updatedCount, total: targetStudents.length }) + '\n');
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        if (typeof dashboardCache !== 'undefined') {
+            dashboardCache.dailyReport.lastFetch = 0;
+        }
+
+        res.write(JSON.stringify({ success: true, message: `문법 코멘트 저장 완료 (${updatedCount}명 반영)` }) + '\n');
+        res.end();
+    } catch (error) {
+        console.error('Grammar Comment Save Error:', error);
         res.write(JSON.stringify({ success: false, message: error.message }) + '\n');
         res.end();
     }
