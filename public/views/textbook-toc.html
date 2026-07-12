@@ -31,6 +31,8 @@
   .status { font-size: 13px; font-weight: 700; min-height: 20px; margin-top: 10px; }
   .hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
   #imgPreview { max-height: 160px; margin-top: 8px; border-radius: 6px; display: none; }
+  #pasteZone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 18px 10px; text-align: center; font-size: 13px; color: #64748b; cursor: pointer; background: #f8fafc; line-height: 1.6; }
+  #pasteZone:focus, #pasteZone.dragover { outline: none; border-color: #8b5cf6; background: #f5f3ff; color: #6b46c1; }
   .toolbar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; gap: 12px; align-items: center; justify-content: flex-end; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
   .progressbar { flex: 1; height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden; display: none; }
   .progressbar > div { height: 100%; width: 0; background: linear-gradient(135deg,#8b5cf6,#a855f7); transition: width .2s; }
@@ -56,10 +58,12 @@
         <label>목차 텍스트 붙여넣기 <span style="font-weight:400;color:#94a3b8;">(권장 — 더 정확)</span></label>
         <textarea id="tocText" placeholder="예)&#10;Unit 1  The Water Cycle  8&#10;Unit 2  Animals in Winter  14&#10;..."></textarea>
       </div>
-      <div style="flex:0 0 240px;">
-        <label>또는 목차 사진</label>
-        <input type="file" id="imgFile" accept="image/*" onchange="onImg()">
+      <div style="flex:0 0 280px;">
+        <label>또는 목차 스크린샷</label>
+        <div id="pasteZone" tabindex="0">📋 여기를 클릭하고 <b>Ctrl+V</b><br>스크린샷을 붙여넣으세요</div>
+        <input type="file" id="imgFile" accept="image/*" onchange="onImg()" style="margin-top:8px; font-size:12px;">
         <img id="imgPreview">
+        <button type="button" class="btn btn-ghost btn-sm" id="clearImgBtn" style="display:none; margin-top:6px;" onclick="clearImage()">이미지 제거</button>
       </div>
     </div>
     <div class="row" style="margin-top:12px;">
@@ -133,18 +137,46 @@
   }
 
   let imgData = null, imgMime = null;
-  function onImg() {
-    const f = document.getElementById('imgFile').files[0];
-    if (!f) { imgData = null; return; }
+
+  function useImageBlob(blob) {
+    if (!blob) return;
     const reader = new FileReader();
     reader.onload = () => {
       const prev = document.getElementById('imgPreview');
       prev.src = reader.result; prev.style.display = 'block';
       imgData = String(reader.result).split(',')[1];
-      imgMime = f.type || 'image/jpeg';
+      imgMime = blob.type || 'image/png';
+      document.getElementById('clearImgBtn').style.display = 'inline-block';
+      const pz = document.getElementById('pasteZone');
+      pz.innerHTML = '✅ 이미지가 첨부되었습니다<br><span style="font-size:11px;">다시 붙여넣으면 교체됩니다</span>';
     };
-    reader.readAsDataURL(f);
+    reader.readAsDataURL(blob);
   }
+
+  function onImg() {
+    const f = document.getElementById('imgFile').files[0];
+    if (f) useImageBlob(f);
+  }
+
+  function clearImage() {
+    imgData = null; imgMime = null;
+    document.getElementById('imgPreview').style.display = 'none';
+    document.getElementById('imgFile').value = '';
+    document.getElementById('clearImgBtn').style.display = 'none';
+    document.getElementById('pasteZone').innerHTML = '📋 여기를 클릭하고 <b>Ctrl+V</b><br>스크린샷을 붙여넣으세요';
+  }
+
+  // 클립보드에서 스크린샷 붙여넣기 (페이지 어디서든 Ctrl+V)
+  document.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || window.clipboardData)?.items || [];
+    for (const it of items) {
+      if (it.type && it.type.indexOf('image') === 0) {
+        const blob = it.getAsFile();
+        if (blob) { useImageBlob(blob); e.preventDefault(); }
+        return;
+      }
+    }
+  });
 
   async function parseToc() {
     const tocText = document.getElementById('tocText').value.trim();
