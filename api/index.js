@@ -186,8 +186,8 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
 }
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' })); // 목차 스크린샷(base64) 업로드 대응
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 function requireAuth(req, res, next) {
     const token = req.headers.authorization?.replace('Bearer ', '');

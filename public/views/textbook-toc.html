@@ -140,17 +140,27 @@
 
   function useImageBlob(blob) {
     if (!blob) return;
-    const reader = new FileReader();
-    reader.onload = () => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      // 큰 스크린샷은 최대 2000px로 축소 + JPEG 변환 (용량↓, OCR 충분)
+      const maxDim = 2000;
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      URL.revokeObjectURL(url);
       const prev = document.getElementById('imgPreview');
-      prev.src = reader.result; prev.style.display = 'block';
-      imgData = String(reader.result).split(',')[1];
-      imgMime = blob.type || 'image/png';
+      prev.src = dataUrl; prev.style.display = 'block';
+      imgData = dataUrl.split(',')[1];
+      imgMime = 'image/jpeg';
       document.getElementById('clearImgBtn').style.display = 'inline-block';
-      const pz = document.getElementById('pasteZone');
-      pz.innerHTML = '✅ 이미지가 첨부되었습니다<br><span style="font-size:11px;">다시 붙여넣으면 교체됩니다</span>';
+      document.getElementById('pasteZone').innerHTML = '✅ 이미지가 첨부되었습니다<br><span style="font-size:11px;">다시 붙여넣으면 교체됩니다</span>';
     };
-    reader.readAsDataURL(blob);
+    img.onerror = () => { URL.revokeObjectURL(url); alert('이미지를 불러오지 못했습니다.'); };
+    img.src = url;
   }
 
   function onImg() {
