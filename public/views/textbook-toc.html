@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교재 목차 AI 입력</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Malgun Gothic', -apple-system, sans-serif; margin: 0; background: #f1f5f9; color: #1e293b; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 20px 80px; }
+  h1 { font-size: 1.5em; color: #6b46c1; margin: 0 0 4px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .card h2 { font-size: 1.05em; margin: 0 0 12px; color: #334155; }
+  label { font-weight: 700; font-size: 13px; color: #475569; display: block; margin-bottom: 5px; }
+  input[type=text], input[type=number], textarea, select { width: 100%; padding: 9px 11px; border: 1px solid #cbd5e0; border-radius: 7px; font-size: 14px; font-family: inherit; }
+  textarea { min-height: 120px; resize: vertical; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .btn { padding: 10px 18px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  .btn-purple { background: #8b5cf6; color: #fff; }
+  .btn-purple:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-green { background: #059669; color: #fff; }
+  .btn-ghost { background: #fff; border: 1px solid #cbd5e0; color: #475569; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { border: 1px solid #e2e8f0; padding: 4px; text-align: center; }
+  th { background: #f8fafc; font-size: 12px; color: #475569; }
+  td input { border: none; text-align: center; padding: 6px; }
+  td.title input { text-align: left; }
+  .col-num { width: 60px; } .col-page { width: 80px; } .col-pass { width: 70px; } .col-del { width: 44px; }
+  .status { font-size: 13px; font-weight: 700; min-height: 20px; margin-top: 10px; }
+  .hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  #imgPreview { max-height: 160px; margin-top: 8px; border-radius: 6px; display: none; }
+  .toolbar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; gap: 12px; align-items: center; justify-content: flex-end; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); }
+  .progressbar { flex: 1; height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden; display: none; }
+  .progressbar > div { height: 100%; width: 0; background: linear-gradient(135deg,#8b5cf6,#a855f7); transition: width .2s; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📚 교재 목차 AI 입력</h1>
+  <div class="sub">목차를 이미지나 텍스트로 넣으면 AI가 유닛 표로 정리합니다. <b>표를 검토·수정한 뒤 저장</b>하세요. 저장 시 교재의 총유닛수도 자동 갱신됩니다.</div>
+
+  <div class="card">
+    <h2>1. 교재 선택</h2>
+    <label>교재 검색</label>
+    <input type="text" id="bookInput" list="bookList" placeholder="🔍 교재 이름 검색 (예: Reading Inside 1)" oninput="onBookSelect()">
+    <datalist id="bookList"></datalist>
+    <div class="hint" id="bookHint">교재를 선택하면 기존에 입력된 유닛이 있으면 불러옵니다.</div>
+  </div>
+
+  <div class="card">
+    <h2>2. 목차 입력 → AI 파싱</h2>
+    <div class="row">
+      <div style="flex:1; min-width:260px;">
+        <label>목차 텍스트 붙여넣기 <span style="font-weight:400;color:#94a3b8;">(권장 — 더 정확)</span></label>
+        <textarea id="tocText" placeholder="예)&#10;Unit 1  The Water Cycle  8&#10;Unit 2  Animals in Winter  14&#10;..."></textarea>
+      </div>
+      <div style="flex:0 0 240px;">
+        <label>또는 목차 사진</label>
+        <input type="file" id="imgFile" accept="image/*" onchange="onImg()">
+        <img id="imgPreview">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn btn-purple" id="parseBtn" onclick="parseToc()">✨ AI로 목차 파싱</button>
+      <span class="status" id="parseStatus"></span>
+    </div>
+  </div>
+
+  <div class="card" id="tableCard" style="display:none;">
+    <h2>3. 검토 · 수정 <span style="font-weight:400;font-size:13px;color:#94a3b8;">(AI 초안이니 페이지 숫자를 꼭 확인하세요)</span></h2>
+    <table>
+      <thead><tr>
+        <th class="col-num">유닛</th><th>유닛 제목</th><th class="col-page">시작p</th><th class="col-page">끝p</th><th class="col-pass">지문수</th><th class="col-del"></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="addRow()">＋ 행 추가</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="progressbar" id="pbar"><div id="pfill"></div></div>
+  <span class="status" id="saveStatus" style="margin:0;"></span>
+  <button class="btn btn-green" id="saveBtn" onclick="saveUnits()" disabled>💾 저장 (교재 세부 내용 DB)</button>
+</div>
+
+<script>
+  const API = window.location.origin;
+  const authToken = localStorage.getItem('teacher_auth_token');
+  let bookMap = {};   // name -> {id, subject}
+  let selectedBookId = null;
+
+  if (!authToken) {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;font-size:16px;">로그인이 필요합니다. 선생님 대시보드에서 로그인 후 다시 열어주세요.</div>';
+  } else {
+    loadBooks();
+  }
+
+  async function loadBooks() {
+    try {
+      const res = await fetch(`${API}/api/textbooks`, { headers: { Authorization: 'Bearer ' + authToken } });
+      const j = await res.json();
+      const dl = document.getElementById('bookList');
+      (j.textbooks || []).forEach(b => {
+        bookMap[b.name] = { id: b.id, subject: b.subject };
+        const opt = document.createElement('option');
+        opt.value = b.name; opt.textContent = b.subject ? `(${b.subject})` : '';
+        dl.appendChild(opt);
+      });
+    } catch (e) { alert('교재 목록 로드 실패: ' + e.message); }
+  }
+
+  async function onBookSelect() {
+    const name = document.getElementById('bookInput').value;
+    const hint = document.getElementById('bookHint');
+    const b = bookMap[name];
+    if (!b) { selectedBookId = null; document.getElementById('saveBtn').disabled = true; return; }
+    selectedBookId = b.id;
+    document.getElementById('saveBtn').disabled = false;
+    hint.textContent = '기존 유닛 확인 중...';
+    try {
+      const res = await fetch(`${API}/api/textbook-units?bookId=${encodeURIComponent(b.id)}`, { headers: { Authorization: 'Bearer ' + authToken } });
+      const j = await res.json();
+      if (j.success && j.units && j.units.length) {
+        renderTable(j.units);
+        hint.textContent = `✅ 기존 유닛 ${j.units.length}개를 불러왔습니다. 수정 후 저장하면 교체됩니다.`;
+      } else {
+        hint.textContent = '이 교재는 아직 입력된 유닛이 없습니다. 목차를 파싱해주세요.';
+      }
+    } catch (e) { hint.textContent = '기존 유닛 로드 실패'; }
+  }
+
+  let imgData = null, imgMime = null;
+  function onImg() {
+    const f = document.getElementById('imgFile').files[0];
+    if (!f) { imgData = null; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const prev = document.getElementById('imgPreview');
+      prev.src = reader.result; prev.style.display = 'block';
+      imgData = String(reader.result).split(',')[1];
+      imgMime = f.type || 'image/jpeg';
+    };
+    reader.readAsDataURL(f);
+  }
+
+  async function parseToc() {
+    const tocText = document.getElementById('tocText').value.trim();
+    if (!tocText && !imgData) return alert('목차 텍스트를 붙여넣거나 사진을 올려주세요.');
+    const btn = document.getElementById('parseBtn');
+    const st = document.getElementById('parseStatus');
+    btn.disabled = true; st.style.color = '#8b5cf6'; st.textContent = '⏳ AI가 목차를 정리 중...';
+    try {
+      const res = await fetch(`${API}/api/parse-toc`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+        body: JSON.stringify({ tocText, imageBase64: imgData, imageMimeType: imgMime })
+      });
+      const j = await res.json();
+      if (j.success) {
+        renderTable(j.units);
+        st.style.color = '#059669'; st.textContent = `✅ ${j.units.length}개 유닛 추출. 표를 확인하세요.`;
+      } else { st.style.color = '#dc2626'; st.textContent = '❌ ' + (j.message || '파싱 실패'); }
+    } catch (e) { st.style.color = '#dc2626'; st.textContent = '❌ ' + e.message; }
+    finally { btn.disabled = false; }
+  }
+
+  function renderTable(units) {
+    document.getElementById('tableCard').style.display = 'block';
+    const tb = document.getElementById('tbody');
+    tb.innerHTML = '';
+    (units || []).forEach(u => tb.appendChild(makeRow(u)));
+  }
+
+  function makeRow(u) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-num"><input type="number" value="${u.unitNumber ?? ''}"></td>
+      <td class="title"><input type="text" value="${(u.title || '').replace(/"/g, '&quot;')}"></td>
+      <td class="col-page"><input type="number" value="${u.startPage ?? ''}"></td>
+      <td class="col-page"><input type="number" value="${u.endPage ?? ''}"></td>
+      <td class="col-pass"><input type="number" value="${u.passages ?? 1}"></td>
+      <td class="col-del"><button class="btn btn-ghost btn-sm" onclick="this.closest('tr').remove()">✕</button></td>`;
+    return tr;
+  }
+
+  function addRow() {
+    document.getElementById('tableCard').style.display = 'block';
+    const rows = document.querySelectorAll('#tbody tr');
+    const nextNum = rows.length + 1;
+    document.getElementById('tbody').appendChild(makeRow({ unitNumber: nextNum, title: '', startPage: null, endPage: null, passages: 1 }));
+  }
+
+  function collectUnits() {
+    const units = [];
+    document.querySelectorAll('#tbody tr').forEach(tr => {
+      const inp = tr.querySelectorAll('input');
+      const num = inp[0].value, title = inp[1].value.trim();
+      if (num === '' && !title) return;
+      units.push({
+        unitNumber: num === '' ? null : Number(num),
+        title,
+        startPage: inp[2].value === '' ? null : Number(inp[2].value),
+        endPage: inp[3].value === '' ? null : Number(inp[3].value),
+        passages: inp[4].value === '' ? 1 : Number(inp[4].value)
+      });
+    });
+    return units;
+  }
+
+  async function saveUnits() {
+    if (!selectedBookId) return alert('교재를 먼저 선택하세요.');
+    const units = collectUnits();
+    if (!units.length) return alert('저장할 유닛이 없습니다.');
+    if (!confirm(`이 교재의 유닛 ${units.length}개를 저장합니다.\n(기존 유닛이 있으면 교체됩니다) 진행할까요?`)) return;
+
+    const btn = document.getElementById('saveBtn');
+    const st = document.getElementById('saveStatus');
+    const pbar = document.getElementById('pbar'), pfill = document.getElementById('pfill');
+    btn.disabled = true; pbar.style.display = 'block'; pfill.style.width = '0%';
+    st.style.color = '#8b5cf6'; st.textContent = '저장 중...';
+    try {
+      const res = await fetch(`${API}/api/save-textbook-units`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+        body: JSON.stringify({ bookId: selectedBookId, units })
+      });
+      const reader = res.body.getReader(); const dec = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        dec.decode(value).split('\n').filter(Boolean).forEach(chunk => {
+          try {
+            const d = JSON.parse(chunk);
+            if (d.progress !== undefined) { pfill.style.width = Math.round(d.progress / d.total * 100) + '%'; st.textContent = `저장 중... ${d.progress}/${d.total}`; }
+            else if (d.success) { st.style.color = '#059669'; st.textContent = '✅ ' + d.message; }
+            else if (d.success === false) { st.style.color = '#dc2626'; st.textContent = '❌ ' + d.message; }
+          } catch (e) {}
+        });
+      }
+    } catch (e) { st.style.color = '#dc2626'; st.textContent = '❌ ' + e.message; }
+    finally { btn.disabled = false; setTimeout(() => pbar.style.display = 'none', 1200); }
+  }
+</script>
+</body>
+</html>

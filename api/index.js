@@ -24,6 +24,7 @@ const {
     MONTHLY_REPORT_DB_ID,
     GRAMMAR_DB_ID,
     TEXTBOOK_DB_ID,
+    TEXTBOOK_UNIT_DB_ID,
     EXAM_DB_ID,
     QUESTION_DB_ID,
     STUDENT_RESULT_DB_ID,
@@ -1329,6 +1330,136 @@ app.post('/api/update-student-progress', requireAuth, async (req, res) => {
         });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ============================================================
+// [교재 목차 AI 입력] 목차(이미지/텍스트) → 유닛 구조화 → 교재 세부 내용 DB
+// ============================================================
+
+// 목차 페이지 도구
+app.get('/textbook-toc', (req, res) => res.sendFile(path.join(publicPath, 'views', 'textbook-toc.html')));
+
+// 목차 파싱 (저장 없이 검토용 초안 반환)
+app.post('/api/parse-toc', requireAuth, async (req, res) => {
+    const { tocText, imageBase64, imageMimeType } = req.body;
+    if (!tocText && !imageBase64) return res.status(400).json({ success: false, message: '목차 텍스트나 이미지를 넣어주세요.' });
+    if (!geminiModel) return res.status(500).json({ success: false, message: 'AI not configured' });
+
+    try {
+        const instruction = `너는 영어 교재의 목차(Table of Contents)를 구조화하는 도우미다. 입력된 목차에서 각 유닛(Unit/Lesson/Chapter 등)을 뽑아 JSON 배열만 출력한다. 설명·마크다운 없이 순수 JSON 배열만.
+각 원소 형식: {"unitNumber": 정수, "title": "유닛 제목", "startPage": 정수 또는 null, "endPage": 정수 또는 null, "passages": 정수}
+규칙:
+- unitNumber: "Unit 1"→1. 번호가 없으면 나온 순서대로 1,2,3…
+- title: 유닛 제목을 원문 그대로(영문/국문). 없으면 "".
+- startPage/endPage: 목차에 표기된 시작/끝 페이지. 하나만 있으면 endPage는 null. 페이지 정보가 전혀 없으면 둘 다 null.
+- passages: 해당 유닛의 리딩 지문 개수. 목차에 지문이 여러 개로 나뉘어 있으면 그 수, 명시가 없으면 1.
+- 부록/색인/워크북/정답/Answer Key 등 유닛이 아닌 항목은 제외한다.
+- 목차에 없는 내용을 절대 지어내지 마라. 불확실하면 페이지는 null로 둔다.`;
+
+        const parts = [{ text: instruction }];
+        if (tocText) parts.push({ text: `\n[목차 텍스트]\n${tocText}` });
+        if (imageBase64) parts.push({ inlineData: { mimeType: imageMimeType || 'image/jpeg', data: imageBase64 } });
+
+        const result = await geminiModel.generateContent({
+            contents: [{ role: 'user', parts }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' }
+        });
+        let text = result.response.text().trim();
+        // 방어적 파싱: 혹시 마크다운 펜스가 섞이면 제거
+        text = text.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+        let units;
+        try { units = JSON.parse(text); } catch (e) {
+            return res.status(500).json({ success: false, message: 'AI 응답을 표로 변환하지 못했습니다. 다시 시도해주세요.' });
+        }
+        if (!Array.isArray(units)) units = [];
+        // 정규화
+        units = units.map((u, i) => ({
+            unitNumber: (u.unitNumber == null || isNaN(Number(u.unitNumber))) ? (i + 1) : Number(u.unitNumber),
+            title: String(u.title || ''),
+            startPage: (u.startPage == null || u.startPage === '' || isNaN(Number(u.startPage))) ? null : Number(u.startPage),
+            endPage: (u.endPage == null || u.endPage === '' || isNaN(Number(u.endPage))) ? null : Number(u.endPage),
+            passages: (u.passages == null || isNaN(Number(u.passages)) || Number(u.passages) < 1) ? 1 : Number(u.passages)
+        }));
+        res.json({ success: true, units });
+    } catch (e) {
+        console.error('parse-toc error', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// 특정 교재의 기존 유닛 불러오기 (재편집용)
+app.get('/api/textbook-units', requireAuth, async (req, res) => {
+    const { bookId } = req.query;
+    if (!bookId) return res.status(400).json({ success: false, message: 'bookId 필요' });
+    if (!TEXTBOOK_UNIT_DB_ID) return res.json({ success: true, units: [] });
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
+        });
+        const units = q.results.map(pg => {
+            const p = pg.properties;
+            return {
+                unitNumber: p['유닛번호']?.number ?? null,
+                title: p['유닛제목']?.title?.[0]?.plain_text || '',
+                startPage: p['시작페이지']?.number ?? null,
+                endPage: p['끝페이지']?.number ?? null,
+                passages: p['지문수']?.number ?? 1
+            };
+        }).sort((a, b) => (a.unitNumber || 0) - (b.unitNumber || 0));
+        res.json({ success: true, units });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 유닛 저장 (기존 교체 + 교재 총유닛수 갱신). 스트리밍 진행률.
+app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
+    const { bookId, units } = req.body;
+    if (!bookId || !Array.isArray(units)) return res.status(400).json({ success: false, message: 'bookId/units 필요' });
+    if (!TEXTBOOK_UNIT_DB_ID) return res.status(500).json({ success: false, message: 'TEXTBOOK_UNIT_DB_ID 미설정' });
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    try {
+        // 1) 이 교재의 기존 유닛 행 archive (교체 방식)
+        const existing = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
+        });
+        for (const pg of existing.results) {
+            await fetchNotion(`https://api.notion.com/v1/pages/${pg.id}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) });
+            await new Promise(r => setTimeout(r, 120));
+        }
+
+        // 2) 새 유닛 행 생성
+        let created = 0;
+        for (const u of units) {
+            const props = {
+                '유닛제목': { title: [{ text: { content: String(u.title || `Unit ${u.unitNumber}`) } }] },
+                '교재': { relation: [{ id: bookId }] },
+                '유닛번호': { number: (u.unitNumber == null || u.unitNumber === '') ? null : Number(u.unitNumber) },
+                '시작페이지': { number: (u.startPage == null || u.startPage === '') ? null : Number(u.startPage) },
+                '끝페이지': { number: (u.endPage == null || u.endPage === '') ? null : Number(u.endPage) },
+                '지문수': { number: (u.passages == null || u.passages === '') ? 1 : Number(u.passages) }
+            };
+            await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: TEXTBOOK_UNIT_DB_ID }, properties: props }) });
+            created++;
+            res.write(JSON.stringify({ progress: created, total: units.length }) + '\n');
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        // 3) 교재 데이터 베이스의 총유닛수 갱신 + 지문수가 균일하면 유닛당지문수도 갱신
+        const totalUnits = units.length;
+        const passSet = new Set(units.map(u => Number(u.passages) || 1));
+        const bookProps = { '총유닛수': { number: totalUnits } };
+        if (passSet.size === 1) bookProps['유닛당지문수'] = { number: [...passSet][0] };
+        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: bookProps }) });
+        if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
+
+        res.write(JSON.stringify({ success: true, message: `${created}개 유닛 저장 완료 (총유닛수 ${totalUnits})` }) + '\n');
+        res.end();
+    } catch (e) {
+        console.error('save-textbook-units error', e);
+        res.write(JSON.stringify({ success: false, message: e.message }) + '\n');
+        res.end();
+    }
 });
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
