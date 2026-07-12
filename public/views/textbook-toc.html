@@ -47,9 +47,12 @@
   <div class="card">
     <h2>1. 교재 선택</h2>
     <label>교재 검색</label>
-    <input type="text" id="bookInput" list="bookList" placeholder="🔍 교재 이름 검색 (예: Reading Inside 1)" oninput="onBookSelect()">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="text" id="bookInput" list="bookList" placeholder="🔍 교재 이름 검색 (예: Reading Inside 1)" oninput="onBookSelect()" style="flex:1;">
+      <button type="button" class="btn btn-ghost btn-sm" id="refreshBooksBtn" onclick="loadBooks(true)" title="방금 노션에 추가한 교재가 안 보이면 눌러주세요">🔄 목록 새로고침</button>
+    </div>
     <datalist id="bookList"></datalist>
-    <div class="hint" id="bookHint">교재를 선택하면 기존에 입력된 유닛이 있으면 불러옵니다.</div>
+    <div class="hint" id="bookHint">교재를 선택하면 기존에 입력된 유닛이 있으면 불러옵니다. (방금 추가한 교재가 안 보이면 🔄 새로고침)</div>
   </div>
 
   <div class="card">
@@ -106,18 +109,24 @@
     loadBooks();
   }
 
-  async function loadBooks() {
+  async function loadBooks(force) {
+    const btn = document.getElementById('refreshBooksBtn');
+    if (force && btn) { btn.disabled = true; btn.textContent = '불러오는 중...'; }
     try {
-      const res = await fetch(`${API}/api/textbooks`, { headers: { Authorization: 'Bearer ' + authToken } });
+      const res = await fetch(`${API}/api/textbooks${force ? '?force=true' : ''}`, { headers: { Authorization: 'Bearer ' + authToken } });
       const j = await res.json();
       const dl = document.getElementById('bookList');
+      dl.innerHTML = '';
+      Object.keys(bookMap).forEach(k => delete bookMap[k]);
       (j.textbooks || []).forEach(b => {
         bookMap[b.name] = { id: b.id, subject: b.subject };
         const opt = document.createElement('option');
         opt.value = b.name; opt.textContent = b.subject ? `(${b.subject})` : '';
         dl.appendChild(opt);
       });
+      if (force) document.getElementById('bookHint').textContent = `✅ 교재 목록 새로고침 완료 (${(j.textbooks || []).length}권).`;
     } catch (e) { alert('교재 목록 로드 실패: ' + e.message); }
+    finally { if (force && btn) { btn.disabled = false; btn.textContent = '🔄 목록 새로고침'; } }
   }
 
   async function onBookSelect() {
