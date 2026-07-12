@@ -1256,7 +1256,8 @@ async function loadTextbooks(force = false) {
             const name = nameProp?.title?.[0]?.plain_text || '';
             if (!name) continue;
             const subject = props['과목']?.select?.name || '';
-            const item = { id: page.id, name, subject };
+            const workbook = props['워크북']?.checkbox || false;
+            const item = { id: page.id, name, subject, workbook };
             list.push(item);
             byId[page.id] = item;
         }
@@ -1416,7 +1417,7 @@ app.get('/api/textbook-units', requireAuth, async (req, res) => {
 
 // 유닛 저장 (기존 교체 + 교재 총유닛수 갱신). 스트리밍 진행률.
 app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
-    const { bookId, units } = req.body;
+    const { bookId, units, workbook } = req.body;
     if (!bookId || !Array.isArray(units)) return res.status(400).json({ success: false, message: 'bookId/units 필요' });
     if (!TEXTBOOK_UNIT_DB_ID) return res.status(500).json({ success: false, message: 'TEXTBOOK_UNIT_DB_ID 미설정' });
 
@@ -1452,9 +1453,11 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
             await new Promise(r => setTimeout(r, 200));
         }
 
-        // 3) 교재 데이터 베이스의 총유닛수(=총 항목수) 갱신
+        // 3) 교재 데이터 베이스의 총유닛수(=총 항목수) + 워크북 유무 갱신
         const totalItems = units.length;
-        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: { '총유닛수': { number: totalItems } } }) });
+        const bookProps = { '총유닛수': { number: totalItems } };
+        if (typeof workbook === 'boolean') bookProps['워크북'] = { checkbox: workbook };
+        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: bookProps }) });
         if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
 
         res.write(JSON.stringify({ success: true, message: `${created}개 항목 저장 완료 (총 ${totalItems}개)` }) + '\n');

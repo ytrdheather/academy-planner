@@ -53,6 +53,9 @@
     </div>
     <datalist id="bookList"></datalist>
     <div class="hint" id="bookHint">교재를 선택하면 기존에 입력된 유닛이 있으면 불러옵니다. (방금 추가한 교재가 안 보이면 🔄 새로고침)</div>
+    <label style="display:inline-flex; align-items:center; gap:6px; margin-top:10px; font-weight:600; cursor:pointer;">
+      <input type="checkbox" id="workbookChk"> 이 교재는 <b>워크북</b>이 있음 (저장 시 교재 정보에 반영)
+    </label>
   </div>
 
   <div class="card">
@@ -136,6 +139,7 @@
     if (!b) { selectedBookId = null; document.getElementById('saveBtn').disabled = true; return; }
     selectedBookId = b.id;
     document.getElementById('saveBtn').disabled = false;
+    document.getElementById('workbookChk').checked = !!b.workbook; // 현재 워크북 값 표시
     hint.textContent = '기존 유닛 확인 중...';
     try {
       const res = await fetch(`${API}/api/textbook-units?bookId=${encodeURIComponent(b.id)}`, { headers: { Authorization: 'Bearer ' + authToken } });
@@ -297,7 +301,7 @@
     try {
       const res = await fetch(`${API}/api/save-textbook-units`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
-        body: JSON.stringify({ bookId: selectedBookId, units })
+        body: JSON.stringify({ bookId: selectedBookId, units, workbook: document.getElementById('workbookChk').checked })
       });
       const reader = res.body.getReader(); const dec = new TextDecoder();
       while (true) {
