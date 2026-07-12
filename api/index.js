@@ -1346,15 +1346,17 @@ app.post('/api/parse-toc', requireAuth, async (req, res) => {
     if (!geminiModel) return res.status(500).json({ success: false, message: 'AI not configured' });
 
     try {
-        const instruction = `너는 영어 교재의 목차(Table of Contents)를 구조화하는 도우미다. 입력된 목차에서 각 유닛(Unit/Lesson/Chapter 등)을 뽑아 JSON 배열만 출력한다. 설명·마크다운 없이 순수 JSON 배열만.
-각 원소 형식: {"unitNumber": 정수, "title": "유닛 제목", "startPage": 정수 또는 null, "endPage": 정수 또는 null, "passages": 정수}
-규칙:
-- unitNumber: "Unit 1"→1. 번호가 없으면 나온 순서대로 1,2,3…
-- title: 유닛 제목을 원문 그대로(영문/국문). 없으면 "".
-- startPage/endPage: 목차에 표기된 시작/끝 페이지. 하나만 있으면 endPage는 null. 페이지 정보가 전혀 없으면 둘 다 null.
-- passages: 해당 유닛의 리딩 지문 개수. 목차에 지문이 여러 개로 나뉘어 있으면 그 수, 명시가 없으면 1.
-- 부록/색인/워크북/정답/Answer Key 등 유닛이 아닌 항목은 제외한다.
-- 목차에 없는 내용을 절대 지어내지 마라. 불확실하면 페이지는 null로 둔다.`;
+        const instruction = `너는 영어 교재의 목차(Table of Contents)를 구조화하는 도우미다. 목차를 "학생에게 낼 수 있는 가장 작은 학습 단위(지문/Reading/Lesson)" 하나하나로 펼쳐서, 나오는 순서대로 JSON 배열만 출력한다. 설명·마크다운 없이 순수 JSON 배열만.
+각 원소 형식: {"group": "챕터/유닛 라벨", "subject": "과목/분류", "title": "항목 제목", "startPage": 정수 또는 null}
+핵심 규칙:
+- 한 유닛/챕터 안에 Reading 1, Reading 2 또는 Lesson 여러 개가 있으면, 그 각각을 "별도의 원소"로 만든다. 큰 제목(챕터/유닛명)만 뽑지 말 것.
+- group: 그 항목이 속한 챕터/유닛 라벨을 번호까지 포함해 원문 그대로. 예: "Unit 1 Food", "Chapter 1 Eyes". 그런 묶음이 없으면 "".
+- subject: 목차에 Subject/과목 표기(Science, History, Art 등)가 있으면 그 값. 없으면 "".
+- title: 그 항목(지문/레슨)의 개별 제목을 원문 그대로. 예: "Marshmallows", "Twice as Good!".
+- startPage: 그 항목의 시작 페이지 정수. 없으면 null. (끝 페이지는 계산 안 해도 됨)
+- 배열 순서 = 책에 나온 실제 학습 순서(위→아래, 좌측 페이지 먼저 그다음 우측 페이지).
+- 부록/색인/워크북/정답/Answer Key 등은 제외한다.
+- 목차에 없는 내용을 절대 지어내지 마라. 불확실하면 페이지는 null.`;
 
         const parts = [{ text: instruction }];
         if (tocText) parts.push({ text: `\n[목차 텍스트]\n${tocText}` });
@@ -1367,20 +1369,21 @@ app.post('/api/parse-toc', requireAuth, async (req, res) => {
         let text = result.response.text().trim();
         // 방어적 파싱: 혹시 마크다운 펜스가 섞이면 제거
         text = text.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-        let units;
-        try { units = JSON.parse(text); } catch (e) {
+        let items;
+        try { items = JSON.parse(text); } catch (e) {
             return res.status(500).json({ success: false, message: 'AI 응답을 표로 변환하지 못했습니다. 다시 시도해주세요.' });
         }
-        if (!Array.isArray(units)) units = [];
-        // 정규화
-        units = units.map((u, i) => ({
-            unitNumber: (u.unitNumber == null || isNaN(Number(u.unitNumber))) ? (i + 1) : Number(u.unitNumber),
+        if (!Array.isArray(items)) items = [];
+        // 정규화 — 순번은 배열 순서대로 부여, 끝페이지는 프론트에서 자동계산
+        items = items.map((u, i) => ({
+            order: i + 1,
+            group: String(u.group || ''),
+            subject: String(u.subject || ''),
             title: String(u.title || ''),
             startPage: (u.startPage == null || u.startPage === '' || isNaN(Number(u.startPage))) ? null : Number(u.startPage),
-            endPage: (u.endPage == null || u.endPage === '' || isNaN(Number(u.endPage))) ? null : Number(u.endPage),
-            passages: (u.passages == null || isNaN(Number(u.passages)) || Number(u.passages) < 1) ? 1 : Number(u.passages)
+            endPage: null
         }));
-        res.json({ success: true, units });
+        res.json({ success: true, units: items });
     } catch (e) {
         console.error('parse-toc error', e);
         res.status(500).json({ success: false, message: e.message });
@@ -1399,13 +1402,14 @@ app.get('/api/textbook-units', requireAuth, async (req, res) => {
         const units = q.results.map(pg => {
             const p = pg.properties;
             return {
-                unitNumber: p['유닛번호']?.number ?? null,
-                title: p['유닛제목']?.title?.[0]?.plain_text || '',
+                order: p['순번']?.number ?? null,
+                group: p['그룹']?.rich_text?.map(t => t.plain_text).join('') || '',
+                subject: p['분류']?.rich_text?.map(t => t.plain_text).join('') || '',
+                title: p['제목']?.title?.[0]?.plain_text || '',
                 startPage: p['시작페이지']?.number ?? null,
-                endPage: p['끝페이지']?.number ?? null,
-                passages: p['지문수']?.number ?? 1
+                endPage: p['끝페이지']?.number ?? null
             };
-        }).sort((a, b) => (a.unitNumber || 0) - (b.unitNumber || 0));
+        }).sort((a, b) => (a.order || 0) - (b.order || 0));
         res.json({ success: true, units });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1428,16 +1432,19 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
             await new Promise(r => setTimeout(r, 120));
         }
 
-        // 2) 새 유닛 행 생성
+        // 2) 새 항목 행 생성 (순번은 배열 순서대로 부여)
         let created = 0;
-        for (const u of units) {
+        for (let i = 0; i < units.length; i++) {
+            const u = units[i];
+            const order = (u.order == null || u.order === '') ? (i + 1) : Number(u.order);
             const props = {
-                '유닛제목': { title: [{ text: { content: String(u.title || `Unit ${u.unitNumber}`) } }] },
+                '제목': { title: [{ text: { content: String(u.title || `항목 ${order}`) } }] },
                 '교재': { relation: [{ id: bookId }] },
-                '유닛번호': { number: (u.unitNumber == null || u.unitNumber === '') ? null : Number(u.unitNumber) },
+                '순번': { number: order },
+                '그룹': { rich_text: u.group ? [{ text: { content: String(u.group) } }] : [] },
+                '분류': { rich_text: u.subject ? [{ text: { content: String(u.subject) } }] : [] },
                 '시작페이지': { number: (u.startPage == null || u.startPage === '') ? null : Number(u.startPage) },
-                '끝페이지': { number: (u.endPage == null || u.endPage === '') ? null : Number(u.endPage) },
-                '지문수': { number: (u.passages == null || u.passages === '') ? 1 : Number(u.passages) }
+                '끝페이지': { number: (u.endPage == null || u.endPage === '') ? null : Number(u.endPage) }
             };
             await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: TEXTBOOK_UNIT_DB_ID }, properties: props }) });
             created++;
@@ -1445,15 +1452,12 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
             await new Promise(r => setTimeout(r, 200));
         }
 
-        // 3) 교재 데이터 베이스의 총유닛수 갱신 + 지문수가 균일하면 유닛당지문수도 갱신
-        const totalUnits = units.length;
-        const passSet = new Set(units.map(u => Number(u.passages) || 1));
-        const bookProps = { '총유닛수': { number: totalUnits } };
-        if (passSet.size === 1) bookProps['유닛당지문수'] = { number: [...passSet][0] };
-        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: bookProps }) });
+        // 3) 교재 데이터 베이스의 총유닛수(=총 항목수) 갱신
+        const totalItems = units.length;
+        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: { '총유닛수': { number: totalItems } } }) });
         if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
 
-        res.write(JSON.stringify({ success: true, message: `${created}개 유닛 저장 완료 (총유닛수 ${totalUnits})` }) + '\n');
+        res.write(JSON.stringify({ success: true, message: `${created}개 항목 저장 완료 (총 ${totalItems}개)` }) + '\n');
         res.end();
     } catch (e) {
         console.error('save-textbook-units error', e);
