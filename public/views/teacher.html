@@ -159,6 +159,10 @@
                     <label class="grammar-label">문법 과제 내용</label>
                     <input type="text" id="grammarHomeworkInput" class="grammar-input" style="width: 100%;" placeholder="예) 6/24 수까지 본책 p.120~122, 6/27 수까지 워크북 p.50~56 처럼 마감일과 함께 각기 적어주세요">
                 </div>
+                <div class="grammar-group" style="flex-basis: 100%; width: 100%;">
+                    <label class="grammar-label">문법 코멘트 <span style="font-weight:400; color:#718096; font-size:12px;">(오늘의 코멘트 생성 시 학생별 리포트 맨 앞에 원문 그대로 들어갑니다)</span></label>
+                    <textarea id="grammarCommentInput" class="grammar-input" style="width: 100%; min-height: 70px; resize: vertical;" placeholder="예) 오늘은 to부정사의 명사적 용법을 배우고 예문에 적용하는 연습을 진행했습니다. 다음 시간에는 형용사적 용법으로 이어갈 예정입니다."></textarea>
+                </div>
                 <button class="grammar-btn" onclick="updateGrammarByClass()">반 전체 적용</button>
             </div>
             <div id="lastGrammarHomeworkBox" style="display:none; margin:-5px 0 15px 0; padding:10px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; font-size:13px; color:#92400e; line-height:1.6;">
@@ -1124,8 +1128,9 @@
         async function updateGrammarByClass() {
             const className = document.getElementById('grammarClassSelect').value;
             const topic = document.getElementById('grammarTopicInput').value;
-            const testContent = document.getElementById('grammarTestInput').value; 
+            const testContent = document.getElementById('grammarTestInput').value;
             const homework = document.getElementById('grammarHomeworkInput').value;
+            const comment = document.getElementById('grammarCommentInput').value;
             const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
             
             if (!className) return alert('반을 선택하세요.');
@@ -1143,7 +1148,7 @@
                 const res = await fetch(`${API_BASE_URL}/api/update-grammar-by-class`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ className, topic, homework, testContent, date }) 
+                    body: JSON.stringify({ className, topic, homework, testContent, comment, date })
                 });
 
                 const reader = res.body.getReader();
@@ -1168,6 +1173,7 @@
                                 document.getElementById('grammarTopicInput').value = '';
                                 document.getElementById('grammarTestInput').value = '';
                                 document.getElementById('grammarHomeworkInput').value = '';
+                                document.getElementById('grammarCommentInput').value = '';
                                 pastGrammarCache = null; // 새 숙제 반영 위해 캐시 초기화
                                 loadDataForCurrentTab(true);
                             } 
@@ -1204,6 +1210,24 @@
             const className = document.getElementById('grammarClassSelect').value;
             const box = document.getElementById('lastGrammarHomeworkBox');
             if (!className) { box.style.display = 'none'; return; }
+
+            // [신규] 오늘 이 반의 GRAMMAR_DB 원장 기록이 있으면 그대로 불러와 편집 (없으면 아래 '지난 숙제' 로직)
+            try {
+                const date = document.getElementById('commonSpecificDate').value || new Date().toISOString().split('T')[0];
+                const gRes = await fetch(`${API_BASE_URL}/api/grammar-record?className=${encodeURIComponent(className)}&date=${encodeURIComponent(date)}`, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                const gJson = await gRes.json();
+                const rec = gJson.success ? gJson.record : null;
+                if (rec && (rec.topic || rec.homework || rec.testContent || rec.comment)) {
+                    document.getElementById('grammarTopicInput').value = rec.topic || '';
+                    document.getElementById('grammarTestInput').value = rec.testContent || '';
+                    document.getElementById('grammarHomeworkInput').value = rec.homework || '';
+                    document.getElementById('grammarCommentInput').value = rec.comment || '';
+                    box.style.display = 'none';
+                    return; // 오늘 기록을 불러왔으니 지난 숙제 프리필은 생략
+                }
+            } catch (e) { console.error('오늘 문법 기록 로드 실패(지난 숙제로 폴백):', e); }
 
             try {
                 if (!pastGrammarCache) {

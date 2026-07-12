@@ -336,7 +336,21 @@ app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: { temperature: 0.72, maxOutputTokens: 2500, thinkingConfig: { thinkingBudget: 1024 } }
         });
-        const commentText = result.response.text();
+        let commentText = result.response.text();
+
+        // [신규] 반별 문법 코멘트를 인사말 바로 뒤에 "원문 그대로" 삽입 (AI 각색 방지 — 코드로 조립)
+        const grammarComment = (parsedData.comment && parsedData.comment.grammarComment) ? parsedData.comment.grammarComment.trim() : '';
+        if (grammarComment) {
+            const greeting = `오늘의 리디튜더 ${studentName}의 일일 학습 리포트📑를 보내드립니다.`;
+            const idx = commentText.indexOf(greeting);
+            if (idx !== -1) {
+                const after = idx + greeting.length;
+                commentText = commentText.slice(0, after) + `\n\n${grammarComment}` + commentText.slice(after);
+            } else {
+                // 인사말을 못 찾으면 안전하게 맨 앞에 붙임
+                commentText = `${greeting}\n\n${grammarComment}\n\n${commentText}`;
+            }
+        }
         res.json({ success: true, comment: commentText });
     } catch (error) {
         console.error('AI Comment Error:', error);
@@ -453,6 +467,7 @@ async function parseDailyReportData(page) {
     const grammarClassName = getRollupValue(props['문법클래스']) || null;
     let grammarTopic = getSimpleText(props['오늘 문법 진도']);
     let grammarHomework = getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']);
+    let grammarComment = getSimpleText(props['문법 코멘트']); // [신규] 반별 문법 코멘트(GRAMMAR_DB에서 투사됨)
 
     const grammarTestProp = getPropByKeywords(props, ['문법', '테스트', '내용']) || props['문법 테스트 내용'] || props['문법 파트'];
     let grammarTestStr = '';
@@ -472,6 +487,8 @@ async function parseDailyReportData(page) {
         grammarTopic: grammarTopic || '진도 해당 없음', 
         grammarTest: grammarTestStr,
         grammarHomework: grammarHomework || '숙제 내용 없음',
+        grammarComment: grammarComment || '', // [신규] 반별 문법 코멘트
+
         studentReflection: getSimpleText(props['오늘의 학습 소감']), // [신규 추가] 학생의 학습 소감
         writeCompleted: props['작성완료']?.checkbox === true // [신규] 코멘트 작성완료 여부
     };
@@ -692,7 +709,7 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
 });
 
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
-    const { className, topic, homework, testContent, date } = req.body; 
+    const { className, topic, homework, testContent, comment, date } = req.body;
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
     
     // [핵심] 진행률을 실시간으로 쪼개서 보내기 위한 청크(Chunk) 스트리밍 설정
@@ -723,6 +740,37 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
             return res.end();
         }
 
+        // [신규] ① GRAMMAR_DB(반별 문법 원장)에 (반이름, 날짜) 1행 upsert — 반별 히스토리 영구 보존
+        if (GRAMMAR_DB_ID) {
+            try {
+                const testTags = (testContent && testContent.trim())
+                    ? testContent.split(',').map(s => s.trim()).filter(Boolean) : [];
+                const gProps = {
+                    '이름': { title: [{ text: { content: `${className}-${date}` } }] },
+                    '반이름': { select: { name: className } },
+                    '날짜': { date: { start: date } },
+                    '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
+                    '문법 과제 내용': { rich_text: [{ text: { content: homework || '' } }] },
+                    '문법 테스트 내용': { multi_select: testTags.map(name => ({ name })) }
+                };
+                if (comment !== undefined) {
+                    gProps['문법 코멘트'] = { rich_text: [{ text: { content: comment || '' } }] };
+                }
+                const gFilter = { "and": [
+                    { property: '반이름', select: { equals: className } },
+                    { property: '날짜', date: { equals: date } }
+                ]};
+                const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: gFilter, page_size: 1 }) });
+                if (existing.results.length > 0) {
+                    await fetchNotion(`https://api.notion.com/v1/pages/${existing.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties: gProps }) });
+                } else {
+                    await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: GRAMMAR_DB_ID }, properties: gProps }) });
+                }
+            } catch (ge) {
+                console.error('GRAMMAR_DB upsert 실패(투사는 계속):', ge.message);
+            }
+        }
+
         let updatedCount = 0;
 
         // Promise.all 대신 for...of 루프를 사용하여 순차 처리 및 딜레이 추가 (노션 속도 제한 방지)
@@ -731,6 +779,11 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
                 '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
                 '문법 숙제 내용': { rich_text: [{ text: { content: homework || '' } }] }
             };
+
+            // [신규] 반별 문법 코멘트를 각 학생 행에 투사 (생성 시 이 필드를 읽어 주입)
+            if (comment !== undefined) {
+                properties['문법 코멘트'] = { rich_text: [{ text: { content: comment || '' } }] };
+            }
 
             if (testContent !== undefined) {
                 if (testContent.trim() === '') {
@@ -773,6 +826,29 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
         res.write(JSON.stringify({ success: false, message: error.message }) + '\n');
         res.end();
     }
+});
+
+// [신규] 반+날짜로 GRAMMAR_DB 원장 기록을 불러오기 (문법 관리 탭 프리필용)
+app.get('/api/grammar-record', requireAuth, async (req, res) => {
+    const { className, date } = req.query;
+    if (!className || !date) return res.status(400).json({ success: false, message: 'Missing className/date' });
+    if (!GRAMMAR_DB_ID) return res.json({ success: true, record: null });
+    try {
+        const filter = { "and": [
+            { property: '반이름', select: { equals: className } },
+            { property: '날짜', date: { equals: date } }
+        ]};
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter, page_size: 1 }) });
+        if (q.results.length === 0) return res.json({ success: true, record: null });
+        const p = q.results[0].properties;
+        const testTags = (p['문법 테스트 내용']?.multi_select || []).map(t => t.name);
+        res.json({ success: true, record: {
+            topic: getSimpleText(p['오늘 문법 진도']),
+            homework: getSimpleText(p['문법 과제 내용']),
+            testContent: testTags.join(', '),
+            comment: getSimpleText(p['문법 코멘트'])
+        }});
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/update-homework', requireAuth, async (req, res) => {
