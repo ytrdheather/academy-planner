@@ -56,6 +56,16 @@
     <label style="display:inline-flex; align-items:center; gap:6px; margin-top:10px; font-weight:600; cursor:pointer;">
       <input type="checkbox" id="workbookChk"> 이 교재는 <b>워크북</b>이 있음 (저장 시 교재 정보에 반영)
     </label>
+    <div style="margin-top:12px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+      <div style="font-weight:700; margin-bottom:6px;">📗 목차 없는 교재(어휘서 등)</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-weight:600;">총유닛수</span>
+        <input type="number" id="totalUnitsInput" style="width:90px;" placeholder="예: 30">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="saveBookMeta()">💾 총유닛수·워크북 저장</button>
+        <span id="metaStatus" style="font-size:12px; font-weight:700;"></span>
+      </div>
+      <div class="hint" style="margin-top:6px;">목차(제목·페이지)가 필요 없는 어휘서는 <b>총유닛수만</b> 넣고 이 버튼으로 저장하세요. (아래 목차 파싱은 안 하셔도 됩니다)</div>
+    </div>
   </div>
 
   <div class="card">
@@ -132,6 +142,27 @@
     finally { if (force && btn) { btn.disabled = false; btn.textContent = '🔄 목록 새로고침'; } }
   }
 
+  async function saveBookMeta() {
+    if (!selectedBookId) return alert('먼저 교재를 선택하세요.');
+    const totalUnits = document.getElementById('totalUnitsInput').value;
+    const workbook = document.getElementById('workbookChk').checked;
+    const st = document.getElementById('metaStatus');
+    st.style.color = '#8b5cf6'; st.textContent = '저장 중...';
+    try {
+      const res = await fetch(`${API}/api/set-textbook-meta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+        body: JSON.stringify({ bookId: selectedBookId, totalUnits, workbook })
+      });
+      const j = await res.json();
+      if (j.success) {
+        st.style.color = '#059669'; st.textContent = '✅ 저장됨';
+        const name = document.getElementById('bookInput').value;
+        if (bookMap[name]) { bookMap[name].totalUnits = totalUnits === '' ? null : Number(totalUnits); bookMap[name].workbook = workbook; }
+      } else { st.style.color = '#e53e3e'; st.textContent = '실패: ' + (j.message || ''); }
+    } catch (e) { st.style.color = '#e53e3e'; st.textContent = '오류: ' + e.message; }
+  }
+
   async function onBookSelect() {
     const name = document.getElementById('bookInput').value;
     const hint = document.getElementById('bookHint');
@@ -140,6 +171,8 @@
     selectedBookId = b.id;
     document.getElementById('saveBtn').disabled = false;
     document.getElementById('workbookChk').checked = !!b.workbook; // 현재 워크북 값 표시
+    document.getElementById('totalUnitsInput').value = (b.totalUnits ?? ''); // 현재 총유닛수 표시
+    document.getElementById('metaStatus').textContent = '';
     hint.textContent = '기존 유닛 확인 중...';
     try {
       const res = await fetch(`${API}/api/textbook-units?bookId=${encodeURIComponent(b.id)}`, { headers: { Authorization: 'Bearer ' + authToken } });

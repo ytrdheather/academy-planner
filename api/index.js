@@ -1257,7 +1257,8 @@ async function loadTextbooks(force = false) {
             if (!name) continue;
             const subject = props['과목']?.select?.name || '';
             const workbook = props['워크북']?.checkbox || false;
-            const item = { id: page.id, name, subject, workbook };
+            const totalUnits = props['총유닛수']?.number ?? null;
+            const item = { id: page.id, name, subject, workbook, totalUnits };
             list.push(item);
             byId[page.id] = item;
         }
@@ -1467,6 +1468,21 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
         res.write(JSON.stringify({ success: false, message: e.message }) + '\n');
         res.end();
     }
+});
+
+// [신규] 목차 없는 교재(어휘서 등)용 — 총유닛수·워크북만 교재 DB에 저장
+app.post('/api/set-textbook-meta', requireAuth, async (req, res) => {
+    const { bookId, totalUnits, workbook } = req.body;
+    if (!bookId) return res.status(400).json({ success: false, message: 'bookId 필요' });
+    try {
+        const props = {};
+        if (totalUnits !== undefined) props['총유닛수'] = { number: (totalUnits === '' || totalUnits === null) ? null : Number(totalUnits) };
+        if (typeof workbook === 'boolean') props['워크북'] = { checkbox: workbook };
+        if (Object.keys(props).length === 0) return res.status(400).json({ success: false, message: '저장할 값 없음' });
+        await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
+        if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
