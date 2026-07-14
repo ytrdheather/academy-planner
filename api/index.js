@@ -1258,7 +1258,8 @@ async function loadTextbooks(force = false) {
             const subject = props['과목']?.select?.name || '';
             const workbook = props['워크북']?.checkbox || false;
             const totalUnits = props['총유닛수']?.number ?? null;
-            const item = { id: page.id, name, subject, workbook, totalUnits };
+            const perPassage = props['유닛당지문수']?.number ?? 1;
+            const item = { id: page.id, name, subject, workbook, totalUnits, perPassage };
             list.push(item);
             byId[page.id] = item;
         }
@@ -1277,37 +1278,42 @@ app.get('/api/textbooks', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// 학생별 진도 설정 읽기 (학생 명부 DB)
+// 학생별 진도 설정 읽기 (학생 명부 DB) — 재사용 함수
+async function readStudentConfigs() {
+    let byId = {};
+    try { byId = (await loadTextbooks()).byId; } catch (e) { /* 교재 못 읽어도 진행 */ }
+    const relName = (prop) => (prop?.relation?.map(r => byId[r.id]?.name || '').filter(Boolean).join(', ')) || '';
+    const relId = (prop) => prop?.relation?.[0]?.id || '';
+
+    const students = [];
+    let cursor = undefined, hasMore = true;
+    while (hasMore) {
+        const body = cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 };
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST', body: JSON.stringify(body)
+        });
+        for (const page of data.results) {
+            const p = page.properties;
+            students.push({
+                pageId: page.id,
+                name: p['이름']?.title?.[0]?.plain_text || '이름없음',
+                teachers: p['담당쌤']?.multi_select?.map(t => t.name) || [],
+                days: p['수강요일']?.multi_select?.map(d => d.name).join('') || '',
+                status: p['학습상태']?.select?.name || '',
+                fixed: p['고정숙제']?.rich_text?.map(t => t.plain_text).join('') || '',
+                vocab: { bookId: relId(p['어휘교재']),   bookName: relName(p['어휘교재']),   unit: p['어휘현재유닛']?.number ?? '',   amount: p['어휘진도량']?.number ?? '',   method: p['어휘진도방식']?.select?.name || '',   weekly: p['어휘요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
+                mainR: { bookId: relId(p['주독해교재']), bookName: relName(p['주독해교재']), unit: p['주독해현재유닛']?.number ?? '', amount: p['주독해진도량']?.number ?? '', method: p['주독해진도방식']?.select?.name || '', weekly: p['주독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
+                subR:  { bookId: relId(p['부독해교재']), bookName: relName(p['부독해교재']), unit: p['부독해현재유닛']?.number ?? '', amount: p['부독해진도량']?.number ?? '', method: p['부독해진도방식']?.select?.name || '', weekly: p['부독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
+            });
+        }
+        hasMore = data.has_more; cursor = data.next_cursor;
+    }
+    return students;
+}
+
 app.get('/api/progress-config-data', requireAuth, async (req, res) => {
     try {
-        let byId = {};
-        try { byId = (await loadTextbooks()).byId; } catch (e) { /* 교재 못 읽어도 진행 */ }
-        const relName = (prop) => (prop?.relation?.map(r => byId[r.id]?.name || '').filter(Boolean).join(', ')) || '';
-        const relId = (prop) => prop?.relation?.[0]?.id || '';
-
-        const students = [];
-        let cursor = undefined, hasMore = true;
-        while (hasMore) {
-            const body = cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 };
-            const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
-                method: 'POST', body: JSON.stringify(body)
-            });
-            for (const page of data.results) {
-                const p = page.properties;
-                students.push({
-                    pageId: page.id,
-                    name: p['이름']?.title?.[0]?.plain_text || '이름없음',
-                    teachers: p['담당쌤']?.multi_select?.map(t => t.name) || [],
-                    days: p['수강요일']?.multi_select?.map(d => d.name).join('') || '',
-                    status: p['학습상태']?.select?.name || '',
-                    fixed: p['고정숙제']?.rich_text?.map(t => t.plain_text).join('') || '',
-                    vocab: { bookId: relId(p['어휘교재']),   bookName: relName(p['어휘교재']),   unit: p['어휘현재유닛']?.number ?? '',   amount: p['어휘진도량']?.number ?? '' },
-                    mainR: { bookId: relId(p['주독해교재']), bookName: relName(p['주독해교재']), unit: p['주독해현재유닛']?.number ?? '', amount: p['주독해진도량']?.number ?? '' },
-                    subR:  { bookId: relId(p['부독해교재']), bookName: relName(p['부독해교재']), unit: p['부독해현재유닛']?.number ?? '', amount: p['부독해진도량']?.number ?? '' },
-                });
-            }
-            hasMore = data.has_more; cursor = data.next_cursor;
-        }
+        const students = await readStudentConfigs();
         res.json({ success: true, students });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1483,6 +1489,196 @@ app.post('/api/set-textbook-meta', requireAuth, async (req, res) => {
         if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// ============================================================
+// [Phase 4] 숙제 자동 생성 엔진 (미리보기 → 확정)
+//   오늘 출석+학습상태=정상 학생마다 다음 등원일 마감 개수만큼 지문을 커서에서 뽑아 문구 생성.
+//   기록은 오늘(배정일) 행. 커서 = 지문 순번(1-based). 빈 숙제칸에만 확정 기록.
+// ============================================================
+const _WEEK_ORDER = ['월', '화', '수', '목', '금', '토'];
+const _WIDX = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 };
+const _DOW = ['일', '월', '화', '수', '목', '금', '토']; // getUTCDay 0=일
+
+function parseAttendDays(days) {
+    if (!days) return [];
+    const set = [...new Set(String(days).split('').filter(c => _WEEK_ORDER.includes(c)))];
+    return set.sort((a, b) => _WEEK_ORDER.indexOf(a) - _WEEK_ORDER.indexOf(b));
+}
+// 직전 등원 다음날 ~ 이번 등원일, 일요일만 제외한 학습일 수
+function studyDaysBetween(prevC, curC) {
+    let steps = (_WIDX[curC] - _WIDX[prevC] + 7) % 7; if (steps === 0) steps = 7;
+    let c = 0; for (let i = 1; i <= steps; i++) { if ((_WIDX[prevC] + i) % 7 !== _WIDX['일']) c++; }
+    return c;
+}
+function computeWeeklyMap(method, N, attend) {
+    const map = {};
+    attend.forEach((d, i) => {
+        if (method === '매일') { const prev = attend[(i - 1 + attend.length) % attend.length]; map[d] = N * studyDaysBetween(prev, d); }
+        else map[d] = N;
+    });
+    return map;
+}
+function parseWeeklyStr(str) {
+    const map = {}; if (!str) return map;
+    const re = /([월화수목금토])\s*(\d+)/g; let m;
+    while ((m = re.exec(str))) map[m[1]] = Number(m[2]);
+    return map;
+}
+// 특정 다음등원일(nextChar)의 마감 개수
+function deadlineQuantity(subjCfg, attendArr, nextChar) {
+    const method = subjCfg.method || '등원마다';
+    if (method === '불규칙') return parseWeeklyStr(subjCfg.weekly)[nextChar] || 0;
+    const N = Number(subjCfg.amount); if (!(N > 0)) return 0;
+    return computeWeeklyMap(method, N, attendArr)[nextChar] || 0;
+}
+// 오늘 날짜(YYYY-MM-DD) 이후 수강요일 패턴의 다음 등원일
+function nextClassInfo(todayStr, attendArr) {
+    if (!attendArr.length) return null;
+    const [Y, M, D] = todayStr.split('-').map(Number);
+    const base = new Date(Date.UTC(Y, M - 1, D, 12));
+    const todayNum = base.getUTCDay();
+    for (let i = 1; i <= 7; i++) {
+        const char = _DOW[(todayNum + i) % 7];
+        if (attendArr.includes(char)) {
+            const dt = new Date(base.getTime() + i * 86400000);
+            return { char, gapDays: i, label: `${char}요일(${dt.getUTCMonth() + 1}/${dt.getUTCDate()})` };
+        }
+    }
+    return null;
+}
+function unitLabel(u) { return (((u.group ? u.group + ' ' : '') + (u.title || '')).trim()) || ('항목 ' + u.order); }
+// 커서부터 count개 지문 → 숙제 문구 + 다음 커서
+function buildAssignment(book, units, cursor, count, deadlineLabel) {
+    cursor = Math.max(1, Number(cursor) || 1);
+    let rangeText = '', pages = '', newCursor = cursor + count, reachedEnd = false, wbRange = '';
+    if (units && units.length) {
+        const assigned = units.filter(u => u.order != null && u.order >= cursor).sort((a, b) => a.order - b.order).slice(0, count);
+        if (assigned.length === 0) return null; // 커서가 책 끝을 넘음
+        if (assigned.length < count) reachedEnd = true;
+        const first = assigned[0], last = assigned[assigned.length - 1];
+        rangeText = assigned.length === 1 ? unitLabel(first) : `${unitLabel(first)} ~ ${unitLabel(last)}`;
+        if (first.startPage != null) { const ep = last.endPage ?? last.startPage; pages = ` (p.${first.startPage}${ep != null ? '~' + ep : ''})`; }
+        newCursor = first.order + assigned.length;
+        if (book.workbook) { const g1 = first.group || '', g2 = last.group || ''; wbRange = g1 ? (g1 === g2 ? g1 : `${g1} ~ ${g2}`) : rangeText; }
+    } else {
+        const per = book.perPassage || 1;
+        const total = book.totalUnits || null;
+        let sU = Math.ceil(cursor / per), eU = Math.ceil((cursor + count - 1) / per);
+        if (total && sU > total) return null;
+        if (total && eU > total) { eU = total; reachedEnd = true; }
+        rangeText = sU === eU ? `Unit ${sU}` : `Unit ${sU}~${eU}`;
+        newCursor = cursor + count;
+        if (book.workbook) wbRange = rangeText;
+    }
+    let text = `${deadlineLabel}까지 ${count}개: ${rangeText}${pages}`;
+    if (wbRange) text += ` + 워크북 ${wbRange}`;
+    return { text, newCursor, reachedEnd };
+}
+
+const PHASE4_SUBJECTS = [
+    { key: 'vocab', label: '📘어휘', hwField: '어휘숙제', cursorField: '어휘현재유닛' },
+    { key: 'mainR', label: '📗주독해', hwField: '주독해숙제', cursorField: '주독해현재유닛' },
+    { key: 'subR', label: '📙부독해', hwField: '부독해숙제', cursorField: '부독해현재유닛' },
+];
+
+// 미리보기: 오늘 출석자 대상 제안만 생성(아무것도 안 씀)
+app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
+    try {
+        const todayStr = req.body?.date || getKSTTodayRange().dateString;
+        // 오늘 일일 DB 행
+        const daily = []; let sc, more = true;
+        while (more) {
+            const d = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST', body: JSON.stringify({ filter: { property: '🕐 날짜', date: { equals: todayStr } }, page_size: 100, start_cursor: sc })
+            });
+            daily.push(...d.results); more = d.has_more; sc = d.next_cursor;
+        }
+        const cfgByName = {};
+        (await readStudentConfigs()).forEach(c => { cfgByName[c.name] = c; });
+        const { byId: bookById } = await loadTextbooks();
+        const unitCache = {};
+        const getUnits = async (bookId) => {
+            if (unitCache[bookId]) return unitCache[bookId];
+            if (!TEXTBOOK_UNIT_DB_ID) { unitCache[bookId] = []; return []; }
+            const q = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+                method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
+            });
+            const units = q.results.map(pg => {
+                const p = pg.properties;
+                return { order: p['순번']?.number ?? null, group: p['그룹']?.rich_text?.map(t => t.plain_text).join('') || '', title: p['제목']?.title?.[0]?.plain_text || '', startPage: p['시작페이지']?.number ?? null, endPage: p['끝페이지']?.number ?? null };
+            }).sort((a, b) => (a.order || 0) - (b.order || 0));
+            unitCache[bookId] = units; return units;
+        };
+
+        const results = [];
+        for (const page of daily) {
+            const p = page.properties;
+            const name = p['이름']?.title?.[0]?.plain_text || '';
+            const attendance = p['출석']?.checkbox || false;
+            const absence = (p['결석 사유']?.rich_text?.map(t => t.plain_text).join('') || '').trim();
+            if (!attendance || absence) continue;
+            const cfg = cfgByName[name];
+            if (!cfg || (cfg.status || '정상') !== '정상') continue;
+            const attendArr = parseAttendDays(cfg.days);
+            const nc = nextClassInfo(todayStr, attendArr);
+            if (!nc) continue;
+            const existing = {
+                어휘숙제: (p['어휘숙제']?.rich_text?.map(t => t.plain_text).join('') || '').trim(),
+                주독해숙제: (p['주독해숙제']?.rich_text?.map(t => t.plain_text).join('') || '').trim(),
+                부독해숙제: (p['부독해숙제']?.rich_text?.map(t => t.plain_text).join('') || '').trim(),
+            };
+            const subjectsOut = [];
+            for (const S of PHASE4_SUBJECTS) {
+                const s2 = cfg[S.key];
+                if (!s2.bookId) continue;
+                const qty = deadlineQuantity(s2, attendArr, nc.char);
+                if (!(qty > 0)) continue;
+                const book = bookById[s2.bookId] || { name: s2.bookName, workbook: false, perPassage: 1, totalUnits: null };
+                const units = await getUnits(s2.bookId);
+                const asg = buildAssignment(book, units, s2.unit, qty, nc.label);
+                subjectsOut.push({
+                    key: S.key, label: S.label, hwField: S.hwField, cursorField: S.cursorField,
+                    bookName: book.name || s2.bookName, qty,
+                    alreadyFilled: !!existing[S.hwField], existingText: existing[S.hwField],
+                    text: asg ? asg.text : `${nc.label}까지 ${qty}개 — ⚠ 교재 끝/커서 확인`,
+                    newCursor: asg ? asg.newCursor : null,
+                    reachedEnd: asg ? asg.reachedEnd : true,
+                });
+            }
+            if (subjectsOut.length) results.push({ dailyPageId: page.id, studentPageId: cfg.pageId, name, days: cfg.days, deadline: nc.label, subjects: subjectsOut });
+        }
+        res.json({ success: true, date: todayStr, students: results });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 확정: 선택된 학생들의 숙제 문구 기록 + 커서 전진 (스트리밍 진행률)
+app.post('/api/confirm-homework', requireAuth, async (req, res) => {
+    const { students } = req.body; // [{ dailyPageId, studentPageId, hw:{어휘숙제:...}, cursors:{어휘현재유닛:n} }]
+    if (!Array.isArray(students)) return res.status(400).json({ success: false, message: 'students 필요' });
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    let done = 0, errors = 0;
+    for (const st of students) {
+        try {
+            if (st.hw && Object.keys(st.hw).length && st.dailyPageId) {
+                const props = {};
+                for (const [k, v] of Object.entries(st.hw)) props[k] = { rich_text: v ? [{ text: { content: String(v).substring(0, 2000) } }] : [] };
+                await fetchNotion(`https://api.notion.com/v1/pages/${st.dailyPageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
+            }
+            if (st.cursors && Object.keys(st.cursors).length && st.studentPageId) {
+                const props = {};
+                for (const [k, v] of Object.entries(st.cursors)) props[k] = { number: (v == null || v === '') ? null : Number(v) };
+                await fetchNotion(`https://api.notion.com/v1/pages/${st.studentPageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
+            }
+            done++;
+        } catch (e) { errors++; }
+        res.write(JSON.stringify({ progress: done + errors, total: students.length }) + '\n');
+        await new Promise(r => setTimeout(r, 150));
+    }
+    if (typeof dashboardCache !== 'undefined') dashboardCache.dailyReport.lastFetch = 0;
+    res.write(JSON.stringify({ success: true, message: `${done}명 확정 완료${errors ? `, ${errors}건 실패` : ''}` }) + '\n');
+    res.end();
 });
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));

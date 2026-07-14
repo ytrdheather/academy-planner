@@ -98,6 +98,7 @@
             <div class="section-title">📋 출결 및 숙제 관리</div>
             <div style="margin-bottom:8px;">
                 <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
+                <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
                 <span style="font-size:13px; color:#64748b; margin-left:8px;">결석사유를 입력하면 결석 처리됩니다(이름 옆 🚫결석 배지 + 누락점검 제외).</span>
             </div>
             <div class="table-scroll-area">
@@ -108,6 +109,25 @@
                     </tr></thead>
                     <tbody id="attendanceTableBody"><tr><td colspan="8" class="loading">로딩중...</td></tr></tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- [Phase 4] 숙제 자동 생성 미리보기 모달 -->
+        <div id="hwPreviewOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; width:min(920px,94vw); max-height:88vh; border-radius:14px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="padding:14px 18px; background:#f5f3ff; border-bottom:1px solid #ede9fe; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="font-weight:800; color:#5b21b6;">🔮 다음 숙제 미리보기 <span id="hwPreviewSub" style="font-weight:500; color:#7c3aed; font-size:13px;"></span></div>
+                    <button onclick="closeHomeworkPreview()" style="border:none; background:transparent; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+                </div>
+                <div style="padding:6px 18px; font-size:12px; color:#64748b; border-bottom:1px solid #f1f5f9;">체크된 학생만 확정됩니다. 문구는 직접 수정 가능. <b>이미 숙제가 있는 칸은 회색·기본 해제</b>(중복 방지). 확정 시 커서가 자동 전진합니다.</div>
+                <div id="hwPreviewBody" style="overflow-y:auto; padding:10px 18px; flex:1;"></div>
+                <div style="padding:12px 18px; border-top:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <span id="hwPreviewCount" style="font-size:13px; color:#475569;"></span>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="closeHomeworkPreview()" class="refresh-btn" style="background:#e2e8f0; color:#334155;">취소</button>
+                        <button id="hwConfirmBtn" onclick="confirmHomework()" class="refresh-btn" style="background:#7c3aed; color:#fff;">✅ 확정 기록</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -197,9 +217,9 @@
                 <table class="styled-table">
                     <thead><tr>
                         <th>학생</th><th>담당</th><th>요일</th><th>학습상태</th>
-                        <th>어휘교재</th><th>유닛</th><th>량</th>
-                        <th>주독해교재</th><th>유닛</th><th>량</th>
-                        <th>부독해교재</th><th>유닛</th><th>량</th>
+                        <th>어휘교재</th><th>유닛</th><th>진도량·방식</th>
+                        <th>주독해교재</th><th>유닛</th><th>진도량·방식</th>
+                        <th>부독해교재</th><th>유닛</th><th>진도량·방식</th>
                         <th>📌 고정숙제</th>
                     </tr></thead>
                     <tbody id="progressTableBody"><tr><td colspan="14" class="loading">로딩중...</td></tr></tbody>
@@ -983,6 +1003,92 @@
             </tr>`;
         }
 
+        // ===== [Phase 4] 숙제 자동 생성 미리보기 → 확정 =====
+        let hwPreviewData = [];
+
+        async function openHomeworkPreview() {
+            const period = document.getElementById('commonPeriodFilter')?.value;
+            const date = document.getElementById('commonSpecificDate')?.value;
+            const effDate = (period === 'specific_date' && date) ? date : undefined;
+            const overlay = document.getElementById('hwPreviewOverlay');
+            const body = document.getElementById('hwPreviewBody');
+            overlay.style.display = 'flex';
+            body.innerHTML = '<div style="padding:30px;text-align:center;color:#7c3aed;">🔮 계산 중...</div>';
+            document.getElementById('hwPreviewSub').textContent = '';
+            document.getElementById('hwPreviewCount').textContent = '';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/generate-homework-preview`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ date: effDate })
+                });
+                const j = await res.json();
+                if (!j.success) throw new Error(j.message || '생성 실패');
+                hwPreviewData = j.students || [];
+                document.getElementById('hwPreviewSub').textContent = `(${j.date} 출석자 기준)`;
+                renderHomeworkPreview();
+            } catch (e) { body.innerHTML = `<div style="padding:24px;color:#dc2626;">실패: ${escAttr(e.message)}</div>`; }
+        }
+
+        function renderHomeworkPreview() {
+            const body = document.getElementById('hwPreviewBody');
+            if (!hwPreviewData.length) {
+                body.innerHTML = '<div style="padding:24px;color:#64748b;">대상 학생이 없습니다.<br><span style="font-size:12px;">(오늘 출석 + 학습상태 정상 + 교재·진도량이 설정된 학생만 나옵니다)</span></div>';
+                document.getElementById('hwPreviewCount').textContent = '';
+                return;
+            }
+            body.innerHTML = hwPreviewData.map((st, i) => {
+                const subs = st.subjects.map((s, j) => {
+                    const dis = s.alreadyFilled;
+                    const end = s.reachedEnd ? ' <span style="color:#f59e0b;font-weight:700;">⚠교재끝</span>' : '';
+                    const existed = dis ? `<span style="font-size:11px;color:#94a3b8;">이미 있음: ${escAttr((s.existingText || '').slice(0, 30))}</span>` : '';
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;${dis ? 'opacity:0.55;' : ''}">
+                        <input type="checkbox" id="hwck_${i}_${j}" ${dis ? '' : 'checked'}>
+                        <span style="width:64px;font-size:13px;">${s.label}</span>
+                        <input id="hwtx_${i}_${j}" class="editable-input" style="flex:1;min-width:260px;" value="${escAttr(s.text)}">
+                        ${end}${existed}
+                    </div>`;
+                }).join('');
+                return `<div style="border:1px solid #ede9fe;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+                    <div style="font-weight:700;margin-bottom:4px;">${escAttr(st.name)} <span style="font-weight:400;color:#7c3aed;font-size:12px;">→ ${escAttr(st.deadline)} 마감 · ${escAttr(st.days)}</span></div>
+                    ${subs}
+                </div>`;
+            }).join('');
+            const totalSubs = hwPreviewData.reduce((a, s) => a + s.subjects.length, 0);
+            document.getElementById('hwPreviewCount').textContent = `학생 ${hwPreviewData.length}명 · 항목 ${totalSubs}개`;
+        }
+
+        function closeHomeworkPreview() { document.getElementById('hwPreviewOverlay').style.display = 'none'; hwPreviewData = []; }
+
+        async function confirmHomework() {
+            const payload = [];
+            hwPreviewData.forEach((st, i) => {
+                const hw = {}, cursors = {};
+                st.subjects.forEach((s, j) => {
+                    const ck = document.getElementById(`hwck_${i}_${j}`);
+                    if (!ck || !ck.checked) return;
+                    const tx = document.getElementById(`hwtx_${i}_${j}`);
+                    hw[s.hwField] = tx ? tx.value : s.text;
+                    if (s.newCursor != null) cursors[s.cursorField] = s.newCursor;
+                });
+                if (Object.keys(hw).length) payload.push({ dailyPageId: st.dailyPageId, studentPageId: st.studentPageId, hw, cursors });
+            });
+            if (!payload.length) { showToast('선택된 항목이 없습니다.', 'error'); return; }
+            const btn = document.getElementById('hwConfirmBtn'); btn.disabled = true; const orig = btn.textContent; btn.textContent = '기록 중...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/confirm-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ students: payload })
+                });
+                const text = await res.text();
+                const lines = text.trim().split('\n').filter(Boolean);
+                const last = JSON.parse(lines[lines.length - 1]);
+                showToast(last.message || '완료', last.success ? 'success' : 'error');
+                closeHomeworkPreview();
+                loadDataForCurrentTab(true);
+            } catch (e) { showToast('확정 실패: ' + e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = orig; }
+        }
+
         async function markAllPresent() {
             const cbs = [...document.querySelectorAll('#attendanceTableBody input.att-check')];
             if (!cbs.length) { alert('대상 학생이 없습니다.'); return; }
@@ -1497,6 +1603,72 @@
             tbody.innerHTML = rows.map(getProgressRow).join('');
         }
 
+        // ===== 진도량·방식 (마감일 기준 요일별 개수 모델) =====
+        const PROGRESS_METHODS = ['등원마다', '매일', '불규칙'];
+        const SUBJ_PREFIX = { vocab: '어휘', mainR: '주독해', subR: '부독해' };
+        const WEEK_ORDER = ['월', '화', '수', '목', '금', '토'];
+        const WIDX = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 };
+
+        function parseAttendDays(days) {
+            if (!days) return [];
+            const set = [...new Set(days.split('').filter(c => WEEK_ORDER.includes(c)))];
+            return set.sort((a, b) => WEEK_ORDER.indexOf(a) - WEEK_ORDER.indexOf(b));
+        }
+        // 직전 등원 다음날 ~ 이번 등원일 사이, 일요일만 제외한 학습일 수
+        function studyDaysBetween(prevC, curC) {
+            let steps = (WIDX[curC] - WIDX[prevC] + 7) % 7; if (steps === 0) steps = 7;
+            let c = 0;
+            for (let i = 1; i <= steps; i++) { if ((WIDX[prevC] + i) % 7 !== WIDX['일']) c++; }
+            return c;
+        }
+        function computeWeeklyMap(method, N, attend) {
+            const map = {};
+            attend.forEach((d, i) => {
+                if (method === '매일') { const prev = attend[(i - 1 + attend.length) % attend.length]; map[d] = N * studyDaysBetween(prev, d); }
+                else map[d] = N;
+            });
+            return map;
+        }
+        function computePreview(method, N, days) {
+            const attend = parseAttendDays(days); N = Number(N);
+            if (!attend.length || !(N > 0)) return '';
+            const map = computeWeeklyMap(method, N, attend);
+            return attend.map(d => `${d}${map[d]}`).join('·');
+        }
+        function parseWeekly(str) {
+            const map = {}; if (!str) return map;
+            const re = /([월화수목금토])\s*(\d+)/g; let m;
+            while ((m = re.exec(str))) map[m[1]] = Number(m[2]);
+            return map;
+        }
+        function stringifyWeekly(map, attend) {
+            return attend.filter(d => Number(map[d]) > 0).map(d => `${d}${map[d]}`).join(' ');
+        }
+
+        function amountCell(s, key) {
+            const d = s[key]; const prefix = SUBJ_PREFIX[key];
+            if (!d.bookId) return '<span class="book-none">교재 없음</span>';
+            const method = d.method || '등원마다';
+            const amtInput = `<input class="editable-input" type="number" min="0" style="width:44px" value="${d.amount === '' ? '' : d.amount}" title="N (하루/등원당 개수)" onchange="saveStudentField('${s.pageId}','${prefix}진도량',this.value,'number')">`;
+            const methodSel = `<select class="homework-dropdown" style="width:78px" onchange="saveMethod('${s.pageId}','${prefix}진도방식',this.value)">`
+                + PROGRESS_METHODS.map(m => `<option value="${m}" ${m === method ? 'selected' : ''}>${m}</option>`).join('') + `</select>`;
+            let below;
+            if (method === '불규칙') {
+                const attend = parseAttendDays(s.days);
+                const wm = parseWeekly(d.weekly);
+                below = attend.length
+                    ? `<div style="display:flex;gap:2px;flex-wrap:wrap;margin-top:2px">` + attend.map(day =>
+                        `<label style="font-size:11px;display:flex;flex-direction:column;align-items:center;color:#475569">${day}<input type="number" min="0" style="width:32px" value="${wm[day] ?? ''}" onchange="saveWeeklyDay('${s.pageId}','${key}','${prefix}요일별진도량','${day}',this.value)"></label>`
+                    ).join('') + `</div>`
+                    : `<div style="font-size:11px;color:#f59e0b">수강요일 없음</div>`;
+            } else {
+                const txt = computePreview(method, d.amount, s.days);
+                below = `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${txt || '—'}</div>`;
+            }
+            const top = method === '불규칙' ? methodSel : `${amtInput}${methodSel}`;
+            return `<div style="display:flex;flex-direction:column;align-items:flex-start"><div style="display:flex;gap:3px;align-items:center">${top}</div>${below}</div>`;
+        }
+
         function getProgressRow(s) {
             const status = s.status || '정상';
             const paused = status !== '정상';
@@ -1516,13 +1688,13 @@
                 <td>${statusSel}</td>
                 <td>${book('어휘교재', s.vocab.bookName, 'dl-vocab')}</td>
                 <td>${num('어휘현재유닛', s.vocab.unit)}</td>
-                <td>${num('어휘진도량', s.vocab.amount)}</td>
+                <td>${amountCell(s, 'vocab')}</td>
                 <td>${book('주독해교재', s.mainR.bookName, 'dl-reading')}</td>
                 <td>${num('주독해현재유닛', s.mainR.unit)}</td>
-                <td>${num('주독해진도량', s.mainR.amount)}</td>
+                <td>${amountCell(s, 'mainR')}</td>
                 <td>${book('부독해교재', s.subR.bookName, 'dl-reading')}</td>
                 <td>${num('부독해현재유닛', s.subR.unit)}</td>
-                <td>${num('부독해진도량', s.subR.amount)}</td>
+                <td>${amountCell(s, 'subR')}</td>
                 <td>${fixed}</td>
             </tr>`;
         }
@@ -1535,6 +1707,8 @@
                 '어휘현재유닛': ['vocab', 'unit'], '어휘진도량': ['vocab', 'amount'],
                 '주독해현재유닛': ['mainR', 'unit'], '주독해진도량': ['mainR', 'amount'],
                 '부독해현재유닛': ['subR', 'unit'], '부독해진도량': ['subR', 'amount'],
+                '어휘진도방식': ['vocab', 'method'], '주독해진도방식': ['mainR', 'method'], '부독해진도방식': ['subR', 'method'],
+                '어휘요일별진도량': ['vocab', 'weekly'], '주독해요일별진도량': ['mainR', 'weekly'], '부독해요일별진도량': ['subR', 'weekly'],
             };
             const path = map[propertyName];
             if (!path) return;
@@ -1555,6 +1729,21 @@
                 showToast('저장됨');
                 if (propertyName === '학습상태') renderProgressConfig(); // 정지 표시 갱신
             } catch (e) { showToast('저장 실패: ' + e.message, 'error'); }
+        }
+
+        // 진도방식 변경: 저장 후 셀 다시 그려 프리뷰/불규칙칸 갱신
+        async function saveMethod(pageId, prop, value) {
+            await saveStudentField(pageId, prop, value, 'select');
+            renderProgressConfig();
+        }
+        // 불규칙 모드: 요일별 개수 1칸 입력 → 전체 문자열 재구성 후 저장
+        async function saveWeeklyDay(pageId, key, prop, day, value) {
+            const s = progressData.find(x => x.pageId === pageId); if (!s) return;
+            const map = parseWeekly(s[key].weekly);
+            const n = Number(value);
+            if (value === '' || !(n > 0)) delete map[day]; else map[day] = n;
+            const str = stringifyWeekly(map, parseAttendDays(s.days));
+            await saveStudentField(pageId, prop, str, 'rich_text');
         }
 
         async function saveTextbook(el) {
