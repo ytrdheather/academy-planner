@@ -1012,14 +1012,15 @@
         function getAttendanceHwRow(st) {
             const absent = isAbsent(st);
             const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
+            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 숙제만 다음 등원까지 미룸(커서 되돌림)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button></div>`;
             return `<tr ${absent ? 'style="background:#fff7ed;"' : ''}>
                 <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" onchange="updateField(this)"></td>
-                <td>${hwInput('어휘숙제', st.assignedHw?.vocab)}</td>
-                <td>${hwInput('주독해숙제', st.assignedHw?.mainR)}</td>
-                <td>${hwInput('부독해숙제', st.assignedHw?.subR)}</td>
+                <td>${hwCell('어휘숙제', st.assignedHw?.vocab, '어휘')}</td>
+                <td>${hwCell('주독해숙제', st.assignedHw?.mainR, '주독해')}</td>
+                <td>${hwCell('부독해숙제', st.assignedHw?.subR, '부독해')}</td>
                 <td>${hwInput('문법 숙제 내용', st.assignedHw?.grammar)}</td>
             </tr>`;
         }
@@ -1102,7 +1103,7 @@
                     if (!ck || !ck.checked) return;
                     const tx = document.getElementById(`hwtx_${i}_${j}`);
                     hw[s.hwField] = tx ? tx.value : s.text;
-                    if (s.newCursor != null) cursors[s.cursorField] = s.newCursor;
+                    if (s.newCursor != null) { cursors[s.cursorField] = s.newCursor; if (s.lastAmtField) cursors[s.lastAmtField] = s.advanced || 0; }
                 });
                 if (Object.keys(hw).length) payload.push({ dailyPageId: st.dailyPageId, studentPageId: st.studentPageId, hw, cursors });
             });
@@ -1212,6 +1213,22 @@
                 showToast('삭제됨');
                 loadPausePeriods(); refreshPauseBanner();
             } catch (e) { showToast('삭제 실패: ' + e.message, 'error'); }
+        }
+
+        // 숙제 미룸(이월): 그 학생·그 과목만 커서 되돌려 다음 생성 때 재출제
+        async function deferHomework(name, prefix, btn) {
+            if (!confirm(`${name} 학생의 ${prefix} 숙제를 다음 등원까지 미룰까요?\n(그 과목 커서를 직전 배정량만큼 되돌려 다음 생성 때 다시 나옵니다)`)) return;
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/defer-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ name, prefix })
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '미룸 실패', 'error'); return; }
+                showToast(`${prefix} 미룸 완료 (커서 ${j.newCursor}로 되돌림, ${j.rolledBack}개). 다음 생성 때 재출제됩니다.`);
+            } catch (e) { showToast('미룸 실패: ' + e.message, 'error'); }
+            finally { if (btn) btn.disabled = false; }
         }
 
         async function markAllPresent() {

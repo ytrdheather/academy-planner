@@ -1580,9 +1580,9 @@ function buildAssignment(book, units, cursor, count, deadlineLabel) {
 }
 
 const PHASE4_SUBJECTS = [
-    { key: 'vocab', label: '📘어휘', hwField: '어휘숙제', cursorField: '어휘현재유닛' },
-    { key: 'mainR', label: '📗주독해', hwField: '주독해숙제', cursorField: '주독해현재유닛' },
-    { key: 'subR', label: '📙부독해', hwField: '부독해숙제', cursorField: '부독해현재유닛' },
+    { key: 'vocab', label: '📘어휘', hwField: '어휘숙제', cursorField: '어휘현재유닛', lastAmtField: '어휘직전배정량' },
+    { key: 'mainR', label: '📗주독해', hwField: '주독해숙제', cursorField: '주독해현재유닛', lastAmtField: '주독해직전배정량' },
+    { key: 'subR', label: '📙부독해', hwField: '부독해숙제', cursorField: '부독해현재유닛', lastAmtField: '부독해직전배정량' },
 ];
 
 // ── 전원생 숙제 정지(킬스위치) ──────────────────────────────
@@ -1713,11 +1713,12 @@ app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
                 const units = await getUnits(s2.bookId);
                 const asg = buildAssignment(book, units, s2.unit, qty, nc.label);
                 subjectsOut.push({
-                    key: S.key, label: S.label, hwField: S.hwField, cursorField: S.cursorField,
+                    key: S.key, label: S.label, hwField: S.hwField, cursorField: S.cursorField, lastAmtField: S.lastAmtField,
                     bookName: book.name || s2.bookName, qty,
                     alreadyFilled: !!existing[S.hwField], existingText: existing[S.hwField],
                     text: asg ? asg.text : `${nc.label}까지 ${qty}개 — ⚠ 교재 끝/커서 확인`,
                     newCursor: asg ? asg.newCursor : null,
+                    advanced: asg ? (asg.newCursor - (Number(s2.unit) || 1)) : 0,
                     reachedEnd: asg ? asg.reachedEnd : true,
                 });
             }
@@ -1754,6 +1755,29 @@ app.post('/api/confirm-homework', requireAuth, async (req, res) => {
     if (typeof dashboardCache !== 'undefined') dashboardCache.dailyReport.lastFetch = 0;
     res.write(JSON.stringify({ success: true, message: `${done}명 확정 완료${errors ? `, ${errors}건 실패` : ''}` }) + '\n');
     res.end();
+});
+
+// 숙제 미룸(이월): 그 과목 커서를 직전배정량만큼 되돌려 다음 생성 때 재출제(A방식: 밀린 것만)
+app.post('/api/defer-homework', requireAuth, async (req, res) => {
+    const { name, prefix } = req.body; // prefix ∈ 어휘/주독해/부독해
+    if (!name || !prefix) return res.status(400).json({ success: false, message: 'name/prefix 필요' });
+    if (!['어휘', '주독해', '부독해'].includes(prefix)) return res.status(400).json({ success: false, message: 'prefix 오류' });
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '이름', title: { equals: name } }, page_size: 1 })
+        });
+        if (!q.results.length) return res.status(404).json({ success: false, message: '학생 명부에서 찾을 수 없음' });
+        const page = q.results[0], p = page.properties;
+        const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량';
+        const cursor = p[cursorField]?.number ?? null;
+        const lastAmt = p[amtField]?.number ?? 0;
+        if (!(lastAmt > 0)) return res.json({ success: false, message: '미룰 직전 숙제 내역이 없습니다(이미 미뤘거나 생성 전).' });
+        const newCursor = Math.max(1, (cursor ?? 1) - lastAmt);
+        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: 0 } } })
+        });
+        res.json({ success: true, newCursor, rolledBack: lastAmt });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
