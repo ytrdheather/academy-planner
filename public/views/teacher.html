@@ -58,6 +58,13 @@
                 <select id="commonTeacherFilter" class="filter-select" onchange="filterDataByTeacher()"><option value="">전체 보기</option></select>
             </div>
 
+            <div id="attendanceActions" style="display:none; align-items:center; gap:8px; flex-wrap:wrap;">
+                <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
+                <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
+                <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
+                <span id="pauseBanner" style="display:none; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
+            </div>
+
             <button class="refresh-btn hidden" id="grammarCommentBtn" onclick="openGrammarCommentModal()" style="background:#8b5cf6; color:#fff;">📝 문법 코멘트 작성</button>
 
             <div class="filter-group hidden" id="grammarClassFilterGroup">
@@ -96,13 +103,7 @@
 
         <div id="attendance-view" class="tab-content">
             <div class="section-title">📋 출결 및 숙제 관리</div>
-            <div style="margin-bottom:8px;">
-                <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
-                <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
-                <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
-                <span id="pauseBanner" style="display:none; margin-left:8px; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
-                <span style="font-size:13px; color:#64748b; margin-left:8px;">결석사유를 입력하면 결석 처리됩니다(이름 옆 🚫결석 배지 + 누락점검 제외).</span>
-            </div>
+            <div style="margin-bottom:8px; font-size:13px; color:#64748b;">결석사유를 입력하면 결석 처리됩니다(이름 옆 🚫결석 배지 + 누락점검 제외).</div>
             <div class="table-scroll-area">
                 <table class="styled-table">
                     <thead><tr>
@@ -801,6 +802,8 @@
             if (tab === 'homework') notice.style.display = 'block';
             else notice.style.display = 'none';
 
+            const attActions = document.getElementById('attendanceActions');
+            if (attActions) attActions.style.display = (tab === 'attendance') ? 'flex' : 'none';
             if (tab === 'attendance') refreshPauseBanner();
             if (tab === 'progress') { loadProgressConfig(); return; }
             loadDataForCurrentTab();
