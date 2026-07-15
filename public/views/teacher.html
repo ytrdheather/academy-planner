@@ -1016,16 +1016,29 @@
             const absent = isAbsent(st);
             const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
             const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 숙제만 다음 등원까지 미룸(커서 되돌림)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button></div>`;
-            return `<tr ${absent ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
+            return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
+                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : ''}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
-                <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" onchange="updateField(this)"></td>
+                <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
                 <td>${hwCell('어휘숙제', st.assignedHw?.vocab, '어휘')}</td>
                 <td>${hwCell('주독해숙제', st.assignedHw?.mainR, '주독해')}</td>
                 <td>${hwCell('부독해숙제', st.assignedHw?.subR, '부독해')}</td>
                 <td>${hwInput('문법 숙제 내용', st.assignedHw?.grammar)}</td>
             </tr>`;
+        }
+
+        // 결석사유 입력 즉시 🚫 배지 + 행 배경 토글(저장은 onchange의 updateField가 담당)
+        function toggleAbsenceUI(input, pageId) {
+            const absent = input.value.trim() !== '';
+            const row = document.getElementById('att-row-' + pageId) || input.closest('tr');
+            if (row) {
+                row.style.background = absent ? '#fff7ed' : '';
+                const slot = row.querySelector('.att-absent-badge');
+                if (slot) slot.innerHTML = absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : '';
+            }
+            const st = (allReportData || []).find(x => x.pageId === pageId);
+            if (st && st.homework) st.homework.absenceReason = input.value;
         }
 
         // ===== [Phase 4] 숙제 자동 생성 미리보기 → 확정 =====
