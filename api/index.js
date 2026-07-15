@@ -31,6 +31,9 @@ const {
     STUDENT_ANSWER_DB_ID,
 } = process.env;
 
+// 숙제 정지 기간 DB (전역 숙제 생성 킬스위치). env 없으면 생성해둔 DB로 폴백 → Render env 추가 없이도 동작.
+const PAUSE_DB_ID = process.env.PAUSE_DB_ID || '39e09320-bce2-8115-aa02-f03fabca5433';
+
 // [핵심] HTTPS 강제
 const DOMAIN_URL = 'https://readitude.onrender.com';
 const PORT = process.env.PORT || 5001;
@@ -1582,10 +1585,82 @@ const PHASE4_SUBJECTS = [
     { key: 'subR', label: '📙부독해', hwField: '부독해숙제', cursorField: '부독해현재유닛' },
 ];
 
+// ── 전원생 숙제 정지(킬스위치) ──────────────────────────────
+// 특정 날짜가 '활성' 정지기간(시작일~종료일) 안에 들면 그 기간 반환, 아니면 null
+async function getActivePause(dateStr) {
+    if (!PAUSE_DB_ID) return null;
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '활성', checkbox: { equals: true } }, page_size: 100 })
+        });
+        for (const pg of q.results) {
+            const p = pg.properties;
+            const start = p['시작일']?.date?.start || null;
+            const end = p['종료일']?.date?.start || p['시작일']?.date?.end || start; // 종료일 없으면 시작일 하루
+            if (!start) continue;
+            if (dateStr >= start && dateStr <= end) {
+                return { reason: p['사유']?.title?.map(t => t.plain_text).join('') || '(사유 없음)', start, end, pageId: pg.id };
+            }
+        }
+    } catch (e) { /* 정지 조회 실패 시 막지 않음(생성은 계속) */ }
+    return null;
+}
+
+// 정지 기간 목록
+app.get('/api/pause-periods', requireAuth, async (req, res) => {
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ sorts: [{ property: '시작일', direction: 'descending' }], page_size: 100 })
+        });
+        const periods = q.results.map(pg => {
+            const p = pg.properties;
+            return {
+                pageId: pg.id,
+                reason: p['사유']?.title?.map(t => t.plain_text).join('') || '',
+                start: p['시작일']?.date?.start || '',
+                end: p['종료일']?.date?.start || '',
+                active: p['활성']?.checkbox || false,
+            };
+        });
+        const todayStr = getKSTTodayRange().dateString;
+        res.json({ success: true, periods, activeNow: await getActivePause(todayStr) });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 정지 기간 추가
+app.post('/api/pause-periods', requireAuth, async (req, res) => {
+    const { reason, start, end } = req.body;
+    if (!start) return res.status(400).json({ success: false, message: '시작일 필요' });
+    try {
+        const props = {
+            '사유': { title: [{ text: { content: String(reason || '숙제 정지').substring(0, 200) } }] },
+            '시작일': { date: { start } },
+            '종료일': { date: { start: end || start } },
+            '활성': { checkbox: true },
+        };
+        await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PAUSE_DB_ID }, properties: props }) });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 정지 기간 활성 토글 / 삭제(archive)
+app.post('/api/pause-periods/update', requireAuth, async (req, res) => {
+    const { pageId, active, archive } = req.body;
+    if (!pageId) return res.status(400).json({ success: false, message: 'pageId 필요' });
+    try {
+        const body = archive ? { archived: true } : { properties: { '활성': { checkbox: !!active } } };
+        await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify(body) });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 // 미리보기: 오늘 출석자 대상 제안만 생성(아무것도 안 씀)
 app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
     try {
         const todayStr = req.body?.date || getKSTTodayRange().dateString;
+        // 전원생 숙제 정지 기간이면 아무것도 생성하지 않음
+        const pause = await getActivePause(todayStr);
+        if (pause) return res.json({ success: true, date: todayStr, paused: true, pause, students: [] });
         // 오늘 일일 DB 행
         const daily = []; let sc, more = true;
         while (more) {

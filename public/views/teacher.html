@@ -99,6 +99,8 @@
             <div style="margin-bottom:8px;">
                 <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
                 <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
+                <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
+                <span id="pauseBanner" style="display:none; margin-left:8px; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
                 <span style="font-size:13px; color:#64748b; margin-left:8px;">결석사유를 입력하면 결석 처리됩니다(이름 옆 🚫결석 배지 + 누락점검 제외).</span>
             </div>
             <div class="table-scroll-area">
@@ -128,6 +130,24 @@
                         <button id="hwConfirmBtn" onclick="confirmHomework()" class="refresh-btn" style="background:#7c3aed; color:#fff;">✅ 확정 기록</button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- [숙제 정지] 전원생 숙제 생성 정지 기간 관리 모달 -->
+        <div id="pauseOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; width:min(640px,94vw); max-height:88vh; border-radius:14px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="padding:14px 18px; background:#f1f5f9; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="font-weight:800; color:#334155;">⏸️ 전원생 숙제 정지 기간</div>
+                    <button onclick="closePauseManager()" style="border:none; background:transparent; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+                </div>
+                <div style="padding:6px 18px; font-size:12px; color:#64748b; border-bottom:1px solid #f1f5f9;">이 기간(생성일 기준)에는 '다음 숙제 생성'이 아무에게도 부과되지 않습니다. 공휴일·방학·임시 휴원에 사용하세요.</div>
+                <div style="padding:12px 18px; display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; border-bottom:1px solid #f1f5f9;">
+                    <label style="font-size:12px;">사유<br><input id="pauseReason" class="editable-input" style="width:150px;" placeholder="예: 설 연휴"></label>
+                    <label style="font-size:12px;">시작일<br><input id="pauseStart" type="date" class="editable-input"></label>
+                    <label style="font-size:12px;">종료일<br><input id="pauseEnd" type="date" class="editable-input"></label>
+                    <button onclick="addPausePeriod()" class="refresh-btn" style="background:#334155; color:#fff;">추가</button>
+                </div>
+                <div id="pauseList" style="overflow-y:auto; padding:10px 18px; flex:1;"></div>
             </div>
         </div>
 
@@ -781,6 +801,7 @@
             if (tab === 'homework') notice.style.display = 'block';
             else notice.style.display = 'none';
 
+            if (tab === 'attendance') refreshPauseBanner();
             if (tab === 'progress') { loadProgressConfig(); return; }
             loadDataForCurrentTab();
         }
@@ -1023,6 +1044,19 @@
                 });
                 const j = await res.json();
                 if (!j.success) throw new Error(j.message || '생성 실패');
+                if (j.paused) {
+                    hwPreviewData = [];
+                    document.getElementById('hwPreviewSub').textContent = '';
+                    document.getElementById('hwPreviewCount').textContent = '';
+                    const pr = j.pause || {};
+                    body.innerHTML = `<div style="padding:28px; text-align:center;">
+                        <div style="font-size:34px;">⏸️</div>
+                        <div style="font-weight:800; color:#b91c1c; margin-top:8px;">숙제 생성 정지 기간입니다</div>
+                        <div style="color:#475569; margin-top:6px;">${escAttr(pr.reason || '')} (${escAttr(pr.start || '')} ~ ${escAttr(pr.end || '')})</div>
+                        <div style="font-size:12px; color:#94a3b8; margin-top:10px;">정지 기간은 '⏸️ 정지 관리'에서 조정할 수 있습니다.</div>
+                    </div>`;
+                    return;
+                }
                 hwPreviewData = j.students || [];
                 document.getElementById('hwPreviewSub').textContent = `(${j.date} 출석자 기준)`;
                 renderHomeworkPreview();
@@ -1087,6 +1121,97 @@
                 loadDataForCurrentTab(true);
             } catch (e) { showToast('확정 실패: ' + e.message, 'error'); }
             finally { btn.disabled = false; btn.textContent = orig; }
+        }
+
+        // ===== [숙제 정지] 전원생 숙제 생성 킬스위치 =====
+        async function refreshPauseBanner() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/pause-periods`, { headers: { Authorization: 'Bearer ' + authToken } });
+                const j = await res.json();
+                const banner = document.getElementById('pauseBanner');
+                if (!banner) return;
+                if (j.success && j.activeNow) {
+                    banner.style.display = 'inline-block';
+                    banner.textContent = `⏸️ 정지 중: ${j.activeNow.reason} (${j.activeNow.start}~${j.activeNow.end})`;
+                } else { banner.style.display = 'none'; }
+                window._pausePeriods = (j.periods || []);
+            } catch (e) { /* 배너 실패는 조용히 */ }
+        }
+
+        function openPauseManager() {
+            document.getElementById('pauseOverlay').style.display = 'flex';
+            loadPausePeriods();
+        }
+        function closePauseManager() { document.getElementById('pauseOverlay').style.display = 'none'; }
+
+        async function loadPausePeriods() {
+            const list = document.getElementById('pauseList');
+            list.innerHTML = '<div style="padding:16px; color:#64748b;">불러오는 중...</div>';
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/pause-periods`, { headers: { Authorization: 'Bearer ' + authToken } });
+                const j = await res.json();
+                if (!j.success) throw new Error(j.message || '로드 실패');
+                renderPausePeriods(j.periods || [], j.activeNow);
+            } catch (e) { list.innerHTML = `<div style="padding:16px; color:#dc2626;">실패: ${escAttr(e.message)}</div>`; }
+        }
+
+        function renderPausePeriods(periods, activeNow) {
+            const list = document.getElementById('pauseList');
+            if (!periods.length) { list.innerHTML = '<div style="padding:16px; color:#64748b;">등록된 정지 기간이 없습니다.</div>'; return; }
+            const activeId = activeNow?.pageId;
+            list.innerHTML = periods.map(p => {
+                const isNow = p.pageId === activeId;
+                return `<div style="display:flex; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid #f1f5f9; ${isNow ? 'background:#fef2f2;' : ''}">
+                    <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:#475569;">
+                        <input type="checkbox" ${p.active ? 'checked' : ''} onchange="togglePause('${p.pageId}', this.checked)"> 활성
+                    </label>
+                    <span style="flex:1; font-size:13px;"><b>${escAttr(p.reason)}</b> <span style="color:#64748b;">${escAttr(p.start)} ~ ${escAttr(p.end)}</span> ${isNow ? '<span style="color:#b91c1c; font-weight:700;">● 현재 정지중</span>' : ''}</span>
+                    <button onclick="deletePause('${p.pageId}')" class="refresh-btn" style="background:#fee2e2; color:#b91c1c; padding:2px 8px;">삭제</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function addPausePeriod() {
+            const reason = document.getElementById('pauseReason').value.trim();
+            const start = document.getElementById('pauseStart').value;
+            const end = document.getElementById('pauseEnd').value;
+            if (!start) { showToast('시작일을 입력하세요.', 'error'); return; }
+            if (end && end < start) { showToast('종료일이 시작일보다 빠릅니다.', 'error'); return; }
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/pause-periods`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ reason, start, end })
+                });
+                const j = await res.json();
+                if (!j.success) throw new Error(j.message || '추가 실패');
+                document.getElementById('pauseReason').value = '';
+                document.getElementById('pauseStart').value = '';
+                document.getElementById('pauseEnd').value = '';
+                showToast('정지 기간 추가됨');
+                loadPausePeriods(); refreshPauseBanner();
+            } catch (e) { showToast('추가 실패: ' + e.message, 'error'); }
+        }
+
+        async function togglePause(pageId, active) {
+            try {
+                await fetch(`${API_BASE_URL}/api/pause-periods/update`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, active })
+                });
+                loadPausePeriods(); refreshPauseBanner();
+            } catch (e) { showToast('변경 실패: ' + e.message, 'error'); }
+        }
+
+        async function deletePause(pageId) {
+            if (!confirm('이 정지 기간을 삭제할까요?')) return;
+            try {
+                await fetch(`${API_BASE_URL}/api/pause-periods/update`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, archive: true })
+                });
+                showToast('삭제됨');
+                loadPausePeriods(); refreshPauseBanner();
+            } catch (e) { showToast('삭제 실패: ' + e.message, 'error'); }
         }
 
         async function markAllPresent() {
