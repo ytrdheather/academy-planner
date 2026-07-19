@@ -423,6 +423,11 @@ async function parseDailyReportData(page) {
         attendanceDays = dayRollup[0].multi_select.map(d => d.name).join('');
     }
 
+    // [신규] 학습상태 (명부 롤업) — 정상이 아니면 숙제정지·누락제외·상태배지
+    let learningStatus = '';
+    const statusRollup = props['학습상태']?.rollup?.array;
+    if (statusRollup && statusRollup[0]?.select) learningStatus = statusRollup[0].select.name;
+
     const homework = {
         attendance: props['출석']?.checkbox || false,
         absenceReason: getSimpleText(props['결석 사유']), // [신규] 결석 사유 (있으면 결석으로 간주)
@@ -539,7 +544,7 @@ async function parseDailyReportData(page) {
         writeCompleted: props['작성완료']?.checkbox === true // [신규] 코멘트 작성완료 여부
     };
 
-    return { pageId: page.id, studentName, attendanceDays, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, assignedHw, tests, listening, reading, comment };
+    return { pageId: page.id, studentName, attendanceDays, learningStatus, date: pageDate, teachers: assignedTeachers, completionRate: performanceRate, homework, assignedHw, tests, listening, reading, comment };
 }
 
 async function fetchProgressData(req, res, parseFunction) {

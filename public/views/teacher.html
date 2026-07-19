@@ -1006,6 +1006,21 @@
         // ==========================================
         function isAbsent(st) { return ((st.homework?.absenceReason) || '').trim() !== ''; }
 
+        // [학습상태 연동] 정상이 아니면 숙제정지·누락제외·상태배지
+        const STATUS_BADGE = {
+            '병결':     ['#b45309', '#fef3c7', '🤒 병결'],
+            '일시휴원': ['#475569', '#e2e8f0', '⏸️ 일시휴원'],
+            '여행휴가': ['#0369a1', '#e0f2fe', '🏖️ 여행휴가'],
+            '내신대비': ['#7e22ce', '#f3e8ff', '📚 내신대비'],
+            '휴원':     ['#475569', '#e2e8f0', '💤 휴원'],
+        };
+        function statusExcluded(st) { const s = (st.learningStatus || '').trim(); return s !== '' && s !== '정상'; }
+        function statusBadgeInfo(st) {
+            const s = (st.learningStatus || '').trim();
+            if (s === '' || s === '정상') return null;
+            return STATUS_BADGE[s] || ['#475569', '#e2e8f0', '⏸️ ' + s];
+        }
+
         function displayAttendanceHwData(data) {
             const tbody = document.getElementById('attendanceTableBody');
             if (!tbody) return;
@@ -1018,7 +1033,7 @@
             const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
             const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 숙제만 다음 등원까지 미룸(커서 되돌림)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : ''}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
+                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
@@ -1036,7 +1051,10 @@
             if (row) {
                 row.style.background = absent ? '#fff7ed' : '';
                 const slot = row.querySelector('.att-absent-badge');
-                if (slot) slot.innerHTML = absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : '';
+                if (slot) {
+                    const sInfo = statusBadgeInfo(allReportData.find(x => x.pageId === pageId) || {});
+                    slot.innerHTML = absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (sInfo ? mcBadge(...sInfo) : '');
+                }
             }
             const st = (allReportData || []).find(x => x.pageId === pageId);
             if (st && st.homework) st.homework.absenceReason = input.value;
@@ -1303,7 +1321,7 @@
                 readingTest:  { label: MISSING_LABELS.readingTest,  names: [] },
             };
             (data || []).forEach(st => {
-                if (isAbsent(st)) return; // 결석 학생은 누락 점검에서 제외
+                if (isAbsent(st) || statusExcluded(st)) return; // 결석·비정상 학습상태(휴원/여행 등)는 누락 점검에서 제외
                 const entry = { name: st.studentName, pageId: st.pageId };
                 const gClass = st.comment?.grammarClass;
                 const isGrammarTarget = gClass && !NON_GRAMMAR_CLASSES.includes(gClass);
@@ -1398,6 +1416,8 @@
 
         function buildStatusBadges(st) {
             if (isAbsent(st)) return mcBadge('#475569', '#e2e8f0', '🚫 결석'); // 결석이면 결석 배지만
+            const si = statusBadgeInfo(st); // 학습상태≠정상이면 상태 배지만(누락 배지 대신)
+            if (si) return mcBadge(si[0], si[1], si[2]);
             const gClass = st.comment?.grammarClass;
             const grammarTarget = gClass && !NON_GRAMMAR_CLASSES.includes(gClass);
 
