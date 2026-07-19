@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>진도·숙제 자동화 사용 설명서 · 리디튜드</title>
+</head>
+<body>
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3; --surface-3:#e7eeef;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --purple:#7c3aed; --purple-wash:#f2ecfd;
+    --slate:#334155;
+    --indigo:#4338ca; --indigo-wash:#eaecff;
+    --warn:#a15b06; --warn-wash:#fdf0dd; --warn-border:#f4d9b0;
+    --danger:#b3261e; --danger-wash:#fbe9e7; --danger-border:#f2cbc7;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e161b; --surface:#161f26; --surface-2:#1c272f; --surface-3:#223038;
+      --ink:#e7eef2; --ink-soft:#a7b7c2; --ink-faint:#6d7f8c;
+      --border:#243139; --border-strong:#31424c;
+      --accent:#2dd4bf; --accent-ink:#7ee7d8; --accent-wash:rgba(45,212,191,.12);
+      --purple:#a78bfa; --purple-wash:rgba(167,139,250,.13);
+      --slate:#94a3b8;
+      --indigo:#a5b4fc; --indigo-wash:rgba(129,140,248,.14);
+      --warn:#f0b657; --warn-wash:rgba(240,182,87,.12); --warn-border:rgba(240,182,87,.28);
+      --danger:#f28b82; --danger-wash:rgba(242,139,130,.12); --danger-border:rgba(242,139,130,.3);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e161b; --surface:#161f26; --surface-2:#1c272f; --surface-3:#223038;
+    --ink:#e7eef2; --ink-soft:#a7b7c2; --ink-faint:#6d7f8c;
+    --border:#243139; --border-strong:#31424c;
+    --accent:#2dd4bf; --accent-ink:#7ee7d8; --accent-wash:rgba(45,212,191,.12);
+    --purple:#a78bfa; --purple-wash:rgba(167,139,250,.13);
+    --slate:#94a3b8;
+    --indigo:#a5b4fc; --indigo-wash:rgba(129,140,248,.14);
+    --warn:#f0b657; --warn-wash:rgba(240,182,87,.12); --warn-border:rgba(240,182,87,.28);
+    --danger:#f28b82; --danger-wash:rgba(242,139,130,.12); --danger-border:rgba(242,139,130,.3);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3; --surface-3:#e7eeef;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --purple:#7c3aed; --purple-wash:#f2ecfd; --slate:#334155;
+    --indigo:#4338ca; --indigo-wash:#eaecff;
+    --warn:#a15b06; --warn-wash:#fdf0dd; --warn-border:#f4d9b0;
+    --danger:#b3261e; --danger-wash:#fbe9e7; --danger-border:#f2cbc7;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .doc{
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:
+      radial-gradient(1200px 500px at 50% -240px, var(--accent-wash), transparent 70%),
+      var(--bg);
+    color:var(--ink);
+    line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+    padding:0 20px 96px;
+    letter-spacing:-.01em;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+
+  /* ---- header ---- */
+  header.masthead{padding:64px 0 34px;text-align:center}
+  .eyebrow{
+    display:inline-block;font-size:12px;font-weight:800;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent-ink);
+    background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);
+    padding:5px 13px;border-radius:999px;margin-bottom:20px;
+  }
+  h1{
+    font-size:clamp(30px,5.4vw,42px);line-height:1.16;margin:0 0 12px;
+    font-weight:850;letter-spacing:-.03em;text-wrap:balance;
+  }
+  .lede{font-size:17px;color:var(--ink-soft);max-width:52ch;margin:0 auto;text-wrap:balance}
+
+  /* ---- summary card ---- */
+  .glance{
+    margin:34px 0 8px;background:var(--surface);border:1px solid var(--border);
+    border-radius:18px;box-shadow:var(--shadow);padding:22px 22px 8px;
+  }
+  .glance h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);
+    font-weight:800;margin:0 0 4px}
+  .glance p.sub{margin:0 0 16px;color:var(--ink-soft);font-size:14.5px}
+  .twotab{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:14px}
+  @media (max-width:560px){.twotab{grid-template-columns:1fr}}
+  .tabcard{border:1px solid var(--border);border-radius:14px;padding:15px 16px;background:var(--surface-2)}
+  .tabcard .tname{font-weight:800;font-size:16px;display:flex;align-items:center;gap:7px;margin-bottom:3px}
+  .tabcard .twhen{font-size:12.5px;font-weight:700;color:var(--accent-ink);text-transform:uppercase;letter-spacing:.05em}
+  .tabcard p{margin:6px 0 0;font-size:14px;color:var(--ink-soft)}
+
+  /* ---- phases ---- */
+  .phase{margin-top:46px}
+  .phase-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .pnum{
+    font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--accent-ink);
+    background:var(--accent-wash);border-radius:8px;padding:3px 10px;white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  .phase-head h2{font-size:24px;font-weight:820;letter-spacing:-.025em;margin:0;text-wrap:balance}
+  .phase-sub{color:var(--ink-soft);font-size:15px;margin:2px 0 20px}
+
+  /* ---- step list ---- */
+  ol.steps{list-style:none;counter-reset:s;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+  ol.steps>li{
+    position:relative;counter-increment:s;padding:16px 4px 18px 52px;
+    border-top:1px solid var(--border);
+  }
+  ol.steps>li:first-child{border-top:none}
+  ol.steps>li::before{
+    content:counter(s);position:absolute;left:0;top:14px;
+    width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+    font-size:15px;font-weight:800;color:var(--accent-ink);
+    background:var(--surface);border:1.5px solid color-mix(in srgb,var(--accent) 40%,var(--border));
+    font-variant-numeric:tabular-nums;
+  }
+  ol.steps>li .st{font-weight:750;font-size:16.5px;margin-bottom:3px;letter-spacing:-.015em}
+  ol.steps>li .sd{color:var(--ink-soft);font-size:14.7px}
+  ol.steps>li .sd b{color:var(--ink);font-weight:750}
+
+  /* ---- inline UI chips ---- */
+  .btn{display:inline-flex;align-items:center;gap:5px;font-weight:750;font-size:13.5px;
+    padding:3px 10px;border-radius:8px;white-space:nowrap;line-height:1.5;vertical-align:baseline;
+    letter-spacing:-.01em}
+  .btn-teal{background:#0d9488;color:#fff}
+  .btn-purple{background:#7c3aed;color:#fff}
+  .btn-slate{background:#334155;color:#fff}
+  .btn-indigo{background:var(--indigo-wash);color:var(--indigo);border:1px solid color-mix(in srgb,var(--indigo) 30%,transparent)}
+  .tab{display:inline-flex;align-items:center;gap:5px;font-weight:800;font-size:13.5px;
+    padding:3px 11px;border-radius:8px;background:var(--surface-3);color:var(--ink);
+    border:1px solid var(--border-strong);white-space:nowrap}
+  .field{display:inline-block;font-weight:750;font-size:13.5px;padding:2px 8px;border-radius:7px;
+    background:var(--surface-2);border:1px dashed var(--border-strong);color:var(--ink);white-space:nowrap}
+  .badge-absent{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-size:12px;
+    padding:2px 9px;border-radius:999px;background:#e2e8f0;color:#475569;white-space:nowrap}
+
+  /* ---- callouts ---- */
+  .note{margin:16px 0 4px 52px;border-radius:12px;padding:13px 15px 13px 15px;font-size:14px;
+    border:1px solid var(--border);background:var(--surface-2)}
+  @media (max-width:560px){.note{margin-left:0}}
+  .note .lbl{font-weight:800;font-size:12px;letter-spacing:.05em;text-transform:uppercase;margin-right:6px}
+  .note.tip{background:var(--accent-wash);border-color:color-mix(in srgb,var(--accent) 24%,transparent)}
+  .note.tip .lbl{color:var(--accent-ink)}
+  .note.warn{background:var(--warn-wash);border-color:var(--warn-border)}
+  .note.warn .lbl{color:var(--warn)}
+  .note b{font-weight:800}
+
+  /* ---- mode explainer (진도방식) ---- */
+  .modes{display:flex;flex-direction:column;gap:10px;margin:18px 0 4px 52px}
+  @media (max-width:560px){.modes{margin-left:0}}
+  .mode{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px}
+  .mode .k{font-weight:800;font-size:14px;color:var(--accent-ink);white-space:nowrap;
+    background:var(--accent-wash);border-radius:7px;padding:3px 9px}
+  .mode .v{font-size:14px;color:var(--ink-soft)}
+  .mode .v b{color:var(--ink);font-weight:750}
+  .mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:13px;background:var(--surface-3);padding:1px 6px;border-radius:5px}
+
+  /* ---- situation cards ---- */
+  .sits{display:flex;flex-direction:column;gap:14px;margin-top:8px}
+  .sit{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;
+    background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow)}
+  @media (max-width:560px){.sit{grid-template-columns:1fr;gap:8px}}
+  .sit .ic{font-size:24px;line-height:1;margin-top:2px}
+  .sit h3{margin:0 0 4px;font-size:17px;font-weight:800;letter-spacing:-.02em}
+  .sit p{margin:0;color:var(--ink-soft);font-size:14.7px}
+
+  /* ---- faq ---- */
+  .faq{display:flex;flex-direction:column;gap:0;margin-top:8px;
+    border:1px solid var(--border);border-radius:15px;overflow:hidden;background:var(--surface)}
+  .faq details{border-top:1px solid var(--border)}
+  .faq details:first-child{border-top:none}
+  .faq summary{cursor:pointer;list-style:none;padding:16px 20px;font-weight:750;font-size:15.5px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";color:var(--accent);font-weight:800;font-size:20px;transition:transform .2s}
+  .faq details[open] summary::after{transform:rotate(45deg)}
+  .faq summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .faq .ans{padding:0 20px 18px;color:var(--ink-soft);font-size:14.7px}
+  .faq .ans b{color:var(--ink);font-weight:750}
+
+  /* ---- flow strip ---- */
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0 4px 52px}
+  @media (max-width:560px){.flow{margin-left:0}}
+  .flow .arrow{color:var(--ink-faint);font-weight:800}
+
+  hr.div{border:none;border-top:1px solid var(--border);margin:60px 0 0}
+  footer{margin-top:26px;text-align:center;color:var(--ink-faint);font-size:13px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="doc">
+  <div class="wrap">
+
+    <header class="masthead">
+      <span class="eyebrow">리디튜드 · 진도 관리</span>
+      <h1>진도·숙제 자동화 사용 설명서</h1>
+      <p class="lede">학생별 교재만 한 번 세팅해 두면, 매일 클릭 몇 번으로 개별 숙제가 자동으로 만들어집니다. 처음 보시는 분도 순서대로 따라오시면 됩니다.</p>
+    </header>
+
+    <section class="glance">
+      <h2>먼저, 이것만 기억하세요</h2>
+      <p class="sub">진도 관리에서 쓰는 탭은 딱 두 개입니다.</p>
+      <div class="twotab">
+        <div class="tabcard">
+          <div class="tname">📈 진도 관리</div>
+          <div class="twhen">처음 한 번</div>
+          <p>학생마다 교재·시작 지점·숙제량을 설정합니다. 교재가 바뀔 때만 다시 손봅니다.</p>
+        </div>
+        <div class="tabcard">
+          <div class="tname">📋 출결·숙제</div>
+          <div class="twhen">매일</div>
+          <p>출석을 체크하고 <b>다음 숙제 생성</b> 버튼으로 그날 숙제를 만들어 내보냅니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 1 -->
+    <section class="phase">
+      <div class="phase-head"><span class="pnum">STEP 1</span><h2>학생별 교재·진도 설정</h2></div>
+      <p class="phase-sub">처음 한 번만 합니다. <span class="tab">📈 진도 관리</span> 탭에서 진행하세요.</p>
+
+      <ol class="steps">
+        <li>
+          <div class="st">상단에서 <span class="tab">📈 진도 관리</span> 탭을 클릭합니다</div>
+          <div class="sd">학생 목록이 표로 나타납니다. 위쪽 <b>담당</b> 필터에서 본인 이름을 고르면 내 학생만 볼 수 있습니다.</div>
+        </li>
+        <li>
+          <div class="st">교재를 지정합니다</div>
+          <div class="sd"><span class="field">어휘교재</span> <span class="field">주독해교재</span> <span class="field">부독해교재</span> 칸에 교재 이름 일부를 입력하면 목록이 뜹니다. 목록에서 <b>정확한 교재를 클릭</b>해 선택하세요. <b>부교재가 없는 학생은 그 칸을 비워 둡니다.</b></div>
+        </li>
+        <li>
+          <div class="st">시작 지점(유닛)을 입력합니다</div>
+          <div class="sd"><span class="field">유닛</span> 칸은 <b>다음에 풀 지점</b>입니다. 교재를 처음부터 시작하면 <b>1</b>(또는 비워 둠), 중간부터면 <b>이어서 풀 유닛 번호</b>를 넣습니다. 예: Unit 6부터면 <span class="mono">6</span>.</div>
+        </li>
+        <li>
+          <div class="st">숙제량과 방식을 정합니다</div>
+          <div class="sd"><span class="field">진도량·방식</span> 칸에 숫자(하루/등원당 개수)를 넣고 방식을 고릅니다. 아래 회색 글씨로 <b>요일별 개수 미리보기</b>가 바로 뜹니다.</div>
+          <div class="modes">
+            <div class="mode"><span class="k">등원마다</span><span class="v"><b>나올 때마다</b> 정해진 개수. 예: 등원마다 1 → 오는 날마다 1개.</span></div>
+            <div class="mode"><span class="k">매일</span><span class="v"><b>하루 1개 페이스.</b> 다음 등원까지의 날수만큼 자동 계산(일요일 제외). 예: 월수금이면 <span class="mono">월2·수2·금2</span>.</span></div>
+            <div class="mode"><span class="k">불규칙</span><span class="v">요일마다 개수를 <b>직접</b> 넣습니다. 요일칸이 펼쳐지면 각 요일에 숫자를 입력하세요.</span></div>
+          </div>
+        </li>
+        <li>
+          <div class="st">학습상태가 ‘정상’인지 확인합니다</div>
+          <div class="sd"><span class="field">학습상태</span>가 <b>정상</b>이어야 숙제가 생성됩니다. 휴원·여행 등은 그 상태로 두면 자동 제외됩니다.</div>
+        </li>
+      </ol>
+
+      <div class="note tip"><span class="lbl">팁</span>교재는 <b>과목당 하나만</b> 지정하세요. 한 칸에 여러 교재가 섞여 있으면 숙제가 엉뚱하게 나올 수 있습니다.</div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="phase">
+      <div class="phase-head"><span class="pnum">STEP 2</span><h2>매일 — 출석 체크 &amp; 숙제 생성</h2></div>
+      <p class="phase-sub">수업이 있는 날마다 반복합니다. <span class="tab">📋 출결·숙제</span> 탭에서 진행하세요.</p>
+
+      <ol class="steps">
+        <li>
+          <div class="st">상단에서 <span class="tab">📋 출결·숙제</span> 탭을 클릭합니다</div>
+          <div class="sd">그날 등원한 학생들의 표가 나옵니다. 화면 위 버튼 줄에 필요한 버튼이 모여 있습니다.</div>
+        </li>
+        <li>
+          <div class="st">출석을 체크합니다</div>
+          <div class="sd">전원 출석이면 <span class="btn btn-teal">✅ 전체 출석</span> 버튼을 누릅니다. 일부만 왔으면 학생별 <b>출석 체크박스</b>를 직접 켜세요.</div>
+        </li>
+        <li>
+          <div class="st">결석한 학생은 사유를 적습니다</div>
+          <div class="sd"><span class="field">결석사유</span> 칸에 사유(예: 여행, 병결)를 적으면 이름 옆에 <span class="badge-absent">🚫 결석</span> 배지가 <b>바로</b> 뜹니다. 이 학생은 숙제 생성에서 자동으로 빠집니다.</div>
+        </li>
+        <li>
+          <div class="st"><span class="btn btn-purple">🔮 다음 숙제 생성</span> 버튼을 누릅니다</div>
+          <div class="sd">출석한 학생들의 <b>다음 등원까지 낼 숙제</b>가 미리보기 창에 뜹니다. <b>이 시점엔 아직 저장되지 않습니다</b> — 먼저 확인하는 단계예요.</div>
+        </li>
+        <li>
+          <div class="st">문구를 확인하고 다듬습니다</div>
+          <div class="sd">학생별·과목별로 제안된 문구가 보입니다. 필요하면 <b>직접 수정</b>하거나, 내보내지 않을 항목은 <b>체크를 해제</b>합니다.</div>
+        </li>
+        <li>
+          <div class="st"><span class="btn btn-purple">✅ 확정 기록</span> 버튼을 누릅니다</div>
+          <div class="sd">이때 비로소 숙제가 학생 기록에 <b>저장</b>되고, 진도(커서)가 <b>자동으로 다음으로 넘어갑니다.</b> 학생 플래너에도 반영됩니다.</div>
+        </li>
+      </ol>
+
+      <div class="flow">
+        <span class="btn btn-teal">✅ 전체 출석</span><span class="arrow">→</span>
+        <span class="btn btn-purple">🔮 다음 숙제 생성</span><span class="arrow">→</span>
+        <span class="tab" style="border-style:dashed">확인·수정</span><span class="arrow">→</span>
+        <span class="btn btn-purple">✅ 확정 기록</span>
+      </div>
+      <div class="note tip"><span class="lbl">안심하세요</span><b>생성</b>은 미리보기일 뿐이라 눌러도 안전합니다. 실제 저장은 <b>확정 기록</b>을 눌러야만 일어납니다.</div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="phase">
+      <div class="phase-head"><span class="pnum">STEP 3</span><h2>상황별 대처</h2></div>
+      <p class="phase-sub">자주 생기는 세 가지 상황과 해결 버튼입니다.</p>
+
+      <div class="sits">
+        <div class="sit">
+          <div class="ic">↩️</div>
+          <div>
+            <h3>숙제를 안 해왔어요 — 다음으로 미루기</h3>
+            <p>안 해온 과목 숙제칸 옆의 <span class="btn btn-indigo">↩</span> 버튼을 누르세요. <b>그 과목만</b> 진도가 되돌아가, 다음 숙제 생성 때 같은 범위가 새 마감으로 다시 나옵니다. 다른 과목·다른 학생은 그대로입니다.</p>
+          </div>
+        </div>
+        <div class="sit">
+          <div class="ic">⏸️</div>
+          <div>
+            <h3>공휴일·방학 — 전체 숙제 멈추기</h3>
+            <p><span class="btn btn-slate">⏸️ 정지 관리</span> 버튼을 눌러 <b>사유·시작일·종료일</b>을 넣고 <b>추가</b>하세요. 그 기간에는 <b>다음 숙제 생성</b>을 눌러도 아무에게도 숙제가 나가지 않습니다. 연휴를 미리 여러 개 등록해 둘 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="sit">
+          <div class="ic">🚫</div>
+          <div>
+            <h3>결석 처리 — 사유만 적으면 끝</h3>
+            <p><span class="field">결석사유</span> 칸에 사유를 적는 것만으로 결석 처리됩니다. <span class="badge-absent">🚫 결석</span> 배지가 뜨고, 누락 점검에서 빠지며, 그날 숙제도 나가지 않습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="phase">
+      <div class="phase-head"><span class="pnum">도움말</span><h2>안 될 때 · 자주 묻는 것</h2></div>
+      <p class="phase-sub">막히면 대부분 아래에서 해결됩니다.</p>
+
+      <div class="faq">
+        <details open>
+          <summary>“대상 학생이 없습니다”라고 떠요</summary>
+          <div class="ans">세 가지 중 하나입니다. ① 그 학생의 <b>진도 설정</b>(교재·진도량)이 아직 안 됨 → <span class="tab">📈 진도 관리</span>에서 설정. ② <b>출석 체크</b>가 안 됨 → 출석부터 켜기. ③ 지금이 <b>숙제 정지 기간</b> → <span class="btn btn-slate">⏸️ 정지 관리</span>에서 확인.</div>
+        </details>
+        <details>
+          <summary>숙제가 엉뚱한 교재로 나와요</summary>
+          <div class="ans">한 과목 칸에 <b>교재가 여러 개</b> 물려 있을 때 생깁니다. <span class="tab">📈 진도 관리</span>에서 그 학생의 교재 칸을 <b>과목당 하나만</b> 남도록 정리하세요.</div>
+        </details>
+        <details>
+          <summary>‘유닛(커서)’이 정확히 뭔가요?</summary>
+          <div class="ans"><b>다음에 풀 지점</b>을 가리키는 숫자입니다. 확정할 때마다 자동으로 앞으로 넘어갑니다. 대부분 교재는 유닛 번호와 같으니, 중간부터 시작하는 학생은 <b>이어서 풀 유닛 번호</b>를 넣으면 됩니다.</div>
+        </details>
+        <details>
+          <summary>숙제는 자동으로 나가나요?</summary>
+          <div class="ans">아직은 <b>수동</b>입니다. 매 수업일에 <span class="btn btn-purple">🔮 다음 숙제 생성</span> → <span class="btn btn-purple">✅ 확정 기록</span>을 눌러야 나갑니다. 한 번에 여러 명이 처리돼 수기보다 훨씬 빠릅니다.</div>
+        </details>
+        <details>
+          <summary>실수로 잘못 확정했어요</summary>
+          <div class="ans">숙제 문구는 출결·숙제 표에서 <b>직접 고쳐</b> 쓸 수 있습니다. 진도(커서)를 되돌리려면 그 과목의 <span class="btn btn-indigo">↩</span> 미루기 버튼을 쓰거나, <span class="tab">📈 진도 관리</span>에서 유닛 숫자를 직접 되돌리면 됩니다.</div>
+        </details>
+      </div>
+    </section>
+
+    <hr class="div">
+    <footer>리디튜드 진도·숙제 자동화 · 선생님 사용 설명서</footer>
+
+  </div>
+</div>
+
+</body>
+</html>

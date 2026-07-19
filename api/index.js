@@ -205,6 +205,7 @@ app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'views', 'login.ht
 app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-modular.html')));
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
+app.get('/manual', (req, res) => res.sendFile(path.join(publicPath, 'views', 'manual.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
