@@ -12,6 +12,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
+import Holidays from 'date-holidays';
 
 const {
     JWT_SECRET = 'dev-only-secret-readitude-2025',
@@ -1534,24 +1535,33 @@ function parseWeeklyStr(str) {
     while ((m = re.exec(str))) map[m[1]] = Number(m[2]);
     return map;
 }
-// 특정 다음등원일(nextChar)의 마감 개수
-function deadlineQuantity(subjCfg, attendArr, nextChar) {
-    const method = subjCfg.method || '등원마다';
-    if (method === '불규칙') return parseWeeklyStr(subjCfg.weekly)[nextChar] || 0;
-    const N = Number(subjCfg.amount); if (!(N > 0)) return 0;
-    return computeWeeklyMap(method, N, attendArr)[nextChar] || 0;
+// 날짜 유틸 (UTC 정오 기준으로 타임존 영향 제거)
+function _dUTC(str) { const [Y, M, D] = str.split('-').map(Number); return new Date(Date.UTC(Y, M - 1, D, 12)); }
+function _fmtUTC(dt) { return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`; }
+// start < d <= end 범위에서 일요일만 제외한 날수 (휴일도 셈)
+function nonSundayCount(startStr, endStr) {
+    const s = _dUTC(startStr).getTime(), e = _dUTC(endStr).getTime(); let c = 0;
+    for (let t = s + 86400000; t <= e; t += 86400000) { if (new Date(t).getUTCDay() !== 0) c++; }
+    return c;
 }
-// 오늘 날짜(YYYY-MM-DD) 이후 수강요일 패턴의 다음 등원일
-function nextClassInfo(todayStr, attendArr) {
+// 다음등원일 마감 개수 (매일=오늘~다음등원일 실제 날수 기반·일요일 제외, 휴일도 셈)
+function deadlineQuantity(subjCfg, nc) {
+    const method = subjCfg.method || '등원마다';
+    if (method === '불규칙') return parseWeeklyStr(subjCfg.weekly)[nc.char] || 0;
+    const N = Number(subjCfg.amount); if (!(N > 0)) return 0;
+    if (method === '매일') return N * nc.studyDays;
+    return N; // 등원마다
+}
+// 오늘(YYYY-MM-DD) 이후 수강요일 패턴의 다음 개원일 (휴무일 건너뜀)
+function nextClassInfo(todayStr, attendArr, isHoliday) {
     if (!attendArr.length) return null;
-    const [Y, M, D] = todayStr.split('-').map(Number);
-    const base = new Date(Date.UTC(Y, M - 1, D, 12));
-    const todayNum = base.getUTCDay();
-    for (let i = 1; i <= 7; i++) {
-        const char = _DOW[(todayNum + i) % 7];
-        if (attendArr.includes(char)) {
-            const dt = new Date(base.getTime() + i * 86400000);
-            return { char, gapDays: i, label: `${char}요일(${dt.getUTCMonth() + 1}/${dt.getUTCDate()})` };
+    const base = _dUTC(todayStr);
+    for (let i = 1; i <= 28; i++) {
+        const dt = new Date(base.getTime() + i * 86400000);
+        const char = _DOW[dt.getUTCDay()];
+        const ds = _fmtUTC(dt);
+        if (attendArr.includes(char) && !(isHoliday && isHoliday(ds))) {
+            return { char, gapDays: i, dateStr: ds, studyDays: nonSundayCount(todayStr, ds), label: `${char}요일(${dt.getUTCMonth() + 1}/${dt.getUTCDate()})` };
         }
     }
     return null;
@@ -1612,6 +1622,54 @@ async function getActivePause(dateStr) {
     return null;
 }
 
+// 활성 정지기간 전체 목록 (엔진용: 정지 판정 + 마감일 휴무 건너뛰기)
+async function getActivePausePeriodList() {
+    if (!PAUSE_DB_ID) return [];
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '활성', checkbox: { equals: true } }, page_size: 100 })
+        });
+        return q.results.map(pg => {
+            const p = pg.properties;
+            const start = p['시작일']?.date?.start || null;
+            const end = p['종료일']?.date?.start || p['시작일']?.date?.end || start;
+            return start ? { start, end, reason: p['사유']?.title?.map(t => t.plain_text).join('') || '', pageId: pg.id } : null;
+        }).filter(Boolean);
+    } catch (e) { return []; }
+}
+
+// 공휴일 자동 프리필: date-holidays(KR) 공휴일을 정지 기간으로 등록(중복 제외)
+app.post('/api/prefill-holidays', requireAuth, async (req, res) => {
+    const year = Number(req.body?.year) || new Date().getFullYear();
+    if (!PAUSE_DB_ID) return res.status(500).json({ success: false, message: 'PAUSE_DB_ID 미설정' });
+    try {
+        const hd = new Holidays('KR');
+        const holidays = (hd.getHolidays(year) || []).filter(h => h.type === 'public');
+        // 기존 정지 기간 시작일 수집(중복 방지) — 페이지네이션
+        const existing = new Set();
+        let cur = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ page_size: 100 }) });
+        const collect = (r) => r.results.forEach(pg => { const s = pg.properties['시작일']?.date?.start; if (s) existing.add(s); });
+        collect(cur);
+        while (cur.has_more) { cur = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ page_size: 100, start_cursor: cur.next_cursor }) }); collect(cur); }
+        let added = 0;
+        for (const h of holidays) {
+            const ds = String(h.date || '').slice(0, 10);
+            if (!ds || existing.has(ds)) continue;
+            await fetchNotion(`https://api.notion.com/v1/pages`, {
+                method: 'POST', body: JSON.stringify({
+                    parent: { database_id: PAUSE_DB_ID }, properties: {
+                        '사유': { title: [{ text: { content: `[공휴일] ${h.name}` } }] },
+                        '시작일': { date: { start: ds } }, '종료일': { date: { start: ds } }, '활성': { checkbox: true },
+                    }
+                })
+            });
+            added++; existing.add(ds);
+            await new Promise(r => setTimeout(r, 120));
+        }
+        res.json({ success: true, added, totalHolidays: holidays.length, year });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 // 정지 기간 목록
 app.get('/api/pause-periods', requireAuth, async (req, res) => {
     try {
@@ -1664,9 +1722,11 @@ app.post('/api/pause-periods/update', requireAuth, async (req, res) => {
 app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
     try {
         const todayStr = req.body?.date || getKSTTodayRange().dateString;
-        // 전원생 숙제 정지 기간이면 아무것도 생성하지 않음
-        const pause = await getActivePause(todayStr);
-        if (pause) return res.json({ success: true, date: todayStr, paused: true, pause, students: [] });
+        // 활성 정지기간: 오늘이 정지면 전체 생성 중단, 그리고 마감일 계산 때 휴무일로 사용
+        const pausePeriods = await getActivePausePeriodList();
+        const isHoliday = (ds) => pausePeriods.some(p => ds >= p.start && ds <= p.end);
+        const pauseNow = pausePeriods.find(p => todayStr >= p.start && todayStr <= p.end);
+        if (pauseNow) return res.json({ success: true, date: todayStr, paused: true, pause: pauseNow, students: [] });
         // 오늘 일일 DB 행
         const daily = []; let sc, more = true;
         while (more) {
@@ -1702,7 +1762,7 @@ app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
             const cfg = cfgByName[name];
             if (!cfg || (cfg.status || '정상') !== '정상') continue;
             const attendArr = parseAttendDays(cfg.days);
-            const nc = nextClassInfo(todayStr, attendArr);
+            const nc = nextClassInfo(todayStr, attendArr, isHoliday);
             if (!nc) continue;
             const existing = {
                 어휘숙제: (p['어휘숙제']?.rich_text?.map(t => t.plain_text).join('') || '').trim(),
@@ -1713,7 +1773,7 @@ app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
             for (const S of PHASE4_SUBJECTS) {
                 const s2 = cfg[S.key];
                 if (!s2.bookId) continue;
-                const qty = deadlineQuantity(s2, attendArr, nc.char);
+                const qty = deadlineQuantity(s2, nc);
                 if (!(qty > 0)) continue;
                 const book = bookById[s2.bookId] || { name: s2.bookName, workbook: false, perPassage: 1, totalUnits: null };
                 const units = await getUnits(s2.bookId);
