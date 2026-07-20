@@ -1157,6 +1157,12 @@ function getReportColor(value, type) {
     return GRAY;
 }
 
+// 진도 자동화 숙제(어휘/주독해/부독해)를 학부모용 리포트에 노출할지 스위치.
+// 학생별 교재 업데이트 검증이 끝나기 전까지는 꺼둠 → 리포트엔 문법 숙제만 노출.
+// 활성화: Render 환경변수 SHOW_GENERATED_HOMEWORK=true 설정(코드 배포 불필요, 재시작만) 또는 아래 기본값을 true로.
+// ※ 문법 숙제는 이 스위치와 무관하게 항상 노출됨. 생성 엔진/저장/출결탭도 스위치와 무관하게 그대로 동작.
+const SHOW_GENERATED_HOMEWORK = process.env.SHOW_GENERATED_HOMEWORK === 'true';
+
 // [신규] 진도 자동화로 설정된 "다음 숙제"(문법/어휘/주독해/부독해) 섹션 행 HTML을 조립.
 // 데이터는 parseDailyReportData가 이미 읽어둠(comment.grammarTopic/grammarHomework, assignedHw.*).
 // 교재가 없거나 내용이 비면 그 과목은 자동 생략. 전부 비면 안내 문구 한 줄.
@@ -1188,15 +1194,17 @@ function buildHomeworkRows(parsed) {
         rows.push(rowShell('📑', '문법', inner));
     }
 
-    // 어휘 / 주독해 / 부독해: 자동생성 숙제 내용 한 줄
-    const subjectRows = [
-        ['📘', '어휘', parsed.assignedHw.vocab],
-        ['📗', '주독해', parsed.assignedHw.mainR],
-        ['📙', '부독해', parsed.assignedHw.subR],
-    ];
-    subjectRows.forEach(([icon, label, detail]) => {
-        if (meaningful(detail)) rows.push(rowShell(icon, label, escHtml(detail.trim())));
-    });
+    // 어휘 / 주독해 / 부독해: 자동생성 숙제 내용 한 줄 (스위치가 켜졌을 때만 노출)
+    if (SHOW_GENERATED_HOMEWORK) {
+        const subjectRows = [
+            ['📘', '어휘', parsed.assignedHw.vocab],
+            ['📗', '주독해', parsed.assignedHw.mainR],
+            ['📙', '부독해', parsed.assignedHw.subR],
+        ];
+        subjectRows.forEach(([icon, label, detail]) => {
+            if (meaningful(detail)) rows.push(rowShell(icon, label, escHtml(detail.trim())));
+        });
+    }
 
     if (rows.length === 0) {
         return `<div class="hw-empty">설정된 다음 숙제가 없습니다.</div>`;
