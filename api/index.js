@@ -1304,6 +1304,8 @@ async function readStudentConfigs() {
         });
         for (const page of data.results) {
             const p = page.properties;
+            const enroll = p['재원상태']?.select?.name || '';
+            if (enroll === '퇴원' || enroll === '휴원') continue; // 미재원생(퇴원·휴원)은 진도관리·생성에서 제외
             students.push({
                 pageId: page.id,
                 name: p['이름']?.title?.[0]?.plain_text || '이름없음',
