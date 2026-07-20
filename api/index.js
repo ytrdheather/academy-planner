@@ -1304,6 +1304,66 @@ cron.schedule('0 22 * * *', async () => {
     } catch (e) { console.error('Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
 
+// ------------------------------------------------------------------
+// [신규] 데일리 리포트 자동 생성 (Make 시나리오 대체)
+// 학생 명부에서 오늘 수강요일인 재원생을 골라, 학습진도 DB에
+// 이름·날짜·학생 relation만 채운 페이지를 만든다 (나머지는 롤업/수식/기본값).
+// 같은 날짜에 이미 페이지가 있는 학생은 건너뛰므로 몇 번을 실행해도 안전(멱등).
+// ------------------------------------------------------------------
+async function generateDailyReports() {
+    const { dateString } = getKSTTodayRange();
+    const todayChar = new Intl.DateTimeFormat('ko-KR', { weekday: 'short', timeZone: 'Asia/Seoul' }).format(new Date());
+    const students = (await readStudentConfigs()).filter(s => s.days.includes(todayChar));
+
+    // 오늘 날짜로 이미 생성된 페이지의 학생 relation 수집 → 중복 생성 방지
+    const existing = new Set();
+    let cursor, hasMore = true;
+    while (hasMore) {
+        const body = { filter: { property: '🕐 날짜', date: { equals: dateString } }, page_size: 100 };
+        if (cursor) body.start_cursor = cursor;
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify(body) });
+        for (const page of data.results) {
+            (page.properties['학생 명부 관리']?.relation || []).forEach(r => existing.add(r.id));
+        }
+        hasMore = data.has_more; cursor = data.next_cursor;
+    }
+
+    const created = [], skipped = [];
+    for (const st of students) {
+        if (existing.has(st.pageId)) { skipped.push(st.name); continue; }
+        await fetchNotion('https://api.notion.com/v1/pages', {
+            method: 'POST',
+            body: JSON.stringify({
+                parent: { database_id: PROGRESS_DATABASE_ID },
+                properties: {
+                    '이름': { title: [{ text: { content: st.name } }] },
+                    '🕐 날짜': { date: { start: dateString } },
+                    '학생 명부 관리': { relation: [{ id: st.pageId }] }
+                }
+            })
+        });
+        created.push(st.name);
+        await new Promise(r => setTimeout(r, 350)); // Notion 초당 3요청 제한 대응
+    }
+    dashboardCache.dailyReport.lastFetch = 0;
+    return { date: dateString, day: todayChar, created, skipped };
+}
+
+// 수동 실행용 (크론이 못 돌았을 때 복구 등)
+app.post('/api/generate-daily-reports', requireAuth, async (req, res) => {
+    try {
+        const result = await generateDailyReports();
+        res.json({ success: true, ...result });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+cron.schedule('20 10 * * *', async () => {
+    try {
+        const r = await generateDailyReports();
+        console.log(`✅ 데일리 리포트 자동 생성: ${r.date}(${r.day}) 신규 ${r.created.length}명, 기존 ${r.skipped.length}명`);
+    } catch (e) { console.error('데일리 리포트 생성 Cron Error', e); }
+}, { timezone: "Asia/Seoul" });
+
 // [신규] 코멘트 작성완료 체크/해제 + 작성완료시각 기록
 // completed=true  → 작성완료=true, 작성완료시각=현재 한국시간
 // completed=false → 작성완료=false, 작성완료시각=비움 (되돌리기)
