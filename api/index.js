@@ -1224,6 +1224,8 @@ app.get('/report', async (req, res) => {
         const formatTestScore = (val) => {
             if (val === '시험 보지 않음') return val;
             if (val === 0 || val === null) return '없음';
+            const num = Number(val);
+            if (!isNaN(num)) return Math.round(num) + '점'; // 공식값이 58.333… 같은 소수로 와도 정수로 반올림
             return val + '점';
         };
 
