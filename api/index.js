@@ -576,6 +576,26 @@ async function fetchProgressData(req, res, parseFunction) {
     return await Promise.all(pages.map(parseFunction));
 }
 
+// 학생 명부에서 이름→학습상태 맵만 가볍게 읽어오기 (일일행에는 학습상태가 없어 조인용)
+async function readStudentStatusMap(nameFilter) {
+    const map = {};
+    let cursor = undefined, hasMore = true;
+    while (hasMore) {
+        const body = { page_size: 100 };
+        if (cursor) body.start_cursor = cursor;
+        if (nameFilter) body.filter = { property: '이름', title: { equals: nameFilter } };
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST', body: JSON.stringify(body)
+        });
+        for (const page of data.results) {
+            const name = page.properties['이름']?.title?.[0]?.plain_text || '';
+            if (name) map[name] = page.properties['학습상태']?.select?.name || '';
+        }
+        hasMore = data.has_more; cursor = data.next_cursor;
+    }
+    return map;
+}
+
 app.get('/api/daily-report-data', requireAuth, async (req, res) => {
     try {
         const { date, force } = req.query;
@@ -588,7 +608,13 @@ app.get('/api/daily-report-data', requireAuth, async (req, res) => {
         }
 
         const data = await fetchProgressData(req, res, parseDailyReportData);
-        
+
+        // 일일행에는 학습상태가 없으므로 명부에서 이름으로 조인 (병결/여행휴가/휴원 등 배지·누락점검 제외용)
+        try {
+            const statusMap = await readStudentStatusMap();
+            data.forEach(st => { st.learningStatus = statusMap[st.studentName] || ''; });
+        } catch (e) { console.error('학습상태 조인 실패:', e.message); }
+
         // 새로 가져온 데이터 캐싱 저장
         dashboardCache.dailyReport = { data, lastFetch: Date.now(), date: targetDate };
         
@@ -603,6 +629,10 @@ app.get('/api/single-student-report', requireAuth, async (req, res) => {
     try {
         const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
         const parsedData = await parseDailyReportData(page);
+        try {
+            const statusMap = await readStudentStatusMap(parsedData.studentName);
+            parsedData.learningStatus = statusMap[parsedData.studentName] || '';
+        } catch (e) { console.error('학습상태 조인 실패(단건):', e.message); }
         res.json({ success: true, data: parsedData });
     } catch (error) {
         console.error('Single fetch error:', error);
@@ -1127,6 +1157,53 @@ function getReportColor(value, type) {
     return GRAY;
 }
 
+// [신규] 진도 자동화로 설정된 "다음 숙제"(문법/어휘/주독해/부독해) 섹션 행 HTML을 조립.
+// 데이터는 parseDailyReportData가 이미 읽어둠(comment.grammarTopic/grammarHomework, assignedHw.*).
+// 교재가 없거나 내용이 비면 그 과목은 자동 생략. 전부 비면 안내 문구 한 줄.
+function buildHomeworkRows(parsed) {
+    const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const PLACEHOLDERS = ['없음', '숙제 내용 없음', '진도 해당 없음', '해당 없음', 'N/A'];
+    const meaningful = (v) => {
+        const c = (v || '').trim();
+        return c && !PLACEHOLDERS.includes(c);
+    };
+
+    const rowShell = (icon, label, inner) => `
+                <div class="hw-row">
+                    <span class="hw-k">${icon} ${label}</span>
+                    <div class="hw-v">${inner}</div>
+                </div>`;
+
+    const rows = [];
+
+    // 문법: 진도(오늘 문법 진도) + 숙제 내용 두 줄
+    const gTopic = parsed.comment.grammarTopic;
+    const gDetail = parsed.comment.grammarHomework;
+    if (meaningful(gTopic) || meaningful(gDetail)) {
+        const line = (labelTxt, val) =>
+            `<div class="hw-line"><span class="hw-sub">${labelTxt}</span><span>${escHtml(val.trim())}</span></div>`;
+        let inner = '';
+        if (meaningful(gTopic)) inner += line('진도', gTopic);
+        if (meaningful(gDetail)) inner += line('숙제', gDetail);
+        rows.push(rowShell('📑', '문법', inner));
+    }
+
+    // 어휘 / 주독해 / 부독해: 자동생성 숙제 내용 한 줄
+    const subjectRows = [
+        ['📘', '어휘', parsed.assignedHw.vocab],
+        ['📗', '주독해', parsed.assignedHw.mainR],
+        ['📙', '부독해', parsed.assignedHw.subR],
+    ];
+    subjectRows.forEach(([icon, label, detail]) => {
+        if (meaningful(detail)) rows.push(rowShell(icon, label, escHtml(detail.trim())));
+    });
+
+    if (rows.length === 0) {
+        return `<div class="hw-empty">설정된 다음 숙제가 없습니다.</div>`;
+    }
+    return rows.join('\n');
+}
+
 app.get('/report', async (req, res) => {
     const { pageId, date } = req.query;
     if (!pageId) return res.status(400).send('Missing info');
@@ -1161,8 +1238,9 @@ app.get('/report', async (req, res) => {
             '{{HW_VOCAB_STATUS}}': parsed.homework.vocabCards, '{{HW_VOCAB_COLOR}}': getReportColor(parsed.homework.vocabCards, 'hw_detail'),
             '{{HW_READING_CARD_STATUS}}': parsed.homework.readingCards, '{{HW_READING_CARD_COLOR}}': getReportColor(parsed.homework.readingCards, 'hw_detail'),
             '{{HW_SUMMARY_STATUS}}': parsed.homework.summary, '{{HW_SUMMARY_COLOR}}': getReportColor(parsed.homework.summary, 'hw_detail'),
+            '{{HW_DAILY_READING_STATUS}}': parsed.homework.dailyReading, '{{HW_DAILY_READING_COLOR}}': getReportColor(parsed.homework.dailyReading, 'hw_detail'),
             '{{HW_DIARY_STATUS}}': parsed.homework.diary, '{{HW_DIARY_COLOR}}': getReportColor(parsed.homework.diary, 'hw_detail'),
-            '{{GRAMMAR_CLASS_TOPIC}}': parsed.comment.grammarTopic, '{{GRAMMAR_HW_DETAIL}}': parsed.comment.grammarHomework,
+            '{{HOMEWORK_ROWS}}': buildHomeworkRows(parsed),
             '{{BOOK_TITLE}}': bookTitleStr, '{{BOOK_LEVEL}}': (parsed.reading.bookAR || parsed.reading.bookLexile) ? `${parsed.reading.bookAR || 'N/A'} / ${parsed.reading.bookLexile || 'N/A'}` : 'N/A',
             '{{WRITING_STATUS}}': parsed.reading.writingStatus, '{{RD_CHECK_POINT_SCORE}}': parsed.completionRate !== null ? parsed.completionRate : '없음'
         };
