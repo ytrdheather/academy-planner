@@ -138,12 +138,25 @@
             const contentArea = document.getElementById('contentArea');
             let html = '';
 
+            // 오늘(KST) 날짜 — '지난 시간'은 오늘 이전의 가장 최근 부여일로 판단 (오늘 갓 입력한 숙제는 제외)
+            const kstToday = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+
             Object.keys(grouped).sort().forEach(className => {
                 const classRecords = grouped[className];
 
-                // 날짜+숙제 내용이 같은 것은 하나로 합쳐서 부여일 목록 생성
+                // [지난 시간만 보기] 숙제가 부여된 날짜들 중 '오늘 이전'의 가장 최근 날짜 하나만 선택
+                const hwDates = [...new Set(
+                    classRecords.filter(r => r.homework && r.homework !== '-' && r.date).map(r => r.date)
+                )].sort();
+                const pastDates = hwDates.filter(d => d < kstToday);
+                const latestDate = (pastDates.length ? pastDates : hwDates).slice(-1)[0] || null;
+
+                // 마지막 수업(부여일) 행만 남김
+                const shownRecords = latestDate ? classRecords.filter(r => r.date === latestDate) : classRecords;
+
+                // 날짜+숙제 내용이 같은 것은 하나로 합쳐서 부여일 목록 생성 (선택된 날짜 것만)
                 const hwMap = new Map();
-                classRecords.forEach(r => {
+                shownRecords.forEach(r => {
                     if (r.homework && r.homework !== '-') {
                         const key = r.date + '||' + r.homework;
                         if (!hwMap.has(key)) hwMap.set(key, { date: r.date, homework: r.homework });
@@ -191,7 +204,7 @@
                         <tbody>
                 `;
 
-                classRecords.forEach(r => {
+                shownRecords.forEach(r => {
                     const testVal = (r.test && r.test !== '-') ? r.test.replace(/"/g, '&quot;') : '';
                     const testInput = `<input list="grammarTagList" value="${testVal}" data-pid="${r.pageId}" onchange="saveTest(this)" placeholder="태그 입력 (여러 개는 쉼표로)" style="width:100%; border:1px solid #d8b4fe; border-radius:6px; padding:5px 8px; font-size:13px;">`;
                     const dateHtml = r.date ? `<span style="color:#6b46c1; font-weight:600; font-size:13px;">${r.date}</span>` : '<span class="text-gray-400">-</span>';
