@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>리디튜드 학습 플래너 - 로그인</title>
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
     <style>
-        * { font-family: "NanumSquareRound", sans-serif !important; }
-        body { background: #f7fafc; color: #2d3748; margin: 0; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-container { max-width: 400px; width: 100%; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-        h1 { text-align: center; color: #6b46c1; margin-bottom: 30px; font-size: 28px; font-weight: 700; }
+        * { font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, -apple-system, "Segoe UI", sans-serif; }
+        body { background: radial-gradient(1200px 600px at 50% -220px, #d7ede8, transparent 70%), #eef3f3; color: #17242e; margin: 0; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; letter-spacing: -.01em; }
+        .login-container { max-width: 400px; width: 100%; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 1px 2px rgba(20,40,55,.05), 0 20px 50px rgba(20,40,55,.12); border: 1px solid #e0e8ea; }
+        h1 { text-align: center; color: #0a6c62; margin-bottom: 30px; font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
         .input-group { margin-bottom: 20px; }
-        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #495057; }
-        .input-group input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; box-sizing: border-box; font-size: 16px; transition: all 0.3s ease; background: #f8fafc; }
-        .input-group input:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1); }
-        .login-button { width: 100%; padding: 14px; border: none; background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: 600; margin-top: 10px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3); }
-        .login-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4); }
-        .error-message { color: #dc3545; text-align: center; margin-top: 15px; padding: 10px; background-color: #f8d7da; border-radius: 6px; display: none; }
+        .input-group label { display: block; font-weight: 700; margin-bottom: 8px; color: #485a68; }
+        .input-group input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid #cdd9db; box-sizing: border-box; font-size: 16px; transition: all 0.3s ease; background: #f4f7f7; }
+        .input-group input:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12); background: #fff; }
+        .login-button { width: 100%; padding: 14px; border: none; background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); color: white; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: 700; margin-top: 10px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.28); }
+        .login-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(13, 148, 136, 0.38); }
+        .error-message { color: #b3261e; text-align: center; margin-top: 15px; padding: 10px; background-color: #fbe9e7; border-radius: 8px; display: none; }
         .logo { text-align: center; margin-bottom: 20px; }
     </style>
 </head>
@@ -39,7 +39,10 @@
         </form>
         <div id="errorMessage" class="error-message"></div>
         <div style="text-align: center; margin-top: 30px; color: #6c757d; font-size: 14px;">
-            <a href="/teacher-login" style="color: #0056b3; text-decoration: none;">선생님 로그인</a>
+            <a href="/teacher-login" style="color: #0a6c62; text-decoration: none; font-weight: 600;">선생님 로그인</a>
+        </div>
+        <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #edf0f4; text-align: center;">
+            <img src="/assets/readiplan-logo.svg" alt="리디플랜" style="width: 220px; height: auto; opacity: 0.92;">
         </div>
     </div>
 
