@@ -178,6 +178,7 @@
       <div class="switch" role="tablist">
         <button class="sw active" onclick="showGuide('jindo',this)">📈 진도·숙제 자동화</button>
         <button class="sw" onclick="showGuide('grammar',this)">📚 문법숙제 업데이트</button>
+        <button class="sw" onclick="showGuide('missing',this)">⚠️ 누락 점검</button>
       </div>
     </header>
 
@@ -373,6 +374,96 @@
         </div>
       </section>
     </div><!-- /guide-grammar -->
+
+    <!-- ============ 가이드 C : 누락 점검 ============ -->
+    <div id="guide-missing" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">누락 점검은 <b>“오늘 온 학생, 결과가 다 입력됐나”</b>를 자동으로 훑어 주는 하원 전 체크리스트입니다.</p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">⚠️ 누락 점검 바</div>
+            <div class="twhen">화면 맨 위 · 항상</div>
+            <p>주황색 바에 <b>빠진 항목과 인원</b>이 뜹니다. 어느 탭에 있어도 보이고, 입력하면 실시간으로 숫자가 줄어듭니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">🎯 목표</div>
+            <div class="twhen">수업이 끝나기 전</div>
+            <p>학생들이 하원하기 전에 <b>✅ 누락 없음</b>이 뜨도록 빈 항목을 모두 채웁니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>누락 점검 바 읽는 법</h2></div>
+        <p class="phase-sub">화면 맨 위 주황색 <b>⚠️ 누락 점검</b> 바를 봅니다. 점검 항목은 네 가지예요.</p>
+        <div class="modes">
+          <div class="mode"><span class="k" style="background:#fee2e2;color:#b91c1c">문법숙제</span><span class="v"><b>지난 문법 숙제를 검사</b>했는지. <b>문법 대상 학생만</b> 봅니다.</span></div>
+          <div class="mode"><span class="k" style="background:#f3e8ff;color:#7e22ce">문법점수</span><span class="v"><b>문법 시험 점수</b>가 들어갔는지. <b>문법 대상 학생만</b> 봅니다.</span></div>
+          <div class="mode"><span class="k" style="background:#ffedd5;color:#ea580c">단어점수</span><span class="v"><b>단어 시험 결과</b>가 들어갔는지. <b>전체 학생</b> 공통.</span></div>
+          <div class="mode"><span class="k" style="background:#fef9c3;color:#ca8a04">독해테스트</span><span class="v"><b>독해 시험 결과</b>가 들어갔는지. <b>전체 학생</b> 공통.</span></div>
+        </div>
+        <ol class="steps">
+          <li><div class="st">칩의 숫자 = 그 항목이 빠진 <b>인원 수</b>입니다</div>
+            <div class="sd">예를 들어 <span style="display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:999px;padding:1px 9px;font-weight:700;font-size:12px">문법숙제 3</span>이면, 문법숙제 검사가 안 된 학생이 <b>3명</b>이라는 뜻입니다.</div></li>
+          <li><div class="st">칩을 <b>클릭</b>하면 누구인지 이름이 펼쳐집니다</div>
+            <div class="sd">빠진 학생이 바로 목록으로 나오니, 그 학생만 골라 채우면 됩니다. 다시 누르면 접힙니다.</div></li>
+          <li><div class="st">학생 이름 옆 <b>배지</b>로도 한눈에 보입니다</div>
+            <div class="sd"><span style="display:inline-block;background:#dcfce7;color:#15803d;border-radius:999px;padding:1px 8px;font-weight:800;font-size:11px">✅ DONE!</span> 다 입력됨 &nbsp;·&nbsp; <span style="display:inline-block;background:#f1f5f9;color:#64748b;border-radius:999px;padding:1px 8px;font-weight:800;font-size:11px">미입력</span> 대상 항목이 전부 빔 &nbsp;·&nbsp; 일부만 비면 <b>빠진 항목 배지</b>(문법숙제·문법점수·독해·단어)가 색깔로 붙습니다.</div></li>
+          <li><div class="st">전부 채워지면 <b style="color:#16a34a">✅ 누락 없음</b>이 뜹니다</div>
+            <div class="sd">이 초록 글씨가 뜨면 그날 점검 끝. 하원 전 이걸 목표로 하세요.</div></li>
+        </ol>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>무엇을 채워야 ‘입력됨’으로 인정되나</h2></div>
+        <p class="phase-sub">항목마다 <b>채워야 하는 칸</b>이 정해져 있습니다. 대부분 <span class="tab">테스트 결과</span> 탭에서 입력하세요.</p>
+        <ol class="steps">
+          <li><div class="st">문법숙제 — 검사 상태를 <b>찍습니다</b></div>
+            <div class="sd">숙제 표의 <span class="field">📕 문법숙제</span> 칸을 눌러 <b>숙제 함</b> 또는 <b>안 해옴</b>으로 바꿉니다. <b>‘숙제 없음’이거나 아직 안 찍었으면 누락으로 남습니다.</b> (안 해왔더라도 ‘안 해옴’으로 찍으면 점검은 완료된 것)</div></li>
+          <li><div class="st">단어점수 — <span class="field">어휘정답</span> · <span class="field">총갯수</span>를 넣습니다</div>
+            <div class="sd"><span class="tab">테스트 결과</span> 탭에서 맞은 개수와 총 개수를 넣으면 <b>어휘점수</b>가 자동 계산되고 누락에서 빠집니다.</div></li>
+          <li><div class="st">독해테스트 — <span class="field">독해오답</span> 개수를 넣습니다</div>
+            <div class="sd">오답 개수를 넣으면 됩니다. <b>다 맞아 0개여도 반드시 0으로 입력</b>하세요 — 그래야 ‘시험 봄’으로 인정됩니다.</div></li>
+          <li><div class="st">문법점수 — <span class="field">문법문항</span> · <span class="field">문법오답</span>을 넣습니다</div>
+            <div class="sd">문항 수와 오답 수를 넣으면 <b>문법점수</b>가 계산되어 채워집니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">가장 중요</span><b>‘0’과 ‘빈칸’은 다릅니다.</b> 시험을 <b>안 봤어도</b> 결과 칸을 <b>0으로 입력</b>하면 ‘확인함’으로 처리되어 누락에서 빠집니다. 반대로 <b>빈칸으로 두면</b> 시스템은 “아직 확인 안 함”으로 보고 계속 누락으로 띄웁니다. 시험을 안 본 학생도 <b>0으로 표시</b>해 주세요.</div>
+        <div class="note tip"><span class="lbl">왜 이렇게 하나요</span>점수(%)는 칸이 비어도 자동으로 0%처럼 계산돼 버립니다. 그래서 시스템은 점수가 아니라 <b>실제로 개수 칸을 채웠는지</b>로 판정합니다. “진짜 확인한 0점”과 “아직 입력 안 한 빈칸”을 구분하기 위해서예요.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>점검에서 빠지는 학생 · 대상 구분</h2></div>
+        <p class="phase-sub">모든 학생이 네 항목을 다 점검받는 건 아닙니다.</p>
+        <div class="sits">
+          <div class="sit"><div class="ic">🚫</div><div>
+            <h3>결석 — 사유를 적으면 통째로 제외</h3>
+            <p><span class="field">결석사유</span>를 적은 학생은 <span class="badge-absent">🚫 결석</span> 배지가 붙고 <b>네 항목 모두 점검에서 빠집니다.</b></p></div></div>
+          <div class="sit"><div class="ic">⏸️</div><div>
+            <h3>학습상태가 ‘정상’이 아니면 제외</h3>
+            <p>병결·일시휴원·여행휴가·내신대비·휴원 등 <b>학습상태가 ‘정상’이 아닌</b> 학생은 상태 배지만 붙고 점검 대상에서 빠집니다.</p></div></div>
+          <div class="sit"><div class="ic">📚</div><div>
+            <h3>문법 비대상 학생 — 단어·독해만 점검</h3>
+            <p>문법반이 없거나 <span class="mono">NN · P2 · 진도 해당 없음</span>인 학생은 <b>문법숙제·문법점수는 점검하지 않고</b> 단어·독해만 봅니다. 이 학생들에게 문법 배지가 안 떠도 정상입니다.</p></div></div>
+        </div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">도움말</span><h2>자주 묻는 것</h2></div>
+        <p class="phase-sub">막히면 대부분 아래에서 해결됩니다.</p>
+        <div class="faq">
+          <details open><summary>시험을 안 본 학생은 어떻게 하나요?</summary>
+            <div class="ans">결과 칸을 <b>0으로 입력</b>하세요. 빈칸으로 두면 계속 누락으로 뜹니다. 문법숙제는 상황에 맞게 <b>‘숙제 함’ 또는 ‘안 해옴’</b>으로 찍으면 점검이 완료됩니다.</div></details>
+          <details><summary>다 입력한 것 같은데 아직 누락으로 떠요</summary>
+            <div class="ans">① 개수 칸(<b>어휘정답·총갯수 / 독해오답 / 문법문항·오답</b>)이 실제로 채워졌는지, ② 문법숙제가 <b>숙제 함/안 해옴</b>으로 찍혔는지 확인하세요. 그래도 남으면 <b>🔄 전체 새로고침</b>을 한 번 눌러 보세요.</div></details>
+          <details><summary>결석 처리했는데도 누락에 이름이 있어요</summary>
+            <div class="ans"><span class="field">결석사유</span>가 실제로 저장됐는지 확인하세요. 사유 칸이 비어 있으면 결석으로 인식되지 않아 계속 점검 대상입니다.</div></details>
+          <details><summary>어떤 학생은 문법 항목이 아예 안 떠요</summary>
+            <div class="ans">그 학생이 <b>문법 비대상</b>(문법반 없음, 또는 NN·P2·진도 해당 없음)이라 정상입니다. 이 학생들은 단어·독해만 점검합니다.</div></details>
+        </div>
+      </section>
+    </div><!-- /guide-missing -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>
