@@ -726,12 +726,14 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
             return res.json({ success: true, data: dashboardCache.pastGrammar.data });
         }
 
-        const { start: kstTodayStr } = getKSTTodayRange();
-        const today = new Date(kstTodayStr);
-        const end = today.toISOString().split('T')[0];
+        // [수정] getKSTTodayRange().start는 KST 자정의 UTC 값(=하루 전 15:00Z)이라
+        //        .split('T')[0]하면 오늘이 아니라 어제가 나오는 버그가 있었음. dateString(KST 오늘)을 기준으로 계산.
+        const { dateString: kstTodayStr } = getKSTTodayRange();
+        const end = kstTodayStr;
 
-        const sevenDaysAgo = new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000);
-        const start = sevenDaysAgo.toISOString().split('T')[0];
+        const startDate = new Date(`${kstTodayStr}T00:00:00.000Z`);
+        startDate.setUTCDate(startDate.getUTCDate() - 8);
+        const start = startDate.toISOString().split('T')[0];
 
         const filter = {
             and: [
@@ -739,12 +741,24 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
                 { property: '🕐 날짜', date: { on_or_before: end } }
             ]
         };
-        
-        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-            method: 'POST',
-            body: JSON.stringify({ filter, sorts: [{ property: '🕐 날짜', direction: 'descending' }], page_size: 100 })
-        });
-        
+
+        // [수정] 노션은 1회 최대 100건만 반환. 이전엔 page_size:100 단일 호출이라
+        //        내림차순 정렬상 최신(월수금) 날짜가 100건을 채우고 화·목 등 오래된 날짜가 잘려나갔음.
+        //        has_more/next_cursor로 전량 수집하도록 페이지네이션 추가.
+        const allResults = [];
+        let startCursor = undefined;
+        let hasMore = true;
+        while (hasMore) {
+            const page = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({ filter, sorts: [{ property: '🕐 날짜', direction: 'descending' }], page_size: 100, start_cursor: startCursor })
+            });
+            allResults.push(...page.results);
+            hasMore = page.has_more;
+            startCursor = page.next_cursor;
+        }
+        const query = { results: allResults };
+
         const records = query.results.map(page => {
             const props = page.properties;
             
