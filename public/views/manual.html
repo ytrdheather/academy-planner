@@ -73,7 +73,7 @@
   h1{font-size:clamp(30px,5.4vw,42px);line-height:1.16;margin:0 0 12px;font-weight:850;letter-spacing:-.03em;text-wrap:balance}
   .lede{font-size:17px;color:var(--ink-soft);max-width:52ch;margin:0 auto;text-wrap:balance}
 
-  .switch{display:inline-flex;gap:4px;margin-top:26px;padding:5px;border-radius:14px;
+  .switch{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:26px;padding:5px;border-radius:14px;
     background:var(--surface-2);border:1px solid var(--border)}
   .switch .sw{font-family:inherit;font-size:14.5px;font-weight:750;cursor:pointer;border:none;background:transparent;
     color:var(--ink-soft);padding:9px 18px;border-radius:10px;letter-spacing:-.01em;transition:background .15s,color .15s;white-space:nowrap}
@@ -176,14 +176,124 @@
       <h1>사용 설명서</h1>
       <p class="lede">필요한 안내를 골라 보세요. 처음 보시는 분도 순서대로 따라 하시면 됩니다.</p>
       <div class="switch" role="tablist">
-        <button class="sw active" onclick="showGuide('jindo',this)">📈 진도·숙제 자동화</button>
+        <button class="sw active" onclick="showGuide('flow',this)">🧭 하루 학습 플로우</button>
+        <button class="sw" onclick="showGuide('jindo',this)">📈 진도·숙제 자동화</button>
         <button class="sw" onclick="showGuide('grammar',this)">📚 문법숙제 업데이트</button>
         <button class="sw" onclick="showGuide('missing',this)">⚠️ 누락 점검</button>
       </div>
     </header>
 
+    <!-- ============ 가이드 · 하루 학습 플로우 ============ -->
+    <div id="guide-flow" class="guide">
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">학생들이 매일 <b>같은 순서</b>로 학습하도록 옆에서 챙겨 주세요. 선생님은 각 단계가 <b>제대로 됐는지 확인·도장·사인</b>하는 역할입니다.</p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">🔁 학생의 하루</div>
+            <div class="twhen">입장 → 마무리</div>
+            <p>출결·수행도 → 채점·오답노트 → 단어·독해 시험 → 문법/독서 → 결과 입력 순서로 진행합니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">👀 선생님 역할</div>
+            <div class="twhen">단계마다</div>
+            <p>넘어가기 전에 <b>확인 도장·사인</b>을 주고, 마지막엔 <b>⚠️ 누락 점검</b>으로 빠진 결과가 없는지 마감합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="flow" style="margin-left:0">
+        <span class="tab">🕘 출결·수행도</span><span class="arrow">→</span>
+        <span class="tab">✍️ 채점·오답노트</span><span class="arrow">→</span>
+        <span class="tab">📝 단어·독해 시험</span><span class="arrow">→</span>
+        <span class="tab">📚 문법 / 독서</span><span class="arrow">→</span>
+        <span class="tab">✅ 결과 입력·귀가</span>
+      </div>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>입장 — 출결 체크 &amp; 수행도 업데이트</h2></div>
+        <p class="phase-sub">학생이 도착하면 가장 먼저 하는 두 가지입니다.</p>
+        <ol class="steps">
+          <li><div class="st">들어오면 <b>반드시 출결 체크</b>를 하도록 합니다</div>
+            <div class="sd">학생이 직접 <span class="field">출결 체크</span>를 눌렀는지 <b>선생님이 확인</b>하세요. 안 한 학생은 그 자리에서 하도록 챙깁니다.</div></li>
+          <li><div class="st"><span class="field">학생 플래너</span>에서 <b>숙제 수행도</b>를 업데이트합니다</div>
+            <div class="sd">모든 학생은 자리에 앉기 전, 플래너 사이트에 들어가 오늘까지의 <b>숙제 수행도</b>를 스스로 갱신합니다.</div></li>
+        </ol>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>숙제 채점 &amp; 오답노트</h2></div>
+        <p class="phase-sub">채점하고, 오답노트를 <b>규칙대로</b> 쓴 뒤 확인을 받습니다.</p>
+        <ol class="steps">
+          <li><div class="st">숙제를 <b>서로 바꿔서</b> 채점합니다</div>
+            <div class="sd">학생들끼리 답안을 교환해 채점하도록 안내합니다.</div></li>
+          <li><div class="st">틀린 문제는 <b>오답노트</b>를 작성합니다</div>
+            <div class="sd">정답과 함께 <b>왜 틀렸는지 오답 이유</b>까지 씁니다.</div></li>
+          <li><div class="st">원래 답은 <b>절대 지우지 않습니다</b></div>
+            <div class="sd">처음 쓴 답은 그대로 두고, <b>다른 색 펜(빨강·파랑 등)</b>으로 2차 답을 씁니다. 또 틀리면 <b>또 다른 색 펜</b>으로 고칩니다. <b>원래 답은 끝까지 남겨 둡니다.</b></div></li>
+          <li><div class="st">담당 선생님에게 <b>확인 도장 + 사인</b>을 받습니다</div>
+            <div class="sd">오답노트가 끝나면 담당 선생님이 확인하고 도장·사인을 줍니다. <b>문법 숙제는 오답을 빠짐없이 다 썼는지 반드시 확인</b>하세요.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>사인을 받지 않으면 <b>확인이 끝난 것으로 인정하지 않아 ‘숙제 미완료’로 처리</b>됩니다. 학생이 사인을 꼭 받고 넘어가도록 챙겨 주세요.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>단어 &amp; 독해 시험</h2></div>
+        <p class="phase-sub">오답 수정을 <b>모두 마친 뒤</b> 시험을 봅니다.</p>
+        <ol class="steps">
+          <li><div class="st">시험지에 <b>아무것도 안 써 있는지</b> 확인 도장을 받습니다</div>
+            <div class="sd">시험지를 보기 <b>전</b>, TA 선생님이나 담당 선생님에게 <b>백지 확인 도장</b>을 받고 시작합니다.</div></li>
+          <li><div class="st"><b>랩실 큰 테이블</b>에서 시험을 봅니다</div>
+            <div class="sd">자기 자리에서 보지 않도록 단속하고, 반드시 랩실의 큰 테이블에서 보도록 합니다.</div></li>
+          <li><div class="st">다 본 시험지는 <b>선생님에게 채점</b>받습니다</div>
+            <div class="sd">TA·담당 선생님이 채점합니다.</div></li>
+          <li><div class="st">재시험 규칙을 적용합니다</div>
+            <div class="sd"><b>독해</b> — 틀린 것은 <b>모두 고치게</b> 합니다. <b>단어</b> — <b>5개 이상 틀리면 2차 시험</b>, 2차도 다 맞히지 못하면 <b>다 맞을 때까지 3차</b>를 봅니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">단속 포인트</span>시험 전 <b>백지 확인</b>과 <b>랩실 큰 테이블 착석</b> 두 가지를 꼭 지켜 주세요.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 4</span><h2>문법 수업 또는 독서</h2></div>
+        <p class="phase-sub">재시험까지 모두 끝낸 학생은 다음으로 넘어갑니다.</p>
+        <div class="sits">
+          <div class="sit"><div class="ic">📚</div><div>
+            <h3>문법반 학생 — 문법 수업</h3>
+            <p>문법 수업을 듣는 학생은 문법 교실로 들어갑니다.</p></div></div>
+          <div class="sit"><div class="ic">📖</div><div>
+            <h3>그 외 학생 — 독서 시작</h3>
+            <p>문법을 듣지 않는 학생은 독서를 시작합니다. <b>독서는 주 2회 이상</b> 하도록 챙겨 주세요.</p></div></div>
+        </div>
+        <div class="note tip"><span class="lbl">초등생 클래스5</span>초등학생은 <b>클래스5를 꼭</b> 하고 가되, <b>15분을 넘기지 않도록</b> 해주세요. 클래스5에 시간을 다 써서 <b>독서를 못 하고 가는 일이 없도록</b> — 독서가 우선입니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 5</span><h2>마무리 — 결과 입력 · 누락 점검 · 귀가</h2></div>
+        <p class="phase-sub">모든 과정을 끝낸 학생은 오늘 결과를 남기고 귀가합니다.</p>
+        <ol class="steps">
+          <li><div class="st">플래너에 <b>오늘 학습 결과</b>를 입력합니다</div>
+            <div class="sd"><b>독해·단어</b>는 정해진 갯수가 있으니 <b>총 갯수와 틀린 갯수</b>를 넣습니다. <b>문법</b>은 — <b>시험을 본 날은 시험 결과</b>를 입력하고, <b>시험이 없는 날은 숙제 문제의 총 갯수를 세어 그중 틀린 갯수</b>를 적도록 안내합니다.</div></li>
+          <li><div class="st"><span class="tab">⚠️ 누락 점검</span>으로 빠진 게 없는지 확인합니다</div>
+            <div class="sd">점수·숙제 결과가 <b>누락된 채 귀가하지 않도록</b> 반드시 확인하세요. 자세한 방법은 위 탭의 <b>‘누락 점검’ 가이드</b>를 참고하세요.</div></li>
+          <li><div class="st">귀가할 때 <b>출석 체크</b>를 누르게 합니다</div>
+            <div class="sd">집에 갈 때도 <span class="field">출석 체크</span>를 반드시 누르고 가도록 당부해 주세요.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">가장 중요</span>학생이 하원하기 전에 <b>⚠️ 누락 점검이 ‘✅ 누락 없음’</b>인지 꼭 확인하세요. 결과를 빠뜨리고 귀가하면 그날 기록이 비게 됩니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">참고</span><h2>파닉스반</h2></div>
+        <div class="sits">
+          <div class="sit"><div class="ic">🔤</div><div>
+            <h3>파닉스반은 사이클이 다릅니다</h3>
+            <p>파닉스반 학생의 학습 사이클은 위 흐름과 다를 수 있습니다. <b>담당 선생님에게 확인</b>해서 안내해 주세요.</p></div></div>
+        </div>
+      </section>
+    </div><!-- /guide-flow -->
+
     <!-- ============ 가이드 A : 진도·숙제 자동화 ============ -->
-    <div id="guide-jindo" class="guide">
+    <div id="guide-jindo" class="guide" hidden>
 
       <section class="glance">
         <h2>먼저, 이것만 기억하세요</h2>
