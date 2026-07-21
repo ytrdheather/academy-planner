@@ -111,7 +111,7 @@ body {
 .styled-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; min-width: 1000px; }
 
 .styled-table th {
-    background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+    background: #0d9488;
     color: white;
     padding: 12px 10px;
     text-align: center;
