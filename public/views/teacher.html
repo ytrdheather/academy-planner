@@ -63,6 +63,7 @@
                 <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
                 <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
                 <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
+                <button class="refresh-btn" style="background:#fff; color:#0a6c62; border:1px solid #a7ddd4;" onclick="generateDailyReportsManual(this)" title="오늘 날짜로 등원 학생 리포트 페이지 생성(자동 생성이 누락됐을 때 복구용). 이미 있는 학생은 건너뜁니다.">📄 오늘 리포트 생성</button>
                 <span id="pauseBanner" style="display:none; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
             </div>
 
@@ -1362,6 +1363,23 @@
                 showToast(`${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
             } catch (e) { showToast('전진 실패: ' + e.message, 'error'); }
             finally { if (btn) btn.disabled = false; }
+        }
+
+        // 오늘 리포트 수동 생성(크론 누락 복구용). 서버가 멱등이라 이미 있는 학생은 건너뜀.
+        async function generateDailyReportsManual(btn) {
+            if (!confirm('오늘 날짜로 등원 학생들의 리포트 페이지를 생성할까요?\n(자동 생성이 빠졌을 때 복구용 — 이미 있는 학생은 건너뜁니다)')) return;
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '생성 중...'; }
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/generate-daily-reports`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '리포트 생성 실패', 'error'); return; }
+                showToast(`✅ ${j.date}(${j.day}) 리포트 생성: 신규 ${j.created.length}명, 기존 ${j.skipped.length}명`, 'success');
+                loadDataForCurrentTab(true);
+            } catch (e) { showToast('리포트 생성 실패: ' + e.message, 'error'); }
+            finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
         }
 
         async function markAllPresent() {
