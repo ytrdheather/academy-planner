@@ -1051,7 +1051,7 @@
         function getAttendanceHwRow(st) {
             const absent = isAbsent(st);
             const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
-            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 숙제만 다음 등원까지 미룸(커서 되돌림)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button></div>`;
+            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 과목 진도 한 칸 되돌림(커서 -1, 다음 생성 때 재출제)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button><button title="이 과목 진도 한 칸 앞으로(커서 +1, 다음 생성 때 건너뜀)" onclick="advanceHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">→</button></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
                 <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button></div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
@@ -1196,16 +1196,28 @@
                 if (Object.keys(hw).length) payload.push({ dailyPageId: st.dailyPageId, studentPageId: st.studentPageId, hw, cursors });
             });
             if (!payload.length) { showToast('선택된 항목이 없습니다.', 'error'); return; }
-            const btn = document.getElementById('hwConfirmBtn'); btn.disabled = true; const orig = btn.textContent; btn.textContent = '기록 중...';
+            const btn = document.getElementById('hwConfirmBtn'); btn.disabled = true; const orig = btn.textContent; btn.textContent = `기록 중 0/${payload.length}`;
             try {
                 const res = await fetch(`${API_BASE_URL}/api/confirm-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ students: payload })
                 });
-                const text = await res.text();
-                const lines = text.trim().split('\n').filter(Boolean);
-                const last = JSON.parse(lines[lines.length - 1]);
-                showToast(last.message || '완료', last.success ? 'success' : 'error');
+                // 스트림을 한 줄씩 읽어 진행률 실시간 표시(서버가 {progress,total} 줄을 흘려보냄)
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '', last = null;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buf += decoder.decode(value, { stream: true });
+                    const parts = buf.split('\n'); buf = parts.pop();
+                    for (const line of parts) {
+                        const s = line.trim(); if (!s) continue;
+                        try { const obj = JSON.parse(s); last = obj; if (obj.total) btn.textContent = `기록 중 ${obj.progress}/${obj.total}`; } catch (_) {}
+                    }
+                }
+                if (buf.trim()) { try { last = JSON.parse(buf.trim()); } catch (_) {} }
+                showToast((last && last.message) || '완료', (last && last.success) ? 'success' : 'error');
                 closeHomeworkPreview();
                 loadDataForCurrentTab(true);
             } catch (e) { showToast('확정 실패: ' + e.message, 'error'); }
@@ -1334,6 +1346,21 @@
                 if (!j.success) { showToast(j.message || '미룸 실패', 'error'); return; }
                 showToast(`${prefix} 미룸 완료 (커서 ${j.newCursor}로 되돌림, ${j.rolledBack}개). 다음 생성 때 재출제됩니다.`);
             } catch (e) { showToast('미룸 실패: ' + e.message, 'error'); }
+            finally { if (btn) btn.disabled = false; }
+        }
+
+        async function advanceHomework(name, prefix, btn) {
+            if (!confirm(`${name} 학생의 ${prefix} 진도를 한 칸 앞으로 보낼까요?\n(그 과목 커서를 +1 전진 — 다음 생성 때 그만큼 건너뜁니다. ↩로 되돌릴 수 있어요)`)) return;
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/advance-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ name, prefix })
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '전진 실패', 'error'); return; }
+                showToast(`${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
+            } catch (e) { showToast('전진 실패: ' + e.message, 'error'); }
             finally { if (btn) btn.disabled = false; }
         }
 

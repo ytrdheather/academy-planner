@@ -2011,6 +2011,28 @@ app.post('/api/defer-homework', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+// 숙제 진도 전진: 그 과목 커서를 +step(기본 1) 앞으로. 직전배정량=step 기록(↩ 미룸으로 되돌리기 가능)
+app.post('/api/advance-homework', requireAuth, async (req, res) => {
+    const { name, prefix } = req.body; // prefix ∈ 어휘/주독해/부독해
+    const step = Math.max(1, Number(req.body?.step) || 1);
+    if (!name || !prefix) return res.status(400).json({ success: false, message: 'name/prefix 필요' });
+    if (!['어휘', '주독해', '부독해'].includes(prefix)) return res.status(400).json({ success: false, message: 'prefix 오류' });
+    try {
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '이름', title: { equals: name } }, page_size: 1 })
+        });
+        if (!q.results.length) return res.status(404).json({ success: false, message: '학생 명부에서 찾을 수 없음' });
+        const page = q.results[0], p = page.properties;
+        const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량';
+        const cursor = p[cursorField]?.number ?? 1;
+        const newCursor = Math.max(1, (cursor || 1) + step);
+        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: step } } })
+        });
+        res.json({ success: true, newCursor, advanced: step });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 app.get('/planner-test', (req, res) => res.sendFile(path.join(publicPath, 'views', 'planner-test.html')));
 
 app.listen(PORT, '0.0.0.0', () => console.log(`✅ Final Server running on ${PORT}`));
