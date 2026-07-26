@@ -1754,7 +1754,8 @@ function buildAssignment(book, units, cursor, count, deadlineLabel) {
         newCursor = cursor + count;
         if (book.workbook) wbRange = rangeText;
     }
-    let text = `${deadlineLabel}까지 ${count}개: ${rangeText}${pages}`;
+    const rangeWithBook = (book && book.name) ? `${book.name} · ${rangeText}` : rangeText;
+    let text = `${deadlineLabel}까지 ${count}개: ${rangeWithBook}${pages}`;
     if (wbRange) text += ` + 워크북 ${wbRange}`;
     return { text, newCursor, reachedEnd };
 }
