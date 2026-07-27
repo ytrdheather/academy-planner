@@ -64,6 +64,7 @@
                 <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
                 <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
                 <button class="refresh-btn" style="background:#fff; color:#0a6c62; border:1px solid #a7ddd4;" onclick="generateDailyReportsManual(this)" title="오늘 날짜로 등원 학생 리포트 페이지 생성(자동 생성이 누락됐을 때 복구용). 이미 있는 학생은 건너뜁니다.">📄 오늘 리포트 생성</button>
+                <button class="refresh-btn" style="background:#fff; color:#5b21b6; border:1px solid #ddd0f5;" onclick="autoGenerateHomeworkManual(this)" title="매일 11시 자동 생성이 누락됐을 때 복구용. 그날 등원 예정 학생 전원의 숙제를 만들어 기록합니다. 이미 숙제가 있는 과목은 건너뜁니다.">🔮 오늘 숙제 자동 기록</button>
                 <span id="pauseBanner" style="display:none; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
             </div>
 
@@ -1400,6 +1401,24 @@
             finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
         }
 
+        // 11시 자동 숙제 생성 수동 실행(크론 누락 복구용). 서버가 멱등이라 이미 있는 과목은 건너뜀.
+        async function autoGenerateHomeworkManual(btn) {
+            if (!confirm('오늘 등원 예정 학생 전원의 숙제를 만들어 기록할까요?\n(매일 11시 자동 생성이 빠졌을 때 복구용 — 이미 숙제가 있는 과목은 건너뜁니다)')) return;
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '기록 중...'; }
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/auto-generate-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '숙제 자동 기록 실패', 'error'); return; }
+                if (j.paused) { showToast(`⏸️ 정지 기간이라 생성하지 않았습니다 (${j.pause?.reason || ''})`, 'error'); return; }
+                showToast(`✅ ${j.date} 숙제 기록: 신규 ${j.written.length}명, 이미 있음 ${j.skipped.length}명${j.errors.length ? `, 실패 ${j.errors.length}건` : ''}`, j.errors.length ? 'error' : 'success');
+                loadDataForCurrentTab(true);
+            } catch (e) { showToast('숙제 자동 기록 실패: ' + e.message, 'error'); }
+            finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
+        }
+
         async function markAllPresent() {
             const cbs = [...document.querySelectorAll('#attendanceTableBody input.att-check')];
             if (!cbs.length) { alert('대상 학생이 없습니다.'); return; }
@@ -1684,14 +1703,22 @@
                 val = val.split(',').map(s => s.trim()).filter(Boolean);
             }
 
-            try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
-                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) 
-                }); 
-                showToast('저장되었습니다.'); 
-            } catch (e) { showToast('실패', 'error'); } 
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type })
+                });
+                // 결석 처리로 그날 숙제가 되돌려졌으면 알려주고 표를 새로고침(지워진 숙제칸 반영)
+                const j = await res.json().catch(() => ({}));
+                const rb = j.absenceRollback?.rolledBack || [];
+                if (rb.length) {
+                    showToast(`결석 처리 — 오늘 숙제(${rb.join(', ')})를 지우고 진도를 되돌렸습니다.`, 'success');
+                    loadDataForCurrentTab(true);
+                } else {
+                    showToast('저장되었습니다.');
+                }
+            } catch (e) { showToast('실패', 'error'); }
         }
 
         async function updateGrammarByClass() {
