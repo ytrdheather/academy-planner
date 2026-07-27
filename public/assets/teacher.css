@@ -175,6 +175,13 @@ body {
 .editable-input { padding: 5px; border: 1px solid #cdd9db; border-radius: 4px; text-align: center; width: 55px; font-size: 14px; }
 .editable-text-input { width: 110px; text-align: left; }
 
+/* 출결·숙제 탭 숙제칸: 한 줄 input이면 문구가 잘려 '숙제 보기'를 열어야 했음 → 줄바꿈 textarea로 전체 노출 */
+.hw-cell-input {
+    width: 230px; min-height: 36px; max-height: 110px;
+    text-align: left; font-size: 13px; line-height: 1.45; font-family: inherit;
+    white-space: pre-wrap; overflow-y: auto; resize: vertical;
+}
+
 .score-circle { width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(var(--score-color, #e5e7eb) 0% var(--score-value, 0%), #e5e7eb var(--score-value, 0%) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto; position: relative; }
 .score-circle::before { content: ''; position: absolute; width: 75%; height: 75%; background: white; border-radius: 50%; }
 .score-text { position: relative; font-size: 12px; font-weight: 700; color: var(--score-color, #6b7280); }

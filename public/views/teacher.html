@@ -1047,14 +1047,26 @@
             if (!tbody) return;
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(getAttendanceHwRow).join('');
+            autoGrowAllHw();
+        }
+
+        // 숙제칸 높이를 내용에 맞춰 늘림(최대 높이는 CSS max-height, 넘치면 칸 안에서 스크롤)
+        function autoGrowHw(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight + 2, 110) + 'px';
+        }
+        function autoGrowAllHw() {
+            document.querySelectorAll('#attendanceTableBody .hw-cell-input').forEach(autoGrowHw);
         }
 
         function getAttendanceHwRow(st) {
             const absent = isAbsent(st);
-            const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
-            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 과목 진도 한 칸 되돌림(커서 -1, 다음 생성 때 재출제)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button><button title="이 과목 진도 한 칸 앞으로(커서 +1, 다음 생성 때 건너뜀)" onclick="advanceHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">→</button></div>`;
+            // 숙제칸: 한 줄 input이면 문구가 잘려서 '숙제 보기'를 눌러야 했음 → 줄바꿈되는 textarea로 내용 전체 노출
+            const hwInput = (prop, val) => `<textarea class="editable-input hw-cell-input" rows="1" title="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" oninput="autoGrowHw(this)" onchange="updateField(this)">${escAttr(val || '')}</textarea>`;
+            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 과목 진도 한 칸 되돌림(커서 -1, 다음 생성 때 재출제)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button><button title="이 과목 진도 한 칸 앞으로(커서 +1, 오늘 숙제 문구도 즉시 갱신)" onclick="advanceHomework('${escAttr(st.studentName)}','${prefix}',this,'${st.pageId}')" style="border:none;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">→</button></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button></div></td>
+                <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button><button onclick="openHomeworkPreview('${escAttr(st.studentName)}')" title="이 학생만 다음 숙제 생성" style="border:1px solid #ddd0f5;background:#f5f3ff;color:#5b21b6;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">🔮 생성</button></div></div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
@@ -1083,13 +1095,16 @@
 
         // ===== [Phase 4] 숙제 자동 생성 미리보기 → 확정 =====
         let hwPreviewData = [];
+        let hwPreviewOnlyName = ''; // 비어있으면 전체 생성, 값이 있으면 그 학생 1명만
 
-        async function openHomeworkPreview() {
+        // onlyName 을 주면 그 학생 1명만 대상(행의 '🔮 생성' 버튼). 없으면 기존처럼 출석자 전체.
+        async function openHomeworkPreview(onlyName) {
             const period = document.getElementById('commonPeriodFilter')?.value;
             const date = document.getElementById('commonSpecificDate')?.value;
             const effDate = (period === 'specific_date' && date) ? date : undefined;
             const overlay = document.getElementById('hwPreviewOverlay');
             const body = document.getElementById('hwPreviewBody');
+            hwPreviewOnlyName = onlyName || '';
             overlay.style.display = 'flex';
             body.innerHTML = '<div style="padding:30px;text-align:center;color:#7c3aed;">🔮 계산 중...</div>';
             document.getElementById('hwPreviewSub').textContent = '';
@@ -1097,7 +1112,7 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/generate-homework-preview`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ date: effDate })
+                    body: JSON.stringify({ date: effDate, name: onlyName || undefined })
                 });
                 const j = await res.json();
                 if (!j.success) throw new Error(j.message || '생성 실패');
@@ -1115,7 +1130,7 @@
                     return;
                 }
                 hwPreviewData = j.students || [];
-                document.getElementById('hwPreviewSub').textContent = `(${j.date} 출석자 기준)`;
+                document.getElementById('hwPreviewSub').textContent = onlyName ? `(${j.date} · ${onlyName} 개인 생성)` : `(${j.date} 출석자 기준)`;
                 renderHomeworkPreview();
             } catch (e) { body.innerHTML = `<div style="padding:24px;color:#dc2626;">실패: ${escAttr(e.message)}</div>`; }
         }
@@ -1123,7 +1138,9 @@
         function renderHomeworkPreview() {
             const body = document.getElementById('hwPreviewBody');
             if (!hwPreviewData.length) {
-                body.innerHTML = '<div style="padding:24px;color:#64748b;">대상 학생이 없습니다.<br><span style="font-size:12px;">(오늘 출석 + 학습상태 정상 + 교재·진도량이 설정된 학생만 나옵니다)</span></div>';
+                body.innerHTML = hwPreviewOnlyName
+                    ? `<div style="padding:24px;color:#64748b;">${escAttr(hwPreviewOnlyName)} 학생은 생성 대상이 아닙니다.<br><span style="font-size:12px;">(결석사유 입력됨 · 학습상태가 '정상'이 아님 · 교재/진도량 미설정 · 오늘 리포트 페이지 없음 중 하나)</span></div>`
+                    : '<div style="padding:24px;color:#64748b;">대상 학생이 없습니다.<br><span style="font-size:12px;">(오늘 출석 + 학습상태 정상 + 교재·진도량이 설정된 학생만 나옵니다)</span></div>';
                 document.getElementById('hwPreviewCount').textContent = '';
                 return;
             }
@@ -1148,7 +1165,7 @@
             document.getElementById('hwPreviewCount').textContent = `학생 ${hwPreviewData.length}명 · 항목 ${totalSubs}개`;
         }
 
-        function closeHomeworkPreview() { document.getElementById('hwPreviewOverlay').style.display = 'none'; hwPreviewData = []; }
+        function closeHomeworkPreview() { document.getElementById('hwPreviewOverlay').style.display = 'none'; hwPreviewData = []; hwPreviewOnlyName = ''; }
 
         // ===== [개인 숙제 보기] 한 학생의 배정 숙제를 모아 출력 =====
         let currentStudentHwText = '';
@@ -1350,17 +1367,18 @@
             finally { if (btn) btn.disabled = false; }
         }
 
-        async function advanceHomework(name, prefix, btn) {
-            if (!confirm(`${name} 학생의 ${prefix} 진도를 한 칸 앞으로 보낼까요?\n(그 과목 커서를 +1 전진 — 다음 생성 때 그만큼 건너뜁니다. ↩로 되돌릴 수 있어요)`)) return;
+        async function advanceHomework(name, prefix, btn, dailyPageId) {
+            if (!confirm(`${name} 학생의 ${prefix} 진도를 한 칸 앞으로 보낼까요?\n(그 과목 커서를 +1 전진 — 오늘 숙제 문구도 있으면 같이 갱신됩니다. ↩로 되돌릴 수 있어요)`)) return;
             if (btn) btn.disabled = true;
             try {
                 const res = await fetch(`${API_BASE_URL}/api/advance-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ name, prefix })
+                    body: JSON.stringify({ name, prefix, dailyPageId })
                 });
                 const j = await res.json();
                 if (!j.success) { showToast(j.message || '전진 실패', 'error'); return; }
-                showToast(`${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
+                showToast(j.updatedText ? `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 오늘 숙제 문구도 갱신됨.` : `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
+                if (j.updatedText) loadDataForCurrentTab(true);
             } catch (e) { showToast('전진 실패: ' + e.message, 'error'); }
             finally { if (btn) btn.disabled = false; }
         }

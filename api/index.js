@@ -1884,8 +1884,10 @@ app.post('/api/pause-periods/update', requireAuth, async (req, res) => {
 });
 
 // 미리보기: 오늘 출석자 대상 제안만 생성(아무것도 안 씀)
+// body.name 을 주면 그 학생 1명만 대상(개인별 생성) — 이땐 출석 체크 전이어도 허용(선생님이 명시적으로 지목한 것이므로)
 app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
     try {
+        const onlyName = String(req.body?.name || '').trim();
         const todayStr = req.body?.date || getKSTTodayRange().dateString;
         // 활성 정지기간: 오늘이 정지면 전체 생성 중단, 그리고 마감일 계산 때 휴무일로 사용
         const pausePeriods = await getActivePausePeriodList();
@@ -1921,9 +1923,11 @@ app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
         for (const page of daily) {
             const p = page.properties;
             const name = p['이름']?.title?.[0]?.plain_text || '';
+            if (onlyName && name !== onlyName) continue;
             const attendance = p['출석']?.checkbox || false;
             const absence = (p['결석 사유']?.rich_text?.map(t => t.plain_text).join('') || '').trim();
-            if (!attendance || absence) continue;
+            if (absence) continue;                    // 결석 사유가 있으면 개인별 지목이어도 제외
+            if (!attendance && !onlyName) continue;   // 전체 생성일 때만 출석 체크 필수
             const cfg = cfgByName[name];
             if (!cfg || (cfg.status || '정상') !== '정상') continue;
             const attendArr = parseAttendDays(cfg.days);
@@ -1955,7 +1959,7 @@ app.post('/api/generate-homework-preview', requireAuth, async (req, res) => {
             }
             if (subjectsOut.length) results.push({ dailyPageId: page.id, studentPageId: cfg.pageId, name, days: cfg.days, deadline: nc.label, subjects: subjectsOut });
         }
-        res.json({ success: true, date: todayStr, students: results });
+        res.json({ success: true, date: todayStr, students: results, onlyName: onlyName || null });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
@@ -2011,9 +2015,55 @@ app.post('/api/defer-homework', requireAuth, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// 숙제 진도 전진: 그 과목 커서를 +step(기본 1) 앞으로. 직전배정량=step 기록(↩ 미룸으로 되돌리기 가능)
+// 특정 학생·과목의 오늘 이미 생성된 숙제 문구를 새 커서 기준으로 다시 계산해 덮어씀
+// (마감일·개수는 생성 로직과 동일하게 새로 계산 — 기존 문구는 수기 수정 등으로 형식이 깨져 있을 수 있어 파싱하지 않음)
+async function regenerateDailyHwText(prefix, studentProps, dailyPageId, newCursor) {
+    const bookId = studentProps[prefix + '교재']?.relation?.[0]?.id || null;
+    if (!bookId) return null;
+    const hwField = prefix + '숙제';
+    const dp = await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`);
+    const existingText = (dp.properties?.[hwField]?.rich_text?.map(t => t.plain_text).join('') || '').trim();
+    if (!existingText) return null; // 오늘 이 과목 숙제가 아직 생성 안 된 경우엔 건드리지 않음
+
+    const { byId: bookById } = await loadTextbooks();
+    const book = bookById[bookId];
+    if (!book) return null;
+    let units = [];
+    if (TEXTBOOK_UNIT_DB_ID) {
+        const uq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
+        });
+        units = uq.results.map(pg => {
+            const up = pg.properties;
+            return { order: up['순번']?.number ?? null, group: up['그룹']?.rich_text?.map(t => t.plain_text).join('') || '', title: up['제목']?.title?.[0]?.plain_text || '', startPage: up['시작페이지']?.number ?? null, endPage: up['끝페이지']?.number ?? null };
+        }).sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+
+    const todayStr = getKSTTodayRange().dateString;
+    const attendArr = parseAttendDays(studentProps['수강요일']?.multi_select?.map(d => d.name).join('') || '');
+    const pausePeriods = await getActivePausePeriodList();
+    const isHoliday = (ds) => pausePeriods.some(pp => ds >= pp.start && ds <= pp.end);
+    const nc = nextClassInfo(todayStr, attendArr, isHoliday);
+    if (!nc) return null;
+    const subjCfg = {
+        method: studentProps[prefix + '진도방식']?.select?.name || '',
+        amount: studentProps[prefix + '진도량']?.number ?? '',
+        weekly: studentProps[prefix + '요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '',
+    };
+    const qty = deadlineQuantity(subjCfg, nc);
+    if (!(qty > 0)) return null;
+
+    const asg = buildAssignment(book, units, newCursor, qty, nc.label);
+    if (!asg) return null;
+    await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`, {
+        method: 'PATCH', body: JSON.stringify({ properties: { [hwField]: { rich_text: [{ text: { content: asg.text.substring(0, 2000) } }] } } })
+    });
+    return asg.text;
+}
+
+// 숙제 진도 전진: 그 과목 커서를 +step(기본 1) 앞으로. 직전배정량=이동한 칸수 기록(↩ 미룸으로 되돌리기 가능)
 app.post('/api/advance-homework', requireAuth, async (req, res) => {
-    const { name, prefix } = req.body; // prefix ∈ 어휘/주독해/부독해
+    const { name, prefix, dailyPageId, setCursor } = req.body; // prefix ∈ 어휘/주독해/부독해, dailyPageId 주면 오늘 숙제 문구도 갱신, setCursor 주면 그 절대값으로 지정(오타·오류 커서 교정용)
     const step = Math.max(1, Number(req.body?.step) || 1);
     if (!name || !prefix) return res.status(400).json({ success: false, message: 'name/prefix 필요' });
     if (!['어휘', '주독해', '부독해'].includes(prefix)) return res.status(400).json({ success: false, message: 'prefix 오류' });
@@ -2025,11 +2075,17 @@ app.post('/api/advance-homework', requireAuth, async (req, res) => {
         const page = q.results[0], p = page.properties;
         const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량';
         const cursor = p[cursorField]?.number ?? 1;
-        const newCursor = Math.max(1, (cursor || 1) + step);
+        const newCursor = (setCursor != null && setCursor !== '') ? Math.max(1, Number(setCursor) || 1) : Math.max(1, (cursor || 1) + step);
+        const advancedAmt = newCursor - (cursor || 1);
         await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
-            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: step } } })
+            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: advancedAmt } } })
         });
-        res.json({ success: true, newCursor, advanced: step });
+        let updatedText = null;
+        if (dailyPageId) {
+            try { updatedText = await regenerateDailyHwText(prefix, p, dailyPageId, newCursor); }
+            catch (e) { /* 오늘 문구 갱신 실패해도 커서 전진 자체는 이미 반영됨 */ }
+        }
+        res.json({ success: true, newCursor, advanced: advancedAmt, updatedText });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
