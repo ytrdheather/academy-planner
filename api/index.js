@@ -1622,6 +1622,8 @@ async function readStudentConfigs() {
         }
         hasMore = data.has_more; cursor = data.next_cursor;
     }
+    // 노션은 DB에 저장된 순서 그대로 준다 → 진도 관리 탭에서 학생을 찾기 어려웠음. 이름 가나다순으로 고정.
+    students.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     return students;
 }
 
@@ -1875,10 +1877,14 @@ function unitLabel(u) { return (((u.group ? u.group + ' ' : '') + (u.title || ''
 function buildAssignment(book, units, cursor, count, deadlineLabel) {
     cursor = Math.max(1, Number(cursor) || 1);
     let rangeText = '', pages = '', newCursor = cursor + count, reachedEnd = false, wbRange = '';
+    // 교재 끝에 걸리면 요청량(count)보다 적게 배정된다. 문구의 개수도 커서 전진도 이 realCount를 따라야
+    // "3개"라고 써놓고 1개만 주거나, 커서가 책 밖으로 넘어가는 일이 생기지 않는다.
+    let realCount = count;
     if (units && units.length) {
         const assigned = units.filter(u => u.order != null && u.order >= cursor).sort((a, b) => a.order - b.order).slice(0, count);
         if (assigned.length === 0) return null; // 커서가 책 끝을 넘음
         if (assigned.length < count) reachedEnd = true;
+        realCount = assigned.length;
         const first = assigned[0], last = assigned[assigned.length - 1];
         rangeText = assigned.length === 1 ? unitLabel(first) : `${unitLabel(first)} ~ ${unitLabel(last)}`;
         if (first.startPage != null) { const ep = last.endPage ?? last.startPage; pages = ` (p.${first.startPage}${ep != null ? '~' + ep : ''})`; }
@@ -1889,15 +1895,15 @@ function buildAssignment(book, units, cursor, count, deadlineLabel) {
         const total = book.totalUnits || null;
         let sU = Math.ceil(cursor / per), eU = Math.ceil((cursor + count - 1) / per);
         if (total && sU > total) return null;
-        if (total && eU > total) { eU = total; reachedEnd = true; }
+        if (total && eU > total) { eU = total; reachedEnd = true; realCount = Math.max(1, total * per - cursor + 1); }
         rangeText = sU === eU ? `Unit ${sU}` : `Unit ${sU}~${eU}`;
-        newCursor = cursor + count;
+        newCursor = cursor + realCount;
         if (book.workbook) wbRange = rangeText;
     }
     const rangeWithBook = (book && book.name) ? `${book.name} · ${rangeText}` : rangeText;
-    let text = `${deadlineLabel}까지 ${count}개: ${rangeWithBook}${pages}`;
+    let text = `${deadlineLabel}까지 ${realCount}개: ${rangeWithBook}${pages}`;
     if (wbRange) text += ` + 워크북 ${wbRange}`;
-    return { text, newCursor, reachedEnd };
+    return { text, newCursor, reachedEnd, count: realCount };
 }
 
 const PHASE4_SUBJECTS = [
@@ -2080,20 +2086,40 @@ async function computeHomeworkProposals({ dateStr, onlyName = '', requireAttenda
         const subjectsOut = [];
         for (const S of PHASE4_SUBJECTS) {
             const s2 = cfg[S.key];
-            if (!s2.bookId) continue;
-            const qty = deadlineQuantity(s2, nc);
-            if (!(qty > 0)) continue;
+            if (!s2.bookId) continue; // 교재 미배정 = 그 과목을 안 하는 학생(정상 제외)
             const book = bookById[s2.bookId] || { name: s2.bookName, workbook: false, perPassage: 1, totalUnits: null };
+            const base = {
+                key: S.key, label: S.label, hwField: S.hwField, cursorField: S.cursorField, lastAmtField: S.lastAmtField,
+                bookName: book.name || s2.bookName,
+                alreadyFilled: !!existing[S.hwField], existingText: existing[S.hwField],
+            };
+            // 교재는 배정됐는데 진도량(또는 요일별 진도량)이 비어 있으면 분량을 계산할 수 없다.
+            // 예전엔 여기서 조용히 continue 해서 그 과목이 화면에 아예 안 나타났고,
+            // 선생님 입장에선 "아무리 눌러도 숙제가 안 생긴다"로만 보여 원인을 알 수 없었다.
+            // 이제는 막힌 이유를 함께 내려보내고, 대신 기록은 못 하도록 blocked로 잠근다.
+            const qty = deadlineQuantity(s2, nc);
+            if (!(qty > 0)) {
+                const why = (s2.method === '불규칙')
+                    ? `⚠ ${nc.char}요일 진도량 없음 — 진도 관리 탭의 '요일별 진도량'을 확인하세요`
+                    : `⚠ 진도량 미설정 — 진도 관리 탭에서 ${S.label} 진도량을 입력하세요`;
+                subjectsOut.push({ ...base, qty: 0, text: why, newCursor: null, advanced: 0, reachedEnd: false, blocked: true });
+                continue;
+            }
             const units = await getUnits(s2.bookId);
             const asg = buildAssignment(book, units, s2.unit, qty, nc.label);
+            if (!asg) {
+                subjectsOut.push({
+                    ...base, qty, blocked: true, newCursor: null, advanced: 0, reachedEnd: true,
+                    text: `⚠ 교재 끝(현재유닛 ${s2.unit || 1}) — 새 교재를 배정하고 현재유닛을 1로 되돌리세요`,
+                });
+                continue;
+            }
             subjectsOut.push({
-                key: S.key, label: S.label, hwField: S.hwField, cursorField: S.cursorField, lastAmtField: S.lastAmtField,
-                bookName: book.name || s2.bookName, qty,
-                alreadyFilled: !!existing[S.hwField], existingText: existing[S.hwField],
-                text: asg ? asg.text : `${nc.label}까지 ${qty}개 — ⚠ 교재 끝/커서 확인`,
-                newCursor: asg ? asg.newCursor : null,
-                advanced: asg ? (asg.newCursor - (Number(s2.unit) || 1)) : 0,
-                reachedEnd: asg ? asg.reachedEnd : true,
+                ...base, qty: asg.count, blocked: false,
+                text: asg.text,
+                newCursor: asg.newCursor,
+                advanced: asg.newCursor - (Number(s2.unit) || 1),
+                reachedEnd: asg.reachedEnd,
             });
         }
         if (subjectsOut.length) results.push({ dailyPageId: page.id, studentPageId: cfg.pageId, name, days: cfg.days, deadline: nc.label, subjects: subjectsOut });
@@ -2152,10 +2178,13 @@ async function autoGenerateHomework(dateStr, { dryRun = false } = {}) {
     const r = await computeHomeworkProposals({ dateStr, requireAttendance: false });
     if (r.paused) return { date: r.date, paused: true, pause: r.pause, written: [], skipped: [], errors: [], dryRun };
 
-    const written = [], skipped = [], errors = [];
+    const written = [], skipped = [], errors = [], blocked = [];
     for (const st of r.students) {
+        // 설정이 막힌 과목(진도량 미설정·교재 끝)은 기록하지 않고 따로 모아 보고한다.
+        // 예전엔 이런 과목이 흔적 없이 사라져 "왜 이 학생만 숙제가 없지?"를 알 방법이 없었다.
+        st.subjects.filter(s => s.blocked).forEach(s => blocked.push({ name: st.name, subject: s.label, reason: s.text }));
         // 아직 문구가 없는 과목만 기록(수기로 채워둔 건 덮어쓰지 않음)
-        const todo = st.subjects.filter(s => !s.alreadyFilled && s.newCursor != null);
+        const todo = st.subjects.filter(s => !s.blocked && !s.alreadyFilled && s.newCursor != null);
         if (!todo.length) { skipped.push(st.name); continue; }
         if (dryRun) { written.push({ name: st.name, subjects: todo.map(s => s.label), texts: todo.map(s => s.text) }); continue; }
         try {
@@ -2172,7 +2201,7 @@ async function autoGenerateHomework(dateStr, { dryRun = false } = {}) {
         await new Promise(x => setTimeout(x, 350)); // Notion 초당 3요청 제한 대응
     }
     if (!dryRun && typeof dashboardCache !== 'undefined') dashboardCache.dailyReport.lastFetch = 0;
-    return { date: r.date, paused: false, written, skipped, errors, dryRun };
+    return { date: r.date, paused: false, written, skipped, errors, blocked, dryRun };
 }
 
 // 수동 실행용 (크론이 못 돌았을 때 복구 등). dryRun:true 면 무엇이 기록될지만 돌려주고 쓰지 않음.
@@ -2187,7 +2216,8 @@ cron.schedule('0 11 * * *', async () => {
     try {
         const r = await autoGenerateHomework();
         if (r.paused) { console.log(`⏸️ 숙제 자동 생성 건너뜀(정지 기간): ${r.pause?.reason || ''}`); return; }
-        console.log(`✅ 숙제 자동 생성: ${r.date} 기록 ${r.written.length}명, 이미 있음 ${r.skipped.length}명, 실패 ${r.errors.length}건`);
+        console.log(`✅ 숙제 자동 생성: ${r.date} 기록 ${r.written.length}명, 이미 있음 ${r.skipped.length}명, 설정막힘 ${r.blocked.length}건, 실패 ${r.errors.length}건`);
+        if (r.blocked.length) console.warn('⚠ 설정이 막혀 건너뛴 과목(진도량 미설정·교재 끝):', r.blocked.map(b => `${b.name}/${b.subject}`).join(', '));
         if (r.errors.length) console.error('숙제 자동 생성 실패 목록:', r.errors);
     } catch (e) { console.error('숙제 자동 생성 Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
