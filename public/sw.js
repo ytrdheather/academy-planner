@@ -1,7 +1,7 @@
 // 리디플랜 서비스워커 — "홈 화면에 추가"(PWA 설치)를 위한 최소 구성.
 // 원칙: 학생별 데이터(HTML/API)는 절대 캐시하지 않는다. 로고·아이콘 같은 /assets 정적 파일만 캐시.
 // 코드를 고치면 아래 CACHE_VERSION 숫자만 올리면 학생 폰에서 옛날 캐시가 자동으로 지워집니다.
-const CACHE_VERSION = 'rdplan-v1';
+const CACHE_VERSION = 'rdplan-v2'; // v2: 앱 아이콘을 부엉이 마스코트로 교체(2026-07-29)
 
 self.addEventListener('install', (e) => {
     self.skipWaiting();
