@@ -1732,9 +1732,23 @@
                     showToast(`결석 처리 — 오늘 숙제(${rb.join(', ')})를 지우고 진도를 되돌렸습니다.`, 'success');
                     loadDataForCurrentTab(true);
                 } else {
+                    // 저장은 됐지만 화면이 들고 있는 allReportData는 예전 값 그대로였다.
+                    // 그래서 손으로 쓴 숙제가 '숙제 보기'에 안 뜨고, 새로고침해야만 보였다.
+                    syncAssignedHwLocal(pageId, prop, val);
                     showToast('저장되었습니다.');
                 }
             } catch (e) { showToast('실패', 'error'); }
+        }
+
+        // 숙제칸을 직접 수정했을 때 화면이 들고 있는 데이터도 같이 갱신 → '숙제 보기'가 즉시 반영된다.
+        const HW_FIELD_TO_KEY = { '어휘숙제': 'vocab', '주독해숙제': 'mainR', '부독해숙제': 'subR', '문법 숙제 내용': 'grammar' };
+        function syncAssignedHwLocal(pageId, prop, val) {
+            const key = HW_FIELD_TO_KEY[prop];
+            if (!key) return;
+            const st = (allReportData || []).find(x => x.pageId === pageId);
+            if (!st) return;
+            if (!st.assignedHw) st.assignedHw = {};
+            st.assignedHw[key] = val;
         }
 
         async function updateGrammarByClass() {
