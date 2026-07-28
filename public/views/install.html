@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d9488">
+<title>리디플랜 앱 설치 안내 · 리디튜드</title>
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --warn:#a15b06; --warn-wash:#fdf0dd; --warn-border:#f4d9b0;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e161b; --surface:#161f26; --surface-2:#1c272f;
+      --ink:#e7eef2; --ink-soft:#a7b7c2; --ink-faint:#6d7f8c;
+      --border:#243139; --border-strong:#31424c;
+      --accent:#2dd4bf; --accent-ink:#7ee7d8; --accent-wash:rgba(45,212,191,.12);
+      --warn:#f0b657; --warn-wash:rgba(240,182,87,.12); --warn-border:rgba(240,182,87,.28);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  [hidden]{display:none!important}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+    line-height:1.62; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:560px; margin:0 auto; padding:22px 16px 56px}
+
+  .top{text-align:center; padding:8px 0 20px}
+  .appicon{width:88px; height:88px; border-radius:20px; box-shadow:var(--shadow); border:1px solid var(--border)}
+  h1{font-size:23px; margin:14px 0 6px; letter-spacing:-.4px}
+  .lede{margin:0; color:var(--ink-soft); font-size:15px}
+  .pill{display:inline-block; margin-top:12px; padding:5px 12px; border-radius:999px;
+        background:var(--accent-wash); color:var(--accent-ink); font-size:13px; font-weight:700}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+        padding:16px 16px 18px; margin:14px 0; box-shadow:var(--shadow)}
+  h2{font-size:17px; margin:0 0 4px; letter-spacing:-.3px}
+  .sub{margin:0 0 12px; color:var(--ink-faint); font-size:13.5px}
+
+  .os{display:flex; gap:8px; margin:18px 0 6px}
+  .os button{flex:1; padding:11px 8px; font-size:15px; font-weight:700; cursor:pointer;
+    border-radius:11px; border:1px solid var(--border-strong); background:var(--surface); color:var(--ink-soft);
+    font-family:inherit}
+  .os button.on{background:var(--accent-ink); border-color:var(--accent-ink); color:#fff}
+
+  ol{margin:0; padding-left:0; list-style:none; counter-reset:s}
+  ol li{counter-increment:s; position:relative; padding:0 0 14px 40px}
+  ol li:last-child{padding-bottom:0}
+  ol li::before{content:counter(s); position:absolute; left:0; top:0;
+    width:26px; height:26px; border-radius:50%; background:var(--accent-wash); color:var(--accent-ink);
+    font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .st{font-weight:700; font-size:15.5px}
+  .sd{color:var(--ink-soft); font-size:14px; margin-top:2px}
+
+  .key{display:inline-block; padding:1px 7px; border-radius:6px; background:var(--surface-2);
+       border:1px solid var(--border-strong); font-size:13.5px; font-weight:700}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13.5px;
+        background:var(--surface-2); padding:1px 6px; border-radius:6px; word-break:break-all}
+
+  .note{border:1px solid var(--warn-border); background:var(--warn-wash); color:var(--warn);
+        border-radius:12px; padding:12px 14px; font-size:14px; margin:14px 0}
+  .note b{color:inherit}
+
+  /* 흰 글씨 대비 4.5:1을 넘기려면 밝은 --accent가 아니라 진한 --accent-ink여야 한다 */
+  .go{display:block; text-align:center; text-decoration:none; margin:18px 0 4px;
+      background:var(--accent-ink); color:#fff; font-weight:800; font-size:16px;
+      padding:14px; border-radius:12px; box-shadow:var(--shadow)}
+  .copy{display:block; width:100%; margin-top:8px; padding:11px; cursor:pointer; font-family:inherit;
+        border-radius:11px; border:1px solid var(--border-strong); background:var(--surface);
+        color:var(--ink-soft); font-size:14px; font-weight:700}
+
+  .feat{display:flex; gap:11px; padding:11px 0; border-top:1px solid var(--border)}
+  .feat:first-of-type{border-top:0; padding-top:2px}
+  .feat .ic{font-size:21px; line-height:1.2}
+  .feat h3{margin:0 0 1px; font-size:15px}
+  .feat p{margin:0; color:var(--ink-soft); font-size:14px}
+
+  details{border-top:1px solid var(--border); padding:11px 0}
+  details:first-of-type{border-top:0}
+  summary{cursor:pointer; font-weight:700; font-size:15px; list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:'＋ '; color:var(--accent); font-weight:800}
+  details[open] summary::before{content:'－ '}
+  .ans{color:var(--ink-soft); font-size:14px; margin-top:6px}
+
+  /* 다크 모드에선 강조색이 밝은 민트라 흰 글씨는 거의 안 읽힌다 → 글자를 어둡게 */
+  @media (prefers-color-scheme:dark){
+    .go, .os button.on{background:var(--accent); border-color:var(--accent); color:#0e161b}
+  }
+
+  footer{text-align:center; color:var(--ink-faint); font-size:13px; margin-top:26px}
+  .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px;
+    font-size:14px; font-weight:700; opacity:0; transition:opacity .2s; pointer-events:none}
+  .toast.show{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <img class="appicon" src="/assets/icon-192.png" alt="리디플랜 앱 아이콘">
+    <h1>리디플랜 앱 설치 안내</h1>
+    <p class="lede">숙제 확인과 제출을 폰에서 바로 할 수 있어요.</p>
+    <div class="pill">앱스토어·플레이스토어 설치 필요 없음</div>
+  </div>
+
+  <div class="card">
+    <h2>설치 주소</h2>
+    <p class="sub">아래 주소로 들어가 로그인한 뒤, 홈 화면에 추가하면 끝입니다.</p>
+    <p style="margin:0"><span class="mono" id="siteUrl">readitude.onrender.com</span></p>
+    <a class="go" href="/">지금 열어서 로그인하기</a>
+    <button class="copy" onclick="copyLink()">🔗 이 안내 페이지 링크 복사</button>
+  </div>
+
+  <div class="os" role="tablist">
+    <button id="btn-ios" class="on" onclick="showOS('ios',this)">📱 아이폰</button>
+    <button id="btn-and" onclick="showOS('and',this)">🤖 안드로이드</button>
+  </div>
+
+  <div class="card" id="os-ios">
+    <h2>아이폰 — 사파리로 설치</h2>
+    <p class="sub">반드시 <b>사파리</b>로 열어야 합니다.</p>
+    <ol>
+      <li><div class="st">사파리에서 주소 열기</div>
+        <div class="sd">주소창에 <span class="mono">readitude.onrender.com</span> 입력</div></li>
+      <li><div class="st">먼저 로그인하기</div>
+        <div class="sd">학원에서 받은 <b>ID·비밀번호</b>로 로그인하세요. 설치 전에 로그인해 두면 앱을 열자마자 바로 사용할 수 있어요.</div></li>
+      <li><div class="st">아래 <span class="key">공유</span> 버튼 누르기</div>
+        <div class="sd">화면 아래 가운데, 네모에서 위로 화살표가 나온 모양입니다.</div></li>
+      <li><div class="st">“홈 화면에 추가” 누르기</div>
+        <div class="sd">메뉴를 <b>아래로 내려야</b> 보입니다.</div></li>
+      <li><div class="st">오른쪽 위 “추가” 누르기</div>
+        <div class="sd">홈 화면에 <b>리디플랜</b> 아이콘이 생깁니다.</div></li>
+    </ol>
+    <div class="note"><b>카카오톡으로 링크를 받았다면?</b><br>
+      카톡 안에서는 “홈 화면에 추가”가 없습니다. 오른쪽 아래 메뉴에서 <b>“사파리로 열기”</b>를 먼저 눌러 주세요.</div>
+  </div>
+
+  <div class="card" id="os-and" hidden>
+    <h2>안드로이드 — 크롬으로 설치</h2>
+    <p class="sub">삼성 인터넷에서도 되지만 <b>크롬</b>이 가장 확실합니다.</p>
+    <ol>
+      <li><div class="st">크롬에서 주소 열기</div>
+        <div class="sd">주소창에 <span class="mono">readitude.onrender.com</span> 입력</div></li>
+      <li><div class="st">먼저 로그인하기</div>
+        <div class="sd">학원에서 받은 <b>ID·비밀번호</b>로 로그인하세요.</div></li>
+      <li><div class="st">오른쪽 위 <span class="key">⋮</span> 누르기</div>
+        <div class="sd">주소창 오른쪽 끝의 점 세 개 버튼입니다.</div></li>
+      <li><div class="st">“앱 설치” 또는 “홈 화면에 추가” 누르기</div>
+        <div class="sd">폰에 따라 둘 중 하나로 표시됩니다. 눌러서 설치를 확인하세요.</div></li>
+    </ol>
+    <div class="note"><b>카카오톡으로 링크를 받았다면?</b><br>
+      카톡 안에서는 설치 메뉴가 없습니다. 오른쪽 아래 메뉴에서 <b>“다른 브라우저로 열기”</b>를 눌러 크롬으로 열어 주세요.</div>
+  </div>
+
+  <div class="card">
+    <h2>설치하면 이런 걸 할 수 있어요</h2>
+    <p class="sub">아이콘을 누르면 주소창 없이 앱처럼 열립니다.</p>
+    <div class="feat"><div class="ic">📚</div><div>
+      <h3>오늘의 숙제</h3>
+      <p>오늘 해야 할 어휘·독해·문법 숙제를 한눈에 확인해요.</p></div></div>
+    <div class="feat"><div class="ic">✍️</div><div>
+      <h3>숙제 제출</h3>
+      <p>숙제를 다 하면 앱에서 바로 제출할 수 있어요.</p></div></div>
+    <div class="feat"><div class="ic">📊</div><div>
+      <h3>나의 데일리 리포트</h3>
+      <p>그날 공부한 결과를 날짜별로 볼 수 있어요.</p></div></div>
+  </div>
+
+  <div class="card">
+    <h2>자주 묻는 것</h2>
+    <details open><summary>“홈 화면에 추가”가 안 보여요</summary>
+      <div class="ans">카카오톡·네이버·인스타그램 <b>앱 안에서 열린 화면</b>이라 그렇습니다. 아이폰은 <b>사파리</b>, 안드로이드는 <b>크롬</b>으로 다시 열어 주세요.</div></details>
+    <details><summary>로그인 정보를 모르겠어요</summary>
+      <div class="ans">학원에서 안내받은 <b>학생 ID·비밀번호</b>입니다. 기억나지 않으면 담당 선생님께 문의해 주세요.</div></details>
+    <details><summary>앱을 여니 로그인 화면이 다시 떠요</summary>
+      <div class="ans">로그인은 <b>30일</b> 동안 유지됩니다. 30일이 지났거나 앱 데이터를 지웠으면 다시 로그인해 주세요.</div></details>
+    <details><summary>숙제가 아직 안 보여요</summary>
+      <div class="ans">그날 숙제가 아직 입력되지 않은 상태입니다. 숙제는 보통 <b>오전 중</b>에 올라옵니다. 오후에도 비어 있으면 담당 선생님께 문의해 주세요.</div></details>
+    <details><summary>폰을 바꿨어요 / 앱을 지웠어요</summary>
+      <div class="ans">위 순서대로 <b>다시 설치</b>하면 됩니다. 숙제와 리포트는 폰이 아니라 학원 서버에 저장되어 있어서 사라지지 않아요.</div></details>
+  </div>
+
+  <footer>리디튜드 어학원 · 리디플랜</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // 접속한 폰에 맞는 안내를 먼저 보여준다(둘 다 직접 눌러 볼 수 있음)
+  function showOS(os, btn){
+    document.getElementById('os-ios').hidden = (os !== 'ios');
+    document.getElementById('os-and').hidden = (os !== 'and');
+    document.querySelectorAll('.os button').forEach(function(b){ b.classList.remove('on'); });
+    if (btn) btn.classList.add('on');
+  }
+  (function(){
+    var ua = navigator.userAgent || '';
+    var isAndroid = /Android/i.test(ua);
+    if (isAndroid) showOS('and', document.getElementById('btn-and'));
+  })();
+
+  document.getElementById('siteUrl').textContent = location.host;
+
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 1800);
+  }
+  function copyLink(){
+    var url = location.origin + '/install';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        function(){ toast('링크를 복사했어요'); },
+        function(){ toast('복사에 실패했어요'); }
+      );
+    } else { toast('주소창의 링크를 복사해 주세요'); }
+  }
+</script>
+</body>
+</html>

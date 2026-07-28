@@ -212,6 +212,8 @@ app.get('/planner', (req, res) => res.sendFile(path.join(publicPath, 'views', 'p
 app.get('/teacher-login', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher-login.html')));
 app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 'teacher.html')));
 app.get('/manual', (req, res) => res.sendFile(path.join(publicPath, 'views', 'manual.html')));
+// 학생·학부모에게 그대로 공유하는 설치 안내(설치 방법만 담김). /manual은 선생님용 내용이 함께 있어 공유용으로 쓰지 않는다.
+app.get('/install', (req, res) => res.sendFile(path.join(publicPath, 'views', 'install.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
