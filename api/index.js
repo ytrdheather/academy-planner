@@ -1850,9 +1850,14 @@ function nonSundayCount(startStr, endStr) {
     for (let t = s + 86400000; t <= e; t += 86400000) { if (new Date(t).getUTCDay() !== 0) c++; }
     return c;
 }
+// 정량 진도를 쓰지 않는 과목(그때그때 숙제가 달라지는 학생)을 위한 진도방식.
+// 자동 생성 대상에서 빼되, '진도량을 빠뜨린 것'과는 구분해서 경고 없이 안내만 한다.
+const MANUAL_METHOD = '직접입력';
+
 // 다음등원일 마감 개수 (매일=오늘~다음등원일 실제 날수 기반·일요일 제외, 휴일도 셈)
 function deadlineQuantity(subjCfg, nc) {
     const method = subjCfg.method || '등원마다';
+    if (method === MANUAL_METHOD) return 0; // 직접입력: 분량 계산 대상이 아님(선생님이 숙제칸에 직접 씀)
     if (method === '불규칙') return parseWeeklyStr(subjCfg.weekly)[nc.char] || 0;
     const N = Number(subjCfg.amount); if (!(N > 0)) return 0;
     if (method === '매일') return N * nc.studyDays;
@@ -2097,6 +2102,14 @@ async function computeHomeworkProposals({ dateStr, onlyName = '', requireAttenda
             // 예전엔 여기서 조용히 continue 해서 그 과목이 화면에 아예 안 나타났고,
             // 선생님 입장에선 "아무리 눌러도 숙제가 안 생긴다"로만 보여 원인을 알 수 없었다.
             // 이제는 막힌 이유를 함께 내려보내고, 대신 기록은 못 하도록 blocked로 잠근다.
+            // 직접입력 과목: 설정 누락이 아니라 의도된 운영 방식 → 경고가 아니라 안내로 표시하고 넘어간다.
+            if (s2.method === MANUAL_METHOD) {
+                subjectsOut.push({
+                    ...base, qty: 0, blocked: true, manual: true, newCursor: null, advanced: 0, reachedEnd: false,
+                    text: '✍ 직접 입력 과목 — 출결·숙제 탭의 숙제칸에 직접 적어주세요',
+                });
+                continue;
+            }
             const qty = deadlineQuantity(s2, nc);
             if (!(qty > 0)) {
                 const why = (s2.method === '불규칙')
@@ -2182,7 +2195,8 @@ async function autoGenerateHomework(dateStr, { dryRun = false } = {}) {
     for (const st of r.students) {
         // 설정이 막힌 과목(진도량 미설정·교재 끝)은 기록하지 않고 따로 모아 보고한다.
         // 예전엔 이런 과목이 흔적 없이 사라져 "왜 이 학생만 숙제가 없지?"를 알 방법이 없었다.
-        st.subjects.filter(s => s.blocked).forEach(s => blocked.push({ name: st.name, subject: s.label, reason: s.text }));
+        // 직접입력 과목(manual)은 정상 운영이므로 경고 집계에서 제외한다.
+        st.subjects.filter(s => s.blocked && !s.manual).forEach(s => blocked.push({ name: st.name, subject: s.label, reason: s.text }));
         // 아직 문구가 없는 과목만 기록(수기로 채워둔 건 덮어쓰지 않음)
         const todo = st.subjects.filter(s => !s.blocked && !s.alreadyFilled && s.newCursor != null);
         if (!todo.length) { skipped.push(st.name); continue; }
