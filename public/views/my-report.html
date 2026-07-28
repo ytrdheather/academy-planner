@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>나의 리포트 - 리디튜드</title>
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="리디플랜">
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0; display: flex; flex-direction: column;
+            font-family: "NanumSquareRound", -apple-system, sans-serif;
+            background: #f1f5f9; color: #1e293b;
+        }
+        .toolbar {
+            flex: 0 0 auto; background: #fff; border-bottom: 1px solid #e2e8f0;
+            padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top));
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+        }
+        .toolbar .title { font-weight: 800; color: #7c3aed; font-size: 16px; margin-right: auto; }
+        select {
+            font-family: inherit; font-size: 15px; padding: 9px 12px;
+            border: 2px solid #e2e8f0; border-radius: 10px; background: #f8fafc; color: #334155;
+            font-weight: 700; max-width: 60vw;
+        }
+        .btn {
+            border: 1px solid #cbd5e1; background: #fff; color: #475569;
+            border-radius: 10px; padding: 9px 14px; font-weight: 700;
+            font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+        }
+        #frame { flex: 1 1 auto; width: 100%; border: 0; background: #f1f5f9; }
+        .msg { padding: 40px 20px; text-align: center; color: #64748b; font-weight: 700; line-height: 1.7; }
+        .msg.hide, #frame.hide { display: none; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <span class="title">📊 <span id="who">나</span>의 리포트</span>
+        <select id="dateSelect" onchange="loadReport(this.value)"><option>불러오는 중…</option></select>
+        <button class="btn" onclick="location.href='/planner'">플래너로</button>
+    </div>
+
+    <div id="msg" class="msg">리포트를 불러오는 중이에요…</div>
+    <iframe id="frame" class="hide" title="나의 데일리 리포트"></iframe>
+
+    <script>
+        const token = localStorage.getItem('authToken');
+        if (!token) location.href = '/';
+
+        const authHeaders = { 'Authorization': 'Bearer ' + token };
+        const msgEl = document.getElementById('msg');
+        const frameEl = document.getElementById('frame');
+        const selectEl = document.getElementById('dateSelect');
+
+        function showMsg(text) {
+            msgEl.textContent = text;
+            msgEl.classList.remove('hide');
+            frameEl.classList.add('hide');
+        }
+
+        function showFrame(html) {
+            frameEl.srcdoc = html;
+            frameEl.classList.remove('hide');
+            msgEl.classList.add('hide');
+        }
+
+        // 2026-07-28 → 7월 28일 (화)
+        function labelFor(dateStr) {
+            const d = new Date(dateStr + 'T00:00:00+09:00');
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+            return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+        }
+
+        async function loadReport(date) {
+            showMsg('리포트를 불러오는 중이에요…');
+            try {
+                const res = await fetch('/api/my-report?date=' + encodeURIComponent(date), { headers: authHeaders });
+                if (res.status === 401) { localStorage.removeItem('authToken'); location.href = '/'; return; }
+                if (!res.ok) { showMsg('그 날짜의 리포트가 아직 없어요.'); return; }
+                showFrame(await res.text());
+            } catch (e) {
+                showMsg('리포트를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');
+            }
+        }
+
+        async function init() {
+            try {
+                const res = await fetch('/api/my-report-dates', { headers: authHeaders });
+                if (res.status === 401) { localStorage.removeItem('authToken'); location.href = '/'; return; }
+                // 서버 오류를 "리포트 없음"으로 보여주면 안 됨 → 구분해서 안내
+                if (!res.ok) {
+                    selectEl.innerHTML = '<option>불러오기 실패</option>';
+                    showMsg('리포트 목록을 불러오지 못했어요.\n잠시 후 다시 시도해 주세요.');
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.studentName) document.getElementById('who').textContent = data.studentName;
+
+                if (!data.dates || data.dates.length === 0) {
+                    selectEl.innerHTML = '<option>리포트 없음</option>';
+                    showMsg('아직 리포트가 없어요.\n수업에 참여하면 그날부터 리포트가 쌓입니다.');
+                    return;
+                }
+
+                selectEl.innerHTML = data.dates.map(d => `<option value="${d}">${labelFor(d)}</option>`).join('');
+                loadReport(data.dates[0]); // 가장 최근 리포트부터
+            } catch (e) {
+                showMsg('리포트 목록을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');
+            }
+        }
+
+        init();
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        }
+    </script>
+</body>
+</html>

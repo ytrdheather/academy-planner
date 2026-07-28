@@ -113,7 +113,12 @@ const userAccounts = {
 };
 
 // Helper Functions
-function generateToken(userData) { return jwt.sign(userData, JWT_SECRET, { expiresIn: '24h' }); }
+// 선생님은 24시간(공용 PC 대비 짧게), 학생은 30일.
+// 학생은 개인 폰에 앱처럼 깔아 쓰기 때문에 매일 로그인시키면 안 씀.
+function generateToken(userData) {
+    const expiresIn = userData.role === 'student' ? '30d' : '24h';
+    return jwt.sign(userData, JWT_SECRET, { expiresIn });
+}
 function verifyToken(token) { try { return jwt.verify(token, JWT_SECRET); } catch (error) { return null; } }
 
 function getKSTTodayRange() {
@@ -215,6 +220,14 @@ app.get('/results-viewer', (req, res) => res.sendFile(path.join(publicPath, 'vie
 app.get('/student-report', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-report.html')));
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
+
+// [PWA] 학생이 폰 홈 화면에 앱처럼 설치할 수 있게 하는 파일들.
+// 서비스워커는 반드시 루트(/sw.js)에서 내려줘야 사이트 전체를 scope로 잡습니다.
+app.get('/manifest.json', (req, res) => res.sendFile(path.join(publicPath, 'manifest.json')));
+app.get('/sw.js', (req, res) => {
+    res.set('Cache-Control', 'no-cache'); // 서비스워커 자체는 캐시 금지 → 배포하면 바로 갱신됨
+    res.sendFile(path.join(publicPath, 'sw.js'));
+});
 
 initializeBookRoutes(app, fetchNotion, process.env);
 try {
@@ -662,6 +675,11 @@ app.get('/api/get-today-progress', requireAuth, async (req, res) => {
             else if (value.type === 'status') progress[key] = value.status?.name;
             else if (value.type === 'files') progress[key] = value.files?.[0]?.external?.url || value.files?.[0]?.file?.url || '';
         }
+        // 선생님 코멘트는 학부모용이므로 학생 플래너 응답에서 제거.
+        // (화면에서 안 그리는 것만으로는 개발자도구/네트워크 탭에서 그대로 보임)
+        delete progress['❤ Today\'s Notice!'];
+        delete progress['Today\'s Notice!'];
+
         const engBookTitles = getRollupArray(props['📖 책제목 (롤업)']); const engBookARs = getRollupArray(props['AR']); const engBookLexiles = getRollupArray(props['Lexile']); const engBookIds = props['오늘 읽은 영어 책']?.relation?.map(r => r.id) || []; progress.englishBooks = engBookTitles.map((title, idx) => ({ title: title, id: engBookIds[idx] || null, ar: engBookARs[idx] || null, lexile: engBookLexiles[idx] || null }));
         const korBookTitles = getRollupArray(props['국어책제목(롤업)']); const korBookIds = props['국어 독서 제목']?.relation?.map(r => r.id) || []; progress.koreanBooks = korBookTitles.map((title, idx) => ({ title, id: korBookIds[idx] || null }));
         
@@ -1226,13 +1244,13 @@ function buildHomeworkRows(parsed) {
     return rows.join('\n');
 }
 
-app.get('/report', async (req, res) => {
-    const { pageId, date } = req.query;
-    if (!pageId) return res.status(400).send('Missing info');
-    try {
-        const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
-        const parsed = await parseDailyReportData(page);
+// 리포트 HTML 조립. forStudent=true면 dailyreport.html의 STUDENT_HIDE 마커 구간(선생님 코멘트)을 잘라냄.
+// 학부모용 /report 와 학생용 /api/my-report 가 같은 템플릿·같은 계산식을 쓰도록 하나로 뽑아둔 함수.
+function buildReportHtml(parsed, forStudent = false) {
         let html = reportTemplate;
+        if (forStudent) {
+            html = html.replace(/<!--\s*STUDENT_HIDE_START[\s\S]*?STUDENT_HIDE_END\s*-->/g, '');
+        }
         const bookTitleStr = parsed.reading.englishBooks && parsed.reading.englishBooks.length > 0 ? parsed.reading.englishBooks.map(b => b.title).join(', ') : (parsed.reading.bookTitle || '읽은 책 없음');
         
         const formatTestScore = (val) => {
@@ -1273,8 +1291,121 @@ app.get('/report', async (req, res) => {
             const displayVal = (val === null || val === undefined || val === '') ? '없음' : val;
             html = html.split(key).join(displayVal);
         }
-        res.send(html);
+        return html;
+}
+
+app.get('/report', async (req, res) => {
+    const { pageId } = req.query;
+    if (!pageId) return res.status(400).send('Missing info');
+    try {
+        const page = await fetchNotion(`https://api.notion.com/v1/pages/${pageId}`);
+        const parsed = await parseDailyReportData(page);
+        res.send(buildReportHtml(parsed, false));
     } catch (e) { res.status(500).send('Report Error'); }
+});
+
+// ==================================================================
+// [학생용] 내 리포트 / 내 숙제
+// 학부모용 /report 는 pageId만 알면 누구나 열리는 공개 링크라서 학생용으로 재사용하면 안 됨.
+// 아래 API들은 전부 로그인 토큰의 이름(req.user.name)으로만 노션을 조회한다 → 남의 것 조회 불가.
+// ==================================================================
+
+function requireStudent(req, res, next) {
+    if (req.user.role !== 'student') return res.status(403).json({ success: false, message: '학생 전용입니다' });
+    next();
+}
+
+// 학생 본인의 진도 DB 행을 날짜 내림차순으로 가져오는 공통 조회
+async function queryMyProgressRows(studentName, { limit = 30, onOrBefore = null } = {}) {
+    const conditions = [{ property: '이름', title: { equals: studentName } }];
+    if (onOrBefore) conditions.push({ property: '🕐 날짜', date: { on_or_before: onOrBefore } });
+
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+        method: 'POST',
+        body: JSON.stringify({
+            filter: { and: conditions },
+            sorts: [{ property: '🕐 날짜', direction: 'descending' }],
+            page_size: limit
+        })
+    });
+    return data.results;
+}
+
+app.get('/my-report', (req, res) => res.sendFile(path.join(publicPath, 'views', 'my-report.html')));
+
+// 리포트가 있는 날짜 목록 (최근 30일치) — 학생이 셀렉트박스에서 고를 수 있게
+app.get('/api/my-report-dates', requireAuth, requireStudent, async (req, res) => {
+    try {
+        const rows = await queryMyProgressRows(req.user.name, { limit: 30 });
+        const dates = rows
+            .map(p => p.properties['🕐 날짜']?.date?.start)
+            .filter(Boolean);
+        res.json({ success: true, studentName: req.user.name, dates });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 학생 본인의 데일리 리포트 HTML (선생님 코멘트 섹션 제거된 버전)
+app.get('/api/my-report', requireAuth, requireStudent, async (req, res) => {
+    const { date } = req.query;
+    try {
+        const rows = await queryMyProgressRows(req.user.name, { limit: 1, onOrBefore: date || null });
+        if (rows.length === 0) return res.status(404).send('리포트가 없습니다.');
+
+        // 날짜를 지정했는데 그 날 행이 없으면(=그 이전 행이 잡히면) 없는 걸로 처리. 엉뚱한 날짜 리포트 방지.
+        const rowDate = rows[0].properties['🕐 날짜']?.date?.start;
+        if (date && rowDate !== date) return res.status(404).send('그 날짜의 리포트가 없습니다.');
+
+        const parsed = await parseDailyReportData(rows[0]);
+        res.set('Cache-Control', 'no-store');
+        res.send(buildReportHtml(parsed, true));
+    } catch (e) { res.status(500).send('Report Error'); }
+});
+
+// 학생 본인에게 부여된 "다음 숙제". 오늘 수업 행이 아직 없을 수 있으므로
+// 최근 행부터 훑어서 숙제 내용이 실제로 채워진 가장 마지막 수업을 찾아 돌려준다.
+app.get('/api/my-homework', requireAuth, requireStudent, async (req, res) => {
+    const PLACEHOLDERS = ['없음', '숙제 내용 없음', '진도 해당 없음', '해당 없음', 'N/A'];
+    const meaningful = (v) => {
+        const c = (v || '').trim();
+        return !!c && !PLACEHOLDERS.includes(c);
+    };
+
+    try {
+        const rows = await queryMyProgressRows(req.user.name, { limit: 10 });
+
+        for (const row of rows) {
+            const props = row.properties;
+            const hw = {
+                date: props['🕐 날짜']?.date?.start || '',
+                grammarTopic: getSimpleText(props['오늘 문법 진도']),
+                grammar: getSimpleText(props['문법 숙제 내용']) || getSimpleText(props['문법 과제 내용']),
+                vocab: getSimpleText(props['어휘숙제']),
+                mainR: getSimpleText(props['주독해숙제']),
+                subR: getSimpleText(props['부독해숙제'])
+            };
+
+            // 자동생성 숙제(어휘/주독해/부독해)는 학부모 리포트와 동일한 스위치를 따른다.
+            if (!SHOW_GENERATED_HOMEWORK) { hw.vocab = ''; hw.mainR = ''; hw.subR = ''; }
+
+            const items = [];
+            if (meaningful(hw.grammarTopic) || meaningful(hw.grammar)) {
+                items.push({
+                    icon: '📑', subject: '문법',
+                    lines: [
+                        meaningful(hw.grammarTopic) ? { label: '진도', text: hw.grammarTopic.trim() } : null,
+                        meaningful(hw.grammar) ? { label: '숙제', text: hw.grammar.trim() } : null
+                    ].filter(Boolean)
+                });
+            }
+            [['📘', '어휘', hw.vocab], ['📗', '주독해', hw.mainR], ['📙', '부독해', hw.subR]].forEach(([icon, subject, detail]) => {
+                if (meaningful(detail)) items.push({ icon, subject, lines: [{ label: '숙제', text: detail.trim() }] });
+            });
+
+            if (items.length > 0) return res.json({ success: true, date: hw.date, items });
+        }
+
+        res.json({ success: true, date: null, items: [] });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/api/admin/regenerate-urls', requireAuth, async (req, res) => {

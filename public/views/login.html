@@ -2,8 +2,17 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>리디튜드 학습 플래너 - 로그인</title>
+
+    <!-- [PWA] 폰 홈 화면에 앱처럼 설치되게 하는 설정 -->
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="리디플랜">
+
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
     <style>
         * { font-family: "NanumSquareRound", sans-serif !important; }
@@ -45,6 +54,14 @@
 
     <script>
         console.log("로그인 페이지 스크립트가 로드되었습니다.");
+
+        // [PWA] 홈 화면에 설치 가능하게 하는 서비스워커 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        }
+
+        // 이미 로그인된 상태(앱 아이콘으로 재실행)면 로그인 화면 건너뛰고 바로 플래너로
+        if (localStorage.getItem('authToken')) window.location.replace('/planner');
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             console.log("로그인 폼 제출 이벤트가 감지되었습니다!");

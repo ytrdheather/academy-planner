@@ -2,8 +2,17 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>오늘의 학습 플래너</title>
+
+    <!-- [PWA] 폰 홈 화면에 앱처럼 설치되게 하는 설정 -->
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="리디플랜">
+
     <!-- Firebase SDK (필수) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
@@ -55,6 +64,17 @@
         .choice-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .choice-btn { width: 44px; height: 44px; border: 1.5px solid #cbd5e1; background: #fff; border-radius: 10px; font-size: 16px; font-weight: 700; color: #475569; cursor: pointer; }
         .choice-btn.sel { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+
+        /* 오늘의 숙제(읽기 전용) */
+        .todo-row { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid #f1f5f9; }
+        .todo-row:last-child { border-bottom: 0; }
+        .todo-subject { flex: 0 0 78px; font-weight: 800; color: #6b46c1; font-size: 15px; }
+        .todo-body { flex: 1; min-width: 0; }
+        .todo-line { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; line-height: 1.6; }
+        .todo-line:last-child { margin-bottom: 0; }
+        .todo-label { flex: 0 0 34px; font-size: 12px; font-weight: 700; color: #94a3b8; }
+        .todo-text { flex: 1; font-size: 15px; color: #334155; word-break: break-word; }
+        .todo-empty { padding: 24px 0; text-align: center; color: #64748b; font-weight: 700; line-height: 1.7; }
     </style>
 </head>
 <body>
@@ -73,10 +93,25 @@
 
         <!-- 1. 메뉴 -->
         <div id="menu-view">
+            <button class="menu-btn" onclick="goToView('todo')"><span class="menu-icon">📚</span> 오늘의 숙제 확인하기</button>
             <button class="menu-btn" onclick="goToView('homework')"><span class="menu-icon">📤</span> 숙제 제출하기</button>
             <button class="menu-btn" onclick="goToView('planner')"><span class="menu-icon">📝</span> 스터디 플래너 입력하기</button>
+            <button class="menu-btn" onclick="location.href='/my-report'"><span class="menu-icon">📊</span> 나의 데일리 리포트 보기</button>
             <button class="menu-btn" onclick="goToView('history')"><span class="menu-icon">📅</span> 나의 스터디 로그 보기</button>
             <button class="menu-btn" onclick="goToView('exam')"><span class="menu-icon">📄</span> 시험 답안 입력하기</button>
+        </div>
+
+        <!-- 0. 오늘의 숙제 확인 (읽기 전용) -->
+        <div id="todo-view" class="sub-view">
+            <div class="view-header">
+                <div class="view-title">📚 오늘의 숙제</div>
+                <button class="back-btn" onclick="goToMenu()">메뉴로</button>
+            </div>
+            <div class="section-card">
+                <div id="todoDate" style="color:#64748b; font-size:13px; margin-bottom:14px;"></div>
+                <div id="todoList">불러오는 중…</div>
+            </div>
+            <button type="button" class="submit-button" onclick="goToView('homework')">숙제 다 했어요 → 제출하러 가기</button>
         </div>
 
         <!-- 5. 시험 답안 입력 -->
@@ -180,7 +215,11 @@
                 <!-- 읽기 전용 폼 -->
                 <form id="historyForm">
                     <div class="section-card"><h2>📋 숙제 기록</h2><div class="input-group input-row"><div><label>문법 숙제</label><input type="text" name="⭕ 지난 문법 숙제 검사" disabled></div><div><label>어휘 클카</label><input type="text" name="1️⃣ 어휘 클카 암기 숙제" disabled></div></div><div class="input-group input-row"><div><label>독해 클카</label><input type="text" name="2️⃣ 독해 단어 클카 숙제" disabled></div><div><label>Summary</label><input type="text" name="4️⃣ Summary 숙제" disabled></div></div><div class="input-group input-row"><div><label>매일 독해</label><input type="text" name="5️⃣ 독해서 풀기" disabled></div><div><label>부&매&일</label><input type="text" name="6️⃣ 부&매&일" disabled></div></div></div>
-                    <div class="section-card"><h2>📝 시험/학습 기록</h2><div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" disabled></div><div class="input-group input-row"><div><label>단어 맞은개수</label><input type="text" name="단어(맞은 개수)" disabled></div><div><label>문법 틀린개수</label><input type="text" name="문법(틀린 개수)" disabled></div></div><div class="input-group"><label>영어 독서</label><input type="text" name="📖 영어독서" disabled></div><div class="input-group"><label>읽은 책 목록</label><div id="historyBookList" style="padding:10px; background:#f1f5f9; border-radius:8px; min-height:40px;"></div></div><div class="input-group"><label>오늘의 소감</label><textarea name="오늘의 학습 소감" disabled rows="3"></textarea></div><div class="input-group"><label>선생님 코멘트</label><div id="historyTeacherComment" style="padding:15px; background:#fffbeb; border:1px solid #fbd38d; border-radius:8px; white-space: pre-wrap;"></div></div></div>
+                    <div class="section-card"><h2>📝 시험/학습 기록</h2><div class="input-group"><label>어휘유닛</label><input type="text" name="어휘유닛" disabled></div><div class="input-group input-row"><div><label>단어 맞은개수</label><input type="text" name="단어(맞은 개수)" disabled></div><div><label>문법 틀린개수</label><input type="text" name="문법(틀린 개수)" disabled></div></div><div class="input-group"><label>영어 독서</label><input type="text" name="📖 영어독서" disabled></div><div class="input-group"><label>읽은 책 목록</label><div id="historyBookList" style="padding:10px; background:#f1f5f9; border-radius:8px; min-height:40px;"></div></div><div class="input-group"><label>오늘의 소감</label><textarea name="오늘의 학습 소감" disabled rows="3"></textarea></div>
+                    <!-- 선생님 코멘트(❤ Today's Notice!)는 학부모용이라 학생 화면에서 제외했습니다.
+                         되살리려면 ① 아래 주석을 풀고 ② api/index.js의 /api/get-today-progress에 있는 delete 두 줄도 지워야 합니다.
+                    <div class="input-group"><label>선생님 코멘트</label><div id="historyTeacherComment" style="padding:15px; background:#fffbeb; border:1px solid #fbd38d; border-radius:8px; white-space: pre-wrap;"></div></div>
+                    --></div>
                 </form>
              </div>
 
@@ -307,6 +346,11 @@
             document.getElementById('homeworkForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('plannerForm').addEventListener('submit', handleFormSubmit);
         });
+
+        // [PWA] 홈 화면에 설치 가능하게 하는 서비스워커 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        }
         
         async function loadStudentInfo() {
             try {
@@ -323,6 +367,8 @@
                         historyTitle.textContent = `📅 ${name}${suffix} 스터디 로그`;
                     }
                 } else {
+                    // 만료된 토큰은 반드시 지우고 보낸다. 안 지우면 로그인 화면이 다시 /planner로 튕겨서 무한루프.
+                    localStorage.removeItem('authToken');
                     alert('로그인이 필요합니다.'); window.location.href = '/';
                 }
             } catch (e) { console.error(e); }
@@ -340,12 +386,15 @@
             document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
             document.getElementById('globalHomeBtn').style.display = 'block'; 
             
-            if (viewName === 'homework') {
+            if (viewName === 'todo') {
+                document.getElementById('todo-view').classList.add('active');
+                loadMyHomework();
+            } else if (viewName === 'homework') {
                 document.getElementById('homework-view').classList.add('active');
-                loadTodayData('homeworkForm'); 
+                loadTodayData('homeworkForm');
             } else if (viewName === 'planner') {
                 document.getElementById('planner-view').classList.add('active');
-                loadTodayData('plannerForm'); 
+                loadTodayData('plannerForm');
             } else if (viewName === 'history') {
                 document.getElementById('history-view').classList.add('active');
                 const today = new Date().toISOString().split('T')[0];
@@ -377,7 +426,10 @@
             document.querySelectorAll('.sub-view').forEach(el => el.classList.remove('active'));
             document.getElementById('globalHomeBtn').style.display = 'block';
             
-            if (viewName === 'homework') {
+            if (viewName === 'todo') {
+                document.getElementById('todo-view').classList.add('active');
+                loadMyHomework();
+            } else if (viewName === 'homework') {
                 document.getElementById('homework-view').classList.add('active');
                 loadTodayData('homeworkForm');
             } else if (viewName === 'planner') {
@@ -419,6 +471,49 @@
             } catch (e) { console.error('Data load error:', e); }
         }
 
+        // ── 오늘의 숙제 (읽기 전용) ─────────────────────────────
+        async function loadMyHomework() {
+            const listEl = document.getElementById('todoList');
+            const dateEl = document.getElementById('todoDate');
+            listEl.innerHTML = '불러오는 중…';
+            dateEl.textContent = '';
+
+            const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            try {
+                const res = await fetch('/api/my-homework', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.status === 401) { localStorage.removeItem('authToken'); window.location.href = '/'; return; }
+                // 서버 오류를 "숙제 없음"으로 보여주면 안 됨 → 구분해서 안내
+                if (!res.ok) { listEl.innerHTML = '<div class="todo-empty">숙제를 불러오지 못했어요.<br>잠시 후 다시 시도해 주세요.</div>'; return; }
+                const json = await res.json();
+
+                if (!json.success || !json.items || json.items.length === 0) {
+                    listEl.innerHTML = '<div class="todo-empty">아직 부여된 숙제가 없어요.<br>수업이 끝나면 여기에 표시됩니다.</div>';
+                    return;
+                }
+
+                if (json.date) {
+                    const d = new Date(json.date + 'T00:00:00+09:00');
+                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                    dateEl.textContent = `📅 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) 수업에서 받은 숙제`;
+                }
+
+                listEl.innerHTML = json.items.map(item => `
+                    <div class="todo-row">
+                        <div class="todo-subject">${esc(item.icon)} ${esc(item.subject)}</div>
+                        <div class="todo-body">
+                            ${item.lines.map(l => `
+                                <div class="todo-line">
+                                    <span class="todo-label">${esc(l.label)}</span>
+                                    <span class="todo-text">${esc(l.text)}</span>
+                                </div>`).join('')}
+                        </div>
+                    </div>`).join('');
+            } catch (e) {
+                listEl.innerHTML = '<div class="todo-empty">숙제를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</div>';
+            }
+        }
+
         async function loadHistoryData() {
             const date = document.getElementById('historyDateInput').value;
             if (!date) return;
@@ -430,7 +525,9 @@
                 const form = document.getElementById('historyForm');
                 form.reset();
                 document.getElementById('historyBookList').innerHTML = '';
-                document.getElementById('historyTeacherComment').textContent = '코멘트 없음';
+                // 선생님 코멘트 영역은 학생 화면에서 제거됨 → 없으면 그냥 건너뜀
+                const commentEl = document.getElementById('historyTeacherComment');
+                if (commentEl) commentEl.textContent = '코멘트 없음';
 
                 if (json.success && json.progress) {
                     const data = json.progress;
@@ -444,13 +541,10 @@
                         document.getElementById('historyBookList').innerHTML = titles || '없음';
                     }
                     
-                    if (data['Today\'s Notice!']) { 
-                         document.getElementById('historyTeacherComment').textContent = data['Today\'s Notice!'];
-                    } else if (data['❤ Today\'s Notice!']) {
-                         document.getElementById('historyTeacherComment').textContent = data['❤ Today\'s Notice!'];
-                    }
-                } else {
-                     document.getElementById('historyTeacherComment').textContent = '데이터가 없습니다.';
+                    const notice = data['Today\'s Notice!'] || data['❤ Today\'s Notice!'];
+                    if (commentEl && notice) commentEl.textContent = notice;
+                } else if (commentEl) {
+                    commentEl.textContent = '데이터가 없습니다.';
                 }
 
             } catch (e) { console.error(e); }
