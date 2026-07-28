@@ -1198,11 +1198,12 @@ function getReportColor(value, type) {
     return GRAY;
 }
 
-// 진도 자동화 숙제(어휘/주독해/부독해)를 학부모용 리포트에 노출할지 스위치.
-// 학생별 교재 업데이트 검증이 끝나기 전까지는 꺼둠 → 리포트엔 문법 숙제만 노출.
-// 활성화: Render 환경변수 SHOW_GENERATED_HOMEWORK=true 설정(코드 배포 불필요, 재시작만) 또는 아래 기본값을 true로.
+// 어휘/주독해/부독해 숙제를 학부모 리포트·학생앱에 노출할지 스위치.
+// 2026-07-28부터 기본 켬. 교재 업데이트 검증이 끝났고, 무엇보다 이 필드는 자동 생성분만이 아니라
+// 선생님이 출결·숙제 탭에서 직접 쓴 숙제도 담기 때문에 꺼두면 수기 입력분까지 학부모에게 안 나갔다.
+// 끄려면 Render 환경변수 SHOW_GENERATED_HOMEWORK=false (코드 배포 불필요, 재시작만).
 // ※ 문법 숙제는 이 스위치와 무관하게 항상 노출됨. 생성 엔진/저장/출결탭도 스위치와 무관하게 그대로 동작.
-const SHOW_GENERATED_HOMEWORK = process.env.SHOW_GENERATED_HOMEWORK === 'true';
+const SHOW_GENERATED_HOMEWORK = process.env.SHOW_GENERATED_HOMEWORK !== 'false';
 
 // [신규] 진도 자동화로 설정된 "다음 숙제"(문법/어휘/주독해/부독해) 섹션 행 HTML을 조립.
 // 데이터는 parseDailyReportData가 이미 읽어둠(comment.grammarTopic/grammarHomework, assignedHw.*).
