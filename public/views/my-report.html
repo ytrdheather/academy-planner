@@ -4,39 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>나의 리포트 - 리디튜드</title>
-    <meta name="theme-color" content="#7c3aed">
+    <meta name="theme-color" content="#0d9488">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="리디플랜">
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
     <style>
         * { box-sizing: border-box; }
         html, body { height: 100%; }
         body {
             margin: 0; display: flex; flex-direction: column;
-            font-family: "NanumSquareRound", -apple-system, sans-serif;
-            background: #f1f5f9; color: #1e293b;
+            font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, -apple-system, sans-serif;
+            background: #f9f7f2; color: #17242e; letter-spacing: -.01em;
         }
         .toolbar {
-            flex: 0 0 auto; background: #fff; border-bottom: 1px solid #e2e8f0;
+            flex: 0 0 auto; background: #fff; border-bottom: 1px solid #e0e8ea;
             padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top));
             display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
         }
-        .toolbar .title { font-weight: 800; color: #7c3aed; font-size: 16px; margin-right: auto; }
+        .toolbar .title { font-weight: 800; color: #0a6c62; font-size: 16px; margin-right: auto; letter-spacing: -.02em; }
         select {
             font-family: inherit; font-size: 15px; padding: 9px 12px;
-            border: 2px solid #e2e8f0; border-radius: 10px; background: #f8fafc; color: #334155;
+            border: 1px solid #cdd9db; border-radius: 10px; background: #f4f7f7; color: #17242e;
             font-weight: 700; max-width: 60vw;
         }
         .btn {
-            border: 1px solid #cbd5e1; background: #fff; color: #475569;
+            border: 1px solid #cdd9db; background: #eef3f3; color: #485a68;
             border-radius: 10px; padding: 9px 14px; font-weight: 700;
             font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
         }
-        #frame { flex: 1 1 auto; width: 100%; border: 0; background: #f1f5f9; }
-        .msg { padding: 40px 20px; text-align: center; color: #64748b; font-weight: 700; line-height: 1.7; }
+        #frame { flex: 1 1 auto; width: 100%; border: 0; background: #f9f7f2; }
+        .msg { padding: 40px 20px; text-align: center; color: #485a68; font-weight: 700; line-height: 1.7; }
         .msg.hide, #frame.hide { display: none; }
     </style>
 </head>

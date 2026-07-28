@@ -1,0 +1,43 @@
+<svg width="680" height="300" viewBox="0 0 680 300" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>리디플랜 로고</title>
+<desc>부엉이 마스코트가 체크리스트 보드를 들고 있고, 옆에 리디플랜 워드마크와 Readiplan 서브텍스트가 있는 가로형 로고</desc>
+
+<path d="M70 52 Q250 24 470 46" fill="none" stroke="#3a4750" stroke-width="2.4" stroke-linecap="round"/>
+<circle cx="70" cy="52" r="4" fill="#3a4750"/>
+<circle cx="470" cy="46" r="4" fill="#3a4750"/>
+<polygon points="120,44 150,44 135,80" fill="#a9c39f"/>
+<polygon points="170,42 200,42 185,78" fill="#f2d59a"/>
+<polygon points="220,40 250,40 235,76" fill="#a9c39f"/>
+<polygon points="270,40 300,40 285,76" fill="#f2d59a"/>
+<polygon points="320,42 350,42 335,78" fill="#a9c39f"/>
+<polygon points="370,44 400,44 385,80" fill="#f2d59a"/>
+
+<ellipse cx="150" cy="215" rx="86" ry="30" fill="#d3dedb"/>
+
+<path d="M150 108 C102 108 84 150 84 182 C84 216 112 238 150 238 C188 238 216 216 216 182 C216 150 198 108 150 108 Z" fill="#c8cfc7" stroke="#2b3b42" stroke-width="2.6"/>
+<path d="M96 120 C88 100 96 86 108 88 C112 100 110 112 104 120 Z" fill="#c8cfc7" stroke="#2b3b42" stroke-width="2.6"/>
+<path d="M204 120 C212 100 204 86 192 88 C188 100 190 112 196 120 Z" fill="#c8cfc7" stroke="#2b3b42" stroke-width="2.6"/>
+<path d="M150 120 C126 130 116 152 116 170 C132 176 142 172 150 164 C158 172 168 176 184 170 C184 152 174 130 150 120 Z" fill="#eef2ee"/>
+
+<circle cx="126" cy="158" r="21" fill="#fbf6ee" stroke="#2b3b42" stroke-width="2.4"/>
+<circle cx="174" cy="158" r="21" fill="#fbf6ee" stroke="#2b3b42" stroke-width="2.4"/>
+<circle cx="126" cy="159" r="9" fill="#a86a1e"/>
+<circle cx="174" cy="159" r="9" fill="#a86a1e"/>
+<circle cx="123" cy="156" r="3" fill="#fff"/>
+<circle cx="171" cy="156" r="3" fill="#fff"/>
+<polygon points="150,168 142,178 158,178" fill="#e08a2b" stroke="#2b3b42" stroke-width="1.6"/>
+
+<g transform="rotate(-9 205 205)">
+<rect x="176" y="168" width="72" height="86" rx="8" fill="#f6efe1" stroke="#2b3b42" stroke-width="2.6"/>
+<rect x="196" y="160" width="32" height="14" rx="6" fill="#a9c39f" stroke="#2b3b42" stroke-width="2.4"/>
+<line x1="190" y1="192" x2="234" y2="192" stroke="#b7c0bc" stroke-width="3" stroke-linecap="round"/>
+<line x1="190" y1="210" x2="234" y2="210" stroke="#b7c0bc" stroke-width="3" stroke-linecap="round"/>
+<line x1="190" y1="228" x2="222" y2="228" stroke="#b7c0bc" stroke-width="3" stroke-linecap="round"/>
+<path d="M184 190 l5 5 l9 -11" fill="none" stroke="#0d9488" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M184 208 l5 5 l9 -11" fill="none" stroke="#0d9488" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+
+<text x="300" y="182" font-family="'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif" font-size="82" font-weight="800" fill="#2b3b42" letter-spacing="-2">리디플랜</text>
+<text x="304" y="222" font-family="'Pretendard','Apple SD Gothic Neo',sans-serif" font-size="22" font-weight="600" letter-spacing="5" fill="#0d9488">READIPLAN</text>
+<text x="306" y="248" font-family="'Pretendard','Apple SD Gothic Neo',sans-serif" font-size="15" font-weight="500" letter-spacing="1" fill="#7b8b98">리디튜드 학원 운영 · 진도 관리</text>
+</svg>

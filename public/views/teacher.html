@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>선생님 대시보드 - 리디튜드</title>
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
     <link rel="stylesheet" href="/assets/teacher.css">
     <style>
         /* 학생 이름 위 상태 배지 영역 */
@@ -63,6 +63,8 @@
                 <button class="refresh-btn" style="background:#0d9488; color:#fff;" onclick="markAllPresent()">✅ 전체 출석</button>
                 <button class="refresh-btn" style="background:#7c3aed; color:#fff;" onclick="openHomeworkPreview()">🔮 다음 숙제 생성</button>
                 <button class="refresh-btn" style="background:#334155; color:#fff;" onclick="openPauseManager()">⏸️ 정지 관리</button>
+                <button class="refresh-btn" style="background:#fff; color:#0a6c62; border:1px solid #a7ddd4;" onclick="generateDailyReportsManual(this)" title="오늘 날짜로 등원 학생 리포트 페이지 생성(자동 생성이 누락됐을 때 복구용). 이미 있는 학생은 건너뜁니다.">📄 오늘 리포트 생성</button>
+                <button class="refresh-btn" style="background:#fff; color:#5b21b6; border:1px solid #ddd0f5;" onclick="autoGenerateHomeworkManual(this)" title="매일 11시 자동 생성이 누락됐을 때 복구용. 그날 등원 예정 학생 전원의 숙제를 만들어 기록합니다. 이미 숙제가 있는 과목은 건너뜁니다.">🔮 오늘 숙제 자동 기록</button>
                 <span id="pauseBanner" style="display:none; padding:4px 10px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px; color:#b91c1c; font-weight:700;"></span>
             </div>
 
@@ -131,6 +133,20 @@
                         <button onclick="closeHomeworkPreview()" class="refresh-btn" style="background:#e2e8f0; color:#334155;">취소</button>
                         <button id="hwConfirmBtn" onclick="confirmHomework()" class="refresh-btn" style="background:#7c3aed; color:#fff;">✅ 확정 기록</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="studentHwOverlay" style="display:none; position:fixed; inset:0; background:rgba(20,40,55,0.45); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; width:min(460px,92vw); max-height:82vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 15px 40px rgba(20,40,55,0.25);">
+                <div style="padding:16px 18px; border-bottom:1px solid #e0e8ea; display:flex; align-items:center; justify-content:space-between;">
+                    <div id="studentHwTitle" style="font-weight:800; color:#0a6c62;">숙제</div>
+                    <button onclick="closeStudentHomework()" style="border:none; background:transparent; font-size:20px; cursor:pointer; color:#7b8b98;">✕</button>
+                </div>
+                <div id="studentHwBody" style="overflow-y:auto; padding:8px 18px 16px; flex:1;"></div>
+                <div style="padding:12px 18px; border-top:1px solid #e0e8ea; display:flex; justify-content:flex-end; gap:8px;">
+                    <button onclick="copyStudentHomework()" class="refresh-btn" style="background:#e4f3f0; color:#0a6c62; border:1px solid #a7ddd4;">📋 복사</button>
+                    <button onclick="closeStudentHomework()" class="refresh-btn" style="background:#0d9488; color:#fff;">닫기</button>
                 </div>
             </div>
         </div>
@@ -1032,14 +1048,26 @@
             if (!tbody) return;
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(getAttendanceHwRow).join('');
+            autoGrowAllHw();
+        }
+
+        // 숙제칸 높이를 내용에 맞춰 늘림(최대 높이는 CSS max-height, 넘치면 칸 안에서 스크롤)
+        function autoGrowHw(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight + 2, 110) + 'px';
+        }
+        function autoGrowAllHw() {
+            document.querySelectorAll('#attendanceTableBody .hw-cell-input').forEach(autoGrowHw);
         }
 
         function getAttendanceHwRow(st) {
             const absent = isAbsent(st);
-            const hwInput = (prop, val) => `<input class="editable-input editable-text-input" style="width:150px;" value="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" onchange="updateField(this)">`;
-            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 숙제만 다음 등원까지 미룸(커서 되돌림)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button></div>`;
+            // 숙제칸: 한 줄 input이면 문구가 잘려서 '숙제 보기'를 눌러야 했음 → 줄바꿈되는 textarea로 내용 전체 노출
+            const hwInput = (prop, val) => `<textarea class="editable-input hw-cell-input" rows="1" title="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" oninput="autoGrowHw(this)" onchange="updateField(this)">${escAttr(val || '')}</textarea>`;
+            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 과목 진도 한 칸 되돌림(커서 -1, 다음 생성 때 재출제)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button><button title="이 과목 진도 한 칸 앞으로(커서 +1, 오늘 숙제 문구도 즉시 갱신)" onclick="advanceHomework('${escAttr(st.studentName)}','${prefix}',this,'${st.pageId}')" style="border:none;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">→</button></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div></td>
+                <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button><button onclick="openHomeworkPreview('${escAttr(st.studentName)}')" title="이 학생만 다음 숙제 생성" style="border:1px solid #ddd0f5;background:#f5f3ff;color:#5b21b6;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">🔮 생성</button></div></div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
@@ -1068,13 +1096,16 @@
 
         // ===== [Phase 4] 숙제 자동 생성 미리보기 → 확정 =====
         let hwPreviewData = [];
+        let hwPreviewOnlyName = ''; // 비어있으면 전체 생성, 값이 있으면 그 학생 1명만
 
-        async function openHomeworkPreview() {
+        // onlyName 을 주면 그 학생 1명만 대상(행의 '🔮 생성' 버튼). 없으면 기존처럼 출석자 전체.
+        async function openHomeworkPreview(onlyName) {
             const period = document.getElementById('commonPeriodFilter')?.value;
             const date = document.getElementById('commonSpecificDate')?.value;
             const effDate = (period === 'specific_date' && date) ? date : undefined;
             const overlay = document.getElementById('hwPreviewOverlay');
             const body = document.getElementById('hwPreviewBody');
+            hwPreviewOnlyName = onlyName || '';
             overlay.style.display = 'flex';
             body.innerHTML = '<div style="padding:30px;text-align:center;color:#7c3aed;">🔮 계산 중...</div>';
             document.getElementById('hwPreviewSub').textContent = '';
@@ -1082,7 +1113,7 @@
             try {
                 const res = await fetch(`${API_BASE_URL}/api/generate-homework-preview`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ date: effDate })
+                    body: JSON.stringify({ date: effDate, name: onlyName || undefined })
                 });
                 const j = await res.json();
                 if (!j.success) throw new Error(j.message || '생성 실패');
@@ -1100,7 +1131,7 @@
                     return;
                 }
                 hwPreviewData = j.students || [];
-                document.getElementById('hwPreviewSub').textContent = `(${j.date} 출석자 기준)`;
+                document.getElementById('hwPreviewSub').textContent = onlyName ? `(${j.date} · ${onlyName} 개인 생성)` : `(${j.date} 출석자 기준)`;
                 renderHomeworkPreview();
             } catch (e) { body.innerHTML = `<div style="padding:24px;color:#dc2626;">실패: ${escAttr(e.message)}</div>`; }
         }
@@ -1108,7 +1139,9 @@
         function renderHomeworkPreview() {
             const body = document.getElementById('hwPreviewBody');
             if (!hwPreviewData.length) {
-                body.innerHTML = '<div style="padding:24px;color:#64748b;">대상 학생이 없습니다.<br><span style="font-size:12px;">(오늘 출석 + 학습상태 정상 + 교재·진도량이 설정된 학생만 나옵니다)</span></div>';
+                body.innerHTML = hwPreviewOnlyName
+                    ? `<div style="padding:24px;color:#64748b;">${escAttr(hwPreviewOnlyName)} 학생은 생성 대상이 아닙니다.<br><span style="font-size:12px;">(결석사유 입력됨 · 학습상태가 '정상'이 아님 · 교재/진도량 미설정 · 오늘 리포트 페이지 없음 중 하나)</span></div>`
+                    : '<div style="padding:24px;color:#64748b;">대상 학생이 없습니다.<br><span style="font-size:12px;">(오늘 출석 + 학습상태 정상 + 교재·진도량이 설정된 학생만 나옵니다)</span></div>';
                 document.getElementById('hwPreviewCount').textContent = '';
                 return;
             }
@@ -1133,7 +1166,40 @@
             document.getElementById('hwPreviewCount').textContent = `학생 ${hwPreviewData.length}명 · 항목 ${totalSubs}개`;
         }
 
-        function closeHomeworkPreview() { document.getElementById('hwPreviewOverlay').style.display = 'none'; hwPreviewData = []; }
+        function closeHomeworkPreview() { document.getElementById('hwPreviewOverlay').style.display = 'none'; hwPreviewData = []; hwPreviewOnlyName = ''; }
+
+        // ===== [개인 숙제 보기] 한 학생의 배정 숙제를 모아 출력 =====
+        let currentStudentHwText = '';
+        function showStudentHomework(pageId) {
+            const st = (allReportData || []).find(x => x.pageId === pageId);
+            if (!st) { showToast('학생 정보를 찾을 수 없습니다. 새로고침 후 다시 시도하세요.', 'error'); return; }
+            const a = st.assignedHw || {};
+            const rows = [['📘 어휘', a.vocab], ['📗 주독해', a.mainR], ['📙 부독해', a.subR], ['📕 문법', a.grammar]];
+            const filled = rows.filter(r => (r[1] || '').trim());
+            document.getElementById('studentHwTitle').textContent = `📄 ${st.studentName} 숙제${st.date ? ' · ' + st.date : ''}`;
+            const body = document.getElementById('studentHwBody');
+            if (!filled.length) {
+                body.innerHTML = '<div style="color:#7b8b98; padding:14px 0;">아직 배정된 숙제가 없습니다.</div>';
+                currentStudentHwText = `${st.studentName} — 배정된 숙제 없음`;
+            } else {
+                body.innerHTML = rows.map(([label, val]) => {
+                    const v = (val || '').trim();
+                    return `<div style="padding:11px 0; border-top:1px solid #eef3f3;">
+                        <div style="font-weight:700; font-size:13px; color:#0a6c62; margin-bottom:3px;">${label}</div>
+                        <div style="font-size:14px; color:${v ? '#17242e' : '#b0bcc4'}; white-space:pre-wrap; line-height:1.55;">${v ? escAttr(v) : '없음'}</div>
+                    </div>`;
+                }).join('');
+                currentStudentHwText = `[${st.studentName} 숙제${st.date ? ' · ' + st.date : ''}]\n` + filled.map(r => `${r[0]} ${r[1].trim()}`).join('\n');
+            }
+            document.getElementById('studentHwOverlay').style.display = 'flex';
+        }
+        function closeStudentHomework() { document.getElementById('studentHwOverlay').style.display = 'none'; }
+        function copyStudentHomework() {
+            if (!currentStudentHwText) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentStudentHwText).then(() => showToast('숙제를 복사했습니다.', 'success'), () => showToast('복사 실패', 'error'));
+            } else { showToast('이 브라우저에서는 복사가 지원되지 않습니다.', 'error'); }
+        }
 
         async function confirmHomework() {
             const payload = [];
@@ -1149,16 +1215,28 @@
                 if (Object.keys(hw).length) payload.push({ dailyPageId: st.dailyPageId, studentPageId: st.studentPageId, hw, cursors });
             });
             if (!payload.length) { showToast('선택된 항목이 없습니다.', 'error'); return; }
-            const btn = document.getElementById('hwConfirmBtn'); btn.disabled = true; const orig = btn.textContent; btn.textContent = '기록 중...';
+            const btn = document.getElementById('hwConfirmBtn'); btn.disabled = true; const orig = btn.textContent; btn.textContent = `기록 중 0/${payload.length}`;
             try {
                 const res = await fetch(`${API_BASE_URL}/api/confirm-homework`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify({ students: payload })
                 });
-                const text = await res.text();
-                const lines = text.trim().split('\n').filter(Boolean);
-                const last = JSON.parse(lines[lines.length - 1]);
-                showToast(last.message || '완료', last.success ? 'success' : 'error');
+                // 스트림을 한 줄씩 읽어 진행률 실시간 표시(서버가 {progress,total} 줄을 흘려보냄)
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '', last = null;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buf += decoder.decode(value, { stream: true });
+                    const parts = buf.split('\n'); buf = parts.pop();
+                    for (const line of parts) {
+                        const s = line.trim(); if (!s) continue;
+                        try { const obj = JSON.parse(s); last = obj; if (obj.total) btn.textContent = `기록 중 ${obj.progress}/${obj.total}`; } catch (_) {}
+                    }
+                }
+                if (buf.trim()) { try { last = JSON.parse(buf.trim()); } catch (_) {} }
+                showToast((last && last.message) || '완료', (last && last.success) ? 'success' : 'error');
                 closeHomeworkPreview();
                 loadDataForCurrentTab(true);
             } catch (e) { showToast('확정 실패: ' + e.message, 'error'); }
@@ -1288,6 +1366,57 @@
                 showToast(`${prefix} 미룸 완료 (커서 ${j.newCursor}로 되돌림, ${j.rolledBack}개). 다음 생성 때 재출제됩니다.`);
             } catch (e) { showToast('미룸 실패: ' + e.message, 'error'); }
             finally { if (btn) btn.disabled = false; }
+        }
+
+        async function advanceHomework(name, prefix, btn, dailyPageId) {
+            if (!confirm(`${name} 학생의 ${prefix} 진도를 한 칸 앞으로 보낼까요?\n(그 과목 커서를 +1 전진 — 오늘 숙제 문구도 있으면 같이 갱신됩니다. ↩로 되돌릴 수 있어요)`)) return;
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/advance-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ name, prefix, dailyPageId })
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '전진 실패', 'error'); return; }
+                showToast(j.updatedText ? `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 오늘 숙제 문구도 갱신됨.` : `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
+                if (j.updatedText) loadDataForCurrentTab(true);
+            } catch (e) { showToast('전진 실패: ' + e.message, 'error'); }
+            finally { if (btn) btn.disabled = false; }
+        }
+
+        // 오늘 리포트 수동 생성(크론 누락 복구용). 서버가 멱등이라 이미 있는 학생은 건너뜀.
+        async function generateDailyReportsManual(btn) {
+            if (!confirm('오늘 날짜로 등원 학생들의 리포트 페이지를 생성할까요?\n(자동 생성이 빠졌을 때 복구용 — 이미 있는 학생은 건너뜁니다)')) return;
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '생성 중...'; }
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/generate-daily-reports`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '리포트 생성 실패', 'error'); return; }
+                showToast(`✅ ${j.date}(${j.day}) 리포트 생성: 신규 ${j.created.length}명, 기존 ${j.skipped.length}명`, 'success');
+                loadDataForCurrentTab(true);
+            } catch (e) { showToast('리포트 생성 실패: ' + e.message, 'error'); }
+            finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
+        }
+
+        // 11시 자동 숙제 생성 수동 실행(크론 누락 복구용). 서버가 멱등이라 이미 있는 과목은 건너뜀.
+        async function autoGenerateHomeworkManual(btn) {
+            if (!confirm('오늘 등원 예정 학생 전원의 숙제를 만들어 기록할까요?\n(매일 11시 자동 생성이 빠졌을 때 복구용 — 이미 숙제가 있는 과목은 건너뜁니다)')) return;
+            const orig = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '기록 중...'; }
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/auto-generate-homework`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+                });
+                const j = await res.json();
+                if (!j.success) { showToast(j.message || '숙제 자동 기록 실패', 'error'); return; }
+                if (j.paused) { showToast(`⏸️ 정지 기간이라 생성하지 않았습니다 (${j.pause?.reason || ''})`, 'error'); return; }
+                showToast(`✅ ${j.date} 숙제 기록: 신규 ${j.written.length}명, 이미 있음 ${j.skipped.length}명${j.errors.length ? `, 실패 ${j.errors.length}건` : ''}`, j.errors.length ? 'error' : 'success');
+                loadDataForCurrentTab(true);
+            } catch (e) { showToast('숙제 자동 기록 실패: ' + e.message, 'error'); }
+            finally { if (btn) { btn.disabled = false; btn.textContent = orig; } }
         }
 
         async function markAllPresent() {
@@ -1574,14 +1703,22 @@
                 val = val.split(',').map(s => s.trim()).filter(Boolean);
             }
 
-            try { 
-                await fetch(`${API_BASE_URL}/api/update-homework`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, 
-                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type }) 
-                }); 
-                showToast('저장되었습니다.'); 
-            } catch (e) { showToast('실패', 'error'); } 
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/update-homework`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ pageId, propertyName: prop, newValue: val, propertyType: type })
+                });
+                // 결석 처리로 그날 숙제가 되돌려졌으면 알려주고 표를 새로고침(지워진 숙제칸 반영)
+                const j = await res.json().catch(() => ({}));
+                const rb = j.absenceRollback?.rolledBack || [];
+                if (rb.length) {
+                    showToast(`결석 처리 — 오늘 숙제(${rb.join(', ')})를 지우고 진도를 되돌렸습니다.`, 'success');
+                    loadDataForCurrentTab(true);
+                } else {
+                    showToast('저장되었습니다.');
+                }
+            } catch (e) { showToast('실패', 'error'); }
         }
 
         async function updateGrammarByClass() {
