@@ -1594,16 +1594,19 @@ app.get('/api/textbooks', requireAuth, async (req, res) => {
 });
 
 // 학생별 진도 설정 읽기 (학생 명부 DB) — 재사용 함수
-async function readStudentConfigs() {
+// onlyName을 주면 노션 쪽에서 그 1명만 필터링해서 가져온다(개인 지목 조회 10배 단축용). 안 주면 기존처럼 전체.
+async function readStudentConfigs(onlyName = '') {
     let byId = {};
     try { byId = (await loadTextbooks()).byId; } catch (e) { /* 교재 못 읽어도 진행 */ }
     const relName = (prop) => (prop?.relation?.map(r => byId[r.id]?.name || '').filter(Boolean).join(', ')) || '';
     const relId = (prop) => prop?.relation?.[0]?.id || '';
+    const nameFilter = onlyName ? { property: '이름', title: { equals: onlyName } } : null;
 
     const students = [];
     let cursor = undefined, hasMore = true;
     while (hasMore) {
         const body = cursor ? { start_cursor: cursor, page_size: 100 } : { page_size: 100 };
+        if (nameFilter) body.filter = nameFilter;
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
             method: 'POST', body: JSON.stringify(body)
         });
@@ -2047,16 +2050,19 @@ async function computeHomeworkProposals({ dateStr, onlyName = '', requireAttenda
     const isHoliday = (ds) => pausePeriods.some(p => ds >= p.start && ds <= p.end);
     const pauseNow = pausePeriods.find(p => todayStr >= p.start && todayStr <= p.end);
     if (pauseNow) return { date: todayStr, paused: true, pause: pauseNow, students: [] };
-    // 오늘 일일 DB 행
+    // 오늘 일일 DB 행 — 개인 지목(onlyName)이면 노션 필터로 그 1명 행만 가져온다(전체 조회 10배 단축)
+    const dailyFilter = onlyName
+        ? { and: [{ property: '🕐 날짜', date: { equals: todayStr } }, { property: '이름', title: { equals: onlyName } }] }
+        : { property: '🕐 날짜', date: { equals: todayStr } };
     const daily = []; let sc, more = true;
     while (more) {
         const d = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
-            method: 'POST', body: JSON.stringify({ filter: { property: '🕐 날짜', date: { equals: todayStr } }, page_size: 100, start_cursor: sc })
+            method: 'POST', body: JSON.stringify({ filter: dailyFilter, page_size: 100, start_cursor: sc })
         });
         daily.push(...d.results); more = d.has_more; sc = d.next_cursor;
     }
     const cfgByName = {};
-    (await readStudentConfigs()).forEach(c => { cfgByName[c.name] = c; });
+    (await readStudentConfigs(onlyName)).forEach(c => { cfgByName[c.name] = c; });
     const { byId: bookById } = await loadTextbooks();
     const unitCache = {};
     const getUnits = async (bookId) => {
