@@ -2173,10 +2173,9 @@
             if (!id) { showToast('교재 목록에 없는 이름입니다. 목록에서 골라주세요.', 'error'); return; }
             await saveStudentField(pid, prop, id, 'relation');
             const s = progressData.find(x => x.pageId === pid); if (s) setBook(s, prop, id, name);
-            // 라벨 갱신 + 검색칸 비우기
-            const label = el.closest('.book-cell')?.querySelector('.book-name');
-            if (label) label.textContent = name;
-            el.value = '';
+            // 교재 없음 → 있음으로 바뀌면 옆 유닛·진도량 칸이 새로 나타나야 하므로 표 전체를 다시 그린다
+            // (saveMethod와 동일한 패턴 — progressData는 이미 최신이라 네트워크 없이 즉시 반영됨)
+            renderProgressConfig();
         }
 
         function setBook(s, prop, id, name) {
