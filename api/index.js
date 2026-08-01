@@ -1162,6 +1162,48 @@ app.get('/api/my-accounts', requireAuth, async (req, res) => {
         res.status(500).json({ error: '아이디 정보를 불러오지 못했습니다' });
     }
 });
+
+// 등록 안내서 링크를 만들 때 학생을 찾아 아이디를 자동으로 채워 넣기 위한 검색.
+// 손으로 다시 타이핑하면 노션 값과 달라지므로 반드시 노션에서 읽어온다.
+app.get('/api/teacher/student-accounts', requireAuth, async (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+
+    const q = (req.query.q || '').trim();
+    if (q.length < 1) return res.json({ students: [] });
+
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: { property: '이름', title: { contains: q } },
+                sorts: [{ property: '이름', direction: 'ascending' }],
+                page_size: 15
+            })
+        });
+
+        const students = (data.results || []).map(page => {
+            const props = page.properties;
+            const accounts = {};
+            PROGRAM_ACCOUNTS.forEach(p => {
+                const id = readNotionText(props[p.idProp]);
+                const pw = readNotionText(props[p.pwProp]);
+                if (id || pw) accounts[p.key] = { id, pw };
+            });
+            return {
+                name: readNotionText(props['이름']),
+                studentId: readNotionText(props['학생 ID']),
+                status: props['재원상태']?.select?.name || '',
+                className: props['Class']?.select?.name || '',
+                accounts
+            };
+        });
+
+        res.json({ students });
+    } catch (e) {
+        console.error('student-accounts 검색 실패:', e);
+        res.status(500).json({ error: '학생을 찾지 못했습니다' });
+    }
+});
 app.post('/login', async (req, res) => { 
     const { studentId, studentPassword } = req.body; 
     const cleanId = studentId ? studentId.trim().toLowerCase() : '';

@@ -57,6 +57,25 @@
   .fields{display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:11px}
   @media (max-width:420px){ .fields{grid-template-columns:1fr} }
 
+  /* 학생 검색 결과 */
+  #results{margin-top:9px}
+  #results:empty{display:none}
+  .hit{display:flex; align-items:center; gap:9px; width:100%; text-align:left; cursor:pointer;
+       padding:10px 12px; margin-top:6px; font-family:inherit; font-size:14.5px; color:var(--ink);
+       border-radius:10px; border:1px solid var(--border-strong); background:var(--surface)}
+  .hit:hover{border-color:var(--accent); background:var(--accent-wash)}
+  .hit b{font-size:15px}
+  .hit .meta{margin-left:auto; font-size:12px; color:var(--ink-faint); text-align:right; flex:none}
+  .hit .out-badge{color:var(--warn); font-weight:700}
+  .msg{margin-top:9px; font-size:13.5px; color:var(--ink-faint)}
+  .picked{display:flex; align-items:center; gap:10px; margin-top:10px; padding:11px 13px;
+          border-radius:10px; background:var(--accent-wash); color:var(--accent-ink);
+          font-weight:800; font-size:15px}
+  .picked button{margin-left:auto; flex:none; padding:5px 11px; font-size:12.5px; font-weight:700;
+          cursor:pointer; font-family:inherit; border-radius:8px; border:1px solid var(--border-strong);
+          background:var(--surface); color:var(--ink-soft)}
+  .prog .src{font-size:11.5px; font-weight:700; color:var(--accent-ink); margin-left:6px}
+
   .out{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; word-break:break-all;
        background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:11px 12px;
        color:var(--ink-soft); max-height:120px; overflow:auto}
@@ -98,14 +117,28 @@
   </div>
 
   <div class="card">
-    <h2>학생 이름</h2>
+    <h2>학생 찾기</h2>
+    <p class="sub">이름을 치면 노션 학생 명부에서 찾아 아이디를 자동으로 채워 넣습니다.</p>
+    <input type="text" id="ssearch" placeholder="예) 김윤하" autocomplete="off" autocapitalize="off">
+    <div id="results"></div>
+    <div class="picked" id="picked" hidden>
+      <span id="pickedName"></span>
+      <button type="button" onclick="clearPick()">다시 찾기</button>
+    </div>
+    <div class="note" id="manualNote" hidden>
+      명부에 없는 학생입니다. 아래 칸에 직접 입력하시면 링크는 만들어지지만 <b>노션에는 저장되지 않습니다.</b>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>학생 이름 표기</h2>
     <p class="sub">안내 페이지 맨 위에 “OOO 학생 · 학부모님께”로 표시됩니다. 비워두셔도 됩니다.</p>
     <input type="text" id="sname" placeholder="예) 김리디" autocomplete="off">
   </div>
 
   <div class="card">
     <h2>사용하는 프로그램</h2>
-    <p class="sub">체크한 것만 아이디·비밀번호가 안내되고, 체크 안 한 것은 “사용하지 않습니다.”로 나갑니다.</p>
+    <p class="sub">체크한 것만 아이디·비밀번호가 안내되고, 체크 안 한 것은 “사용하지 않습니다.”로 나갑니다. 불러온 값도 고쳐서 보낼 수 있습니다.</p>
     <div id="progs"></div>
   </div>
 
@@ -167,6 +200,7 @@ box.innerHTML = PROGRAMS.map(function(p){
   return '<div class="prog off" id="p-' + p.k + '">'
     + '<label class="ph"><input type="checkbox" data-p="' + p.k + '">'
     + '<span class="pn">' + p.name + '</span>'
+    + '<span class="src" id="src-' + p.k + '"></span>'
     + '<span class="tag" id="tag-' + p.k + '">사용하지 않습니다</span></label>'
     + '<div class="fields">'
     + '<div><label class="fl" for="id-' + p.k + '">아이디</label>'
@@ -175,6 +209,89 @@ box.innerHTML = PROGRAMS.map(function(p){
     + '<input type="text" id="pw-' + p.k + '" autocomplete="off" autocapitalize="off" spellcheck="false"></div>'
     + '</div></div>';
 }).join('');
+
+/* ── 노션 학생 명부에서 찾아 자동으로 채우기 ── */
+var searchTimer = null;
+
+document.getElementById('ssearch').addEventListener('input', function(){
+  var q = this.value.trim();
+  clearTimeout(searchTimer);
+  var box = document.getElementById('results');
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="msg">찾는 중…</div>';
+  // 한 글자 칠 때마다 노션에 물어보면 느려진다. 손을 멈추면 그때 한 번만 보낸다.
+  searchTimer = setTimeout(function(){ searchStudents(q); }, 350);
+});
+
+function searchStudents(q){
+  var box = document.getElementById('results');
+  fetch('/api/teacher/student-accounts?q=' + encodeURIComponent(q), {
+    headers: { Authorization: 'Bearer ' + localStorage.getItem('teacher_auth_token') }
+  })
+    .then(function(r){ if (!r.ok) throw new Error('fail'); return r.json(); })
+    .then(function(d){
+      var list = d.students || [];
+      if (!list.length) {
+        box.innerHTML = '<div class="msg">찾는 학생이 없습니다. 아래 칸에 직접 입력하셔도 됩니다.</div>';
+        document.getElementById('manualNote').hidden = false;
+        return;
+      }
+      document.getElementById('manualNote').hidden = true;
+      box.innerHTML = '';
+      list.forEach(function(s){
+        var n = Object.keys(s.accounts).length;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hit';
+        var meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.innerHTML = (s.status === '퇴원' ? '<span class="out-badge">퇴원</span> · ' : '')
+          + (s.className ? s.className + ' · ' : '') + '아이디 ' + n + '개';
+        var nameEl = document.createElement('b');
+        nameEl.textContent = s.name || '(이름 없음)';
+        b.appendChild(nameEl);
+        b.appendChild(meta);
+        b.onclick = function(){ pickStudent(s); };
+        box.appendChild(b);
+      });
+    })
+    .catch(function(){
+      box.innerHTML = '<div class="msg">불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
+    });
+}
+
+function pickStudent(s){
+  document.getElementById('sname').value = s.name || '';
+  PROGRAMS.forEach(function(p){
+    var v = s.accounts[p.k];
+    document.getElementById('id-' + p.k).value = v ? (v.id || '') : '';
+    document.getElementById('pw-' + p.k).value = v ? (v.pw || '') : '';
+    // 노션에 값이 있는 프로그램만 켜 둔다. 원장님이 직접 끄고 켤 수 있다.
+    document.querySelector('[data-p="' + p.k + '"]').checked = !!v;
+    var src = document.getElementById('src-' + p.k);
+    src.textContent = v ? '노션에서 불러옴' : '';
+  });
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('ssearch').value = '';
+  document.getElementById('manualNote').hidden = true;
+  document.getElementById('pickedName').textContent = (s.name || '') + ' 학생을 불러왔습니다';
+  document.getElementById('picked').hidden = false;
+  build();
+}
+
+function clearPick(){
+  document.getElementById('picked').hidden = true;
+  document.getElementById('ssearch').focus();
+}
+
+// 불러온 값을 손으로 고치면 더 이상 노션 값이 아니므로 표시를 지운다
+PROGRAMS.forEach(function(p){
+  ['id-', 'pw-'].forEach(function(pre){
+    document.getElementById(pre + p.k).addEventListener('input', function(){
+      document.getElementById('src-' + p.k).textContent = '';
+    });
+  });
+});
 
 function b64url(str){
   var bytes = new TextEncoder().encode(str);
@@ -233,8 +350,13 @@ function copyOut(){
 }
 function resetAll(){
   document.getElementById('sname').value = '';
+  document.getElementById('ssearch').value = '';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('picked').hidden = true;
+  document.getElementById('manualNote').hidden = true;
   document.querySelectorAll('input[type=checkbox]').forEach(function(c){ c.checked = false; });
   document.querySelectorAll('.fields input').forEach(function(i){ i.value = ''; });
+  document.querySelectorAll('.src').forEach(function(s){ s.textContent = ''; });
   build();
 }
 </script>
