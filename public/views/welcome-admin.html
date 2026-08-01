@@ -75,6 +75,11 @@
           cursor:pointer; font-family:inherit; border-radius:8px; border:1px solid var(--border-strong);
           background:var(--surface); color:var(--ink-soft)}
   .prog .src{font-size:11.5px; font-weight:700; color:var(--accent-ink); margin-left:6px}
+  .prog .save{display:block; width:100%; margin-top:10px; padding:10px; cursor:pointer; font-family:inherit;
+       font-size:14px; font-weight:700; border-radius:10px; border:1px solid var(--accent-ink);
+       background:var(--surface); color:var(--accent-ink)}
+  .prog .save:disabled{border-color:var(--border-strong); color:var(--ink-faint); cursor:not-allowed}
+  .prog .savehint{margin-top:7px; font-size:12.5px; color:var(--ink-faint); line-height:1.5}
 
   .out{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; word-break:break-all;
        background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:11px 12px;
@@ -188,12 +193,16 @@ function logout(){
 }
 
 /* welcome.html 의 PROGRAMS 와 키(k)가 반드시 같아야 한다 */
+/* editable: 노션에서 직접 입력하는 칸이라 여기서 저장할 수 있다.
+   나머지는 노션이 수식으로 자동 계산하므로 저장 버튼을 붙이지 않는다. */
 var PROGRAMS = [
   { k:'nelt', name:'넬트 / 교재성취 TEST' },
   { k:'cc',   name:'클래스카드' },
   { k:'c5',   name:'클래스5' },
-  { k:'rv',   name:'리도보카' }
+  { k:'rv',   name:'리도보카', editable:true }
 ];
+
+var pickedStudentId = '';   // 노션에 저장할 때 어느 학생인지 알아야 한다
 
 var box = document.getElementById('progs');
 box.innerHTML = PROGRAMS.map(function(p){
@@ -207,7 +216,14 @@ box.innerHTML = PROGRAMS.map(function(p){
     + '<input type="text" id="id-' + p.k + '" autocomplete="off" autocapitalize="off" spellcheck="false"></div>'
     + '<div><label class="fl" for="pw-' + p.k + '">비밀번호</label>'
     + '<input type="text" id="pw-' + p.k + '" autocomplete="off" autocapitalize="off" spellcheck="false"></div>'
-    + '</div></div>';
+    + '</div>'
+    + (p.editable
+        ? '<button type="button" class="save" id="save-' + p.k + '" onclick="saveToNotion(\'' + p.k + '\')">'
+          + '노션 학생 명부에 저장</button>'
+          + '<div class="savehint" id="savehint-' + p.k + '">이 프로그램은 노션이 자동으로 만들어 주지 않습니다. '
+          + '여기서 저장하면 리디플랜에도 바로 뜹니다.</div>'
+        : '')
+    + '</div>';
 }).join('');
 
 /* ── 노션 학생 명부에서 찾아 자동으로 채우기 ── */
@@ -261,6 +277,7 @@ function searchStudents(q){
 }
 
 function pickStudent(s){
+  pickedStudentId = s.studentId || '';
   document.getElementById('sname').value = s.name || '';
   PROGRAMS.forEach(function(p){
     var v = s.accounts[p.k];
@@ -279,9 +296,49 @@ function pickStudent(s){
   build();
 }
 
+/* ── 직접 입력하는 아이디를 노션에 저장 ── */
+function saveToNotion(k){
+  var prog = PROGRAMS.find(function(p){ return p.k === k; });
+  if (!pickedStudentId) { toast('학생을 먼저 찾아서 선택해 주세요'); return; }
+
+  var id = document.getElementById('id-' + k).value.trim();
+  var pw = document.getElementById('pw-' + k).value.trim();
+  var name = document.getElementById('sname').value.trim() || '이 학생';
+  var msg = (!id && !pw)
+    ? name + '의 ' + prog.name + ' 아이디를 노션에서 지웁니다. 계속할까요?'
+    : name + '의 ' + prog.name + ' 아이디를 노션 학생 명부에 저장합니다.\n\n아이디 ' + (id || '(빈칸)') + '\n비밀번호 ' + (pw || '(빈칸)');
+  if (!confirm(msg)) return;
+
+  var btn = document.getElementById('save-' + k);
+  btn.disabled = true;
+  btn.textContent = '저장 중…';
+
+  fetch('/api/teacher/save-account', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + localStorage.getItem('teacher_auth_token')
+    },
+    body: JSON.stringify({ studentId: pickedStudentId, key: k, id: id, pw: pw })
+  })
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (!res.ok) throw new Error(res.d.error || '저장 실패');
+      document.getElementById('src-' + k).textContent = '노션에 저장됨';
+      toast('노션에 저장했어요');
+    })
+    .catch(function(e){ toast(e.message || '저장하지 못했어요'); })
+    .finally(function(){
+      btn.disabled = false;
+      btn.textContent = '노션 학생 명부에 저장';
+    });
+}
+
 function clearPick(){
+  pickedStudentId = '';
   document.getElementById('picked').hidden = true;
   document.getElementById('ssearch').focus();
+  build();
 }
 
 // 불러온 값을 손으로 고치면 더 이상 노션 값이 아니므로 표시를 지운다
@@ -321,6 +378,16 @@ function build(){
     }
   });
 
+  // 어느 학생인지 모르면 노션에 저장할 수 없다
+  PROGRAMS.filter(function(p){ return p.editable; }).forEach(function(p){
+    var btn = document.getElementById('save-' + p.k);
+    if (!btn) return;
+    btn.disabled = !pickedStudentId;
+    document.getElementById('savehint-' + p.k).textContent = pickedStudentId
+      ? '이 프로그램은 노션이 자동으로 만들어 주지 않습니다. 여기서 저장하면 리디플랜에도 바로 뜹니다.'
+      : '노션에 저장하려면 위에서 학생을 먼저 찾아 주세요.';
+  });
+
   var url = location.origin + '/welcome';
   var hasData = cfg.n || Object.keys(cfg.p).length;
   if (hasData) url += '#' + b64url(JSON.stringify(cfg));
@@ -349,6 +416,7 @@ function copyOut(){
   } else { toast('링크를 길게 눌러 복사해 주세요'); }
 }
 function resetAll(){
+  pickedStudentId = '';
   document.getElementById('sname').value = '';
   document.getElementById('ssearch').value = '';
   document.getElementById('results').innerHTML = '';

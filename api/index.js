@@ -1114,11 +1114,13 @@ app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 
 // ── 학생이 쓰는 학습 사이트 아이디·비번 ──
 // 학생 명부의 속성에서 그대로 읽어온다. 칸이 없는 프로그램은 조용히 건너뛰므로,
 // 노션에 아래 이름으로 칸만 만들면 코드를 고치지 않아도 리디플랜에 바로 뜬다.
+// editable: 노션에서 수식이 아니라 직접 입력하는 칸이라 리디플랜에서 저장할 수 있다는 뜻.
+// 수식 칸(넬트·클래스카드·클래스5)은 노션이 자동 계산하므로 쓰기를 시도해서는 안 된다.
 const PROGRAM_ACCOUNTS = [
     { key: 'nelt', name: '넬트 / 교재성취 TEST', idProp: '넬트/교재성취 ID', pwProp: '넬트/교재성취 PW', site: '' },
     { key: 'cc',   name: '클래스카드',            idProp: '클래스카드 ID',    pwProp: '클래스카드 PW',    site: 'https://www.classcard.net/Login' },
     { key: 'c5',   name: '클래스5',               idProp: '클래스5 ID',       pwProp: '클래스5 PW',       site: 'https://www.classmovie.co.kr/main' },
-    { key: 'rv',   name: '리도보카',              idProp: '리도보카 ID',      pwProp: '리도보카 PW',      site: '' }
+    { key: 'rv',   name: '리도보카',              idProp: '리도보카 ID',      pwProp: '리도보카 PW',      site: '', editable: true }
 ];
 
 // 노션 속성은 수식·텍스트·숫자 등 타입이 제각각이라 무엇이 오든 문자열로 뽑아낸다.
@@ -1202,6 +1204,60 @@ app.get('/api/teacher/student-accounts', requireAuth, async (req, res) => {
     } catch (e) {
         console.error('student-accounts 검색 실패:', e);
         res.status(500).json({ error: '학생을 찾지 못했습니다' });
+    }
+});
+
+// 직접 입력하는 아이디(리도보카)를 노션 학생 명부에 저장한다.
+// 학생 명부는 원장님의 실제 기록이므로, 지정한 학생의 지정한 두 칸 외에는 절대 건드리지 않는다.
+app.post('/api/teacher/save-account', requireAuth, async (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+
+    const { studentId, key } = req.body || {};
+    const newId = (req.body?.id ?? '').toString().trim();
+    const newPw = (req.body?.pw ?? '').toString().trim();
+
+    const prog = PROGRAM_ACCOUNTS.find(p => p.key === key && p.editable);
+    if (!prog) return res.status(400).json({ error: '저장할 수 없는 프로그램입니다' });
+    if (!studentId) return res.status(400).json({ error: '학생을 먼저 선택해 주세요' });
+
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: { property: '학생 ID', rich_text: { equals: studentId } },
+                page_size: 2
+            })
+        });
+        if (!data.results?.length) return res.status(404).json({ error: '학생을 찾지 못했습니다' });
+        // 같은 학생 ID가 둘 이상이면 어느 쪽을 고쳐야 할지 알 수 없으므로 저장하지 않는다
+        if (data.results.length > 1) return res.status(409).json({ error: '같은 학생 ID가 여러 개입니다. 노션에서 확인해 주세요' });
+
+        const page = data.results[0];
+        // 수식 칸에 쓰려 하면 노션이 거부한다. 그 전에 여기서 막는다.
+        for (const propName of [prog.idProp, prog.pwProp]) {
+            const type = page.properties[propName]?.type;
+            if (type !== 'rich_text') {
+                return res.status(400).json({ error: `'${propName}' 칸은 직접 입력할 수 없습니다` });
+            }
+        }
+
+        const toRichText = (v) => ({ rich_text: v ? [{ text: { content: v } }] : [] });
+        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                properties: {
+                    [prog.idProp]: toRichText(newId),
+                    [prog.pwProp]: toRichText(newPw)
+                }
+            })
+        });
+
+        const who = readNotionText(page.properties['이름']);
+        console.log(`[아이디 저장] ${req.user.name} → ${who}(${studentId}) ${prog.name}`);
+        res.json({ success: true, name: who });
+    } catch (e) {
+        console.error('save-account 저장 실패:', e);
+        res.status(500).json({ error: '노션에 저장하지 못했습니다' });
     }
 });
 app.post('/login', async (req, res) => { 
