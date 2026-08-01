@@ -472,16 +472,14 @@ function esc(s){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-(function render(){
+function render(){
   var cfg = decodeCfg() || {};
   var acc = cfg.p || {};
   var hasAny = false;
 
-  if (cfg.n) {
-    var pill = document.getElementById('namePill');
-    pill.textContent = cfg.n + ' 학생 · 학부모님께';
-    pill.hidden = false;
-  }
+  var pill = document.getElementById('namePill');
+  pill.textContent = cfg.n ? (cfg.n + ' 학생 · 학부모님께') : '';
+  pill.hidden = !cfg.n;
 
   var html = '';
   PROGRAMS.forEach(function(p){
@@ -509,18 +507,25 @@ function esc(s){
 
   document.getElementById('idNote').hidden = !hasAny;
   document.getElementById('idAsk').hidden  = hasAny;
-  if (!hasAny) document.getElementById('idSub').textContent = '우리 아이가 사용하는 프로그램 안내입니다.';
+  document.getElementById('idSub').textContent = hasAny
+    ? '학원에서 발급된 아이디와 비밀번호입니다.'
+    : '우리 아이가 사용하는 프로그램 안내입니다.';
 
   // 리도보카를 쓰는 학생에게만 사용권 입금 안내를 띄운다
   var usesVocab = !!(acc.rv && (acc.rv.id || acc.rv.pw));
-  document.getElementById('s-vocab').hidden   = !usesVocab;
+  document.getElementById('s-vocab').hidden    = !usesVocab;
   document.getElementById('todo-vocab').hidden = !usesVocab;
+}
 
-  document.getElementById('accts').addEventListener('click', function(e){
-    var b = e.target.closest('[data-copy]');
-    if (b) copyText(b.getAttribute('data-copy'), '복사했어요');
-  });
-})();
+render();
+// 주소의 # 뒤만 바뀌면 브라우저가 페이지를 새로 읽지 않는다.
+// 관리자 화면에서 미리보기를 연달아 열 때 앞 학생 정보가 그대로 남는 것을 막는다.
+window.addEventListener('hashchange', render);
+
+document.getElementById('accts').addEventListener('click', function(e){
+  var b = e.target.closest('[data-copy]');
+  if (b) copyText(b.getAttribute('data-copy'), '복사했어요');
+});
 
 /* ── 체크리스트 저장 ── */
 (function(){
