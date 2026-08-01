@@ -41,6 +41,17 @@
         .view-title { font-size: 20px; font-weight: 800; color: #17242e; letter-spacing: -.02em; }
         .back-btn { background: #eef3f3; color: #485a68; border: 1px solid #cdd9db; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; }
         .section-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 1px 2px rgba(20,40,55,.04), 0 6px 18px rgba(20,40,55,.05); border: 1px solid #e0e8ea; margin-bottom: 20px; }
+        /* 내 아이디·비밀번호 카드 */
+        .acct-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid #eef3f3; }
+        .acct-row:first-child { border-top: 0; padding-top: 0; }
+        .acct-row .acct-name { flex: none; width: 96px; font-size: 13.5px; font-weight: 800; color: #0a6c62; line-height: 1.35; }
+        .acct-row .acct-val { flex: 1; min-width: 0; }
+        .acct-row .acct-val div { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 700; color: #17242e; word-break: break-all; }
+        .acct-row .acct-val span { font-family: 'Pretendard','Apple SD Gothic Neo',sans-serif; font-size: 11.5px; font-weight: 700; color: #7b8b98; margin-right: 5px; }
+        .acct-row .acct-copy { flex: none; padding: 7px 11px; font-size: 12.5px; font-weight: 700; cursor: pointer; border-radius: 9px; border: 1px solid #cdd9db; background: white; color: #485a68; font-family: inherit; }
+        .acct-row .acct-copy:hover { border-color: #0d9488; color: #0a6c62; }
+        .acct-site { display: inline-block; margin-top: 3px; font-size: 12.5px; font-weight: 700; color: #0a6c62; text-decoration: none; }
+        @media (max-width: 380px) { .acct-row .acct-name { width: 78px; font-size: 12.5px; } }
         h2 { color: #0a6c62; margin: 0 0 15px 0; font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; font-weight: 700; margin-bottom: 6px; color: #485a68; font-size: 14px; }
@@ -97,6 +108,11 @@
 
         <!-- 1. 메뉴 -->
         <div id="menu-view">
+            <!-- 학원에서 쓰는 학습 사이트 아이디·비번. 노션 학생 명부에서 읽어온다. -->
+            <div class="section-card" id="myAccounts" style="display:none; text-align:left; margin-bottom:0;">
+                <h2>🔑 내 아이디 · 비밀번호</h2>
+                <div id="myAccountsList"></div>
+            </div>
             <button class="menu-btn" onclick="goToView('todo')"><span class="menu-icon">📚</span> 오늘의 숙제 확인하기</button>
             <button class="menu-btn" onclick="goToView('homework')"><span class="menu-icon">📤</span> 숙제 제출하기</button>
             <button class="menu-btn" onclick="goToView('planner')"><span class="menu-icon">📝</span> 스터디 플래너 입력하기</button>
@@ -345,6 +361,7 @@
             document.getElementById('currentDate').textContent = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
             initializeBookAutocomplete();
             initializeSayuBookAutocomplete();
+            loadMyAccounts();
             goToMenu(false);
             
             document.getElementById('homeworkForm').addEventListener('submit', handleFormSubmit);
@@ -376,6 +393,77 @@
                     alert('로그인이 필요합니다.'); window.location.href = '/';
                 }
             } catch (e) { console.error(e); }
+        }
+
+        // 학원에서 쓰는 사이트 아이디·비번을 첫 화면에 띄운다.
+        // 쓰는 프로그램이 하나도 없으면 카드 자체를 감춘다(빈 카드가 뜨는 게 더 헷갈린다).
+        async function loadMyAccounts() {
+            try {
+                const res = await fetch('/api/my-accounts', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) return;
+                const { accounts } = await res.json();
+                if (!accounts || !accounts.length) return;
+
+                const list = document.getElementById('myAccountsList');
+                list.innerHTML = '';
+
+                accounts.forEach(a => {
+                    const row = document.createElement('div');
+                    row.className = 'acct-row';
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'acct-name';
+                    nameEl.textContent = a.name;
+
+                    const valEl = document.createElement('div');
+                    valEl.className = 'acct-val';
+                    [['아이디', a.id], ['비번', a.pw]].forEach(([label, value]) => {
+                        if (!value) return;
+                        const line = document.createElement('div');
+                        const tag = document.createElement('span');
+                        tag.textContent = label;
+                        line.appendChild(tag);
+                        line.appendChild(document.createTextNode(value));
+                        valEl.appendChild(line);
+                    });
+                    if (a.site) {
+                        const link = document.createElement('a');
+                        link.className = 'acct-site';
+                        link.href = a.site;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = '사이트 열기 →';
+                        valEl.appendChild(link);
+                    }
+
+                    row.appendChild(nameEl);
+                    row.appendChild(valEl);
+
+                    if (a.id) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'acct-copy';
+                        btn.textContent = '복사';
+                        btn.onclick = () => copyAccount(a.id, a.pw);
+                        row.appendChild(btn);
+                    }
+                    list.appendChild(row);
+                });
+
+                document.getElementById('myAccounts').style.display = 'block';
+            } catch (e) { console.error('아이디 불러오기 실패:', e); }
+        }
+
+        // 아이디만 복사한다. 비번까지 같이 복사하면 로그인 칸에 통째로 붙어 들어간다.
+        function copyAccount(id, pw) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(id).then(
+                    () => showToast('아이디를 복사했어요', 'success'),
+                    () => showToast('복사에 실패했어요', 'error')
+                );
+            } else {
+                showToast('길게 눌러서 복사해 주세요', 'error');
+            }
         }
 
         function goToMenu(pushHistory = true) {

@@ -1110,6 +1110,58 @@ app.post('/teacher-login', async (req, res) => { const { teacherId, teacherPassw
 app.get('/api/teacher/user-info', requireAuth, (req, res) => { res.json({ userName: req.user.name, userRole: req.user.role, loginId: req.user.loginId }); });
 app.get('/api/user-info', requireAuth, (req, res) => { res.json({ userId: req.user.userId, userName: req.user.name, userRole: req.user.role }); });
 app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' }); res.json({ studentId: req.user.userId, studentName: req.user.name }); });
+
+// ── 학생이 쓰는 학습 사이트 아이디·비번 ──
+// 학생 명부의 속성에서 그대로 읽어온다. 칸이 없는 프로그램은 조용히 건너뛰므로,
+// 노션에 아래 이름으로 칸만 만들면 코드를 고치지 않아도 리디플랜에 바로 뜬다.
+const PROGRAM_ACCOUNTS = [
+    { key: 'nelt', name: '넬트 / 교재성취 TEST', idProp: '넬트/교재성취 ID', pwProp: '넬트/교재성취 PW', site: '' },
+    { key: 'cc',   name: '클래스카드',            idProp: '클래스카드 ID',    pwProp: '클래스카드 PW',    site: 'https://www.classcard.net/Login' },
+    { key: 'c5',   name: '클래스5',               idProp: '클래스5 ID',       pwProp: '클래스5 PW',       site: 'https://www.classmovie.co.kr/main' },
+    { key: 'rv',   name: '리도보카',              idProp: '리도보카 ID',      pwProp: '리도보카 PW',      site: '' }
+];
+
+// 노션 속성은 수식·텍스트·숫자 등 타입이 제각각이라 무엇이 오든 문자열로 뽑아낸다.
+function readNotionText(prop) {
+    if (!prop) return '';
+    switch (prop.type) {
+        case 'formula':   return String(prop.formula?.string ?? prop.formula?.number ?? '').trim();
+        case 'rich_text': return (prop.rich_text || []).map(t => t.plain_text).join('').trim();
+        case 'title':     return (prop.title || []).map(t => t.plain_text).join('').trim();
+        case 'number':    return prop.number == null ? '' : String(prop.number);
+        case 'select':    return prop.select?.name || '';
+        case 'rollup':    return readNotionText(prop.rollup?.array?.[0]);
+        default:          return '';
+    }
+}
+
+app.get('/api/my-accounts', requireAuth, async (req, res) => {
+    if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' });
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: { property: '학생 ID', rich_text: { equals: req.user.userId } },
+                page_size: 1
+            })
+        });
+        if (!data.results?.length) return res.json({ accounts: [] });
+
+        const props = data.results[0].properties;
+        const accounts = PROGRAM_ACCOUNTS.map(p => ({
+            key: p.key,
+            name: p.name,
+            site: p.site,
+            id: readNotionText(props[p.idProp]),
+            pw: readNotionText(props[p.pwProp])
+        })).filter(a => a.id || a.pw); // 아이디도 비번도 없으면 안 쓰는 프로그램으로 본다
+
+        res.json({ accounts });
+    } catch (e) {
+        console.error('my-accounts 조회 실패:', e);
+        res.status(500).json({ error: '아이디 정보를 불러오지 못했습니다' });
+    }
+});
 app.post('/login', async (req, res) => { 
     const { studentId, studentPassword } = req.body; 
     const cleanId = studentId ? studentId.trim().toLowerCase() : '';
