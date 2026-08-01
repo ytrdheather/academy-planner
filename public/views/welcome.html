@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d9488">
+<title>등록 전 안내서 · 리디튜드 언어학원</title>
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --warn:#a15b06; --warn-wash:#fdf0dd; --warn-border:#f4d9b0;
+    --off:#7b8b98; --off-wash:#f1f4f5;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e161b; --surface:#161f26; --surface-2:#1c272f;
+      --ink:#e7eef2; --ink-soft:#a7b7c2; --ink-faint:#6d7f8c;
+      --border:#243139; --border-strong:#31424c;
+      --accent:#2dd4bf; --accent-ink:#7ee7d8; --accent-wash:rgba(45,212,191,.12);
+      --warn:#f0b657; --warn-wash:rgba(240,182,87,.12); --warn-border:rgba(240,182,87,.28);
+      --off:#6d7f8c; --off-wash:rgba(120,140,155,.10);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  [hidden]{display:none!important}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+    line-height:1.62; -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:560px; margin:0 auto; padding:22px 16px 56px}
+
+  .top{text-align:center; padding:8px 0 18px}
+  .appicon{width:80px; height:80px; border-radius:20px; box-shadow:var(--shadow); border:1px solid var(--border)}
+  .eyebrow{margin:14px 0 0; color:var(--accent-ink); font-size:13px; font-weight:800; letter-spacing:.6px}
+  h1{font-size:23px; margin:4px 0 6px; letter-spacing:-.4px}
+  .lede{margin:0; color:var(--ink-soft); font-size:15px}
+  .pill{display:inline-block; margin-top:12px; padding:5px 12px; border-radius:999px;
+        background:var(--accent-wash); color:var(--accent-ink); font-size:13.5px; font-weight:700}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+        padding:16px 16px 18px; margin:14px 0; box-shadow:var(--shadow); scroll-margin-top:14px}
+  h2{font-size:17px; margin:0 0 4px; letter-spacing:-.3px}
+  .sub{margin:0 0 12px; color:var(--ink-faint); font-size:13.5px}
+  .card p{font-size:14.5px; color:var(--ink-soft)}
+  .card p:last-child{margin-bottom:0}
+
+  .must{display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px;
+        background:var(--warn-wash); color:var(--warn); border:1px solid var(--warn-border);
+        font-size:11.5px; font-weight:800; vertical-align:2px; letter-spacing:0}
+
+  /* 할 일 체크리스트 — 부모님이 진행 상황을 눈으로 확인하도록 로컬에 저장한다 */
+  .todo{list-style:none; margin:0; padding:0}
+  .todo li{border-top:1px solid var(--border)}
+  .todo li:first-child{border-top:0}
+  .todo label{display:flex; gap:11px; align-items:flex-start; padding:11px 0; cursor:pointer}
+  .todo input{width:21px; height:21px; margin:2px 0 0; accent-color:var(--accent-ink); flex:none}
+  .todo .t{font-weight:700; font-size:15px}
+  .todo .d{color:var(--ink-faint); font-size:13.5px}
+  .todo input:checked ~ div .t{color:var(--ink-faint); text-decoration:line-through}
+
+  ol.steps{margin:0; padding-left:0; list-style:none; counter-reset:s}
+  ol.steps li{counter-increment:s; position:relative; padding:0 0 14px 40px}
+  ol.steps li:last-child{padding-bottom:0}
+  ol.steps li::before{content:counter(s); position:absolute; left:0; top:0;
+    width:26px; height:26px; border-radius:50%; background:var(--accent-wash); color:var(--accent-ink);
+    font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center}
+  .st{font-weight:700; font-size:15.5px}
+  .sd{color:var(--ink-soft); font-size:14px; margin-top:2px}
+
+  ul.bul{margin:0; padding-left:19px; color:var(--ink-soft); font-size:14.5px}
+  ul.bul li{margin-bottom:6px}
+  ul.bul li:last-child{margin-bottom:0}
+
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px;
+        background:var(--surface-2); padding:2px 7px; border-radius:6px; word-break:break-all}
+
+  .note{border:1px solid var(--warn-border); background:var(--warn-wash); color:var(--warn);
+        border-radius:12px; padding:12px 14px; font-size:14px; margin:14px 0}
+  .note b{color:inherit}
+  .note:last-child{margin-bottom:0}
+
+  /* 흰 글씨 대비 4.5:1을 넘기려면 밝은 --accent가 아니라 진한 --accent-ink여야 한다 */
+  .go{display:block; text-align:center; text-decoration:none; margin:14px 0 0;
+      background:var(--accent-ink); color:#fff; font-weight:800; font-size:16px;
+      padding:14px; border-radius:12px; box-shadow:var(--shadow)}
+  .go.ghost{background:var(--surface); color:var(--accent-ink); border:1px solid var(--border-strong);
+      box-shadow:none; font-size:15px; padding:12px}
+  .copy{display:block; width:100%; margin-top:8px; padding:11px; cursor:pointer; font-family:inherit;
+        border-radius:11px; border:1px solid var(--border-strong); background:var(--surface);
+        color:var(--ink-soft); font-size:14px; font-weight:700}
+
+  /* 프로그램 계정 카드 */
+  .acct{border:1px solid var(--border); border-radius:12px; padding:13px 14px; margin-top:10px;
+        background:var(--surface-2)}
+  .acct:first-of-type{margin-top:0}
+  .acct .an{display:flex; align-items:center; gap:8px; font-weight:800; font-size:15.5px; margin-bottom:8px}
+  .acct .an .badge{margin-left:auto; font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:999px;
+        background:var(--accent-wash); color:var(--accent-ink); letter-spacing:0}
+  .acct.no{background:var(--off-wash); border-style:dashed}
+  .acct.no .an{color:var(--off)}
+  .acct.no .an .badge{background:transparent; color:var(--off); border:1px solid var(--border-strong)}
+  .acct .none{margin:0; color:var(--off); font-size:14px}
+  .kv{display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px dashed var(--border-strong)}
+  .kv:first-of-type{border-top:0; padding-top:0}
+  .kv .k{flex:none; width:62px; color:var(--ink-faint); font-size:13px; font-weight:700}
+  .kv .v{flex:1; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14.5px;
+         font-weight:700; word-break:break-all}
+  .kv button{flex:none; padding:5px 10px; font-size:12.5px; font-weight:700; cursor:pointer;
+         border-radius:8px; border:1px solid var(--border-strong); background:var(--surface);
+         color:var(--ink-soft); font-family:inherit}
+  .acct .lnk{display:inline-block; margin-top:9px; font-size:13.5px; font-weight:700;
+         color:var(--accent-ink); text-decoration:none}
+
+  /* 수강료 */
+  .fee{display:flex; gap:10px; padding:11px 0; border-top:1px solid var(--border)}
+  .fee:first-of-type{border-top:0; padding-top:2px}
+  .fee .fn{flex:1}
+  .fee h3{margin:0 0 1px; font-size:15px}
+  .fee p{margin:0; color:var(--ink-faint); font-size:13.5px}
+  .fee .fp{flex:none; text-align:right; font-weight:800; font-size:15px; white-space:nowrap}
+  .fee .fp small{display:block; font-weight:600; font-size:11.5px; color:var(--ink-faint)}
+
+  /* 계좌 */
+  .bank{display:flex; align-items:center; gap:10px; background:var(--surface-2);
+        border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin:10px 0 0}
+  .bank div{flex:1; min-width:0}
+  .bank .bl{font-size:12.5px; color:var(--ink-faint); font-weight:700}
+  .bank .bn{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:15px; font-weight:800;
+        word-break:break-all}
+  .bank button{flex:none; padding:7px 11px; font-size:12.5px; font-weight:700; cursor:pointer;
+        border-radius:9px; border:1px solid var(--border-strong); background:var(--surface);
+        color:var(--ink-soft); font-family:inherit}
+
+  details{border-top:1px solid var(--border); padding:11px 0}
+  details:first-of-type{border-top:0}
+  summary{cursor:pointer; font-weight:700; font-size:15px; list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:'＋ '; color:var(--accent); font-weight:800}
+  details[open] summary::before{content:'－ '}
+  .ans{color:var(--ink-soft); font-size:14px; margin-top:6px}
+  .ans ul{margin:6px 0 0; padding-left:19px}
+  .ans li{margin-bottom:5px}
+
+  /* 다크 모드에선 강조색이 밝은 민트라 흰 글씨는 거의 안 읽힌다 → 글자를 어둡게 */
+  @media (prefers-color-scheme:dark){
+    .go{background:var(--accent); border-color:var(--accent); color:#0e161b}
+    .go.ghost{background:var(--surface); color:var(--accent-ink)}
+  }
+
+  footer{text-align:center; color:var(--ink-faint); font-size:13px; margin-top:26px; line-height:1.8}
+  .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px;
+    font-size:14px; font-weight:700; opacity:0; transition:opacity .2s; pointer-events:none; z-index:9}
+  .toast.show{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <img class="appicon" src="/assets/icon-192.png" alt="리디튜드 로고">
+    <p class="eyebrow">ENROLL GUIDELINE</p>
+    <h1>등록 전 안내서</h1>
+    <p class="lede">찐 공부 실력자 양성소 리디튜드에 오신 것을 환영합니다.<br>등록 전 준비해 주실 것들을 정리했습니다.</p>
+    <div class="pill" id="namePill" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2>먼저 해주실 것</h2>
+    <p class="sub">누르면 해당 안내로 이동합니다. 체크는 이 폰에만 저장돼요.</p>
+    <ul class="todo" id="todo">
+      <li><label><input type="checkbox" data-k="kakao"><div>
+        <div class="t">1. 학원 카톡 채널 추가하기</div>
+        <div class="d">모든 공지·상담이 카톡으로 나갑니다 <a href="#s-kakao">보기</a></div></div></label></li>
+      <li><label><input type="checkbox" data-k="form"><div>
+        <div class="t">2. 입회 등록서 작성하기</div>
+        <div class="d">CCTV·정보제공 동의서 포함 <a href="#s-form">보기</a></div></div></label></li>
+      <li><label><input type="checkbox" data-k="eduok"><div>
+        <div class="t">3. 에듀OK 학부모앱 설치하기</div>
+        <div class="d">출결·결제 내역 확인 <a href="#s-eduok">보기</a></div></div></label></li>
+      <li><label><input type="checkbox" data-k="apps"><div>
+        <div class="t">4. 학습 앱 설치하기</div>
+        <div class="d">우리 아이가 사용하는 프로그램만 <a href="#s-id">보기</a></div></div></label></li>
+      <li><label><input type="checkbox" data-k="headset"><div>
+        <div class="t">5. 헤드셋 구매해서 보내기</div>
+        <div class="d">3.5파이 4극 · 마이크 포함 <a href="#s-headset">보기</a></div></div></label></li>
+      <li id="todo-vocab" hidden><label><input type="checkbox" data-k="vocab"><div>
+        <div class="t">6. 리도보카 사용권 입금하기</div>
+        <div class="d">1년 5만원 <a href="#s-vocab">보기</a></div></div></label></li>
+    </ul>
+  </div>
+
+  <!-- 우리 아이 학습 프로그램 -->
+  <div class="card" id="s-id">
+    <h2>우리 아이 학습 프로그램</h2>
+    <p class="sub" id="idSub">학원에서 발급된 아이디와 비밀번호입니다.</p>
+    <div id="accts"></div>
+    <div class="note" id="idNote" hidden>
+      아이디·비밀번호는 <b>이 링크를 받으신 분만</b> 보실 수 있습니다. 링크를 다른 곳에 공유하지 말아 주세요.
+    </div>
+    <div class="note" id="idAsk" hidden>
+      아직 개인 아이디가 연결되지 않은 안내 페이지입니다. 아이디·비밀번호는 <b>학원 카톡 채널</b>로 문의해 주세요.
+    </div>
+  </div>
+
+  <!-- 1. 카톡 채널 -->
+  <div class="card" id="s-kakao">
+    <h2>1. 학원 카톡 채널 추가<span class="must">필수</span></h2>
+    <p class="sub">개인정보보호법상 저희가 먼저 메시지를 보낼 수 없습니다.</p>
+    <ol class="steps">
+      <li><div class="st">카카오톡 친구 탭 → 돋보기 아이콘</div>
+        <div class="sd">화면 위쪽 검색 버튼을 눌러주세요.</div></li>
+      <li><div class="st">“리디튜드영어학원” 검색</div>
+        <div class="sd">채널이 나오면 <b>친구 추가</b>를 눌러주세요.</div></li>
+      <li><div class="st">채팅하기 → 인사 남기기</div>
+        <div class="sd">“<b>OOO 학부모입니다</b>” 하고 메시지를 보내주세요.</div></li>
+    </ol>
+    <a class="go" data-link="kakao" target="_blank" rel="noopener">카톡 채널 바로 추가하기</a>
+    <div class="note"><b>추가한 채팅방은 절대 나가지 말아주세요!</b><br>
+      채팅방을 나가시면 저희가 다시 연락을 드릴 수 없습니다. 모든 공지와 상담이 이 채팅방으로 나갑니다.</div>
+  </div>
+
+  <!-- 2. 입회 등록서 -->
+  <div class="card" id="s-form">
+    <h2>2. 입회 등록서 작성<span class="must">필수</span></h2>
+    <p class="sub">리디튜드 언어학원(영어/국어) 입회 등록서</p>
+    <p>CCTV 촬영 동의서와 정보제공 동의서가 함께 들어 있습니다. 아래 버튼을 눌러 작성해 주세요.</p>
+    <a class="go" data-link="enrollForm" target="_blank" rel="noopener">입회 등록서 작성하기</a>
+  </div>
+
+  <!-- 3. 에듀OK -->
+  <div class="card" id="s-eduok">
+    <h2>3. 에듀OK 학부모앱 설치</h2>
+    <p class="sub">출결 상황과 결제 내역을 확인하실 수 있습니다.</p>
+    <p>앱스토어나 구글플레이에서 <b>“에듀OK 학부모앱”</b>을 설치해 주세요. 설치하지 않으시면 <b>출결 알림만 문자</b>로 받으실 수 있습니다.</p>
+    <a class="go" data-link="eduokIos" target="_blank" rel="noopener">📱 아이폰 · 앱스토어</a>
+    <a class="go ghost" data-link="eduokAnd" target="_blank" rel="noopener">🤖 안드로이드 · 플레이스토어</a>
+  </div>
+
+  <!-- 4. 리디플랜 -->
+  <div class="card">
+    <h2>4. 리디플랜 앱 설치</h2>
+    <p class="sub">아이가 오늘의 숙제를 확인하고 제출하는 학원 자체 앱입니다.</p>
+    <p>설치는 앱스토어가 아니라 <b>홈 화면에 추가</b>로 합니다. 설치 방법은 아래 안내를 따라 주세요.</p>
+    <a class="go" href="/install" target="_blank" rel="noopener">리디플랜 설치 방법 보기</a>
+  </div>
+
+  <!-- 5. 헤드셋 -->
+  <div class="card" id="s-headset">
+    <h2>5. 헤드셋 구매<span class="must">필수</span></h2>
+    <p class="sub">감염병 예방을 위해 개인 헤드셋을 사용합니다.</p>
+    <ul class="bul">
+      <li><b>3.5파이 단자 1개(4극)</b>짜리로, <b>마이크까지 있는</b> 제품이어야 합니다.</li>
+      <li>큰 것, USB 포트 제품은 <b>사용할 수 없습니다.</b></li>
+      <li>구매하신 뒤 아이 편에 원으로 보내주세요.</li>
+    </ul>
+    <div class="acct" style="margin-top:12px">
+      <div class="an">원에서 추천드리는 제품<span class="badge">1~1.3만원</span></div>
+      <div class="kv"><span class="k">모델</span><span class="v">ANYZEN 애니젠 AZ-580C</span></div>
+      <div class="kv"><span class="k">사양</span><span class="v" style="font-family:inherit;font-weight:600">어학용 스테레오 헤드셋 · 3.5mm 4극 · C타입 젠더 포함</span></div>
+      <a class="lnk" data-link="headset" target="_blank" rel="noopener">쿠팡에서 찾아보기 →</a>
+    </div>
+    <div class="note">비싸고 크고 좋은 것은 사서 보내지 말아주세요. 😭 금방 고장냅니다…</div>
+  </div>
+
+  <!-- 6. 리도보카 입금 (리도보카 사용하는 경우만) -->
+  <div class="card" id="s-vocab" hidden>
+    <h2>6. 리도보카 사용권 입금<span class="must">원서 수업 필수</span></h2>
+    <p class="sub">원서 어휘 학습 프로그램 리도보카 1년 사용권</p>
+    <ul class="bul">
+      <li>아이디 1개당 <b>1년 5만원</b>입니다.</li>
+      <li>원서 수업을 하는 모든 학생은 <b>필수 구매</b>입니다.</li>
+      <li>학원을 그만두시더라도 <b>1년 동안 개인적으로 사용</b>하실 수 있습니다.</li>
+    </ul>
+    <div class="bank">
+      <div>
+        <div class="bl">국민은행 · 예금주 이명수</div>
+        <div class="bn" id="bank-vocab">4266 02 01415 043</div>
+      </div>
+      <button onclick="copyText('42660201415043','계좌번호를 복사했어요')">복사</button>
+    </div>
+    <div class="note"><b>입금 시 꼭 학생 이름으로 보내주세요.</b><br>
+      입금 후 학원 카톡 채널로 “입금 완료” 메시지를 한 번만 남겨주시면 됩니다.</div>
+  </div>
+
+  <!-- 교육비 결제 -->
+  <div class="card" id="s-pay">
+    <h2>교육비 결제 방법</h2>
+    <p class="sub">아래 방법 중 편하신 것으로 이용해 주세요.</p>
+    <ol class="steps">
+      <li><div class="st">출결OK 모바일 결제 <span class="must" style="margin-left:2px">자동 발송</span></div>
+        <div class="sd">매달 결제 링크가 <b>문자로 자동 발송</b>됩니다. 문자 속 링크를 눌러 카드로 결제하시면 됩니다. 따로 신청하지 않으셔도 됩니다.</div></li>
+      <li><div class="st">계좌이체</div>
+        <div class="sd">우리은행 · 리디튜드</div></li>
+      <li><div class="st">방문 시 키오스크 결제</div>
+        <div class="sd">원에 오셔서 직접 결제하실 수 있습니다.</div></li>
+    </ol>
+    <div class="bank">
+      <div>
+        <div class="bl">우리은행 · 예금주 리디튜드</div>
+        <div class="bn">1005-003-337891</div>
+      </div>
+      <button onclick="copyText('1005003337891','계좌번호를 복사했어요')">복사</button>
+    </div>
+    <a class="go" data-link="payment" target="_blank" rel="noopener">출결OK 모바일 결제하기</a>
+    <div class="note"><b>수원페이를 쓰고 싶으신 경우</b><br>
+      아이 편에 카드를 원으로 보내주시거나, 카카오페이·네이버페이에 등록해서 사용해 주세요.</div>
+  </div>
+
+  <!-- 수강료 -->
+  <div class="card">
+    <h2>커리큘럼별 수강료</h2>
+    <p class="sub">2025년 7월 기준</p>
+    <div class="fee"><div class="fn"><h3>영어 초등 기초반</h3><p>주3회 90분</p></div>
+      <div class="fp">24.5만원<small>교재비·포트폴리오비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>영어 초등 기본/심화반</h3><p>주3회 120분</p></div>
+      <div class="fp">28.5만원<small>교재비·포트폴리오비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>영어 중등부</h3><p>주2회 180분 · 내신기간 무료 3회 직전 보강</p></div>
+      <div class="fp">33.5만원<small>교재비·내신대비 교재비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>영어 고등부</h3><p>주2회 180분 · 내신기간 무료 3회 직전 보강</p></div>
+      <div class="fp">37만원<small>교재비·내신대비 교재비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>국어 초등부 기초반</h3><p>주3회 30분</p></div>
+      <div class="fp">11만원<small>교재비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>국어 초등부 심화반</h3><p>주3회 50분</p></div>
+      <div class="fp">18만원<small>교재비 별도</small></div></div>
+    <div class="fee"><div class="fn"><h3>국어 중등부 통합반</h3><p>주2회 50분</p></div>
+      <div class="fp">15만원<small>교재비 별도</small></div></div>
+  </div>
+
+  <!-- 교재비 -->
+  <div class="card">
+    <h2>교재비 안내</h2>
+    <p class="sub">2025년 7월 1일부터 적용</p>
+    <p>모든 교재는 <b>리디튜드에서 일괄 구매</b>하고 교재비를 따로 요청드립니다. 시중에서 구매하실 때 <b>10% 할인 받는 그대로의 가격</b>만 입금 요청드리니 참고해 주세요.</p>
+    <p>교재비도 <b>위 우리은행 계좌</b>로 입금해 주시고, 입금 시 <b>학생 이름</b>으로 보내주세요.</p>
+  </div>
+
+  <!-- 할인 -->
+  <div class="card">
+    <h2>할인 혜택 받는 법</h2>
+    <p class="sub">받으실 수 있는 혜택을 놓치지 마세요.</p>
+    <div class="fee"><div class="fn"><h3>지인 소개 · 미래수 소개</h3><p>소개받고 오신 학부모님</p></div>
+      <div class="fp">2만원<small>등록 시 할인</small></div></div>
+    <div class="fee"><div class="fn"><h3>등록생을 소개해 주신 경우</h3><p>소개해 주신 학부모님</p></div>
+      <div class="fp">10%<small>다음 달 수강료 할인</small></div></div>
+    <div class="fee"><div class="fn"><h3>아이가 친구를 직접 소개</h3><p>소개한 친구가 3개월 이상 함께 다니면 양쪽 학생 모두</p></div>
+      <div class="fp">5만원<small>장학금 지급</small></div></div>
+    <div class="fee"><div class="fn"><h3>네이버 영수증 리뷰</h3><p>리뷰 화면 인증샷을 카톡에 올려주세요</p></div>
+      <div class="fp">1만원<small>다음 달 교육비 공제</small></div></div>
+  </div>
+
+  <!-- 결제일·보강 -->
+  <div class="card">
+    <h2>결제일과 보강</h2>
+    <p class="sub">꼭 확인해 주세요.</p>
+    <ul class="bul">
+      <li>결제일은 <b>매달 마지막 주</b>입니다. 마지막 주에 다음 달 수강료를 미리 결제해 주세요.</li>
+      <li>개인 사정으로 인한 <b>수업료 환불은 진행하지 않습니다.</b> 다만 개인 사정으로 인한 결석도 <b>2회까지는 그 달 안에 보강</b>해 드립니다.</li>
+      <li>보강은 매달 1~2회 진행되는 <b>토요 수업일</b>에 보내주시거나, 원 카톡으로 먼저 스케줄을 상의해 주세요.</li>
+      <li>여행·감염병 등으로 <b>3회 이상 결석이 예상되면 미리</b> 알려주세요. 다음 달 교육비에서 제해 드립니다.</li>
+    </ul>
+    <div class="note">향상성은 아이의 학습 습관과 태도에 매우 큰 영향을 줍니다. 보강에 꼭 보내주세요!</div>
+  </div>
+
+  <!-- 결석 -->
+  <div class="card">
+    <h2>결석하게 되었을 때</h2>
+    <p class="sub">두 가지만 기억해 주세요.</p>
+    <ul class="bul">
+      <li>결석 시에는 <b>학원 카카오톡 채널 채팅에 있는 결석 폼</b>을 작성해 주세요.</li>
+      <li>결석으로 숙제를 못 했을 때는 <b>문법은 리디플랜에서 확인</b>하고, <b>1일치 단어·독해</b>는 꼭 다 해서 오세요.</li>
+    </ul>
+  </div>
+
+  <!-- 규정·환불 -->
+  <div class="card">
+    <h2>학원 규정 · 환불 약관</h2>
+    <p class="sub">눌러서 펼쳐 보실 수 있습니다.</p>
+    <details><summary>학원 규정</summary>
+      <div class="ans"><ul>
+        <li>무단 결석 3번 이상 후 보강을 미루거나 참여하지 않을 시 퇴원 조치될 수 있습니다.</li>
+        <li>상습적인 지각, 고의적인 기물 파손, 면학 분위기에 비협조적일 시 퇴원 조치될 수 있습니다.</li>
+        <li>숙제 3회 이상 미완료로 등원 시 보강이 1회 추가됩니다. 숙제는 원에 와서 해도 괜찮으니, 못 했더라도 수업 시간에 맞춰 등원해서 30분 정도 추가 시간을 들여서라도 완료하고 가세요.</li>
+        <li>원에서 못한 온라인 테스트는 자동으로 숙제가 됩니다. 다음 등원 전까지 완료해 주세요.</li>
+        <li>숙제 미수행으로 원서 독서에 지장이 생기면 주말 도서 대여 숙제가 추가됩니다.</li>
+      </ul></div></details>
+    <details><summary>환불 약관</summary>
+      <div class="ans"><ul>
+        <li><b>교습 시작 전</b> : 이미 납부한 교습비 전액</li>
+        <li><b>총 교습시간의 1/3 경과 전</b> : 납부한 교습비의 2/3</li>
+        <li><b>총 교습시간의 1/2 경과 전</b> : 납부한 교습비의 1/2</li>
+        <li><b>총 교습시간의 1/2 경과 후</b> : 반환하지 않음</li>
+        <li>본 규정은 수강 기간 및 수업 상황에 따라 차등 환불될 수 있습니다.</li>
+        <li>천재지변으로 인한 경우에는 환불 규정에 해당되지 않습니다.</li>
+        <li>이미 사용한 교재·프로그램 비용은 환불되지 않습니다.</li>
+      </ul></div></details>
+  </div>
+
+  <!-- 문의 -->
+  <div class="card">
+    <h2>문의는 카톡으로만</h2>
+    <p class="sub">대부분 수업 중이라 전화를 받기 어렵습니다.</p>
+    <p>학습 관련 문의는 <b>카카오톡 채널</b>로 부탁드립니다. 학원 번호로 문자를 보내시면 <b>답장이 불가능</b>하여 확인을 못 드릴 가능성이 높습니다.</p>
+    <a class="go" data-link="kakao" target="_blank" rel="noopener">카톡 채널로 문의하기</a>
+    <button class="copy" onclick="copyLink()">🔗 이 안내 페이지 링크 복사</button>
+  </div>
+
+  <footer>
+    리디튜드 언어학원 (영어 · 국어)<br>
+    영어와 국어, 제대로 읽는 법을 가르칩니다.
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ────────────────────────────────────────────────────────────
+   여기만 고치면 됩니다 — 안내에 들어가는 바깥 링크 주소
+   주소를 비워두면(''), 그 버튼은 페이지에서 자동으로 숨겨집니다.
+   ──────────────────────────────────────────────────────────── */
+var LINKS = {
+  kakao      : 'https://pf.kakao.com/_iyixjC/chat',           // 리디튜드영어학원 채널 채팅
+  enrollForm : 'https://forms.gle/dbJ5VMdCc2ciyC557',         // 입회 등록서(구글폼)
+  eduokIos   : 'https://apps.apple.com/kr/search?term=%EC%97%90%EB%93%80OK%20%ED%95%99%EB%B6%80%EB%AA%A8',
+  eduokAnd   : 'https://play.google.com/store/search?q=%EC%97%90%EB%93%80OK%20%ED%95%99%EB%B6%80%EB%AA%A8&c=apps',
+  payment    : '',   // 결제 링크는 그때그때 카톡으로 보내므로 비워둔다(버튼이 자동으로 숨겨짐)
+  headset    : 'https://www.coupang.com/vp/products/4672169181?itemId=5843422614&vendorItemId=73141717494'
+};
+
+/* 학습 프로그램 정의 — 관리자 페이지(/welcome-admin)의 키와 같아야 한다 */
+var PROGRAMS = [
+  { k:'nelt', name:'넬트 / 교재성취 TEST', site:'', siteLabel:'' },
+  { k:'cc',   name:'클래스카드',           site:'https://www.classcard.net/Login', siteLabel:'클래스카드 바로가기' },
+  { k:'c5',   name:'클래스5',              site:'https://www.classmovie.co.kr/main', siteLabel:'클래스5 바로가기' },
+  { k:'rv',   name:'리도보카',             site:'', siteLabel:'' }
+];
+
+/* ── 링크 채우기 ── */
+(function(){
+  document.querySelectorAll('[data-link]').forEach(function(a){
+    var url = LINKS[a.getAttribute('data-link')];
+    if (url) { a.href = url; } else { a.hidden = true; }
+  });
+})();
+
+/* ── 학생별 정보 읽기 ──
+   #뒤의 값은 서버로 전송되지 않으므로 아이디·비번이 서버 로그에 남지 않는다 */
+function decodeCfg(){
+  var raw = (location.hash || '').replace(/^#/, '');
+  if (!raw) return null;
+  try {
+    var b64 = raw.replace(/-/g,'+').replace(/_/g,'/');
+    while (b64.length % 4) b64 += '=';
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch(e) { return null; }
+}
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+(function render(){
+  var cfg = decodeCfg() || {};
+  var acc = cfg.p || {};
+  var hasAny = false;
+
+  if (cfg.n) {
+    var pill = document.getElementById('namePill');
+    pill.textContent = cfg.n + ' 학생 · 학부모님께';
+    pill.hidden = false;
+  }
+
+  var html = '';
+  PROGRAMS.forEach(function(p){
+    var v = acc[p.k];
+    var on = v && (v.id || v.pw);
+    if (on) {
+      hasAny = true;
+      html += '<div class="acct">'
+        + '<div class="an">' + esc(p.name) + '<span class="badge">사용</span></div>'
+        + (v.id ? '<div class="kv"><span class="k">아이디</span><span class="v">' + esc(v.id)
+            + '</span><button type="button" data-copy="' + esc(v.id) + '">복사</button></div>' : '')
+        + (v.pw ? '<div class="kv"><span class="k">비밀번호</span><span class="v">' + esc(v.pw)
+            + '</span><button type="button" data-copy="' + esc(v.pw) + '">복사</button></div>' : '')
+        + (p.site ? '<a class="lnk" href="' + p.site + '" target="_blank" rel="noopener">'
+            + esc(p.siteLabel) + ' →</a>' : '')
+        + '</div>';
+    } else {
+      html += '<div class="acct no">'
+        + '<div class="an">' + esc(p.name) + '<span class="badge">미사용</span></div>'
+        + '<p class="none">사용하지 않습니다.</p>'
+        + '</div>';
+    }
+  });
+  document.getElementById('accts').innerHTML = html;
+
+  document.getElementById('idNote').hidden = !hasAny;
+  document.getElementById('idAsk').hidden  = hasAny;
+  if (!hasAny) document.getElementById('idSub').textContent = '우리 아이가 사용하는 프로그램 안내입니다.';
+
+  // 리도보카를 쓰는 학생에게만 사용권 입금 안내를 띄운다
+  var usesVocab = !!(acc.rv && (acc.rv.id || acc.rv.pw));
+  document.getElementById('s-vocab').hidden   = !usesVocab;
+  document.getElementById('todo-vocab').hidden = !usesVocab;
+
+  document.getElementById('accts').addEventListener('click', function(e){
+    var b = e.target.closest('[data-copy]');
+    if (b) copyText(b.getAttribute('data-copy'), '복사했어요');
+  });
+})();
+
+/* ── 체크리스트 저장 ── */
+(function(){
+  var KEY = 'readitude-welcome-todo';
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) {}
+  var boxes = document.querySelectorAll('#todo input[type=checkbox]');
+  boxes.forEach(function(b){
+    b.checked = !!saved[b.dataset.k];
+    b.addEventListener('change', function(){
+      saved[b.dataset.k] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e) {}
+    });
+  });
+})();
+
+/* ── 유틸 ── */
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 1800);
+}
+function copyText(text, msg){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      function(){ toast(msg || '복사했어요'); },
+      function(){ toast('복사에 실패했어요'); }
+    );
+  } else { toast('길게 눌러서 복사해 주세요'); }
+}
+function copyLink(){ copyText(location.href, '링크를 복사했어요'); }
+</script>
+</body>
+</html>

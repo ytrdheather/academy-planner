@@ -214,6 +214,11 @@ app.get('/teacher', (req, res) => res.sendFile(path.join(publicPath, 'views', 't
 app.get('/manual', (req, res) => res.sendFile(path.join(publicPath, 'views', 'manual.html')));
 // 학생·학부모에게 그대로 공유하는 설치 안내(설치 방법만 담김). /manual은 선생님용 내용이 함께 있어 공유용으로 쓰지 않는다.
 app.get('/install', (req, res) => res.sendFile(path.join(publicPath, 'views', 'install.html')));
+// 신규 등록생 학부모께 카톡으로 보내는 등록 전 안내서.
+// 학생별 아이디는 URL의 # 뒤에 실려 오므로(서버로 전송되지 않음) 여기서는 정적 파일만 내려준다.
+app.get('/welcome', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome.html')));
+// 위 안내서 링크를 학생별로 만들어 주는 원장·선생님용 도구
+app.get('/welcome-admin', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome-admin.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));

@@ -106,7 +106,11 @@
                     console.log("로그인 성공! 토큰 저장 및 페이지 이동 시작."); // 로그 7
                     localStorage.setItem('teacher_auth_token', result.token);
                     console.log("토큰 저장 완료:", result.token); // 로그 8
-                    window.location.href = '/teacher';
+                    // 로그인 때문에 튕겨 온 경우 원래 보려던 페이지로 돌려보낸다.
+                    // 외부 사이트로 끌려가지 않도록 같은 사이트의 경로(/xxx)만 허용한다.
+                    const next = new URLSearchParams(location.search).get('next');
+                    const safeNext = (next && /^\/(?!\/)[A-Za-z0-9\-_/]*$/.test(next)) ? next : '/teacher';
+                    window.location.href = safeNext;
                 } else {
                     console.log("로그인 실패. 서버 메시지:", result.message); // 로그 9
                     errorDiv.textContent = result.message || '로그인에 실패했습니다.';
