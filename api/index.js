@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import crypto from 'crypto';
 import cron from 'node-cron';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -217,6 +218,8 @@ app.get('/install', (req, res) => res.sendFile(path.join(publicPath, 'views', 'i
 // 신규 등록생 학부모께 카톡으로 보내는 등록 전 안내서.
 // 학생별 아이디는 URL의 # 뒤에 실려 오므로(서버로 전송되지 않음) 여기서는 정적 파일만 내려준다.
 app.get('/welcome', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome.html')));
+// 학부모께 실제로 보내는 짧은 주소. 아이디는 페이지가 열린 뒤 서버에서 받아오므로 주소에 담기지 않는다.
+app.get('/w/:code', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome.html')));
 // 위 안내서 링크를 학생별로 만들어 주는 원장·선생님용 도구
 app.get('/welcome-admin', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome-admin.html')));
 
@@ -1137,6 +1140,66 @@ function readNotionText(prop) {
     }
 }
 
+// ── 학부모께 보내는 짧은 안내서 주소 (/w/<학생ID><서명>) ──
+// 학생 ID만 쓰면 뒷번호를 바꿔가며 남의 아이 아이디를 볼 수 있으므로 서명을 붙인다.
+// 서명 확인은 서버에서만 되고, 틀리면 노션을 조회하기 전에 막힌다.
+const WELCOME_SIG_LEN = 10;
+
+function welcomeSign(studentId) {
+    return crypto.createHmac('sha256', JWT_SECRET)
+        .update('welcome:' + studentId)
+        .digest('hex')
+        .slice(0, WELCOME_SIG_LEN);
+}
+
+function welcomeCode(studentId) {
+    return studentId + welcomeSign(studentId);
+}
+
+// 코드가 올바르면 학생 ID를, 아니면 빈 문자열을 돌려준다
+function readWelcomeCode(code) {
+    const raw = (code || '').trim();
+    if (raw.length <= WELCOME_SIG_LEN) return '';
+    const studentId = raw.slice(0, -WELCOME_SIG_LEN);
+    const sig = raw.slice(-WELCOME_SIG_LEN);
+    const want = welcomeSign(studentId);
+    // 길이가 같아야 timingSafeEqual을 쓸 수 있다
+    if (sig.length !== want.length) return '';
+    const ok = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
+    return ok ? studentId : '';
+}
+
+// 학부모용이라 로그인이 없다. 링크(=서명)를 가진 사람만 볼 수 있다.
+app.get('/api/welcome-info/:code', async (req, res) => {
+    const studentId = readWelcomeCode(req.params.code);
+    if (!studentId) return res.status(404).json({ error: '잘못된 주소입니다' });
+
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: { property: '학생 ID', rich_text: { equals: studentId } },
+                page_size: 1
+            })
+        });
+        if (!data.results?.length) return res.status(404).json({ error: '학생을 찾지 못했습니다' });
+
+        const props = data.results[0].properties;
+        const accounts = {};
+        PROGRAM_ACCOUNTS.forEach(p => {
+            const id = readNotionText(props[p.idProp]);
+            const pw = readNotionText(props[p.pwProp]);
+            if (id || pw) accounts[p.key] = { id, pw };
+        });
+
+        res.set('Cache-Control', 'no-store'); // 아이디가 들어 있으므로 캐시에 남기지 않는다
+        res.json({ n: readNotionText(props['이름']), p: accounts });
+    } catch (e) {
+        console.error('welcome-info 조회 실패:', e);
+        res.status(500).json({ error: '정보를 불러오지 못했습니다' });
+    }
+});
+
 app.get('/api/my-accounts', requireAuth, async (req, res) => {
     if (req.user.role !== 'student') return res.status(401).json({ error: 'Students only' });
     try {
@@ -1191,9 +1254,12 @@ app.get('/api/teacher/student-accounts', requireAuth, async (req, res) => {
                 const pw = readNotionText(props[p.pwProp]);
                 if (id || pw) accounts[p.key] = { id, pw };
             });
+            const studentId = readNotionText(props['학생 ID']);
             return {
                 name: readNotionText(props['이름']),
-                studentId: readNotionText(props['학생 ID']),
+                studentId,
+                // 학부모께 보낼 짧은 주소. 학생 ID가 없으면 만들 수 없다.
+                code: studentId ? welcomeCode(studentId) : '',
                 status: props['재원상태']?.select?.name || '',
                 className: props['Class']?.select?.name || '',
                 accounts

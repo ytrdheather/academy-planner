@@ -84,6 +84,7 @@
   .out{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; word-break:break-all;
        background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:11px 12px;
        color:var(--ink-soft); max-height:120px; overflow:auto}
+  .urlkind{margin-top:7px; font-size:12.5px; color:var(--ink-faint); line-height:1.5}
 
   .btn{display:block; width:100%; text-align:center; text-decoration:none; margin-top:10px;
       background:var(--accent-ink); color:#fff; font-weight:800; font-size:15.5px; font-family:inherit;
@@ -151,6 +152,7 @@
     <h2>보낼 링크</h2>
     <p class="sub">아이디·비밀번호는 <b>#</b> 뒤에 담겨 서버에 기록되지 않습니다. 링크 자체가 열쇠이니 학부모님께만 보내주세요.</p>
     <div class="out" id="out">링크 생성 중…</div>
+    <div class="urlkind" id="urlKind"></div>
     <button class="btn" onclick="copyOut()">🔗 링크 복사하기</button>
     <a class="btn ghost" id="preview" target="_blank" rel="noopener">미리보기 열기</a>
     <button class="btn ghost" onclick="resetAll()">전부 지우고 새로 만들기</button>
@@ -203,6 +205,9 @@ var PROGRAMS = [
 ];
 
 var pickedStudentId = '';   // 노션에 저장할 때 어느 학생인지 알아야 한다
+var pickedCode = '';        // 짧은 주소(/w/...)에 쓰는 학생별 코드
+var pickedSnapshot = '';    // 불러온 직후의 값. 손으로 고쳤는지 판별한다.
+var lastCfgJson = '';
 
 var box = document.getElementById('progs');
 box.innerHTML = PROGRAMS.map(function(p){
@@ -278,6 +283,8 @@ function searchStudents(q){
 
 function pickStudent(s){
   pickedStudentId = s.studentId || '';
+  pickedCode = s.code || '';
+  pickedSnapshot = '';
   document.getElementById('sname').value = s.name || '';
   PROGRAMS.forEach(function(p){
     var v = s.accounts[p.k];
@@ -293,6 +300,9 @@ function pickStudent(s){
   document.getElementById('manualNote').hidden = true;
   document.getElementById('pickedName').textContent = (s.name || '') + ' 학생을 불러왔습니다';
   document.getElementById('picked').hidden = false;
+  // 불러온 직후 상태를 기준으로 잡아둔다. 이후 값이 달라지면 손으로 고친 것이다.
+  build();
+  pickedSnapshot = lastCfgJson;
   build();
 }
 
@@ -325,6 +335,10 @@ function saveToNotion(k){
     .then(function(res){
       if (!res.ok) throw new Error(res.d.error || '저장 실패');
       document.getElementById('src-' + k).textContent = '노션에 저장됨';
+      // 이제 노션 값과 화면 값이 같으므로 다시 짧은 주소를 쓸 수 있다
+      build();
+      pickedSnapshot = lastCfgJson;
+      build();
       toast('노션에 저장했어요');
     })
     .catch(function(e){ toast(e.message || '저장하지 못했어요'); })
@@ -335,7 +349,7 @@ function saveToNotion(k){
 }
 
 function clearPick(){
-  pickedStudentId = '';
+  pickedStudentId = ''; pickedCode = ''; pickedSnapshot = '';
   document.getElementById('picked').hidden = true;
   document.getElementById('ssearch').focus();
   build();
@@ -388,12 +402,27 @@ function build(){
       : '노션에 저장하려면 위에서 학생을 먼저 찾아 주세요.';
   });
 
-  var url = location.origin + '/welcome';
-  var hasData = cfg.n || Object.keys(cfg.p).length;
-  if (hasData) url += '#' + b64url(JSON.stringify(cfg));
+  var cfgJson = JSON.stringify(cfg);
+  lastCfgJson = cfgJson;
+
+  var url, kind;
+  if (pickedCode && cfgJson === pickedSnapshot) {
+    // 노션에서 불러온 그대로면 짧은 주소를 쓴다. 페이지가 열릴 때 노션에서 다시 읽어오므로
+    // 나중에 아이디를 고쳐도 이미 보낸 링크가 최신 값을 보여준다.
+    url = location.origin + '/w/' + pickedCode;
+    kind = '짧은 주소입니다. 나중에 아이디를 고치셔도 이 링크가 알아서 최신 값을 보여줍니다.';
+  } else {
+    url = location.origin + '/welcome';
+    var hasData = cfg.n || Object.keys(cfg.p).length;
+    if (hasData) url += '#' + b64url(cfgJson);
+    kind = pickedCode
+      ? '값을 손으로 고치셔서 긴 주소가 됩니다. 고친 값이 링크에 그대로 담기고, 나중에 노션을 바꿔도 이 링크는 바뀌지 않습니다.'
+      : '명부에서 학생을 찾아 고르시면 훨씬 짧은 주소가 나옵니다.';
+  }
 
   document.getElementById('out').textContent = url;
   document.getElementById('preview').href = url;
+  document.getElementById('urlKind').textContent = kind;
   return url;
 }
 
@@ -416,7 +445,7 @@ function copyOut(){
   } else { toast('링크를 길게 눌러 복사해 주세요'); }
 }
 function resetAll(){
-  pickedStudentId = '';
+  pickedStudentId = ''; pickedCode = ''; pickedSnapshot = '';
   document.getElementById('sname').value = '';
   document.getElementById('ssearch').value = '';
   document.getElementById('results').innerHTML = '';

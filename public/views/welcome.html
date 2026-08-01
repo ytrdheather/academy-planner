@@ -453,7 +453,25 @@ var PROGRAMS = [
 })();
 
 /* ── 학생별 정보 읽기 ──
-   #뒤의 값은 서버로 전송되지 않으므로 아이디·비번이 서버 로그에 남지 않는다 */
+   주소가 /w/<코드> 이면 서버에서 받아온다. 아이디가 주소에 담기지 않아 링크가 짧고,
+   나중에 아이디를 고쳐도 이미 보낸 링크가 최신 값을 보여준다.
+   예전에 보낸 #뒤에 담긴 링크도 그대로 열리게 남겨둔다. */
+function currentCode(){
+  var m = location.pathname.match(/^\/w\/([A-Za-z0-9_-]+)\/?$/);
+  return m ? m[1] : '';
+}
+
+function loadCfg(){
+  var code = currentCode();
+  if (!code) return Promise.resolve(decodeCfg() || {});
+  return fetch('/api/welcome-info/' + encodeURIComponent(code))
+    .then(function(r){
+      if (!r.ok) throw new Error('not found');
+      return r.json();
+    })
+    .catch(function(){ return { __error: true }; });
+}
+
 function decodeCfg(){
   var raw = (location.hash || '').replace(/^#/, '');
   if (!raw) return null;
@@ -473,7 +491,11 @@ function esc(s){
 }
 
 function render(){
-  var cfg = decodeCfg() || {};
+  if (currentCode()) document.getElementById('idSub').textContent = '불러오는 중…';
+  loadCfg().then(applyCfg);
+}
+
+function applyCfg(cfg){
   var acc = cfg.p || {};
   var hasAny = false;
 
@@ -510,6 +532,13 @@ function render(){
   document.getElementById('idSub').textContent = hasAny
     ? '학원에서 발급된 아이디와 비밀번호입니다.'
     : '우리 아이가 사용하는 프로그램 안내입니다.';
+
+  // 주소가 잘못됐거나 학생을 못 찾은 경우엔 "미사용"이 아니라 문의 안내를 띄운다
+  if (cfg.__error) {
+    document.getElementById('idSub').textContent = '아이디를 불러오지 못했습니다.';
+    document.getElementById('idAsk').innerHTML =
+      '주소가 잘못되었거나 지금 불러올 수 없는 상태입니다. <b>학원 카톡 채널</b>로 문의해 주세요.';
+  }
 
   // 리도보카를 쓰는 학생에게만 사용권 입금 안내를 띄운다
   var usesVocab = !!(acc.rv && (acc.rv.id || acc.rv.pw));
