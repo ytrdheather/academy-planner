@@ -222,6 +222,8 @@ app.get('/welcome', (req, res) => res.sendFile(path.join(publicPath, 'views', 'w
 app.get('/w/:code', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome.html')));
 // 위 안내서 링크를 학생별로 만들어 주는 원장·선생님용 도구
 app.get('/welcome-admin', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome-admin.html')));
+// 비밀번호를 여러 번 틀려 잠긴 학생을 선생님이 바로 풀어주는 화면
+app.get('/unlock', (req, res) => res.sendFile(path.join(publicPath, 'views', 'unlock.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
@@ -1326,23 +1328,106 @@ app.post('/api/teacher/save-account', requireAuth, async (req, res) => {
         res.status(500).json({ error: '노션에 저장하지 못했습니다' });
     }
 });
-app.post('/login', async (req, res) => { 
-    const { studentId, studentPassword } = req.body; 
+// ── 로그인 실패 제한 ──
+// 비밀번호가 4자리라 계속 찍어보면 뚫린다. 5번 틀리면 10분 잠근다.
+// 잠금은 서버 메모리에만 둔다. 서버가 다시 뜨면 풀리는데, 그건 무차별 대입을
+// 늦추려는 장치이지 잠가두는 것이 목적이 아니라서 그대로 둔다.
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MS = 10 * 60 * 1000;
+const loginFails = new Map(); // 학생ID -> { count, until, lastTry }
+
+function loginLockLeft(id) {
+    const rec = loginFails.get(id);
+    if (!rec || !rec.until) return 0;
+    const left = rec.until - Date.now();
+    if (left <= 0) { loginFails.delete(id); return 0; }
+    return left;
+}
+
+function noteLoginFail(id) {
+    const rec = loginFails.get(id) || { count: 0, until: 0 };
+    rec.count += 1;
+    rec.lastTry = Date.now();
+    if (rec.count >= LOGIN_MAX_FAILS) rec.until = Date.now() + LOGIN_LOCK_MS;
+    loginFails.set(id, rec);
+    return rec;
+}
+
+// 잠긴 기록이 쌓이지 않게 한 시간에 한 번 청소한다
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, rec] of loginFails) {
+        if ((rec.until && rec.until < now) || (!rec.until && now - rec.lastTry > LOGIN_LOCK_MS)) {
+            loginFails.delete(id);
+        }
+    }
+}, 60 * 60 * 1000).unref?.();
+
+app.post('/login', async (req, res) => {
+    const { studentId, studentPassword } = req.body;
     const cleanId = studentId ? studentId.trim().toLowerCase() : '';
     const cleanPw = studentPassword ? studentPassword.toString().trim() : '';
 
-    try { 
-        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, { 
-            method: 'POST', 
-            body: JSON.stringify({ filter: { and: [ { property: '학생 ID', rich_text: { equals: cleanId } }, { property: '비밀번호', rich_text: { equals: cleanPw } } ] } }) 
-        }); 
+    const left = loginLockLeft(cleanId);
+    if (left > 0) {
+        const mins = Math.ceil(left / 60000);
+        return res.status(429).json({
+            success: false,
+            locked: true,
+            message: `비밀번호를 여러 번 틀려서 잠겼습니다. ${mins}분 뒤에 다시 해보거나 선생님께 말씀해 주세요.`
+        });
+    }
 
-        if (data.results.length > 0) { 
-            const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || cleanId; 
-            const token = generateToken({ userId: cleanId, role: 'student', name: name }); 
-            res.json({ success: true, token }); 
-        } else { res.json({ success: false, message: '로그인 실패' }); } 
-    } catch (e) { res.status(500).json({ success: false, message: 'Error' }); } 
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({ filter: { and: [ { property: '학생 ID', rich_text: { equals: cleanId } }, { property: '비밀번호', rich_text: { equals: cleanPw } } ] } })
+        });
+
+        if (data.results.length > 0) {
+            const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || cleanId;
+            loginFails.delete(cleanId); // 성공하면 실패 기록을 지운다
+            const token = generateToken({ userId: cleanId, role: 'student', name: name });
+            res.json({ success: true, token });
+        } else {
+            const rec = noteLoginFail(cleanId);
+            const remain = LOGIN_MAX_FAILS - rec.count;
+            if (rec.until) {
+                console.warn(`[로그인 잠금] ${cleanId} — ${LOGIN_MAX_FAILS}회 실패`);
+                return res.status(429).json({
+                    success: false,
+                    locked: true,
+                    message: `비밀번호를 ${LOGIN_MAX_FAILS}번 틀려서 10분간 잠겼습니다. 선생님께 말씀하시면 바로 풀어드립니다.`
+                });
+            }
+            res.json({
+                success: false,
+                message: remain <= 2 ? `로그인 실패 (${remain}번 더 틀리면 잠깁니다)` : '로그인 실패'
+            });
+        }
+    } catch (e) { res.status(500).json({ success: false, message: 'Error' }); }
+});
+
+// ── 선생님용 잠금 해제 ──
+app.get('/api/teacher/locked-accounts', requireAuth, (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+    const now = Date.now();
+    const locked = [];
+    for (const [id, rec] of loginFails) {
+        if (rec.until && rec.until > now) {
+            locked.push({ studentId: id, fails: rec.count, minutesLeft: Math.ceil((rec.until - now) / 60000) });
+        }
+    }
+    res.json({ locked, maxFails: LOGIN_MAX_FAILS, lockMinutes: LOGIN_LOCK_MS / 60000 });
+});
+
+app.post('/api/teacher/unlock-account', requireAuth, (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+    const studentId = (req.body?.studentId || '').trim().toLowerCase();
+    if (!studentId) return res.status(400).json({ error: '학생 아이디가 필요합니다' });
+    loginFails.delete(studentId);
+    console.log(`[로그인 잠금 해제] ${req.user.name} → ${studentId}`);
+    res.json({ success: true });
 });
 
 app.post('/save-progress', requireAuth, async (req, res) => {
