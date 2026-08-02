@@ -233,6 +233,70 @@ app.get('/student-grader', (req, res) => res.sendFile(path.join(publicPath, 'vie
 app.get('/results-viewer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'results-viewer.html')));
 app.get('/student-report', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-report.html')));
 
+// ------------------------------------------------------------------
+// [공지사항 허브] 카카오톡 채널 홈 메뉴에서 학부모가 여는 공개 페이지.
+// 학사일정·공지·소식·FAQ를 전부 노션에서 읽는다 — 공지 한 줄 고치려고
+// 코드를 배포하는 상황을 만들지 않기 위해서. 인증 없음(학생 데이터 없음).
+// ------------------------------------------------------------------
+const NOTICE_DB_ID = process.env.NOTICE_DB_ID || '';
+const NOTICE_CACHE_MS = 1000 * 60 * 5;
+let noticeCache = { data: null, lastFetch: 0 };
+
+// 폼 주소는 env로 둔다. 구글폼을 새로 만들거나 갈아끼울 때 재배포가 필요 없도록.
+const NOTICE_FORMS = [
+    { label: '결석 · 보강 신청', desc: '결석 알림과 보강 희망 시간 접수', url: process.env.FORM_ABSENCE_URL || '' },
+    { label: '재원생 상담 신청', desc: '담임 선생님 전화 상담 예약', url: process.env.FORM_COUNSEL_URL || '' },
+    { label: '입학 상담 신청', desc: '신규 등록 문의', url: process.env.FORM_ADMISSION_URL || '' },
+];
+
+function noticePlainText(prop) {
+    if (!prop) return '';
+    const arr = prop.title || prop.rich_text || [];
+    return arr.map(t => t.plain_text || '').join('').trim();
+}
+
+async function loadNotices() {
+    if (noticeCache.data && (Date.now() - noticeCache.lastFetch < NOTICE_CACHE_MS)) return noticeCache.data;
+    if (!NOTICE_DB_ID) return [];
+
+    // 노션 쪽 필터·정렬을 쓰지 않는다. 속성 이름이 하나라도 다르면 400이 나서
+    // 학부모 화면이 통째로 비는데, 건수가 적어 전부 읽어와 걸러도 부담이 없다.
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
+        method: 'POST',
+        body: JSON.stringify({ page_size: 100 }),
+    });
+
+    const items = (data.results || []).map(page => {
+        const p = page.properties || {};
+        return {
+            title: noticePlainText(p['제목']),
+            type: p['유형']?.select?.name || '공지',
+            body: noticePlainText(p['내용']),
+            link: p['링크']?.url || '',
+            start: p['날짜']?.date?.start || '',
+            end: p['날짜']?.date?.end || '',
+            pinned: !!p['고정']?.checkbox,
+            // '게시' 칸 자체가 없으면 숨기지 않는다. 있으면 체크된 것만 내보낸다.
+            published: p['게시'] ? !!p['게시'].checkbox : true,
+        };
+    }).filter(it => it.title && it.published);
+
+    noticeCache = { data: items, lastFetch: Date.now() };
+    return items;
+}
+
+app.get('/notice', (req, res) => res.sendFile(path.join(publicPath, 'views', 'notice.html')));
+
+app.get('/api/notice', async (req, res) => {
+    try {
+        res.json({ items: await loadNotices(), forms: NOTICE_FORMS });
+    } catch (e) {
+        // 노션이 죽어도 신청 링크는 살아 있어야 한다. 학부모가 빈 화면을 보는 것이 최악.
+        console.error('공지 조회 실패:', e.message);
+        res.json({ items: [], forms: NOTICE_FORMS });
+    }
+});
+
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
 // [PWA] 학생이 폰 홈 화면에 앱처럼 설치할 수 있게 하는 파일들.
