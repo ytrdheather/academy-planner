@@ -1506,8 +1506,9 @@ function makePlannerPassword() {
     return String(crypto.randomInt(100000, 1000000));
 }
 
+// 명단 전체의 비밀번호가 한눈에 보이고, 발급하면 학생이 못 들어오게 되므로 원장님만 쓴다.
 app.get('/api/teacher/passwords', requireAuth, async (req, res) => {
-    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+    if (req.user.role !== 'manager') return res.status(403).json({ error: '원장님만 볼 수 있습니다' });
     try {
         const students = [];
         let cursor;
@@ -1548,7 +1549,7 @@ app.get('/api/teacher/passwords', requireAuth, async (req, res) => {
 });
 
 app.post('/api/teacher/reset-passwords', requireAuth, async (req, res) => {
-    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+    if (req.user.role !== 'manager') return res.status(403).json({ error: '원장님만 발급할 수 있습니다' });
 
     const ids = Array.isArray(req.body?.studentIds) ? req.body.studentIds : [];
     if (!ids.length) return res.status(400).json({ error: '학생을 선택해 주세요' });
