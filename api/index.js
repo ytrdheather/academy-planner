@@ -1323,7 +1323,9 @@ app.get('/api/teacher/student-accounts', requireAuth, async (req, res) => {
                 // 학부모께 보낼 짧은 주소. 학생 ID가 없으면 만들 수 없다.
                 code: studentId ? welcomeCode(studentId, plannerPw) : '',
                 status: props['재원상태']?.select?.name || '',
-                className: props['Class']?.select?.name || '',
+                // 선생님들이 학생을 구분할 때 쓰는 건 문법반이다.
+                // 'Class'는 대부분 비어 있어서 화면에 아무 도움이 안 됐다.
+                className: props['문법반']?.select?.name || '',
                 accounts
             };
         });
@@ -1531,7 +1533,9 @@ app.get('/api/teacher/passwords', requireAuth, async (req, res) => {
                 students.push({
                     name: readNotionText(props['이름']),
                     studentId,
-                    className: props['Class']?.select?.name || '',
+                    // 선생님들이 학생을 구분할 때 쓰는 건 문법반이다.
+                // 'Class'는 대부분 비어 있어서 화면에 아무 도움이 안 됐다.
+                className: props['문법반']?.select?.name || '',
                     password: plannerPw,
                     issued: !!issued,                       // 새 비밀번호를 발급받았는지
                     code: welcomeCode(studentId, plannerPw) // 학부모께 보낼 안내서 주소
