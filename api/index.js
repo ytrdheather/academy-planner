@@ -224,6 +224,8 @@ app.get('/w/:code', (req, res) => res.sendFile(path.join(publicPath, 'views', 'w
 app.get('/welcome-admin', (req, res) => res.sendFile(path.join(publicPath, 'views', 'welcome-admin.html')));
 // 비밀번호를 여러 번 틀려 잠긴 학생을 선생님이 바로 풀어주는 화면
 app.get('/unlock', (req, res) => res.sendFile(path.join(publicPath, 'views', 'unlock.html')));
+// 리디플랜 로그인 비밀번호를 새로 발급하는 화면
+app.get('/passwords', (req, res) => res.sendFile(path.join(publicPath, 'views', 'passwords.html')));
 
 app.get('/past-grammar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'past-grammar.html')));
 app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'exam-analyzer.html')));
@@ -1119,6 +1121,18 @@ app.get('/api/student-info', requireAuth, (req, res) => { if (req.user.role !== 
 // ── 학생이 쓰는 학습 사이트 아이디·비번 ──
 // 학생 명부의 속성에서 그대로 읽어온다. 칸이 없는 프로그램은 조용히 건너뛰므로,
 // 노션에 아래 이름으로 칸만 만들면 코드를 고치지 않아도 리디플랜에 바로 뜬다.
+// 리디플랜 로그인은 학습 사이트 계정과 분리한다.
+// 넬트·클래스카드·클래스5 비밀번호는 노션 '비밀번호'를 두 번 이어붙인 값인데,
+// 그건 실제 사이트 계정을 받아 적어둔 것이라 우리가 바꿀 수 없다.
+// 리디플랜 로그인만 따로 '리디플랜 비밀번호'에 두면, 링크가 새도 여기만 바꾸면 된다.
+const PLANNER_ACCOUNT = { key: 'plan', name: '리디플랜 (숙제앱)', site: '/' };
+
+// 아직 새 비밀번호를 발급하지 않은 학생은 예전처럼 '비밀번호'로 로그인한다.
+// 발급이 끝나면 이 대비책을 지운다.
+function plannerPassword(props) {
+    return readNotionText(props['리디플랜 비밀번호']) || readNotionText(props['비밀번호']);
+}
+
 // editable: 노션에서 수식이 아니라 직접 입력하는 칸이라 리디플랜에서 저장할 수 있다는 뜻.
 // 수식 칸(넬트·클래스카드·클래스5)은 노션이 자동 계산하므로 쓰기를 시도해서는 안 된다.
 const PROGRAM_ACCOUNTS = [
@@ -1147,47 +1161,80 @@ function readNotionText(prop) {
 // 서명 확인은 서버에서만 되고, 틀리면 노션을 조회하기 전에 막힌다.
 const WELCOME_SIG_LEN = 10;
 
-function welcomeSign(studentId) {
+// 서명에 리디플랜 비밀번호를 섞는다.
+// 링크를 잘못 보냈을 때 비밀번호만 새로 발급하면 예전 링크가 저절로 죽는다.
+function welcomeSign(studentId, plannerPw) {
     return crypto.createHmac('sha256', JWT_SECRET)
-        .update('welcome:' + studentId)
+        .update('welcome:' + studentId + ':' + (plannerPw || ''))
         .digest('hex')
         .slice(0, WELCOME_SIG_LEN);
 }
 
-function welcomeCode(studentId) {
-    return studentId + welcomeSign(studentId);
+function welcomeCode(studentId, plannerPw) {
+    return studentId + welcomeSign(studentId, plannerPw);
 }
 
-// 코드가 올바르면 학생 ID를, 아니면 빈 문자열을 돌려준다
-function readWelcomeCode(code) {
+function splitWelcomeCode(code) {
     const raw = (code || '').trim();
-    if (raw.length <= WELCOME_SIG_LEN) return '';
-    const studentId = raw.slice(0, -WELCOME_SIG_LEN);
-    const sig = raw.slice(-WELCOME_SIG_LEN);
-    const want = welcomeSign(studentId);
-    // 길이가 같아야 timingSafeEqual을 쓸 수 있다
-    if (sig.length !== want.length) return '';
-    const ok = crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
-    return ok ? studentId : '';
+    if (raw.length <= WELCOME_SIG_LEN) return null;
+    return { studentId: raw.slice(0, -WELCOME_SIG_LEN), sig: raw.slice(-WELCOME_SIG_LEN) };
+}
+
+function welcomeSigMatches(sig, want) {
+    if (!sig || sig.length !== want.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
+}
+
+// ── 안내서 주소 넘겨짚기 방지 ──
+// 서명에 비밀번호가 들어가면서 노션을 먼저 조회해야 확인할 수 있게 됐다.
+// 틀린 코드를 계속 던지는 것을 IP 단위로 막는다.
+const welcomeMiss = new Map(); // ip -> { count, until }
+const WELCOME_MAX_MISS = 20;
+const WELCOME_BLOCK_MS = 10 * 60 * 1000;
+
+function welcomeBlocked(ip) {
+    const rec = welcomeMiss.get(ip);
+    if (!rec || !rec.until) return false;
+    if (rec.until < Date.now()) { welcomeMiss.delete(ip); return false; }
+    return true;
+}
+
+function noteWelcomeMiss(ip) {
+    const rec = welcomeMiss.get(ip) || { count: 0, until: 0 };
+    rec.count += 1;
+    rec.lastTry = Date.now();
+    if (rec.count >= WELCOME_MAX_MISS) rec.until = Date.now() + WELCOME_BLOCK_MS;
+    welcomeMiss.set(ip, rec);
 }
 
 // 학부모용이라 로그인이 없다. 링크(=서명)를 가진 사람만 볼 수 있다.
 app.get('/api/welcome-info/:code', async (req, res) => {
-    const studentId = readWelcomeCode(req.params.code);
-    if (!studentId) return res.status(404).json({ error: '잘못된 주소입니다' });
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    if (welcomeBlocked(ip)) return res.status(429).json({ error: '잠시 뒤에 다시 열어 주세요' });
+
+    const parts = splitWelcomeCode(req.params.code);
+    if (!parts) { noteWelcomeMiss(ip); return res.status(404).json({ error: '잘못된 주소입니다' }); }
 
     try {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: { property: '학생 ID', rich_text: { equals: studentId } },
+                filter: { property: '학생 ID', rich_text: { equals: parts.studentId } },
                 page_size: 1
             })
         });
-        if (!data.results?.length) return res.status(404).json({ error: '학생을 찾지 못했습니다' });
+        if (!data.results?.length) { noteWelcomeMiss(ip); return res.status(404).json({ error: '잘못된 주소입니다' }); }
 
         const props = data.results[0].properties;
+        const plannerPw = plannerPassword(props);
+        // 비밀번호를 새로 발급하면 서명이 달라져 예전 링크는 여기서 막힌다
+        if (!welcomeSigMatches(parts.sig, welcomeSign(parts.studentId, plannerPw))) {
+            noteWelcomeMiss(ip);
+            return res.status(404).json({ error: '더 이상 쓸 수 없는 주소입니다' });
+        }
+
         const accounts = {};
+        accounts[PLANNER_ACCOUNT.key] = { id: parts.studentId, pw: plannerPw };
         PROGRAM_ACCOUNTS.forEach(p => {
             const id = readNotionText(props[p.idProp]);
             const pw = readNotionText(props[p.pwProp]);
@@ -1223,6 +1270,16 @@ app.get('/api/my-accounts', requireAuth, async (req, res) => {
             pw: readNotionText(props[p.pwProp])
         })).filter(a => a.id || a.pw); // 아이디도 비번도 없으면 안 쓰는 프로그램으로 본다
 
+        // 리디플랜 로그인은 본인이 이미 로그인해서 보는 것이므로 맨 앞에 같이 보여준다
+        accounts.unshift({
+            key: PLANNER_ACCOUNT.key,
+            name: PLANNER_ACCOUNT.name,
+            site: '',
+            id: req.user.userId,
+            pw: plannerPassword(props)
+        });
+
+        res.set('Cache-Control', 'no-store');
         res.json({ accounts });
     } catch (e) {
         console.error('my-accounts 조회 실패:', e);
@@ -1250,18 +1307,21 @@ app.get('/api/teacher/student-accounts', requireAuth, async (req, res) => {
 
         const students = (data.results || []).map(page => {
             const props = page.properties;
+            const studentId = readNotionText(props['학생 ID']);
+            const plannerPw = plannerPassword(props);
+
             const accounts = {};
+            if (studentId || plannerPw) accounts[PLANNER_ACCOUNT.key] = { id: studentId, pw: plannerPw };
             PROGRAM_ACCOUNTS.forEach(p => {
                 const id = readNotionText(props[p.idProp]);
                 const pw = readNotionText(props[p.pwProp]);
                 if (id || pw) accounts[p.key] = { id, pw };
             });
-            const studentId = readNotionText(props['학생 ID']);
             return {
                 name: readNotionText(props['이름']),
                 studentId,
                 // 학부모께 보낼 짧은 주소. 학생 ID가 없으면 만들 수 없다.
-                code: studentId ? welcomeCode(studentId) : '',
+                code: studentId ? welcomeCode(studentId, plannerPw) : '',
                 status: props['재원상태']?.select?.name || '',
                 className: props['Class']?.select?.name || '',
                 accounts
@@ -1379,13 +1439,20 @@ app.post('/login', async (req, res) => {
     }
 
     try {
+        // 예전에는 아이디·비밀번호를 노션 필터로 한 번에 걸렀는데, 이제 비밀번호가
+        // '리디플랜 비밀번호'와 예전 '비밀번호' 두 곳에 걸쳐 있어 아이디로만 찾고 여기서 맞춘다.
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: { and: [ { property: '학생 ID', rich_text: { equals: cleanId } }, { property: '비밀번호', rich_text: { equals: cleanPw } } ] } })
+            body: JSON.stringify({ filter: { property: '학생 ID', rich_text: { equals: cleanId } }, page_size: 1 })
         });
 
-        if (data.results.length > 0) {
-            const name = data.results[0].properties['이름']?.title?.[0]?.plain_text || cleanId;
+        const props = data.results[0]?.properties;
+        const expected = props ? plannerPassword(props) : '';
+        const matched = !!expected && cleanPw.length === expected.length &&
+            crypto.timingSafeEqual(Buffer.from(cleanPw), Buffer.from(expected));
+
+        if (matched) {
+            const name = props['이름']?.title?.[0]?.plain_text || cleanId;
             loginFails.delete(cleanId); // 성공하면 실패 기록을 지운다
             const token = generateToken({ userId: cleanId, role: 'student', name: name });
             res.json({ success: true, token });
@@ -1428,6 +1495,98 @@ app.post('/api/teacher/unlock-account', requireAuth, (req, res) => {
     loginFails.delete(studentId);
     console.log(`[로그인 잠금 해제] ${req.user.name} → ${studentId}`);
     res.json({ success: true });
+});
+
+// ── 리디플랜 비밀번호 발급 ──
+// 예전 비밀번호는 전화번호 뒷자리라 친구가 번호만 알면 그대로 로그인됐다.
+// 학생은 리디플랜 첫 화면에서, 학부모님은 안내서 링크에서 새 비밀번호를 보시므로
+// 더 이상 외우기 쉬울 필요가 없다.
+function makePlannerPassword() {
+    // 0으로 시작하지 않는 6자리. 앞자리가 잘려 보이는 실수를 막는다.
+    return String(crypto.randomInt(100000, 1000000));
+}
+
+app.get('/api/teacher/passwords', requireAuth, async (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+    try {
+        const students = [];
+        let cursor;
+        do {
+            const body = {
+                filter: { property: '재원상태', select: { equals: '재원' } },
+                sorts: [{ property: '이름', direction: 'ascending' }],
+                page_size: 100
+            };
+            if (cursor) body.start_cursor = cursor;
+            const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+                method: 'POST', body: JSON.stringify(body)
+            });
+            (data.results || []).forEach(page => {
+                const props = page.properties;
+                const studentId = readNotionText(props['학생 ID']);
+                if (!studentId) return;
+                const issued = readNotionText(props['리디플랜 비밀번호']);
+                const plannerPw = issued || readNotionText(props['비밀번호']);
+                students.push({
+                    name: readNotionText(props['이름']),
+                    studentId,
+                    className: props['Class']?.select?.name || '',
+                    password: plannerPw,
+                    issued: !!issued,                       // 새 비밀번호를 발급받았는지
+                    code: welcomeCode(studentId, plannerPw) // 학부모께 보낼 안내서 주소
+                });
+            });
+            cursor = data.has_more ? data.next_cursor : null;
+        } while (cursor);
+
+        res.set('Cache-Control', 'no-store');
+        res.json({ students, pending: students.filter(s => !s.issued).length });
+    } catch (e) {
+        console.error('passwords 조회 실패:', e);
+        res.status(500).json({ error: '명단을 불러오지 못했습니다' });
+    }
+});
+
+app.post('/api/teacher/reset-passwords', requireAuth, async (req, res) => {
+    if (req.user.role === 'student') return res.status(401).json({ error: 'Teachers only' });
+
+    const ids = Array.isArray(req.body?.studentIds) ? req.body.studentIds : [];
+    if (!ids.length) return res.status(400).json({ error: '학생을 선택해 주세요' });
+    if (ids.length > 200) return res.status(400).json({ error: '한 번에 200명까지만 됩니다' });
+
+    const done = [], failed = [];
+    for (const rawId of ids) {
+        const studentId = String(rawId || '').trim().toLowerCase();
+        if (!studentId) continue;
+        try {
+            const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+                method: 'POST',
+                body: JSON.stringify({ filter: { property: '학생 ID', rich_text: { equals: studentId } }, page_size: 2 })
+            });
+            if (data.results.length !== 1) { failed.push({ studentId, reason: data.results.length ? '같은 아이디가 여러 개' : '찾지 못함' }); continue; }
+
+            const page = data.results[0];
+            const pw = makePlannerPassword();
+            await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties: { '리디플랜 비밀번호': { rich_text: [{ text: { content: pw } }] } } })
+            });
+            loginFails.delete(studentId); // 비밀번호가 바뀌었으니 잠금도 푼다
+            done.push({
+                studentId,
+                name: readNotionText(page.properties['이름']),
+                password: pw,
+                code: welcomeCode(studentId, pw)
+            });
+        } catch (e) {
+            console.error('비밀번호 발급 실패:', studentId, e);
+            failed.push({ studentId, reason: '저장 실패' });
+        }
+    }
+
+    console.log(`[리디플랜 비밀번호 발급] ${req.user.name} → 성공 ${done.length}명, 실패 ${failed.length}명`);
+    res.set('Cache-Control', 'no-store');
+    res.json({ done, failed });
 });
 
 app.post('/save-progress', requireAuth, async (req, res) => {
