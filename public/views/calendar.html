@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d9488">
+<title>학사일정 달력 · 리디플랜</title>
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --bad:#b4342b; --bad-wash:#fbe9e7;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg); color:var(--ink);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif; line-height:1.6}
+  .wrap{max-width:1120px; margin:0 auto; padding:20px 16px 60px}
+
+  h1{font-size:21px; margin:0 0 2px; letter-spacing:-.4px}
+  .lede{margin:0 0 18px; color:var(--ink-soft); font-size:14px}
+
+  .bar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px}
+  button{font-family:inherit; font-size:14px; cursor:pointer; border-radius:10px;
+    border:1px solid var(--border-strong); background:var(--surface); color:var(--ink); padding:8px 13px}
+  button:hover{background:var(--surface-2)}
+  button.primary{background:var(--accent-ink); border-color:var(--accent-ink); color:#fff; font-weight:700}
+  button.primary:disabled{opacity:.45; cursor:default}
+  .month{font-size:17px; font-weight:800; min-width:150px; text-align:center}
+
+  .tools{display:flex; gap:7px; flex-wrap:wrap; margin:0 0 14px}
+  .tools button{display:flex; align-items:center; gap:7px; font-weight:600}
+  .tools button.on{border-color:var(--accent-ink); box-shadow:0 0 0 2px var(--accent-wash)}
+  .sw{width:13px; height:13px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.12)}
+
+  .cols{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:18px; align-items:start}
+  @media (max-width:880px){ .cols{grid-template-columns:1fr} }
+
+  .cal{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+       box-shadow:var(--shadow); overflow:hidden}
+  .cal svg{display:block; width:100%; height:auto}
+  .cal svg .cell{cursor:pointer}
+  .cal svg .cell:hover .hit{stroke:#0a6c62; stroke-width:2}
+
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+         padding:14px 16px; box-shadow:var(--shadow)}
+  .panel h2{font-size:15px; margin:0 0 10px}
+  .trk{display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--border)}
+  .trk:last-of-type{border-bottom:0}
+  .trk .nm{font-weight:700; font-size:14.5px; flex:0 0 74px}
+  .trk .cnt{font-variant-numeric:tabular-nums; font-size:14.5px; color:var(--ink-soft)}
+  .trk .st{margin-left:auto; font-size:13px; font-weight:800}
+  .ok{color:var(--accent-ink)}
+  .no{color:var(--bad)}
+  .hint{margin-top:12px; padding:10px 12px; border-radius:10px; background:var(--bad-wash);
+        color:var(--bad); font-size:13px; line-height:1.55}
+  .hint.good{background:var(--accent-wash); color:var(--accent-ink)}
+  .note{color:var(--ink-faint); font-size:12.5px; margin-top:12px; line-height:1.6}
+  .msg{margin-left:auto; font-size:13px; color:var(--ink-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>학사일정 달력</h1>
+  <p class="lede">휴강일을 고르면 트랙별 수업 시수를 바로 다시 셉니다. 저장하면 학부모 안내 페이지와 결석·보강 폼에도 반영됩니다.</p>
+
+  <div class="bar">
+    <button id="prev">◀</button>
+    <div class="month" id="monthLabel">—</div>
+    <button id="next">▶</button>
+    <button id="save" class="primary">노션에 저장</button>
+    <button id="png">이미지로 저장</button>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="tools" id="tools"></div>
+
+  <div class="cols">
+    <div class="cal" id="calBox"></div>
+    <div class="panel">
+      <h2>수업 시수</h2>
+      <div id="tracks"></div>
+      <div id="verdict" class="hint good">—</div>
+      <p class="note">
+        같은 날이 여러 트랙에 함께 들어갑니다. 예를 들어 금요일을 쉬면 월수금과 화목금이 같이 줄어듭니다.
+        그래서 한 날만 쉬어서는 세 트랙이 잘 안 맞습니다.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 트랙 정의 (요일: 0=일 … 6=토) ─────────────────────────
+const TRACKS = [
+  { name: '월수금', days: [1, 3, 5], target: 12 },
+  { name: '화목',   days: [2, 4],    target: 8  },
+  { name: '화목금', days: [2, 4, 5], target: 12 },
+];
+
+// 표시 종류. color 는 달력에, wash 는 도구 버튼 점에 쓴다.
+const MARKS = {
+  '휴강':   { color: '#e0b64a', label: '휴강' },
+  '이벤트': { color: '#b89ad6', label: '이벤트' },
+  '보강일': { color: '#ef9ec4', label: '토요보강' },
+};
+// 수업 요일 기본 색 (원래 쓰시던 달력과 같은 구분)
+const WEEKDAY_FILL = { 2: '#a9d6c4', 4: '#a9d6c4', 1: '#fbd4d9', 3: '#fbd4d9', 5: '#fbd4d9' };
+const WD = ['일','월','화','수','목','금','토'];
+
+let cur = new Date();
+let month = '';              // YYYY-MM
+let marks = {};              // { 'YYYY-MM-DD': '휴강' | '이벤트' | '보강일' }
+let tool = '휴강';
+let dirty = false;
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+const ym = d => d.getFullYear() + '-' + pad(d.getMonth() + 1);
+const iso = (y, m, d) => y + '-' + pad(m + 1) + '-' + pad(d);
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function setMsg(t, bad){ $('msg').textContent = t || ''; $('msg').style.color = bad ? '#b4342b' : ''; }
+
+// ── 도구 버튼 ─────────────────────────────────────────────
+function drawTools(){
+  $('tools').innerHTML = Object.keys(MARKS).map(k =>
+    '<button data-tool="' + k + '"><span class="sw" style="background:' + MARKS[k].color + '"></span>' + MARKS[k].label + '</button>'
+  ).join('') + '<button data-tool="지우기"><span class="sw" style="background:#fff"></span>지우기</button>';
+
+  [...$('tools').querySelectorAll('button')].forEach(b => {
+    b.classList.toggle('on', b.dataset.tool === tool);
+    b.onclick = () => { tool = b.dataset.tool; drawTools(); };
+  });
+}
+
+// ── 시수 계산 ─────────────────────────────────────────────
+// 휴강만 수업일에서 뺀다. 이벤트는 수업을 하는 날이고, 토요보강은 결석생 보강이라 시수와 무관하다.
+function countSessions(){
+  const [y, m] = month.split('-').map(Number);
+  const byDay = {};
+  for (let d = 1; d <= 31; d++){
+    const dt = new Date(y, m - 1, d);
+    if (dt.getMonth() !== m - 1) break;
+    if (marks[iso(y, m - 1, d)] === '휴강') continue;
+    byDay[dt.getDay()] = (byDay[dt.getDay()] || 0) + 1;
+  }
+  return TRACKS.map(t => {
+    const n = t.days.reduce((a, d) => a + (byDay[d] || 0), 0);
+    return { name: t.name, n, target: t.target, diff: n - t.target };
+  });
+}
+
+function drawTracks(){
+  const rows = countSessions();
+  $('tracks').innerHTML = rows.map(r =>
+    '<div class="trk"><span class="nm">' + r.name + '</span>' +
+    '<span class="cnt">' + r.n + ' / ' + r.target + '회</span>' +
+    '<span class="st ' + (r.diff === 0 ? 'ok' : 'no') + '">' +
+      (r.diff === 0 ? '맞음' : (r.diff > 0 ? '+' + r.diff + '회' : r.diff + '회')) +
+    '</span></div>'
+  ).join('');
+
+  const off = rows.filter(r => r.diff !== 0);
+  const v = $('verdict');
+  if (!off.length){
+    v.className = 'hint good';
+    v.textContent = '세 트랙 모두 목표 시수와 맞습니다.';
+  } else {
+    v.className = 'hint';
+    v.textContent = off.map(r => r.name + ' ' + (r.diff > 0 ? r.diff + '회 초과' : (-r.diff) + '회 부족')).join(' · ');
+  }
+}
+
+// ── 달력 그리기 (SVG) ─────────────────────────────────────
+function drawCalendar(){
+  const [y, m] = month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const days = new Date(y, m, 0).getDate();
+  const lead = first.getDay();
+  const rows = Math.ceil((lead + days) / 7);
+
+  const W = 1080, PAD = 70, HEAD = 250, CELL = (W - PAD * 2) / 7;
+  const ROW = 108, H = HEAD + rows * ROW + 150;
+
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="Pretendard, sans-serif">';
+  s += '<rect width="' + W + '" height="' + H + '" fill="#e9eff1"/>';
+  s += '<text x="' + W/2 + '" y="120" text-anchor="middle" font-size="76" font-weight="800" fill="#3a4047">' + y + '</text>';
+  s += '<text x="' + W/2 + '" y="180" text-anchor="middle" font-size="34" font-weight="700" fill="#5b656e">· ' + m + '월 ·</text>';
+
+  for (let i = 0; i < 7; i++){
+    const cx = PAD + CELL * i + CELL / 2;
+    s += '<text x="' + cx + '" y="' + (HEAD - 20) + '" text-anchor="middle" font-size="26" fill="#5b656e">' + WD[i] + '</text>';
+  }
+
+  for (let d = 1; d <= days; d++){
+    const idx = lead + d - 1;
+    const cx = PAD + CELL * (idx % 7) + CELL / 2;
+    const cy = HEAD + Math.floor(idx / 7) * ROW + 34;
+    const key = iso(y, m - 1, d);
+    const dow = new Date(y, m - 1, d).getDay();
+    const mk = marks[key];
+    const fill = mk ? MARKS[mk].color : (WEEKDAY_FILL[dow] || '');
+    const strike = mk === '휴강';
+
+    s += '<g class="cell" data-date="' + key + '">';
+    if (fill) s += '<circle cx="' + cx + '" cy="' + cy + '" r="30" fill="' + fill + '"/>';
+    s += '<circle class="hit" cx="' + cx + '" cy="' + cy + '" r="34" fill="transparent" stroke="none"/>';
+    s += '<text x="' + cx + '" y="' + (cy + 11) + '" text-anchor="middle" font-size="30" ' +
+         'fill="' + (strike ? '#8a7320' : '#3a4047') + '" ' +
+         (strike ? 'text-decoration="line-through" ' : '') + '>' + d + '</text>';
+    s += '</g>';
+  }
+
+  // 범례
+  const legend = [
+    { c: '#a9d6c4', t: '화 · 목 수업' },
+    { c: '#fbd4d9', t: '월 · 수 · 금 수업' },
+    { c: MARKS['휴강'].color, t: '휴강' },
+    { c: MARKS['보강일'].color, t: '토요 보강일' },
+  ];
+  legend.forEach((L, i) => {
+    const lx = PAD + (i % 2) * ((W - PAD * 2) / 2);
+    const ly = HEAD + rows * ROW + 40 + Math.floor(i / 2) * 48;
+    s += '<circle cx="' + (lx + 16) + '" cy="' + ly + '" r="15" fill="' + L.c + '"/>';
+    s += '<text x="' + (lx + 45) + '" y="' + (ly + 9) + '" font-size="25" fill="#4a545c">' + esc(L.t) + '</text>';
+  });
+
+  s += '</svg>';
+  $('calBox').innerHTML = s;
+
+  [...$('calBox').querySelectorAll('.cell')].forEach(g => {
+    g.onclick = () => {
+      const k = g.dataset.date;
+      if (tool === '지우기') delete marks[k];
+      else marks[k] = tool;
+      dirty = true;
+      drawCalendar(); drawTracks(); setMsg('저장 안 됨', true);
+    };
+  });
+}
+
+// ── 불러오기 / 저장 ───────────────────────────────────────
+async function load(){
+  month = ym(cur);
+  $('monthLabel').textContent = cur.getFullYear() + '년 ' + (cur.getMonth() + 1) + '월';
+  marks = {}; dirty = false; setMsg('불러오는 중…');
+  drawCalendar(); drawTracks();
+
+  try{
+    const r = await fetch('/api/calendar?m=' + month);
+    if(!r.ok) throw new Error('http ' + r.status);
+    const d = await r.json();
+    (d.marks || []).forEach(m => { marks[m.date] = m.type; });
+    setMsg(d.configured === false ? 'NOTICE_DB_ID 미설정' : '');
+  }catch(e){
+    setMsg('불러오지 못했습니다', true);
+  }
+  drawCalendar(); drawTracks();
+}
+
+async function save(){
+  const token = localStorage.getItem('teacher_auth_token');
+  if(!token){ setMsg('선생님 로그인이 필요합니다', true); location.href = '/teacher-login'; return; }
+
+  $('save').disabled = true; setMsg('저장 중…');
+  try{
+    const r = await fetch('/api/calendar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        month,
+        marks: Object.keys(marks).map(date => ({ date, type: marks[date], title: marks[date] })),
+      }),
+    });
+    if(r.status === 401){ localStorage.removeItem('teacher_auth_token'); location.href = '/teacher-login'; return; }
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || 'http ' + r.status);
+    dirty = false;
+    setMsg('저장됨 (추가 ' + d.added + ' · 삭제 ' + d.removed + ')');
+  }catch(e){
+    setMsg('저장 실패: ' + e.message, true);
+  }
+  $('save').disabled = false;
+}
+
+// SVG 를 그대로 PNG 로 굽는다. 외부 라이브러리 없이 canvas 만 쓴다.
+function savePng(){
+  const svg = $('calBox').querySelector('svg');
+  const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+  const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = vb[2]; c.height = vb[3];
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#e9eff1'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = month + ' 학사일정.png';
+    a.href = c.toDataURL('image/png');
+    a.click();
+    setMsg('이미지를 내려받았습니다');
+  };
+  img.onerror = () => setMsg('이미지 변환에 실패했습니다', true);
+  img.src = url;
+}
+
+function move(n){
+  if(dirty && !confirm('저장하지 않은 변경이 있습니다. 이동할까요?')) return;
+  cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1);
+  load();
+}
+
+$('prev').onclick = () => move(-1);
+$('next').onclick = () => move(1);
+$('save').onclick = save;
+$('png').onclick = savePng;
+window.addEventListener('beforeunload', e => { if(dirty){ e.preventDefault(); e.returnValue = ''; } });
+
+drawTools();
+load();
+</script>
+</body>
+</html>

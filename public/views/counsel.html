@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d9488">
+<title>상담 신청 · 리디튜드</title>
+<style>
+  :root{
+    --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3;
+    --ink:#17242e; --ink-soft:#485a68; --ink-faint:#7b8b98;
+    --border:#e0e8ea; --border-strong:#cdd9db;
+    --accent:#0d9488; --accent-ink:#0a6c62; --accent-wash:#e4f3f0;
+    --bad:#b4342b; --bad-wash:#fbe9e7;
+    --shadow:0 1px 2px rgba(20,40,55,.04),0 6px 20px rgba(20,40,55,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e161b; --surface:#161f26; --surface-2:#1c272f;
+      --ink:#e7eef2; --ink-soft:#a7b7c2; --ink-faint:#6d7f8c;
+      --border:#243139; --border-strong:#31424c;
+      --accent:#2dd4bf; --accent-ink:#7ee7d8; --accent-wash:rgba(45,212,191,.12);
+      --bad:#ff9c8f; --bad-wash:rgba(255,120,100,.12);
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  [hidden]{display:none!important}
+  body{background:var(--bg); color:var(--ink);
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+    line-height:1.62; -webkit-text-size-adjust:100%}
+  .wrap{max-width:560px; margin:0 auto; padding:24px 16px 56px}
+
+  .top{text-align:center; padding:6px 0 20px}
+  h1{font-size:23px; margin:0 0 6px; letter-spacing:-.4px}
+  .lede{margin:0; color:var(--ink-soft); font-size:15px}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+        padding:18px 16px; margin:12px 0; box-shadow:var(--shadow)}
+
+  label{display:block; font-weight:700; font-size:15px; margin:0 0 6px}
+  .req{color:var(--accent-ink); font-size:13px; margin-left:3px}
+  .help{color:var(--ink-faint); font-size:13.5px; margin:0 0 8px}
+  input[type=text], input[type=tel], textarea{
+    width:100%; font-family:inherit; font-size:16px; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--border-strong); border-radius:11px;
+    padding:12px 13px; line-height:1.55}
+  input:focus, textarea:focus{outline:none; border-color:var(--accent); background:var(--surface)}
+  textarea{min-height:130px; resize:vertical}
+  .field{margin:0 0 20px}
+  .field:last-child{margin-bottom:0}
+
+  .choice{display:flex; gap:9px}
+  .choice button{flex:1; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer;
+    padding:13px 8px; border-radius:11px; border:1px solid var(--border-strong);
+    background:var(--surface-2); color:var(--ink-soft)}
+  .choice button.on{background:var(--accent-ink); border-color:var(--accent-ink); color:#fff}
+
+  .notice{background:var(--accent-wash); border-radius:12px; padding:13px 15px; margin:0 0 14px;
+          color:var(--accent-ink); font-size:14.5px; line-height:1.6}
+
+  .submit{width:100%; margin-top:6px; font-family:inherit; font-size:16.5px; font-weight:800;
+    padding:15px; border-radius:12px; border:none; cursor:pointer;
+    background:var(--accent-ink); color:#fff}
+  .submit:disabled{opacity:.5; cursor:default}
+
+  .err{background:var(--bad-wash); color:var(--bad); border-radius:11px; padding:11px 13px;
+       font-size:14px; margin-top:12px}
+
+  .done{text-align:center; padding:22px 8px}
+  .done .mark{font-size:44px; line-height:1}
+  .done h2{font-size:19px; margin:12px 0 8px}
+  .done p{margin:0 0 6px; color:var(--ink-soft); font-size:15px}
+
+  .foot{margin-top:26px; text-align:center; color:var(--ink-faint); font-size:12.5px; line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>상담 신청</h1>
+    <p class="lede">리디튜드 영어학원</p>
+  </div>
+
+  <form id="form" class="card">
+    <p class="notice">
+      선생님들이 수업 중이라 바로 통화가 어렵습니다.<br>
+      <strong>수업이 끝난 뒤 담당 선생님이 전화드립니다.</strong>
+    </p>
+
+    <div class="field">
+      <label for="name">학생 이름 <span class="req">필수</span></label>
+      <p class="help">학원에 등록된 이름 그대로 적어 주세요.</p>
+      <input type="text" id="name" autocomplete="off" maxlength="20" required>
+    </div>
+
+    <div class="field">
+      <label for="memo">문의 내용 <span class="req">필수</span></label>
+      <p class="help">간단히 적어 주시면 선생님이 미리 확인하고 전화드립니다.</p>
+      <textarea id="memo" maxlength="2000" required></textarea>
+    </div>
+
+    <div class="field">
+      <label>밤 10시 이후에 전화드려도 괜찮으신가요? <span class="req">필수</span></label>
+      <p class="help">수업이 늦게 끝나는 날에는 통화가 늦어질 수 있습니다.</p>
+      <div class="choice" id="late">
+        <button type="button" data-v="yes">예, 괜찮습니다</button>
+        <button type="button" data-v="no">아니요</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="phone">연락처</label>
+      <p class="help">비워두시면 학원에 등록된 번호로 연락드립니다.</p>
+      <input type="tel" id="phone" inputmode="numeric" autocomplete="tel" maxlength="20">
+    </div>
+
+    <button type="submit" class="submit" id="submit">신청하기</button>
+    <div class="err" id="err" hidden></div>
+  </form>
+
+  <div class="card done" id="done" hidden>
+    <div class="mark">✅</div>
+    <h2>접수되었습니다</h2>
+    <p>수업이 끝난 뒤 담당 선생님이 전화드립니다.</p>
+    <p id="doneSms"></p>
+  </div>
+
+  <p class="foot">
+    리디튜드 영어학원<br>
+    급한 일은 카카오톡 채널로 문의해 주세요.
+  </p>
+
+</div>
+
+<script>
+let lateOk = null;
+
+const $ = id => document.getElementById(id);
+
+// 예/아니오는 라디오 대신 버튼으로 받는다. 폰에서 누르기 쉽고 선택 여부가 눈에 바로 보인다.
+[...$('late').querySelectorAll('button')].forEach(b => {
+  b.onclick = () => {
+    lateOk = b.dataset.v === 'yes';
+    [...$('late').querySelectorAll('button')].forEach(x => x.classList.toggle('on', x === b));
+    hideErr();
+  };
+});
+
+function showErr(msg){ $('err').textContent = msg; $('err').hidden = false; }
+function hideErr(){ $('err').hidden = true; }
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideErr();
+
+  const name = $('name').value.trim();
+  const memo = $('memo').value.trim();
+  const phone = $('phone').value.trim();
+
+  if(!name)  return showErr('학생 이름을 적어 주세요.');
+  if(!memo)  return showErr('문의 내용을 적어 주세요.');
+  if(lateOk === null) return showErr('밤 10시 이후 통화가 가능한지 골라 주세요.');
+
+  $('submit').disabled = true;
+  $('submit').textContent = '보내는 중…';
+
+  try{
+    const r = await fetch('/api/counsel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, memo, phone, lateOk })
+    });
+    const d = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(d.error || '잠시 후 다시 시도해 주세요.');
+
+    $('form').hidden = true;
+    $('done').hidden = false;
+    $('doneSms').textContent = lateOk ? '밤 10시 이후 통화 가능으로 접수되었습니다.' : '';
+    window.scrollTo(0, 0);
+  }catch(err){
+    showErr(err.message || '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    $('submit').disabled = false;
+    $('submit').textContent = '신청하기';
+  }
+});
+</script>
+</body>
+</html>

@@ -46,7 +46,8 @@
         padding:14px 16px; margin:10px 0; box-shadow:var(--shadow)}
 
   /* 신청 버튼 */
-  a.form{display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;
+  /* 링크가 아직 없는 항목은 <div>로 그려지므로 a 로 한정하지 않는다 */
+  .form{display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;
     background:var(--surface); border:1px solid var(--border); border-radius:14px;
     padding:14px 16px; margin:10px 0; box-shadow:var(--shadow)}
   a.form:active{background:var(--surface-2)}
@@ -56,7 +57,13 @@
   .form.off{opacity:.55}
   .form.off .go{font-size:12.5px; font-weight:700; color:var(--ink-faint)}
 
-  /* 학사일정 */
+  /* 학사일정 — 달력 이미지 */
+  .cal{display:block; border:1px solid var(--border); border-radius:14px; overflow:hidden;
+       box-shadow:var(--shadow); background:var(--surface)}
+  .cal img{display:block; width:100%; height:auto}
+  .calcap{color:var(--ink-faint); font-size:12.5px; text-align:center; margin:7px 0 0}
+
+  /* 학사일정 — 날짜 목록 */
   .sch{display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border)}
   .sch:last-child{border-bottom:0}
   .sch .when{flex:0 0 84px; color:var(--accent-ink); font-weight:800; font-size:13.5px; padding-top:1px}
@@ -105,7 +112,7 @@
 
   <section id="schedule" hidden>
     <h2><span class="ico">📅</span>학사일정</h2>
-    <div class="card" id="schList"></div>
+    <div id="schList"></div>
   </section>
 
   <section id="news" hidden>
@@ -187,21 +194,43 @@ function render(data){
   }).join('');
 
   // ── 학사일정 ─────────────────────────────
-  // 지난 일정은 감춘다. 기간 일정은 종료일까지 남긴다.
-  const sch = items
-    .filter(it => it.type === '학사일정' && it.start && (it.end || it.start) >= today)
+  const schedItems = items.filter(it => it.type === '학사일정');
+
+  // 달력 이미지는 월초에 한 장 올리는 방식이라, 올린 날짜가 지나도 그 달 내내 보여야 한다.
+  // 그래서 날짜로 거르지 않고 가장 최근에 올린 것 하나만 쓴다.
+  const cal = schedItems
+    .filter(it => it.image)
+    .sort((a,b) => String(b.start).localeCompare(String(a.start)))[0];
+
+  // 날짜를 적어 올린 개별 일정은 지난 것을 감춘다. 기간 일정은 종료일까지 남긴다.
+  const sch = schedItems
+    .filter(it => !it.image && it.start && (it.end || it.start) >= today)
     .sort((a,b) => a.start.localeCompare(b.start))
     .slice(0, 10);
 
+  let schHtml = '';
+  if(cal){
+    const src = safeUrl(cal.image);
+    if(src){
+      schHtml += '<a class="cal" href="' + esc(src) + '" target="_blank" rel="noopener">' +
+        // 이 섹션의 본체라 지연 로딩하지 않는다. 인앱 브라우저에서 lazy 가 안 도는 경우도 있다.
+        '<img src="' + esc(src) + '" alt="' + esc(cal.title || '학사일정') + '"></a>';
+      if(cal.title) schHtml += '<p class="calcap">' + esc(cal.title) + ' · 눌러서 크게 보기</p>';
+    }
+  }
   if(sch.length){
-    document.getElementById('schList').innerHTML = sch.map(it => {
+    schHtml += '<div class="card">' + sch.map(it => {
       const isToday = it.start <= today && (it.end || it.start) >= today;
       return '<div class="sch' + (isToday ? ' today' : '') + '">' +
         '<div class="when">' + esc(fmtRange(it.start, it.end)) + '</div>' +
         '<div><div class="what">' + esc(it.title) + '</div>' +
         (it.body ? '<div class="memo">' + esc(it.body) + '</div>' : '') +
         '</div></div>';
-    }).join('');
+    }).join('') + '</div>';
+  }
+
+  if(schHtml){
+    document.getElementById('schList').innerHTML = schHtml;
     document.getElementById('schedule').hidden = false;
   }
 

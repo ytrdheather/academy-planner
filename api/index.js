@@ -273,6 +273,9 @@ async function loadNotices() {
             type: p['유형']?.select?.name || '공지',
             body: noticePlainText(p['내용']),
             link: p['링크']?.url || '',
+            // 학사일정을 달력 이미지 한 장으로 올리는 방식이라 파일 칸을 함께 읽는다.
+            // 노션이 주는 파일 주소는 한 시간쯤 뒤 만료되는데, 5분마다 새로 읽으므로 문제되지 않는다.
+            image: (p['이미지']?.files || []).map(f => f?.file?.url || f?.external?.url || '').filter(Boolean)[0] || '',
             start: p['날짜']?.date?.start || '',
             end: p['날짜']?.date?.end || '',
             pinned: !!p['고정']?.checkbox,
@@ -296,6 +299,333 @@ app.get('/api/notice', async (req, res) => {
         res.json({ items: [], forms: NOTICE_FORMS });
     }
 });
+
+// ------------------------------------------------------------------
+// [재원생 상담 신청] 학부모가 카카오톡 채널에서 여는 공개 폼.
+//
+// 구글폼을 거치지 않고 이 서버가 직접 받는다. 학원 디자인 그대로 열리고,
+// 중간에 스프레드시트·Apps Script 단계가 없어 고장 날 지점이 하나 줄어든다.
+//
+// 대신 구글폼이 공짜로 주던 안전망(응답이 시트에 남는 것)이 없으므로,
+// 노션 기록이 실패하면 신청 원문을 통째로 카카오워크와 원장 문자에 실어 보낸다.
+// 신청이 조용히 사라지는 것이 최악이기 때문이다.
+// ------------------------------------------------------------------
+const COUNSEL_DB_ID = process.env.COUNSEL_DB_ID || '3b109320-bce2-8197-a62b-e232bd5d74b7';
+const KAKAOWORK_APP_KEY = process.env.KAKAOWORK_APP_KEY || '';
+const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004416942501766';
+
+/** 카카오워크 방으로 알림을 보낸다. 키가 없으면 조용히 건너뛴다(로그는 남긴다). */
+async function sendKakaoWork(conversationId, text) {
+    if (!KAKAOWORK_APP_KEY || !conversationId) {
+        console.warn('⚠️ 카카오워크 설정 없음 — 발송 건너뜀');
+        return false;
+    }
+    const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${KAKAOWORK_APP_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            conversation_id: conversationId,
+            text,
+            blocks: [{ type: 'text', text, markdown: false }],
+        }),
+    });
+    if (!res.ok) throw new Error(`카카오워크 ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return true;
+}
+
+/** 솔라피 문자 발송. 한글은 EUC-KR 기준 2바이트라 90바이트를 넘으면 LMS로 보낸다. */
+async function sendSms(to, text, subject = '리디튜드') {
+    const key = process.env.SOLAPI_API_KEY;
+    const secret = process.env.SOLAPI_API_SECRET;
+    const from = process.env.SOLAPI_SENDER;
+    if (!key || !secret || !from || !to) {
+        console.warn('⚠️ 솔라피 설정 없음 — 문자 발송 건너뜀');
+        return false;
+    }
+
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(16).toString('hex');
+    const signature = crypto.createHmac('sha256', secret).update(date + salt).digest('hex');
+
+    let bytes = 0;
+    for (const ch of text) bytes += ch.charCodeAt(0) < 128 ? 1 : 2;
+
+    const message = { to: String(to).replace(/[^0-9]/g, ''), from, text };
+    if (bytes > 90) { message.type = 'LMS'; message.subject = subject; }
+
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `HMAC-SHA256 apiKey=${key}, date=${date}, salt=${salt}, signature=${signature}`,
+        },
+        body: JSON.stringify({ message }),
+    });
+    if (!res.ok) throw new Error(`문자 ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return true;
+}
+
+/** 이름으로 재원생을 찾는다. 반환 status: OK | UNMATCHED | DUPLICATE */
+async function lookupStudentByName(name) {
+    const miss = { status: 'UNMATCHED', studentId: '', teacher: '', phone: '' };
+    if (!name) return miss;
+
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
+        method: 'POST',
+        body: JSON.stringify({
+            filter: {
+                and: [
+                    { property: '이름', title: { equals: name } },
+                    { property: '재원상태', select: { equals: '재원' } },
+                ],
+            },
+            page_size: 10,
+        }),
+    });
+
+    const rows = data.results || [];
+    if (rows.length === 0) return miss;
+    if (rows.length > 1) return { ...miss, status: 'DUPLICATE' };
+
+    const p = rows[0].properties || {};
+    return {
+        status: 'OK',
+        studentId: noticePlainText(p['학생 ID']),
+        teacher: (p['담당쌤']?.multi_select || []).map(o => o.name).join(', '),
+        phone: (p['전화번호']?.phone_number || '').replace(/[^0-9]/g, ''),
+    };
+}
+
+app.get('/counsel', (req, res) => res.sendFile(path.join(publicPath, 'views', 'counsel.html')));
+
+app.post('/api/counsel', async (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    const memo = String(req.body?.memo || '').trim();
+    const lateOk = req.body?.lateOk === true || req.body?.lateOk === 'true';
+    const typedPhone = String(req.body?.phone || '').replace(/[^0-9]/g, '');
+
+    if (!name || !memo) return res.status(400).json({ error: '이름과 문의 내용을 적어 주세요' });
+    if (name.length > 20 || memo.length > 2000) return res.status(400).json({ error: '입력이 너무 깁니다' });
+
+    const steps = [];
+    let match = { status: 'UNMATCHED', studentId: '', teacher: '', phone: '' };
+    try {
+        match = await lookupStudentByName(name);
+        steps.push(`조회:${match.status}`);
+    } catch (e) {
+        steps.push(`조회실패:${e.message}`);
+    }
+
+    const phone = typedPhone || match.phone;
+    const lateText = lateOk ? '가능' : '어려움';
+
+    // 1) 노션 기록
+    let pageUrl = '';
+    try {
+        const page = await fetchNotion('https://api.notion.com/v1/pages', {
+            method: 'POST',
+            body: JSON.stringify({
+                parent: { database_id: COUNSEL_DB_ID },
+                properties: {
+                    '학생명': { title: [{ text: { content: name } }] },
+                    '학생ID': { rich_text: match.studentId ? [{ text: { content: match.studentId } }] : [] },
+                    '담임': { select: { name: match.teacher || '미지정' } },
+                    '문의 내용': { rich_text: [{ text: { content: memo } }] },
+                    '밤10시 이후 통화': { select: { name: lateText } },
+                    '상태': { select: { name: '접수' } },
+                    '학부모 연락처': { phone_number: phone || null },
+                    '매칭상태': { select: { name: match.status } },
+                },
+            }),
+        });
+        pageUrl = page.url || '';
+        steps.push('노션:OK');
+    } catch (e) {
+        steps.push(`노션실패:${e.message}`);
+    }
+
+    // 2) 카카오워크 알림. 노션 기록이 실패했으면 원문을 그대로 실어 보낸다.
+    try {
+        const lines = [
+            '[재원생 상담 신청]',
+            `학생: ${name} (담임: ${match.teacher || '미지정'})`,
+            `밤 10시 이후 통화: ${lateText}`,
+        ];
+        if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
+        if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
+        if (!phone) lines.push('', '⚠️ 연락처가 없어 접수 문자를 보내지 못했습니다. 직접 연락이 필요합니다.');
+
+        if (pageUrl) {
+            lines.push('', '→ 통화 후 노션에서 상태를 바꿔주세요', pageUrl);
+        } else {
+            lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.',
+                `연락처: ${phone || '없음'}`, `문의: ${memo}`);
+        }
+        await sendKakaoWork(KAKAOWORK_COUNSEL_CONV, lines.join('\n'));
+        steps.push('카카오워크:OK');
+    } catch (e) {
+        steps.push(`카카오워크실패:${e.message}`);
+    }
+
+    // 3) 학부모 접수 확인 문자
+    try {
+        if (phone) {
+            const sent = await sendSms(phone,
+                '[리디튜드] 상담 신청이 접수되었습니다.\n'
+                + `학생: ${name}\n`
+                + '수업이 끝난 뒤 담당 선생님이 전화드립니다.'
+                + (lateOk ? '\n밤 10시 이후 통화 가능으로 접수되었습니다.' : ''),
+                '상담 신청');
+            // 설정이 없어 건너뛴 것을 'OK'로 적으면 나중에 원인을 못 찾는다
+            steps.push(sent ? '문자:OK' : '문자:미설정');
+        } else {
+            steps.push('문자:번호없음');
+        }
+    } catch (e) {
+        steps.push(`문자실패:${e.message}`);
+    }
+
+    const failed = steps.filter(s => s.includes('실패'));
+    if (failed.length) {
+        console.error('상담 신청 처리 실패:', name, steps.join(' | '));
+        // 조용히 넘기지 않는다. 원장에게 원문을 통째로 보낸다.
+        try {
+            await sendSms(process.env.ADMIN_PHONE || '',
+                `[자동화 오류] ${name} 상담 신청 처리 실패\n${failed.join('\n')}\n문의: ${memo.slice(0, 200)}`,
+                '자동화 오류');
+        } catch (_) { /* 오류 알림까지 실패하면 로그만 남는다 */ }
+    }
+    console.log(`📞 상담 신청: ${name} — ${steps.join(' | ')}`);
+
+    // 학부모에게는 항상 접수됐다고 답한다. 카카오워크나 노션 중 하나라도 갔으면 사람에게 도달한 것이다.
+    res.json({ success: true });
+});
+
+// ------------------------------------------------------------------
+// [학사일정 달력] 원장·선생님용 도구.
+// 휴강일을 고르면 트랙별 수업 시수를 즉시 다시 세어 준다.
+// 손으로 세면 휴강 하나 바꿀 때마다 세 트랙을 전부 다시 세야 해서 실수가 난다.
+// 저장은 위 공지사항 DB를 그대로 쓴다(유형: 휴강 / 이벤트 / 보강일).
+// ------------------------------------------------------------------
+const CALENDAR_TYPES = ['휴강', '이벤트', '보강일'];
+
+app.get('/calendar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'calendar.html')));
+
+// 그 달에 찍힌 표시를 읽어 온다. 달력을 그리는 데만 쓰므로 인증을 걸지 않는다.
+app.get('/api/calendar', async (req, res) => {
+    const month = String(req.query.m || '');            // YYYY-MM
+    if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: '월 형식은 YYYY-MM' });
+    if (!NOTICE_DB_ID) return res.json({ marks: [], configured: false });
+
+    try {
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '날짜', date: { on_or_after: month + '-01' } },
+                        { property: '날짜', date: { before: nextMonth_(month) } },
+                    ],
+                },
+                page_size: 100,
+            }),
+        });
+
+        const marks = (data.results || []).map(page => {
+            const p = page.properties || {};
+            return {
+                id: page.id,
+                type: p['유형']?.select?.name || '',
+                date: p['날짜']?.date?.start || '',
+                title: noticePlainText(p['제목']),
+            };
+        }).filter(m => CALENDAR_TYPES.includes(m.type) && m.date);
+
+        res.json({ marks, configured: true });
+    } catch (e) {
+        console.error('달력 조회 실패:', e.message);
+        res.status(502).json({ error: '노션에서 읽지 못했습니다' });
+    }
+});
+
+// 그 달 표시를 통째로 맞춘다. 없어진 건 지우고 새로 생긴 건 만든다.
+app.post('/api/calendar', requireAuth, async (req, res) => {
+    const { month, marks } = req.body || {};
+    if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return res.status(400).json({ error: '월 형식은 YYYY-MM' });
+    if (!Array.isArray(marks)) return res.status(400).json({ error: 'marks 배열이 필요합니다' });
+    if (!NOTICE_DB_ID) return res.status(500).json({ error: 'NOTICE_DB_ID 미설정' });
+
+    const wanted = marks
+        .filter(m => CALENDAR_TYPES.includes(m.type) && /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')))
+        .filter(m => m.date.slice(0, 7) === month);
+
+    try {
+        const current = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '날짜', date: { on_or_after: month + '-01' } },
+                        { property: '날짜', date: { before: nextMonth_(month) } },
+                    ],
+                },
+                page_size: 100,
+            }),
+        });
+
+        const existing = (current.results || []).map(page => ({
+            id: page.id,
+            type: page.properties?.['유형']?.select?.name || '',
+            date: page.properties?.['날짜']?.date?.start || '',
+        })).filter(m => CALENDAR_TYPES.includes(m.type));
+
+        const key = m => m.date + '|' + m.type;
+        const wantedKeys = new Set(wanted.map(key));
+        const existingKeys = new Set(existing.map(key));
+
+        // 빠진 것 지우기 (아카이브라 노션 휴지통에서 되살릴 수 있다)
+        let removed = 0;
+        for (const m of existing) {
+            if (wantedKeys.has(key(m))) continue;
+            await fetchNotion(`https://api.notion.com/v1/pages/${m.id}`, {
+                method: 'PATCH', body: JSON.stringify({ archived: true }),
+            });
+            removed++;
+        }
+
+        // 새로 생긴 것 만들기
+        let added = 0;
+        for (const m of wanted) {
+            if (existingKeys.has(key(m))) continue;
+            await fetchNotion('https://api.notion.com/v1/pages', {
+                method: 'POST',
+                body: JSON.stringify({
+                    parent: { database_id: NOTICE_DB_ID },
+                    properties: {
+                        '제목': { title: [{ text: { content: m.title || m.type } }] },
+                        '유형': { select: { name: m.type } },
+                        '날짜': { date: { start: m.date } },
+                        // 휴강·이벤트는 학부모 안내 페이지에도 바로 보이게 한다.
+                        // 보강일은 달력 이미지로 안내하므로 목록에는 띄우지 않는다.
+                        '게시': { checkbox: m.type !== '보강일' },
+                    },
+                }),
+            });
+            added++;
+        }
+
+        noticeCache.lastFetch = 0;   // 학부모 페이지가 바로 반영되도록 캐시를 비운다
+        res.json({ success: true, added, removed });
+    } catch (e) {
+        console.error('달력 저장 실패:', e.message);
+        res.status(502).json({ error: '노션에 저장하지 못했습니다' });
+    }
+});
+
+function nextMonth_(month) {
+    const [y, m] = month.split('-').map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
