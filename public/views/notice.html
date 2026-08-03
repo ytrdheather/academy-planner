@@ -57,6 +57,16 @@
   .form.off{opacity:.55}
   .form.off .go{font-size:12.5px; font-weight:700; color:var(--ink-faint)}
 
+  /* 학사일정 — 직접 그리는 달력 */
+  .calnav{display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 8px}
+  .calnav button{font-family:inherit; font-size:15px; cursor:pointer; padding:5px 11px;
+    border-radius:9px; border:1px solid var(--border-strong); background:var(--surface); color:var(--ink-soft)}
+  .calnav button:disabled{opacity:.35; cursor:default}
+  .calnav .m{font-weight:800; font-size:15.5px; min-width:118px; text-align:center}
+  .calbox{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+          box-shadow:var(--shadow); overflow:hidden}
+  .calbox svg{display:block; width:100%; height:auto}
+
   /* 학사일정 — 달력 이미지 */
   .cal{display:block; border:1px solid var(--border); border-radius:14px; overflow:hidden;
        box-shadow:var(--shadow); background:var(--surface)}
@@ -107,14 +117,19 @@
     <p class="lede">학사일정 · 신청 · 공지사항</p>
   </div>
 
+  <section id="schedule" hidden>
+    <h2><span class="ico">📅</span>학사일정</h2>
+    <div class="calnav" id="calNav" hidden>
+      <button type="button" id="calPrev">◀</button>
+      <span class="m" id="calMonthLabel"></span>
+      <button type="button" id="calNext">▶</button>
+    </div>
+    <div id="schList"></div>
+  </section>
+
   <section id="forms">
     <h2><span class="ico">📝</span>신청하기</h2>
     <div id="formList"></div>
-  </section>
-
-  <section id="schedule" hidden>
-    <h2><span class="ico">📅</span>학사일정</h2>
-    <div id="schList"></div>
   </section>
 
   <section id="news" hidden>
@@ -179,6 +194,105 @@ function fmtShort(iso){
   return (d.getMonth()+1) + '.' + d.getDate();
 }
 
+// ── 학사일정 달력 ─────────────────────────────
+// 원장이 /calendar 에서 찍은 휴강·이벤트·보강일을 학부모 화면에도 그대로 그린다.
+// 달력 이미지를 매달 만들어 올리지 않아도 되게 하려는 것이다.
+const CAL_FILL = { 2:'#a9d6c4', 4:'#a9d6c4', 1:'#fbd4d9', 3:'#fbd4d9', 5:'#fbd4d9' };
+const CAL_MARK = { '휴강':'#e0b64a', '이벤트':'#b89ad6', '보강일':'#ef9ec4' };
+const CAL_LEGEND = [
+  { c:'#a9d6c4', t:'화 · 목 수업' }, { c:'#fbd4d9', t:'월 · 수 · 금 수업' },
+  { c:CAL_MARK['휴강'], t:'휴강' }, { c:CAL_MARK['보강일'], t:'토요 보강일' },
+];
+
+let NOTICE_ITEMS = [];
+let calCursor = new Date();
+
+function drawMonthSvg(year, month, marks){
+  const first = new Date(year, month, 1);
+  const days = new Date(year, month + 1, 0).getDate();
+  const lead = first.getDay();
+  const rows = Math.ceil((lead + days) / 7);
+
+  const W = 1080, PAD = 60, HEAD = 120, CELL = (W - PAD*2) / 7, ROW = 108;
+  const H = HEAD + rows*ROW + 150;
+
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" font-family="Pretendard, sans-serif">';
+  s += '<rect width="'+W+'" height="'+H+'" fill="#e9eff1"/>';
+  for(let i=0;i<7;i++){
+    s += '<text x="'+(PAD+CELL*i+CELL/2)+'" y="'+(HEAD-24)+'" text-anchor="middle" font-size="26" fill="#5b656e">'+WD[i]+'</text>';
+  }
+  for(let d=1; d<=days; d++){
+    const idx = lead + d - 1;
+    const cx = PAD + CELL*(idx%7) + CELL/2;
+    const cy = HEAD + Math.floor(idx/7)*ROW + 34;
+    const dow = new Date(year, month, d).getDay();
+    const mk = marks[year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0')];
+    const fill = mk ? CAL_MARK[mk] : (CAL_FILL[dow] || '');
+    const off = mk === '휴강';
+    if(fill) s += '<circle cx="'+cx+'" cy="'+cy+'" r="30" fill="'+fill+'"/>';
+    s += '<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" font-size="30" fill="'
+      + (off ? '#8a7320' : '#3a4047') + '"' + (off ? ' text-decoration="line-through"' : '') + '>'+d+'</text>';
+  }
+  CAL_LEGEND.forEach((L,i) => {
+    const lx = PAD + (i%2) * ((W-PAD*2)/2);
+    const ly = HEAD + rows*ROW + 40 + Math.floor(i/2)*48;
+    s += '<circle cx="'+(lx+16)+'" cy="'+ly+'" r="15" fill="'+L.c+'"/>';
+    s += '<text x="'+(lx+45)+'" y="'+(ly+9)+'" font-size="25" fill="#4a545c">'+esc(L.t)+'</text>';
+  });
+  return s + '</svg>';
+}
+
+function renderSchedule(){
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  const prefix = y + '-' + String(m+1).padStart(2,'0');
+  const today = ymd(new Date());
+
+  const marks = {};
+  NOTICE_ITEMS.forEach(it => {
+    if(CAL_MARK[it.type] && it.start && it.start.slice(0,7) === prefix) marks[it.start] = it.type;
+  });
+
+  // 원장이 손으로 만든 달력 이미지를 올렸으면 그것을 우선한다.
+  const cal = NOTICE_ITEMS
+    .filter(it => it.type === '학사일정' && it.image)
+    .sort((a,b) => String(b.start).localeCompare(String(a.start)))[0];
+
+  let html = '';
+  if(cal && safeUrl(cal.image)){
+    const src = safeUrl(cal.image);
+    html += '<a class="cal" href="'+esc(src)+'" target="_blank" rel="noopener">'
+      + '<img src="'+esc(src)+'" alt="'+esc(cal.title || '학사일정')+'"></a>';
+    if(cal.title) html += '<p class="calcap">'+esc(cal.title)+' · 눌러서 크게 보기</p>';
+  } else {
+    html += '<div class="calbox">' + drawMonthSvg(y, m, marks) + '</div>';
+  }
+
+  // 그 달에 적힌 설명(휴강 사유 등)과 제목이 따로 있는 일정만 아래에 덧붙인다.
+  const list = NOTICE_ITEMS
+    .filter(it => it.start && it.start.slice(0,7) === prefix)
+    .filter(it => (it.type === '학사일정' && !it.image) || ((it.type === '휴강' || it.type === '이벤트') && it.body))
+    .sort((a,b) => a.start.localeCompare(b.start));
+
+  if(list.length){
+    html += '<div class="card">' + list.map(it => {
+      const isToday = it.start <= today && (it.end || it.start) >= today;
+      const badge = it.type === '휴강' ? '<span class="tag off">휴강</span>'
+        : it.type === '이벤트' ? '<span class="tag ev">행사</span>' : '';
+      const label = (it.title === it.type) ? '' : esc(it.title);
+      return '<div class="sch'+(isToday?' today':'')+'">'
+        + '<div class="when">'+esc(fmtRange(it.start, it.end))+'</div>'
+        + '<div><div class="what">'+badge+label+'</div>'
+        + (it.body ? '<div class="memo">'+esc(it.body)+'</div>' : '')
+        + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  document.getElementById('schList').innerHTML = html;
+  document.getElementById('calMonthLabel').textContent = y + '년 ' + (m+1) + '월';
+  document.getElementById('calNav').hidden = !!cal;   // 이미지를 올렸으면 월 이동은 의미가 없다
+  document.getElementById('schedule').hidden = false;
+}
+
 function render(data){
   const items = data.items || [];
   const today = ymd(new Date());
@@ -196,53 +310,8 @@ function render(data){
   }).join('');
 
   // ── 학사일정 ─────────────────────────────
-  // 학사일정 달력(/calendar)이 저장하는 '휴강'·'이벤트'도 여기서 함께 보여준다.
-  // '보강일'은 결석·보강 폼 선택지로만 쓰고 목록에는 띄우지 않는다.
-  const SCHED_TYPES = ['학사일정', '휴강', '이벤트'];
-  const schedItems = items.filter(it => SCHED_TYPES.includes(it.type));
-
-  // 달력 이미지는 월초에 한 장 올리는 방식이라, 올린 날짜가 지나도 그 달 내내 보여야 한다.
-  // 그래서 날짜로 거르지 않고 가장 최근에 올린 것 하나만 쓴다.
-  const cal = schedItems
-    .filter(it => it.image)
-    .sort((a,b) => String(b.start).localeCompare(String(a.start)))[0];
-
-  // 날짜를 적어 올린 개별 일정은 지난 것을 감춘다. 기간 일정은 종료일까지 남긴다.
-  const sch = schedItems
-    .filter(it => !it.image && it.start && (it.end || it.start) >= today)
-    .sort((a,b) => a.start.localeCompare(b.start))
-    .slice(0, 10);
-
-  let schHtml = '';
-  if(cal){
-    const src = safeUrl(cal.image);
-    if(src){
-      schHtml += '<a class="cal" href="' + esc(src) + '" target="_blank" rel="noopener">' +
-        // 이 섹션의 본체라 지연 로딩하지 않는다. 인앱 브라우저에서 lazy 가 안 도는 경우도 있다.
-        '<img src="' + esc(src) + '" alt="' + esc(cal.title || '학사일정') + '"></a>';
-      if(cal.title) schHtml += '<p class="calcap">' + esc(cal.title) + ' · 눌러서 크게 보기</p>';
-    }
-  }
-  if(sch.length){
-    schHtml += '<div class="card">' + sch.map(it => {
-      const isToday = it.start <= today && (it.end || it.start) >= today;
-      // 휴강은 학부모가 제일 신경 쓰는 항목이라 한눈에 구분되게 표시한다.
-      const badge = it.type === '휴강' ? '<span class="tag off">휴강</span>'
-        : it.type === '이벤트' ? '<span class="tag ev">행사</span>' : '';
-      // 달력에서 찍은 항목은 제목이 유형과 같게 저장된다. 배지와 겹치므로 그때는 제목을 생략한다.
-      const label = (it.title === it.type) ? '' : esc(it.title);
-      return '<div class="sch' + (isToday ? ' today' : '') + '">' +
-        '<div class="when">' + esc(fmtRange(it.start, it.end)) + '</div>' +
-        '<div><div class="what">' + badge + label + '</div>' +
-        (it.body ? '<div class="memo">' + esc(it.body) + '</div>' : '') +
-        '</div></div>';
-    }).join('') + '</div>';
-  }
-
-  if(schHtml){
-    document.getElementById('schList').innerHTML = schHtml;
-    document.getElementById('schedule').hidden = false;
-  }
+  NOTICE_ITEMS = items;
+  renderSchedule();
 
   // ── 공지 · 소식 ──────────────────────────
   const posts = items
@@ -287,6 +356,15 @@ function render(data){
     if(el) el.scrollIntoView({ block:'start' });
   }
 }
+
+document.getElementById('calPrev').onclick = () => {
+  calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() - 1, 1);
+  renderSchedule();
+};
+document.getElementById('calNext').onclick = () => {
+  calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + 1, 1);
+  renderSchedule();
+};
 
 fetch('/api/notice')
   .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
