@@ -312,7 +312,8 @@ app.get('/api/notice', async (req, res) => {
 // ------------------------------------------------------------------
 const COUNSEL_DB_ID = process.env.COUNSEL_DB_ID || '3b109320-bce2-8197-a62b-e232bd5d74b7';
 const KAKAOWORK_APP_KEY = process.env.KAKAOWORK_APP_KEY || '';
-const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004416942501766';
+// 봇이 만든 공개 채널(channel_type: public). 사람이 UI 에서 만든 채널에는 봇이 못 들어간다.
+const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004426035560321';
 
 /** 카카오워크 방으로 알림을 보낸다. 키가 없으면 조용히 건너뛴다(로그는 남긴다). */
 async function sendKakaoWork(conversationId, text) {

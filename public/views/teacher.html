@@ -285,6 +285,18 @@
                 </div>
             </div>
 
+            <!-- 학부모가 카카오톡 채널에서 여는 페이지들. 주소를 아는 사람만 열 수 있으면
+                 미리보기도 못 하고 카톡 메뉴에 넣을 주소도 찾기 어려워서 여기 모아 둔다. -->
+            <div class="section-title">🔗 학부모용 링크 (카카오톡 채널 메뉴)</div>
+            <div class="table-scroll-area" style="padding: 20px; border:none; background: transparent; box-shadow: none;">
+                <div class="admin-links-container">
+                    <button class="admin-link-button" onclick="openParentLink('/notice')" title="학사일정·공지·FAQ·신청 링크가 모인 학부모 안내 페이지">📢 학부모 안내 페이지</button>
+                    <button class="admin-link-button" onclick="openParentLink('/notice#faq')" title="안내 페이지의 자주 묻는 질문 부분으로 바로 열립니다">💬 자주 묻는 질문</button>
+                    <button class="admin-link-button" onclick="openParentLink('/counsel')" title="재원생 학부모가 상담을 신청하는 폼">📞 상담 신청 폼</button>
+                    <button class="admin-link-button" onclick="copyParentLinks()" title="카카오톡 채널 메뉴에 붙여넣을 주소를 한 번에 복사합니다">📋 주소 모두 복사</button>
+                </div>
+            </div>
+
             <div class="section-title">⚙️ 관리자 바로가기 (Notion DB)</div>
             <div class="table-scroll-area" style="padding: 20px; border:none; background: transparent; box-shadow: none;">
                 <div class="admin-links-container">
@@ -2397,6 +2409,21 @@
         }
         function logout() { localStorage.removeItem('teacher_auth_token'); window.location.href='/teacher-login'; }
         function openNotionWindow(url) { window.open(url, '_blank', 'width=1200,height=800'); }
+
+        // 학부모용 페이지는 폰에서 보는 화면이라 좁은 창으로 띄운다.
+        function openParentLink(path) {
+            window.open(location.origin + path, '_blank', 'width=430,height=880');
+        }
+
+        // 카카오톡 채널 메뉴에 붙여넣을 주소를 한 번에 복사한다.
+        function copyParentLinks() {
+            const o = location.origin;
+            copyText(
+                '공지사항: ' + o + '/notice\n' +
+                '결제·교재 문의(FAQ): ' + o + '/notice#faq\n' +
+                '재원생 상담: ' + o + '/counsel'
+            );
+        }
         
         function copyText(text) {
             if (navigator.clipboard && window.isSecureContext) {
