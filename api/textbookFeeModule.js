@@ -171,7 +171,7 @@ export function initializeTextbookFeeRoutes({
             }),
         });
         const body = await res.json().catch(() => ({}));
-        if (res.ok && !body?.failedMessageList?.length) return '알림톡';
+        if (res.ok && !body?.failedMessageList?.length) return '알림톡으로';
 
         // 폴백: 문자. 계좌는 템플릿에만 있으므로 문자용 문구를 여기서 만든다.
         console.warn('알림톡 실패 → 문자 폴백:', JSON.stringify(body).slice(0, 300));
@@ -179,7 +179,7 @@ export function initializeTextbookFeeRoutes({
             `[리디튜드] 교재 입금 안내\n${이름} 학생의 새 교재입니다.\n\n${row.교재목록}\n\n교재비 ${won(row.청구금액)}\n국민 4266 02 01415 043 (예금주 : 이명수)`,
             '교재 입금 안내');
         if (!ok) throw new Error('알림톡·문자 모두 실패');
-        return '문자';
+        return '문자로';
     }
 
     // ── 카카오워크 ─────────────────────────────────────────────────
@@ -326,8 +326,11 @@ export function initializeTextbookFeeRoutes({
                     '진행상태': { select: { name: '발송완료' } },
                     '발송 일시': { date: { start: new Date().toISOString() } },
                     '발송 예약': { checkbox: false },
+                    // 승인대기를 안 거치고 바로 승인됨으로 올린 행은 제목이 비어 있다.
+                    // 이력이 쌓이는 원장인데 제목 없는 행이 섞이면 나중에 못 알아본다.
+                    ...(row.제목 ? {} : { '제목': { title: [{ text: { content: `${이름} · ${kstToday()}` } }] } }),
                 });
-                await notifyOwner('교재비 안내 발송 완료', `${이름} 학부모님께 ${경로}로 보냈습니다.\n\n${row.교재목록}\n청구 ${won(row.청구금액)}`);
+                await notifyOwner('교재비 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n${row.교재목록}\n청구 ${won(row.청구금액)}`);
                 r.발송++;
             } catch (e) {
                 r.실패.push(`발송/${row.id}: ${e.message}`);
