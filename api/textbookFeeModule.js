@@ -115,12 +115,16 @@ export function initializeTextbookFeeRoutes({
         if (!row.변경교재Ids.length) problems.push('변경 교재가 비어 있음');
         if (!row.연락처) problems.push('학부모 연락처 없음');
 
-        const 무가격 = [];
+        // 이름을 여기서 같이 모은다. `교재 목록` 수식 문자열을 ", " 로 쪼개면
+        // 교재명 자체에 쉼표가 든 경우 엉뚱하게 잘린다. relation 에서 직접 읽는 게 안전하다.
+        const names = [], 무가격 = [];
         for (const id of row.변경교재Ids) {
             try {
                 const book = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
+                const 이름 = plain(book.properties?.['교재이름']) || '(이름없음)';
                 const 가격 = book.properties?.['가격']?.number;
-                if (가격 == null || 가격 === 0) 무가격.push(plain(book.properties?.['교재이름']) || '(이름없음)');
+                names.push(이름);
+                if (가격 == null || 가격 === 0) 무가격.push(이름);
             } catch { problems.push('교재 정보를 읽지 못함'); }
         }
         if (무가격.length) problems.push(`가격 미입력: ${무가격.join(', ')}`);
@@ -128,7 +132,7 @@ export function initializeTextbookFeeRoutes({
         // 알림톡은 변수 자리에 빈 문자열이 들어가면 카카오가 거부한다 (설계 §5)
         if (!row.교재목록) problems.push('교재 목록이 비어 있음');
         if (!row.청구금액) problems.push('청구 금액이 0이거나 비어 있음');
-        return problems;
+        return { problems, names };
     }
 
     // ── 알림톡 ─────────────────────────────────────────────────────
@@ -137,7 +141,7 @@ export function initializeTextbookFeeRoutes({
      * 알림톡이 거부되면 같은 내용을 문자로 보낸다 — 안 나가는 것보다는 문자가 낫다.
      * (다만 솔라피가 접수한 뒤 비동기로 실패하는 경우는 여기서 못 잡는다.)
      */
-    async function sendAlimtalk(row, 이름) {
+    async function sendAlimtalk(row, 이름, 교재이름들) {
         const key = process.env.SOLAPI_API_KEY;
         const secret = process.env.SOLAPI_API_SECRET;
         const from = process.env.SOLAPI_SENDER;
@@ -146,6 +150,11 @@ export function initializeTextbookFeeRoutes({
         const date = new Date().toISOString();
         const salt = crypto.randomBytes(16).toString('hex');
         const signature = crypto.createHmac('sha256', secret).update(date + salt).digest('hex');
+
+        // 한 줄에 한 권. 쉼표로 이어붙이면 5권부터 문단처럼 뭉쳐서 못 읽는다(실측).
+        // 설계 §5 는 "줄바꿈 든 변수는 심사에서 거절 사례가 있다"고 적었지만 그건 신규 심사 얘기고,
+        // 이미 승인된 템플릿의 변수 값에 개행을 넣는 것은 발송 단계 문제다. 실발송으로 확인했다.
+        const 교재정보 = (교재이름들?.length ? 교재이름들 : [row.교재목록]).join('\n');
 
         const res = await fetch('https://api.solapi.com/messages/v4/send', {
             method: 'POST',
@@ -163,7 +172,7 @@ export function initializeTextbookFeeRoutes({
                         disableSms: true,   // 폴백은 아래에서 직접 한다(어느 경로로 나갔는지 로그에 남기려고)
                         variables: {
                             '#{학생이름}': 이름,
-                            '#{교재정보}': row.교재목록,
+                            '#{교재정보}': 교재정보,
                             '#{교재비}': won(row.청구금액),
                         },
                     },
@@ -176,7 +185,7 @@ export function initializeTextbookFeeRoutes({
         // 폴백: 문자. 계좌는 템플릿에만 있으므로 문자용 문구를 여기서 만든다.
         console.warn('알림톡 실패 → 문자 폴백:', JSON.stringify(body).slice(0, 300));
         const ok = await sendSms(row.연락처,
-            `[리디튜드] 교재 입금 안내\n${이름} 학생의 새 교재입니다.\n\n${row.교재목록}\n\n교재비 ${won(row.청구금액)}\n국민 4266 02 01415 043 (예금주 : 이명수)`,
+            `[리디튜드] 교재 입금 안내\n${이름} 학생의 새 교재입니다.\n\n${교재정보}\n\n교재비 ${won(row.청구금액)}\n국민 4266 02 01415 043 (예금주 : 이명수)`,
             '교재 입금 안내');
         if (!ok) throw new Error('알림톡·문자 모두 실패');
         return '문자로';
@@ -255,7 +264,7 @@ export function initializeTextbookFeeRoutes({
         })) {
             try {
                 const 이름 = await studentName(row.학생Id);
-                const problems = await validate(row);
+                const { problems } = await validate(row);
                 // 승인 시점에 미리 알려주면 원장이 교재 마스터를 고치고 승인할 수 있다 (설계 §6-2)
                 const body = summary(row, 이름) + (problems.length ? `\n\n⚠️ 이대로는 발송이 막힙니다\n· ${problems.join('\n· ')}` : '');
                 await notifyOwner('교재 변경 승인 요청', body, [
@@ -308,7 +317,7 @@ export function initializeTextbookFeeRoutes({
             let 선점 = false;
             try {
                 const 이름 = await studentName(row.학생Id);
-                const problems = await validate(row);
+                const { problems, names } = await validate(row);
                 if (problems.length) {
                     await patch(row.id, { '진행상태': { select: { name: '보류' } }, '발송 예약': { checkbox: false } });
                     await notifyOwner('발송 보류', `${이름} 건을 보내지 않았습니다.\n\n· ${problems.join('\n· ')}\n\n고친 뒤 진행상태를 '승인됨'으로 되돌리고 발송 예약을 다시 켜 주세요.`,
@@ -321,7 +330,7 @@ export function initializeTextbookFeeRoutes({
                 await patch(row.id, { '진행상태': { select: { name: '발송중' } } });
                 선점 = true;
 
-                const 경로 = await sendAlimtalk(row, 이름);
+                const 경로 = await sendAlimtalk(row, 이름, names);
                 await patch(row.id, {
                     '진행상태': { select: { name: '발송완료' } },
                     '발송 일시': { date: { start: new Date().toISOString() } },
