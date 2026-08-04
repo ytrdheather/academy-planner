@@ -182,6 +182,7 @@
         <button class="sw" onclick="showGuide('missing',this)">⚠️ 누락 점검</button>
         <button class="sw" onclick="showGuide('app',this)">📱 학생 앱 설치</button>
         <button class="sw" onclick="showGuide('welcome',this)">📨 신입생 등록 안내서</button>
+        <button class="sw" onclick="showGuide('textbook',this)">💰 교재 변경·교재비</button>
       </div>
     </header>
 
@@ -864,6 +865,121 @@
         </div>
       </section>
     </div><!-- /guide-welcome -->
+
+    <!-- ============ 가이드 · 교재 변경·교재비 ============ -->
+    <div id="guide-textbook" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">교재를 바꿀 때 선생님이 하는 일은 <b>노션에 한 줄 만들고 교재를 고르는 것</b>뿐입니다. 금액 계산·원장님 승인 요청·학부모님 문자는 전부 자동입니다. <b>학부모님께 직접 연락하지 마세요.</b></p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">✍️ 선생님이 하는 것</div>
+            <div class="twhen">교재비 관리 DB</div>
+            <p>행 하나 만들고 <b>학생 · 변경 교재</b>를 고른 뒤 진행상태를 <b>승인대기</b>로 바꿉니다. 끝입니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">🤖 자동으로 되는 것</div>
+            <div class="twhen">5분 안에</div>
+            <p>금액 계산 → 원장님 승인 요청 → 승인되면 선생님께 알림 → 학부모님께 입금 안내.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="flow" style="margin-left:0">
+        <span class="tab">📝 행 만들기</span><span class="arrow">→</span>
+        <span class="tab">📚 교재 고르기</span><span class="arrow">→</span>
+        <span class="tab">🙋 승인대기</span><span class="arrow">→</span>
+        <span class="tab">👩‍💼 원장님 승인</span><span class="arrow">→</span>
+        <span class="tab">💬 학부모 안내</span>
+      </div>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>교재비 관리 DB에 한 줄 만들기</h2></div>
+        <p class="phase-sub">노션 <b>각종 데이터 베이스 모음 → 교재비 관리</b>를 엽니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>새 행</b>을 하나 추가합니다</div>
+            <div class="sd">제목은 <b>비워 두세요.</b> <b>“이재아 · 2026-08-05”</b> 처럼 서버가 알아서 채웁니다.</div></li>
+          <li><div class="st"><b>학생</b> 칸에서 학생을 고릅니다</div>
+            <div class="sd">이름을 타이핑하는 칸이 아니라 <b>학생 명부에서 고르는</b> 칸입니다. 고르면 학부모님 연락처와 담당쌤이 저절로 따라옵니다.</div></li>
+          <li><div class="st"><b>변경 교재</b>에 새로 나갈 교재를 <b>전부</b> 담습니다</div>
+            <div class="sd">몇 권이든 <b>한 줄에 다 넣으세요.</b> 4권이면 4권 모두 이 칸에 담습니다. 교재마다 줄을 나누면 학부모님이 문자를 네 통 받습니다.</div></li>
+          <li><div class="st">(선택) <b>기존 교재</b>에 끝낸 교재를 담습니다</div>
+            <div class="sd">원장님이 무엇을 무엇으로 바꾸는지 보고 판단하십니다. 학부모님께는 <b>새 교재만</b> 나갑니다.</div></li>
+          <li><div class="st">(선택) <b>요청 메모</b>에 사유를 적습니다</div>
+            <div class="sd">“레벨업 교체”, “분실 재구매” 처럼 짧게. 원장님 승인 화면에 같이 보입니다.</div></li>
+        </ol>
+        <div class="note tip"><span class="lbl">참고</span>교재 이름은 <b>손으로 적지 않습니다.</b> 고른 교재에서 이름과 가격을 그대로 가져오기 때문에 오타가 학부모님께 나갈 일이 없습니다. 금액도 자동입니다 — <b>계산기를 두드리지 마세요.</b></div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>진행상태를 “승인대기”로 바꾸기</h2></div>
+        <p class="phase-sub">이것이 <b>신청 버튼</b>입니다. 이걸 바꿔야 원장님께 요청이 갑니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>진행상태</b>를 <b>승인대기</b>로 고릅니다</div>
+            <div class="sd"><b>작성중</b>으로 두면 아무 일도 일어나지 않습니다. 교재를 고르다 만 상태로 두고 싶을 때 쓰세요.</div></li>
+          <li><div class="st">5분 안에 원장님께 알림이 갑니다</div>
+            <div class="sd">원장님 화면에 학생·기존 교재·변경 교재·청구 금액과 <b>승인 / 반려</b> 버튼이 뜹니다.</div></li>
+          <li><div class="st">승인되면 <b>선생님께 카카오워크 알림</b>이 옵니다</div>
+            <div class="sd">반려된 경우에도 <b>반려 사유와 함께</b> 옵니다. 노션을 계속 들여다보지 않으셔도 됩니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span><b>발송 예약</b> 칸은 <b>선생님이 켜지 마세요.</b> 이걸 켜면 학부모님께 입금 안내가 실제로 나갑니다. <b>원장님이 켜는 칸</b>입니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>승인된 뒤 — 교재 준비와 입금 확인</h2></div>
+        <p class="phase-sub">교재를 챙기고 결과를 적는 단계입니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>구매 상태</b>를 바꿉니다</div>
+            <div class="sd">미구매 → 일부구매 → 구매완료. 조교쌤이 무엇을 몇 권 사야 하는지 여기서 봅니다.</div></li>
+          <li><div class="st">못 구한 교재가 있으면 <b>미확보 교재</b>에 적습니다</div>
+            <div class="sd">품절·입고 지연처럼 학생에게 바로 못 주는 것을 적어 두세요.</div></li>
+          <li><div class="st">입금이 확인되면 <b>입금 확인</b>을 켜고 날짜를 적습니다</div>
+            <div class="sd">이 기록이 남아야 나중에 “누가 아직 안 냈는지”를 뽑을 수 있습니다.</div></li>
+        </ol>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">막힐 때</span><h2>“보류”가 떴어요</h2></div>
+        <p class="phase-sub">발송이 멈췄다는 뜻입니다. <b>사고가 아니라 안전장치입니다.</b></p>
+        <ol class="steps">
+          <li><div class="st">거의 항상 <b>교재 가격이 비어 있어서</b>입니다</div>
+            <div class="sd">교재 데이터베이스에 <b>가격</b>이 없는 교재를 담으면, 그 책이 <b>0원으로 빠진 채</b> 학부모님께 청구됩니다. 나중에 “돈을 더 보내주세요”라고 다시 말씀드려야 하므로 미리 막습니다.</div></li>
+          <li><div class="st">교재 데이터베이스에서 그 교재의 <b>가격을 채웁니다</b></div>
+            <div class="sd">어느 교재인지는 원장님께 간 알림에 이름까지 적혀 있습니다. 문법서는 절반 넘게 가격이 비어 있으니 특히 자주 걸립니다.</div></li>
+          <li><div class="st">진행상태를 다시 <b>승인됨</b>으로 되돌립니다</div>
+            <div class="sd">그다음은 원장님이 발송 예약을 다시 켜 주십니다.</div></li>
+        </ol>
+        <div class="note tip"><span class="lbl">참고</span>가격이 비어 있는 교재는 <b>승인 요청 단계에서 미리</b> 알려 드립니다. 원장님이 승인하기 전에 고칠 수 있어서, 보류까지 가는 일은 점점 줄어듭니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">FAQ</span><h2>자주 묻는 것</h2></div>
+        <div class="faq">
+          <details><summary>같은 학생이 지난달에도 교재를 바꿨는데, 그 줄을 고쳐 쓰면 되나요?</summary><div class="ans">
+            아니요. <b>새 줄을 만드세요.</b> 한 줄이 <b>변경 한 번</b>입니다. 예전 줄을 고쳐 쓰면 지난번에 무슨 교재를 얼마에 안내했는지가 <b>사라집니다.</b> 줄을 나눠 두면 “이번 달 교재비”, “아직 입금 안 한 학생” 같은 것을 뽑을 수 있습니다.
+          </div></details>
+          <details><summary>교재를 4권 바꾸면 줄을 네 개 만드나요?</summary><div class="ans">
+            아니요. <b>한 줄에 4권을 다 담으세요.</b> 학부모님은 <b>문자 한 통</b>을 받고, 그 안에 4권이 한 줄씩 나옵니다. 줄을 네 개 만들면 문자가 네 통 갑니다.
+          </div></details>
+          <details><summary>같은 교재를 2권 사야 합니다 (형제, 분실 재구매)</summary><div class="ans">
+            교재 칸에는 <b>같은 책을 두 번 담을 수 없습니다.</b> 한 권만 담고, <b>조정 금액</b>에 더 받을 금액을 적으세요. <b>요청 메모</b>에 사유도 같이 남겨 주세요. 조정 금액도 10% 할인이 적용되어 청구됩니다.
+          </div></details>
+          <details><summary>금액이 제가 계산한 것과 다릅니다</summary><div class="ans">
+            <b>10% 할인</b>이 들어가서입니다. 교재값을 모두 더한 뒤 <b>한 번에</b> 10%를 뺍니다. 학부모님께는 <b>할인된 금액만</b> 나갑니다. 계산이 이상해 보이면 담은 교재 중에 <b>가격이 비어 있는 것</b>이 있는지부터 보세요.
+          </div></details>
+          <details><summary>학부모님이 “문자를 못 받았다”고 하십니다</summary><div class="ans">
+            그 줄의 <b>진행상태</b>를 보세요. <b>발송완료</b>면 나간 것이고 <b>발송 일시</b>에 시각이 적혀 있습니다. <b>승인됨</b>에 멈춰 있으면 아직 발송 예약이 안 켜진 것이니 <b>원장님께 말씀드리세요.</b> <b>보류</b>면 위 “막힐 때”를 보세요.
+          </div></details>
+          <details><summary>잘못 만들었어요. 지워도 되나요?</summary><div class="ans">
+            <b>발송완료가 아니라면</b> 지우셔도 됩니다. 이미 <b>발송완료</b>인 줄은 <b>지우지 마세요</b> — 학부모님께 실제로 청구가 나간 기록이고, 입금 확인을 여기에 적어야 합니다. 잘못 나갔으면 원장님께 알려 주세요.
+          </div></details>
+          <details><summary>제목·학부모 연락처·담당쌤 칸은 왜 못 고치나요?</summary><div class="ans">
+            <b>학생 명부에서 자동으로 따라오는 칸</b>이라 그렇습니다. 연락처가 틀렸다면 <b>학생 명부</b>에서 고치세요. 그러면 여기도 같이 바뀝니다.
+          </div></details>
+        </div>
+      </section>
+    </div><!-- /guide-textbook -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>

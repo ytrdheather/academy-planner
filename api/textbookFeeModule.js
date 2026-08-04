@@ -249,7 +249,9 @@ export function initializeTextbookFeeRoutes({
         const lines = [`학생    ${이름 || '(이름없음)'}${row.담당쌤.length ? `  (담당 ${row.담당쌤.join(', ')})` : ''}`];
         if (row.기존교재목록) lines.push('', `기존    ${row.기존교재목록}`);
         lines.push(row.기존교재목록 ? `변경    ${row.교재목록}` : `\n교재    ${row.교재목록}`);
-        lines.push('', `정가    ${won(row.합계금액)}`, `청구    ${won(row.청구금액)}`);
+        // 정가는 싣지 않는다. 어떤 항목이든 결국 10% 할인된 금액으로 나가므로
+        // 승인 판단에 필요한 것은 청구액뿐이다(2026-08-05 원장 확정).
+        lines.push('', `청구    ${won(row.청구금액)}`);
         if (row.요청메모) lines.push('', `메모    ${row.요청메모}`);
         return lines.join('\n');
     }
