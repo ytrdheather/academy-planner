@@ -256,6 +256,88 @@ export function initializeTextbookFeeRoutes({
         return lines.join('\n');
     }
 
+    // ── 발송 한 건 ─────────────────────────────────────────────────
+    /**
+     * 🔴 중복 발송 방지가 여기 전부 걸려 있다. 학부모가 같은 입금 요청을 두 번 받으면 안 된다.
+     * 5분 크론(즉시 발송)과 월·목 배치가 같은 시각에 겹칠 수 있어서 세 겹으로 막는다.
+     *   1) 같은 프로세스 안에서 같은 행을 동시에 집지 않도록 잠금
+     *   2) 보내기 직전에 노션을 다시 읽어 아직 '승인됨' 인지 확인 (다른 크론이 이미 가져갔을 수 있다)
+     *   3) '발송중' 으로 먼저 PATCH 해서 선점
+     */
+    const sending = new Set();
+
+    async function sendOne(row, { 개별알림 }) {
+        if (sending.has(row.id)) return { skipped: true };
+        sending.add(row.id);
+        let 선점 = false;
+        try {
+            const 이름 = await studentName(row.학생Id);
+            const { problems, names } = await validate(row);
+            if (problems.length) {
+                await patch(row.id, { '진행상태': { select: { name: '보류' } }, '발송 예약': { checkbox: false } });
+                await notifyOwner('발송 보류', `${이름} 건을 보내지 않았습니다.\n\n· ${problems.join('\n· ')}\n\n고친 뒤 진행상태를 '승인됨'으로 되돌려 주세요.`,
+                    [{ text: '노션에서 열기', url: row.url }]);
+                return { held: true, 이름, problems };
+            }
+
+            // 다시 읽어서 확인. 그사이 다른 크론이 가져갔으면 여기서 멈춘다.
+            const 지금 = readRow(await fetchNotion(`https://api.notion.com/v1/pages/${row.id}`));
+            if (지금.진행상태 !== '승인됨') return { skipped: true };
+
+            await patch(row.id, { '진행상태': { select: { name: '발송중' } } });
+            선점 = true;
+
+            const 경로 = await sendAlimtalk(row, 이름, names);
+            await patch(row.id, {
+                '진행상태': { select: { name: '발송완료' } },
+                '발송 일시': { date: { start: new Date().toISOString() } },
+                '발송 예약': { checkbox: false },
+                // 승인대기를 안 거치고 바로 승인됨으로 올린 행은 제목이 비어 있다.
+                // 이력이 쌓이는 원장인데 제목 없는 행이 섞이면 나중에 못 알아본다.
+                ...(row.제목 ? {} : { '제목': { title: [{ text: { content: `${이름} · ${kstToday()}` } }] } }),
+            });
+            if (개별알림) {
+                await notifyOwner('교재비 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n${row.교재목록}\n청구 ${won(row.청구금액)}`);
+            }
+            return { sent: true, 이름, 경로, 금액: row.청구금액 };
+        } catch (e) {
+            // 선점만 해두고 실패하면 '발송중'에 갇힌다. tick 4번이 주워서 원장에게 알린다.
+            if (선점) console.error(`교재비 발송 실패(발송중 상태로 남음) ${row.id}: ${e.message}`);
+            return { error: e.message };
+        } finally {
+            sending.delete(row.id);
+        }
+    }
+
+    // ── 월·목 묶음 발송 ────────────────────────────────────────────
+    /**
+     * 원장이 승인해 둔 것을 모아서 한 번에 보낸다. 행마다 발송 예약을 켜는 수고를 없앤다.
+     * 알림톡 자체는 학부모별로 각각 나간다 — 묶는 것은 발송 작업이지 메시지가 아니다.
+     * 완료 알림도 건별로 보내면 열 통씩 쌓이므로 요약 한 통만 보낸다.
+     */
+    async function sendBatch() {
+        const rows = await queryFee({ property: '진행상태', select: { equals: '승인됨' } });
+        const 보냄 = [], 보류 = [], 실패 = [];
+
+        for (const row of rows) {
+            const res = await sendOne(row, { 개별알림: false });
+            if (res.sent) 보냄.push(`· ${res.이름}  ${won(res.금액)}`);
+            else if (res.held) 보류.push(`· ${res.이름} — ${res.problems.join(', ')}`);
+            else if (res.error) 실패.push(`· ${row.제목 || row.id}: ${res.error}`);
+        }
+
+        const 합계 = 보냄.length;
+        const lines = [`승인된 ${rows.length}건 중 ${합계}건을 보냈습니다.`];
+        if (보냄.length) lines.push('', '보낸 건', ...보냄);
+        if (보류.length) lines.push('', '⚠️ 보류 — 고친 뒤 진행상태를 승인됨으로 되돌려 주세요', ...보류);
+        if (실패.length) lines.push('', '🔴 실패 — 확인이 필요합니다', ...실패);
+        if (!rows.length) lines[0] = '오늘 나갈 교재비 안내가 없습니다.';
+
+        // 0건이어도 보낸다. 배치가 조용히 안 도는 것을 아무도 모르는 게 제일 나쁘다.
+        await notifyOwner('교재비 묶음 발송', lines.join('\n'));
+        return { 대상: rows.length, 발송: 합계, 보류: 보류.length, 실패: 실패.length };
+    }
+
     // ── 크론 한 바퀴 ───────────────────────────────────────────────
     async function tick() {
         const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 실패: [] };
@@ -312,42 +394,14 @@ export function initializeTextbookFeeRoutes({
             } catch (e) { r.실패.push(`교사알림/${row.id}: ${e.message}`); }
         }
 
-        // 3) 승인됨 + 발송예약 → 학부모 알림톡
+        // 3) 승인됨 + 발송예약 → 즉시 발송 (월·목 배치를 못 기다리는 급한 건)
         for (const row of await queryFee({
             and: [{ property: '진행상태', select: { equals: '승인됨' } }, { property: '발송 예약', checkbox: { equals: true } }],
         })) {
-            let 선점 = false;
-            try {
-                const 이름 = await studentName(row.학생Id);
-                const { problems, names } = await validate(row);
-                if (problems.length) {
-                    await patch(row.id, { '진행상태': { select: { name: '보류' } }, '발송 예약': { checkbox: false } });
-                    await notifyOwner('발송 보류', `${이름} 건을 보내지 않았습니다.\n\n· ${problems.join('\n· ')}\n\n고친 뒤 진행상태를 '승인됨'으로 되돌리고 발송 예약을 다시 켜 주세요.`,
-                        [{ text: '노션에서 열기', url: row.url }]);
-                    r.보류++;
-                    continue;
-                }
-
-                // 🔴 발송 직전 선점. 이 PATCH 가 성공한 행만 실제로 보낸다.
-                await patch(row.id, { '진행상태': { select: { name: '발송중' } } });
-                선점 = true;
-
-                const 경로 = await sendAlimtalk(row, 이름, names);
-                await patch(row.id, {
-                    '진행상태': { select: { name: '발송완료' } },
-                    '발송 일시': { date: { start: new Date().toISOString() } },
-                    '발송 예약': { checkbox: false },
-                    // 승인대기를 안 거치고 바로 승인됨으로 올린 행은 제목이 비어 있다.
-                    // 이력이 쌓이는 원장인데 제목 없는 행이 섞이면 나중에 못 알아본다.
-                    ...(row.제목 ? {} : { '제목': { title: [{ text: { content: `${이름} · ${kstToday()}` } }] } }),
-                });
-                await notifyOwner('교재비 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n${row.교재목록}\n청구 ${won(row.청구금액)}`);
-                r.발송++;
-            } catch (e) {
-                r.실패.push(`발송/${row.id}: ${e.message}`);
-                // 선점만 해두고 실패하면 '발송중'에 갇힌다. 4번이 주워서 원장에게 알린다.
-                if (선점) console.error(`교재비 발송 실패(발송중 상태로 남음) ${row.id}: ${e.message}`);
-            }
+            const res = await sendOne(row, { 개별알림: true });
+            if (res.sent) r.발송++;
+            else if (res.held) r.보류++;
+            else if (res.error) r.실패.push(`발송/${row.id}: ${res.error}`);
         }
 
         // 4) 발송중에 갇힌 행
@@ -438,6 +492,12 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
+    // 월·목을 못 기다릴 때 묶음 발송을 손으로 돌린다
+    app.post('/api/textbook/send-batch', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await sendBatch()) }); }
+        catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    });
+
     cron.schedule('*/5 * * * *', async () => {
         try {
             const r = await tick();
@@ -448,5 +508,13 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('교재비 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론)');
+    // 월·목 오후 2시 묶음 발송. 은행 업무시간 안이고, 데일리 리포트(10:20)·숙제 알림(11:00)과 안 겹친다.
+    cron.schedule('0 14 * * 1,4', async () => {
+        try {
+            const r = await sendBatch();
+            console.log(`📚 교재비 묶음 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+        } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
+    }, { timezone: 'Asia/Seoul' });
+
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 월·목 14시 묶음 발송)');
 }
