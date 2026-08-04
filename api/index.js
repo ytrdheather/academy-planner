@@ -13,6 +13,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
+import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -651,6 +652,19 @@ try {
 try {
     initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, dbIds: { EXAM_DB_ID, QUESTION_DB_ID, STUDENT_RESULT_DB_ID, STUDENT_ANSWER_DB_ID } });
 } catch(e) { console.error('Exam Analyzer Module Init Error', e); }
+
+// 교재비 관리 — 신청/승인/발송. 설계: docs/교재비관리-설계.md
+try {
+    initializeTextbookFeeRoutes({
+        app, requireAuth, fetchNotion, sendKakaoWork, sendSms, cron,
+        jwtSecret: JWT_SECRET, domainUrl: DOMAIN_URL,
+        dbIds: {
+            TEXTBOOK_FEE_DB_ID: process.env.TEXTBOOK_FEE_DB_ID,
+            TEACHER_DB_ID: process.env.TEACHER_DB_ID,
+        },
+        approvalConv: process.env.KAKAOWORK_APPROVAL_CONV,
+    });
+} catch(e) { console.error('Textbook Fee Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;
