@@ -30,7 +30,7 @@ const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slic
 
 export function initializeTextbookFeeRoutes({
     app, requireAuth, fetchNotion, sendKakaoWork, sendSms,
-    jwtSecret, domainUrl, dbIds, approvalConv, cron,
+    jwtSecret, domainUrl, dbIds, approvalConv, assistantConv, cron, publicPath, path,
 }) {
     const FEE_DB = dbIds?.TEXTBOOK_FEE_DB_ID;
     const TEACHER_DB = dbIds?.TEACHER_DB_ID;
@@ -338,6 +338,56 @@ export function initializeTextbookFeeRoutes({
         return { 대상: rows.length, 발송: 합계, 보류: 보류.length, 실패: 실패.length };
     }
 
+    // ── 조교 장보기 목록 (설계 §7) ─────────────────────────────────
+    /**
+     * 학부모는 학생별로 받지만 조교는 교재별로 산다.
+     * 한 행에 5권이 묶여 있으면 노션에서는 "이번 주에 Reading Sense 3 을 몇 권 사야 하나"가 안 나온다.
+     * DB 를 쪼개지 않고 서버가 교재별로 합산해서 한 장으로 뽑아 준다.
+     *
+     * 대상: 진행상태가 승인됨·발송중·발송완료 이고 구매상태가 구매완료가 아닌 행.
+     *   - 승인됨: 아직 학부모에게 안 나갔지만 원장이 승인했으니 미리 사도 된다
+     *   - 보류·반려·작성중은 제외 — 나갈지 안 나갈지 모르는 것을 미리 사면 재고가 된다
+     */
+    async function shoppingList() {
+        const rows = await queryFee({
+            and: [
+                {
+                    or: ['승인됨', '발송중', '발송완료'].map(s => ({ property: '진행상태', select: { equals: s } })),
+                },
+                { property: '구매 상태', select: { does_not_equal: '구매완료' } },
+            ],
+        });
+
+        // 교재 id → { 이름, 학생들[] }
+        const 교재별 = new Map();
+        const 학생캐시 = new Map();
+        for (const row of rows) {
+            const 이름 = await studentName(row.학생Id);
+            for (const id of row.변경교재Ids) {
+                if (!학생캐시.has(id)) {
+                    const b = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
+                    학생캐시.set(id, plain(b.properties?.['교재이름']) || '(이름없음)');
+                }
+                const 교재이름 = 학생캐시.get(id);
+                if (!교재별.has(교재이름)) 교재별.set(교재이름, []);
+                교재별.get(교재이름).push(이름 || '(이름없음)');
+            }
+        }
+
+        const items = [...교재별.entries()]
+            .map(([교재, 학생들]) => ({ 교재, 권수: 학생들.length, 학생들 }))
+            .sort((a, b) => b.권수 - a.권수 || a.교재.localeCompare(b.교재, 'ko'));
+
+        return { 건수: rows.length, 총권수: items.reduce((s, i) => s + i.권수, 0), items };
+    }
+
+    function shoppingText(list) {
+        if (!list.items.length) return '지금 사야 할 교재가 없습니다.';
+        const lines = [`교재 ${list.총권수}권 (신청 ${list.건수}건)`, ''];
+        for (const i of list.items) lines.push(`${i.교재}  ${i.권수}권`, `   ${i.학생들.join(' ')}`);
+        return lines.join('\n');
+    }
+
     // ── 크론 한 바퀴 ───────────────────────────────────────────────
     async function tick() {
         const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 실패: [] };
@@ -498,6 +548,22 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
+    // 조교 장보기 목록
+    app.get('/shopping', (req, res) => res.sendFile(path.join(publicPath, 'views', 'shopping.html')));
+    app.get('/api/textbook/shopping-list', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await shoppingList()) }); }
+        catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    });
+    // 조교 채널로 지금 목록을 밀어넣는다
+    app.post('/api/textbook/shopping-push', requireAuth, async (req, res) => {
+        try {
+            if (!assistantConv) return res.status(400).json({ success: false, message: 'KAKAOWORK_ASSISTANT_CONV 가 없습니다' });
+            const list = await shoppingList();
+            await sendCard(assistantConv, '교재 장보기 목록', shoppingText(list), [{ text: '목록 열기', url: `${domainUrl}/shopping` }]);
+            res.json({ success: true, ...list });
+        } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    });
+
     cron.schedule('*/5 * * * *', async () => {
         try {
             const r = await tick();
@@ -513,6 +579,12 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         try {
             const r = await sendBatch();
             console.log(`📚 교재비 묶음 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+            // 발송 직후가 조교에게 장보기 목록을 주기 제일 좋은 시점이다
+            if (assistantConv) {
+                const list = await shoppingList();
+                await sendCard(assistantConv, '교재 장보기 목록', shoppingText(list), [{ text: '목록 열기', url: `${domainUrl}/shopping` }]);
+                console.log(`🛒 장보기 목록 발송: 교재 ${list.총권수}권 / 신청 ${list.건수}건`);
+            }
         } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 

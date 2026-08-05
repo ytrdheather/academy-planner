@@ -656,13 +656,15 @@ try {
 // 교재비 관리 — 신청/승인/발송. 설계: docs/교재비관리-설계.md
 try {
     initializeTextbookFeeRoutes({
-        app, requireAuth, fetchNotion, sendKakaoWork, sendSms, cron,
+        app, requireAuth, fetchNotion, sendKakaoWork, sendSms, cron, publicPath, path,
         jwtSecret: JWT_SECRET, domainUrl: DOMAIN_URL,
         dbIds: {
             TEXTBOOK_FEE_DB_ID: process.env.TEXTBOOK_FEE_DB_ID,
             TEACHER_DB_ID: process.env.TEACHER_DB_ID,
         },
         approvalConv: process.env.KAKAOWORK_APPROVAL_CONV,
+        // 조교 장보기 목록을 밀어넣을 채널. 없으면 목록 페이지만 쓰고 발송은 건너뛴다.
+        assistantConv: process.env.KAKAOWORK_ASSISTANT_CONV,
     });
 } catch(e) { console.error('Textbook Fee Module Init Error', e); }
 
