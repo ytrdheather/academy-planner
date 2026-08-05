@@ -268,7 +268,8 @@ function drawTimes(){
   if(!days.length){ box.innerHTML = ''; box.hidden = true; return; }
   box.hidden = false;
 
-  let s = '<h3>보강일 시간</h3><p class="hint">결석 신청 폼에서 학부모님이 고르실 때 이 시간이 함께 보입니다. 비워 두면 날짜만 보입니다.</p>';
+  // 요일까지 적으면 폼에서 "8월 29일 (토) 일요일 오후 4시" 처럼 날짜와 어긋나 보인다.
+  let s = '<h3>보강일 시간</h3><p class="hint">결석 신청 폼에서 학부모님이 고르실 때 함께 보입니다. <b>시간만</b> 적어 주세요 — 날짜와 요일은 자동으로 붙습니다. 비워 두면 날짜만 보입니다.</p>';
   days.forEach(d => {
     const [y, m, dd] = d.split('-').map(Number);
     const wd = WD[new Date(y, m - 1, dd).getDay()];
