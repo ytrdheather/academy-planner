@@ -183,6 +183,7 @@
         <button class="sw" onclick="showGuide('app',this)">📱 학생 앱 설치</button>
         <button class="sw" onclick="showGuide('welcome',this)">📨 신입생 등록 안내서</button>
         <button class="sw" onclick="showGuide('textbook',this)">💰 교재 변경·교재비</button>
+        <button class="sw" onclick="showGuide('notice',this)">📅 공지사항·학사일정</button>
       </div>
     </header>
 
@@ -987,6 +988,99 @@
         </div>
       </section>
     </div><!-- /guide-textbook -->
+
+    <!-- ============ 가이드 · 공지사항·학사일정 ============ -->
+    <div id="guide-notice" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">학부모님이 보시는 안내 페이지(<b>readitude.onrender.com/notice</b>)는 노션 <b>공지사항</b> DB를 그대로 비춥니다. 노션을 고치면 그 페이지가 바뀝니다. <b>따로 발행 버튼이 없습니다.</b></p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">📅 날짜에 관한 것</div>
+            <div class="twhen">/calendar</div>
+            <p>휴강·이벤트·<b>보강일</b>은 달력 화면에서 찍습니다. 수업 시수가 자동으로 다시 계산됩니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">📝 글로 알리는 것</div>
+            <div class="twhen">노션 공지사항 DB</div>
+            <p>공지·뉴스·FAQ는 노션에서 직접 씁니다. <b>게시</b>를 체크한 것만 학부모님께 보입니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>휴강·보강일 찍기 — 달력에서</h2></div>
+        <p class="phase-sub"><b>readitude.onrender.com/calendar</b> 에서 합니다. 선생님 로그인이 필요합니다.</p>
+        <ol class="steps">
+          <li><div class="st">위쪽에서 <b>도구</b>를 고릅니다</div>
+            <div class="sd"><b>휴강</b> · <b>이벤트</b> · <b>토요보강</b> · <b>지우기</b> 네 가지입니다. 고른 뒤 날짜를 누르면 찍힙니다.</div></li>
+          <li><div class="st">날짜를 눌러 찍고, 잘못 찍었으면 <b>지우기</b>로 지웁니다</div>
+            <div class="sd">찍는 즉시 오른쪽 <b>수업 시수</b>가 다시 계산됩니다. 저장 전에도 결과를 볼 수 있습니다.</div></li>
+          <li><div class="st">보강일을 찍으면 오른쪽에 <b>보강일 시간</b> 칸이 나타납니다</div>
+            <div class="sd"><b>오전 10시</b>, <b>일요일 오후 4시</b> 처럼 적습니다. 보강 시간이 매번 다르기 때문에 날짜만으로는 안내가 안 됩니다. 비워 두면 날짜만 안내됩니다.</div></li>
+          <li><div class="st"><b>저장</b>을 누릅니다</div>
+            <div class="sd">“저장됨 (추가 1 · 삭제 0 · 시간수정 2)” 처럼 결과가 뜹니다. 이 숫자가 예상과 다르면 뭔가 잘못 눌린 것입니다.</div></li>
+          <li><div class="st">필요하면 <b>PNG로 저장</b>해서 달력 그림을 받습니다</div>
+            <div class="sd">학부모님께 카톡으로 보낼 때 씁니다. 노션 공지사항의 <b>이미지</b> 칸에 올려도 됩니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>저장은 <b>그 달을 통째로 맞춥니다.</b> 달력 화면에 없는 표시는 노션에서 <b>지워집니다.</b> 그래서 달력을 열어 둔 채 다른 사람이 노션에서 휴강을 추가하면, 내가 저장할 때 그게 사라집니다. <b>저장 전에 새로 불러오세요</b>(월을 옮겼다 돌아오면 다시 읽습니다). 지워진 것은 노션 휴지통에 남습니다.</div>
+        <div class="note tip"><span class="lbl">참고</span>시수 계산에서 <b>빠지는 것은 휴강뿐입니다.</b> 이벤트는 수업을 하는 날이고, 보강일은 결석생 보강이라 정규 시수와 무관합니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>공지·뉴스·FAQ 쓰기 — 노션에서</h2></div>
+        <p class="phase-sub">노션 <b>공지사항</b> DB에 한 줄 추가하면 학부모 페이지에 뜹니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>제목</b>을 반드시 적습니다</div>
+            <div class="sd">제목이 비어 있으면 <b>학부모 페이지에 아예 안 나옵니다.</b> 조용히 안 보이니 빠뜨리기 쉽습니다.</div></li>
+          <li><div class="st"><b>유형</b>을 고릅니다</div>
+            <div class="sd"><b>공지</b> · <b>뉴스</b> · <b>FAQ</b> · <b>학사일정</b> · 휴강 · 이벤트 · 보강일. 뒤 세 개는 달력이 쓰는 것이니 손으로 만들지 마세요.</div></li>
+          <li><div class="st"><b>내용</b>에 본문을 씁니다</div>
+            <div class="sd">필요하면 <b>링크</b>(주소)와 <b>이미지</b>(달력 그림 등)도 넣을 수 있습니다.</div></li>
+          <li><div class="st">🔴 <b>게시</b>를 체크합니다</div>
+            <div class="sd">이게 <b>학부모에게 보이기 스위치</b>입니다. 체크하지 않으면 초안으로 남습니다. 반대로 <b>내리고 싶으면 체크만 풀면</b> 됩니다 — 지우지 않아도 됩니다.</div></li>
+          <li><div class="st">맨 위에 붙이고 싶으면 <b>고정</b>을 체크합니다</div>
+            <div class="sd">중요한 안내를 위로 올립니다.</div></li>
+        </ol>
+        <div class="note tip"><span class="lbl">참고</span>학부모 페이지는 <b>5분 캐시</b>입니다. 노션을 고쳐도 최대 5분은 예전 내용이 보일 수 있습니다. 안 바뀌었다고 여러 번 고치지 마시고 잠시 기다려 주세요.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>결석·보강 신청 받기</h2></div>
+        <p class="phase-sub">학부모님이 신청하는 창구입니다.</p>
+        <ol class="steps">
+          <li><div class="st">지금은 <b>구글폼</b>으로 받습니다</div>
+            <div class="sd">학부모 안내 페이지의 <b>결석 · 보강 신청</b> 버튼이 그 폼으로 갑니다.</div></li>
+          <li><div class="st">신청이 들어오면 노션 <b>결석·보강 신청</b> DB에 쌓입니다</div>
+            <div class="sd">카카오워크 <b>결석보강 신청알림_BOT</b> 채널로도 알림이 옵니다. 담임 이름이 함께 오니 자기 학생인지 보고 챙기시면 됩니다.</div></li>
+          <li><div class="st">담임이 보강 일정을 조율하고 <b>상태</b>를 바꿉니다</div>
+            <div class="sd">접수 → 조율중 → 확정 → 완료 순입니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>구글폼의 <b>보강 희망 날짜 선택지는 사람이 손으로 고쳐야 합니다.</b> 날짜가 지난 선택지가 그대로 남아 있으면 학부모님이 지난 날짜를 고릅니다. 폼을 우리 서버로 옮기는 작업이 예정돼 있고, 그러면 달력의 보강일을 자동으로 읽어와 이 손질이 없어집니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">FAQ</span><h2>자주 묻는 것</h2></div>
+        <div class="faq">
+          <details><summary>노션을 고쳤는데 학부모 페이지가 그대로예요</summary><div class="ans">
+            <b>5분 캐시</b> 때문입니다. 잠시 기다렸다 새로고침하세요. 5분이 지나도 안 바뀌면 <b>제목이 비어 있거나 게시 체크가 빠진</b> 경우가 대부분입니다.
+          </div></details>
+          <details><summary>달력에서 저장했는데 다른 휴강이 사라졌어요</summary><div class="ans">
+            저장이 <b>그 달을 통째로 맞추기</b> 때문입니다. 달력 화면에 안 보이던 표시는 지워집니다. 사라진 것은 <b>노션 휴지통</b>에 있으니 되살릴 수 있습니다. 다음부터는 저장 전에 월을 옮겼다 돌아와 새로 불러오세요.
+          </div></details>
+          <details><summary>보강일에 시간을 안 적으면 어떻게 되나요?</summary><div class="ans">
+            날짜만 안내됩니다. 학부모님이 <b>몇 시에 오는지 모르는</b> 상태로 신청하게 되니, 되도록 적어 주세요.
+          </div></details>
+          <details><summary>공지를 내리고 싶은데 지워야 하나요?</summary><div class="ans">
+            지우지 마세요. <b>게시 체크만 풀면</b> 학부모 페이지에서 사라집니다. 나중에 다시 쓸 수 있고, 지난 공지 기록도 남습니다.
+          </div></details>
+          <details><summary>보강일·휴강이 학부모 페이지 목록에 “보강일”이라고만 떠 있어요</summary><div class="ans">
+            달력에서 찍은 표시는 <b>제목이 유형 이름 그대로</b>(“보강일”, “휴강”) 들어갑니다. 학부모님이 봐도 무슨 뜻인지 모르니, 목록에 띄울 필요가 없으면 노션에서 <b>게시 체크를 풀어</b> 주세요. 달력 그림으로 안내하는 편이 낫습니다. 띄우려면 제목을 <b>“8월 17일 휴강”</b> 처럼 고쳐 주세요.
+          </div></details>
+        </div>
+      </section>
+    </div><!-- /guide-notice -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>

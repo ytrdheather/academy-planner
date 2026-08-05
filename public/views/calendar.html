@@ -61,6 +61,15 @@
   .hint.good{background:var(--accent-wash); color:var(--accent-ink)}
   .note{color:var(--ink-faint); font-size:12.5px; margin-top:12px; line-height:1.6}
   .msg{margin-left:auto; font-size:13px; color:var(--ink-faint)}
+
+  .times{margin-top:20px; padding-top:16px; border-top:1px solid var(--border)}
+  .times h3{margin:0 0 4px; font-size:15px}
+  .times .hint{margin:0 0 10px; background:transparent; color:var(--ink-faint); padding:0; font-size:12.5px}
+  .trow{display:flex; align-items:center; gap:8px; margin-bottom:7px}
+  .trow .tdate{flex:0 0 96px; font-size:13.5px; font-weight:650}
+  .trow input{flex:1; min-width:0; font:inherit; font-size:13.5px; padding:7px 9px;
+              border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--ink)}
+  .trow input:focus{outline:2px solid var(--accent); outline-offset:-1px}
 </style>
 </head>
 <body>
@@ -90,6 +99,8 @@
         같은 날이 여러 트랙에 함께 들어갑니다. 예를 들어 금요일을 쉬면 월수금과 화목금이 같이 줄어듭니다.
         그래서 한 날만 쉬어서는 세 트랙이 잘 안 맞습니다.
       </p>
+
+      <div id="times" class="times" hidden></div>
     </div>
   </div>
 
@@ -116,6 +127,9 @@ const WD = ['일','월','화','수','목','금','토'];
 let cur = new Date();
 let month = '';              // YYYY-MM
 let marks = {};              // { 'YYYY-MM-DD': '휴강' | '이벤트' | '보강일' }
+// 보강일에만 쓰는 시간 메모. 토 10시·일 4시처럼 매번 달라서 날짜만으로는
+// 결석 신청 폼에 무엇을 고르는지 보여줄 수 없다. { 'YYYY-MM-DD': '오전 10시' }
+let times = {};
 let tool = '휴강';
 let dirty = false;
 
@@ -237,10 +251,37 @@ function drawCalendar(){
   [...$('calBox').querySelectorAll('.cell')].forEach(g => {
     g.onclick = () => {
       const k = g.dataset.date;
-      if (tool === '지우기') delete marks[k];
+      if (tool === '지우기') { delete marks[k]; delete times[k]; }
       else marks[k] = tool;
       dirty = true;
-      drawCalendar(); drawTracks(); setMsg('저장 안 됨', true);
+      drawCalendar(); drawTracks(); drawTimes(); setMsg('저장 안 됨', true);
+    };
+  });
+}
+
+// ── 보강일 시간 입력 ──────────────────────────────────────
+// 결석 신청 폼이 이 값을 그대로 학부모에게 보여준다. 비워 두면 날짜만 나간다.
+function drawTimes(){
+  const box = $('times');
+  if(!box) return;
+  const days = Object.keys(marks).filter(d => marks[d] === '보강일').sort();
+  if(!days.length){ box.innerHTML = ''; box.hidden = true; return; }
+  box.hidden = false;
+
+  let s = '<h3>보강일 시간</h3><p class="hint">결석 신청 폼에서 학부모님이 고르실 때 이 시간이 함께 보입니다. 비워 두면 날짜만 보입니다.</p>';
+  days.forEach(d => {
+    const [y, m, dd] = d.split('-').map(Number);
+    const wd = WD[new Date(y, m - 1, dd).getDay()];
+    s += '<label class="trow"><span class="tdate">' + (m) + '월 ' + dd + '일 (' + wd + ')</span>'
+       + '<input type="text" data-date="' + d + '" value="' + esc(times[d] || '') + '" placeholder="예: 오전 10시" maxlength="40"></label>';
+  });
+  box.innerHTML = s;
+
+  [...box.querySelectorAll('input')].forEach(inp => {
+    inp.oninput = () => {
+      const v = inp.value.trim();
+      if(v) times[inp.dataset.date] = v; else delete times[inp.dataset.date];
+      dirty = true; setMsg('저장 안 됨', true);
     };
   });
 }
@@ -249,19 +290,22 @@ function drawCalendar(){
 async function load(){
   month = ym(cur);
   $('monthLabel').textContent = cur.getFullYear() + '년 ' + (cur.getMonth() + 1) + '월';
-  marks = {}; dirty = false; setMsg('불러오는 중…');
-  drawCalendar(); drawTracks();
+  marks = {}; times = {}; dirty = false; setMsg('불러오는 중…');
+  drawCalendar(); drawTracks(); drawTimes();
 
   try{
     const r = await fetch('/api/calendar?m=' + month);
     if(!r.ok) throw new Error('http ' + r.status);
     const d = await r.json();
-    (d.marks || []).forEach(m => { marks[m.date] = m.type; });
+    (d.marks || []).forEach(m => {
+      marks[m.date] = m.type;
+      if(m.type === '보강일' && m.time) times[m.date] = m.time;
+    });
     setMsg(d.configured === false ? 'NOTICE_DB_ID 미설정' : '');
   }catch(e){
     setMsg('불러오지 못했습니다', true);
   }
-  drawCalendar(); drawTracks();
+  drawCalendar(); drawTracks(); drawTimes();
 }
 
 async function save(){
@@ -275,14 +319,18 @@ async function save(){
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({
         month,
-        marks: Object.keys(marks).map(date => ({ date, type: marks[date], title: marks[date] })),
+        marks: Object.keys(marks).map(date => ({
+          date, type: marks[date], title: marks[date],
+          ...(marks[date] === '보강일' ? { time: times[date] || '' } : {}),
+        })),
       }),
     });
     if(r.status === 401){ localStorage.removeItem('teacher_auth_token'); location.href = '/teacher-login'; return; }
     const d = await r.json();
     if(!r.ok) throw new Error(d.error || 'http ' + r.status);
     dirty = false;
-    setMsg('저장됨 (추가 ' + d.added + ' · 삭제 ' + d.removed + ')');
+    setMsg('저장됨 (추가 ' + d.added + ' · 삭제 ' + d.removed
+      + (d.retimed ? ' · 시간수정 ' + d.retimed : '') + ')');
   }catch(e){
     setMsg('저장 실패: ' + e.message, true);
   }

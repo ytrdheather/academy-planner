@@ -540,6 +540,9 @@ app.get('/api/calendar', async (req, res) => {
                 type: p['유형']?.select?.name || '',
                 date: p['날짜']?.date?.start || '',
                 title: noticePlainText(p['제목']),
+                // 보강일에만 쓴다. 보강 시간이 토 10시·일 4시처럼 매번 달라서
+                // 날짜만으로는 결석 폼에 무엇을 고르는지 보여줄 수 없다.
+                time: noticePlainText(p['보강시간']),
             };
         }).filter(m => CALENDAR_TYPES.includes(m.type) && m.date);
 
@@ -559,7 +562,8 @@ app.post('/api/calendar', requireAuth, async (req, res) => {
 
     const wanted = marks
         .filter(m => CALENDAR_TYPES.includes(m.type) && /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')))
-        .filter(m => m.date.slice(0, 7) === month);
+        .filter(m => m.date.slice(0, 7) === month)
+        .map(m => ({ ...m, time: m.type === '보강일' ? String(m.time || '').trim().slice(0, 40) : '' }));
 
     try {
         const current = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
@@ -579,6 +583,7 @@ app.post('/api/calendar', requireAuth, async (req, res) => {
             id: page.id,
             type: page.properties?.['유형']?.select?.name || '',
             date: page.properties?.['날짜']?.date?.start || '',
+            time: noticePlainText(page.properties?.['보강시간']),
         })).filter(m => CALENDAR_TYPES.includes(m.type));
 
         const key = m => m.date + '|' + m.type;
@@ -607,6 +612,7 @@ app.post('/api/calendar', requireAuth, async (req, res) => {
                         '제목': { title: [{ text: { content: m.title || m.type } }] },
                         '유형': { select: { name: m.type } },
                         '날짜': { date: { start: m.date } },
+                        '보강시간': { rich_text: m.time ? [{ text: { content: m.time } }] : [] },
                         // 휴강·이벤트는 학부모 안내 페이지에도 바로 보이게 한다.
                         // 보강일은 달력 이미지로 안내하므로 목록에는 띄우지 않는다.
                         '게시': { checkbox: m.type !== '보강일' },
@@ -616,8 +622,23 @@ app.post('/api/calendar', requireAuth, async (req, res) => {
             added++;
         }
 
+        // 날짜는 그대로인데 시간만 바뀐 보강일을 갱신한다.
+        // 위 add/remove 는 date|type 로만 비교하므로 시간 변경은 여기서 잡아야 한다.
+        let retimed = 0;
+        const byKey = new Map(existing.map(m => [key(m), m]));
+        for (const m of wanted) {
+            if (m.type !== '보강일') continue;
+            const old = byKey.get(key(m));
+            if (!old || old.time === m.time) continue;
+            await fetchNotion(`https://api.notion.com/v1/pages/${old.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties: { '보강시간': { rich_text: m.time ? [{ text: { content: m.time } }] : [] } } }),
+            });
+            retimed++;
+        }
+
         noticeCache.lastFetch = 0;   // 학부모 페이지가 바로 반영되도록 캐시를 비운다
-        res.json({ success: true, added, removed });
+        res.json({ success: true, added, removed, retimed });
     } catch (e) {
         console.error('달력 저장 실패:', e.message);
         res.status(502).json({ error: '노션에 저장하지 못했습니다' });
