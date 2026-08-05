@@ -35,6 +35,8 @@
   .body{flex:1;min-width:0}
   .book{font-weight:700;font-size:15.5px;line-height:1.35;word-break:break-word}
   .who{color:var(--ink-soft);font-size:13.5px;margin-top:4px;line-height:1.5}
+  .unpaid{color:#c0392b;font-weight:650}
+  @media (prefers-color-scheme:dark){.unpaid{color:#ff8a7a}}
   .n{flex:none;font-weight:800;font-size:15px;color:var(--accent);
      background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:7px;padding:3px 9px}
   .msg{color:var(--ink-soft);font-size:14.5px;padding:28px 4px;text-align:center;line-height:1.7}
@@ -97,7 +99,17 @@
       book.textContent = i.교재;
       const who = document.createElement('div');
       who.className = 'who';
-      who.textContent = i.학생들.join(' · ');
+      // 미입금은 빼지 않고 표시만 한다 — 빼면 책이 필요한데 입금이 늦는 학생이 묻힌다
+      const 미 = new Set(i.미입금 || []);
+      i.학생들.forEach((s, idx) => {
+        if (idx) who.append(document.createTextNode(' · '));
+        if (미.has(s)) {
+          const em = document.createElement('span');
+          em.className = 'unpaid';
+          em.textContent = s + ' 미입금';
+          who.append(em);
+        } else who.append(document.createTextNode(s));
+      });
       body.append(book, who);
       const n = document.createElement('span');
       n.className = 'n';
@@ -120,7 +132,8 @@
       const j = await r.json();
       if (!j.success) throw new Error(j.message || '실패');
       목록 = j.items || [];
-      sum.innerHTML = `교재 <b>${j.총권수}권</b> · 신청 <b>${j.건수}건</b>`;
+      sum.innerHTML = `교재 <b>${j.총권수}권</b> · 신청 <b>${j.건수}건</b>`
+        + (j.미입금건수 ? ` · <span class="unpaid">미입금 ${j.미입금건수}건</span>` : '');
       render();
     } catch (e) {
       sum.textContent = '';
@@ -130,7 +143,10 @@
 
   document.getElementById('reload').addEventListener('click', load);
   document.getElementById('copy').addEventListener('click', async () => {
-    const text = 목록.map(i => `${i.교재}  ${i.권수}권\n   ${i.학생들.join(' ')}`).join('\n');
+    const text = 목록.map(i => {
+      const 미 = new Set(i.미입금 || []);
+      return `${i.교재}  ${i.권수}권\n   ${i.학생들.map(s => 미.has(s) ? `${s}(미입금)` : s).join(' ')}`;
+    }).join('\n');
     try { await navigator.clipboard.writeText(text || '사야 할 교재 없음'); alert('복사했습니다'); }
     catch { alert('복사에 실패했습니다'); }
   });

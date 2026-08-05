@@ -70,6 +70,7 @@ export function initializeTextbookFeeRoutes({
             요청메모: plain(p['요청 메모']),
             반려사유: plain(p['반려 사유']),
             발송예약: !!p['발송 예약']?.checkbox,
+            입금확인: !!p['입금 확인']?.checkbox,
             원장알림함: !!p['원장알림함']?.checkbox,
             교사알림함: !!p['교사알림함']?.checkbox,
         };
@@ -358,33 +359,51 @@ export function initializeTextbookFeeRoutes({
             ],
         });
 
-        // 교재 id → { 이름, 학생들[] }
+        // 교재 이름 → [{ 학생, 입금확인 }]
+        // 입금 안 된 건을 빼지 않고 표시만 한다. 빼면 교재가 필요한데 입금이 늦는 학생이
+        // 목록에서 사라져 아무도 모르게 된다 — 수업에 책 없이 앉아 있는 게 더 나쁘다.
         const 교재별 = new Map();
-        const 학생캐시 = new Map();
+        const 교재이름캐시 = new Map();
         for (const row of rows) {
             const 이름 = await studentName(row.학생Id);
             for (const id of row.변경교재Ids) {
-                if (!학생캐시.has(id)) {
+                if (!교재이름캐시.has(id)) {
                     const b = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
-                    학생캐시.set(id, plain(b.properties?.['교재이름']) || '(이름없음)');
+                    교재이름캐시.set(id, plain(b.properties?.['교재이름']) || '(이름없음)');
                 }
-                const 교재이름 = 학생캐시.get(id);
+                const 교재이름 = 교재이름캐시.get(id);
                 if (!교재별.has(교재이름)) 교재별.set(교재이름, []);
-                교재별.get(교재이름).push(이름 || '(이름없음)');
+                교재별.get(교재이름).push({ 학생: 이름 || '(이름없음)', 입금확인: row.입금확인 });
             }
         }
 
         const items = [...교재별.entries()]
-            .map(([교재, 학생들]) => ({ 교재, 권수: 학생들.length, 학생들 }))
+            .map(([교재, 목록]) => ({
+                교재,
+                권수: 목록.length,
+                학생들: 목록.map(x => x.학생),
+                미입금: 목록.filter(x => !x.입금확인).map(x => x.학생),
+            }))
             .sort((a, b) => b.권수 - a.권수 || a.교재.localeCompare(b.교재, 'ko'));
 
-        return { 건수: rows.length, 총권수: items.reduce((s, i) => s + i.권수, 0), items };
+        return {
+            건수: rows.length,
+            총권수: items.reduce((s, i) => s + i.권수, 0),
+            미입금건수: rows.filter(r => !r.입금확인).length,
+            items,
+        };
     }
 
     function shoppingText(list) {
         if (!list.items.length) return '지금 사야 할 교재가 없습니다.';
-        const lines = [`교재 ${list.총권수}권 (신청 ${list.건수}건)`, ''];
-        for (const i of list.items) lines.push(`${i.교재}  ${i.권수}권`, `   ${i.학생들.join(' ')}`);
+        const head = `교재 ${list.총권수}권 (신청 ${list.건수}건)`
+            + (list.미입금건수 ? `\n※ 입금 확인 안 된 건 ${list.미입금건수}건 — 이름 뒤 (미입금)` : '');
+        const lines = [head, ''];
+        for (const i of list.items) {
+            const 미 = new Set(i.미입금);
+            lines.push(`${i.교재}  ${i.권수}권`,
+                `   ${i.학생들.map(s => 미.has(s) ? `${s}(미입금)` : s).join(' ')}`);
+        }
         return lines.join('\n');
     }
 
@@ -579,14 +598,19 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         try {
             const r = await sendBatch();
             console.log(`📚 교재비 묶음 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
-            // 발송 직후가 조교에게 장보기 목록을 주기 제일 좋은 시점이다
-            if (assistantConv) {
-                const list = await shoppingList();
-                await sendCard(assistantConv, '교재 장보기 목록', shoppingText(list), [{ text: '목록 열기', url: `${domainUrl}/shopping` }]);
-                console.log(`🛒 장보기 목록 발송: 교재 ${list.총권수}권 / 신청 ${list.건수}건`);
-            }
         } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 월·목 14시 묶음 발송)');
+    // 화·금 오전 10시 장보기 목록. 학부모 발송(월·목 14시) **다음 날 아침**이다.
+    // 하루를 두면 그사이 입금이 들어와서, 조교가 입금 상태까지 보고 사러 갈 수 있다.
+    cron.schedule('0 10 * * 2,5', async () => {
+        if (!assistantConv) return;
+        try {
+            const list = await shoppingList();
+            await sendCard(assistantConv, '교재 장보기 목록', shoppingText(list), [{ text: '목록 열기', url: `${domainUrl}/shopping` }]);
+            console.log(`🛒 장보기 목록 발송: 교재 ${list.총권수}권 / 신청 ${list.건수}건 / 미입금 ${list.미입금건수}건`);
+        } catch (e) { console.error('장보기 목록 Cron Error', e); }
+    }, { timezone: 'Asia/Seoul' });
+
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 월·목 14시 발송 + 화·금 10시 장보기)');
 }
