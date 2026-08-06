@@ -14,6 +14,7 @@ import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
 import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
+import { initializeAdmissionRoutes } from './admissionModule.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -855,6 +856,15 @@ try {
         assistantConv: process.env.KAKAOWORK_ASSISTANT_CONV,
     });
 } catch(e) { console.error('Textbook Fee Module Init Error', e); }
+
+// 입학 상담 예약 확인 알림톡 — 노션 '발송' 체크박스가 방아쇠
+try {
+    initializeAdmissionRoutes({
+        app, requireAuth, fetchNotion, sendSms, cron,
+        dbId: process.env.ADMISSION_DB_ID || '18609320-bce2-804c-9aaa-ca82ca1256ff',
+        alertConv: process.env.KAKAOWORK_APPROVAL_CONV,   // 보류 알림은 원장 DM 으로
+    });
+} catch(e) { console.error('Admission Module Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;
