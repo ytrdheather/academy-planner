@@ -80,6 +80,25 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
     const patch = (id, properties) =>
         fetchNotion(`https://api.notion.com/v1/pages/${id}`, { method: 'PATCH', body: JSON.stringify({ properties }) });
 
+    /** 카카오워크 알림. 고칠 대상이 있으면 노션 링크 버튼을 같이 달아 준다. */
+    async function notify(title, body, url) {
+        if (!alertConv) return false;
+        const blocks = [
+            { type: 'header', text: title, style: 'blue' },
+            { type: 'text', text: body, markdown: false },
+        ];
+        if (url) blocks.push({ type: 'button', text: '노션에서 고치기', style: 'default', action_type: 'open_system_browser', value: url });
+
+        const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${process.env.KAKAOWORK_APP_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversation_id: alertConv, text: `${title}\n\n${body}${url ? '\n' + url : ''}`, blocks }),
+        });
+        const b = await res.json().catch(() => ({}));
+        if (!b?.success) throw new Error(`카카오워크: ${JSON.stringify(b).slice(0, 200)}`);
+        return true;
+    }
+
     async function tick() {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${DB}/query`, {
             method: 'POST',
@@ -104,16 +123,10 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
             if (빠짐.length) {
                 try {
                     await patch(page.id, { '발송': { checkbox: false } });
-                    if (alertConv) {
-                        await fetch('https://api.kakaowork.com/v1/messages.send', {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${process.env.KAKAOWORK_APP_KEY}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                conversation_id: alertConv,
-                                text: `[상담 안내 발송 보류]\n${이름 || '(이름없음)'} — ${빠짐.join(', ')}이(가) 비어 있습니다.\n채우고 '발송'을 다시 켜 주세요.`,
-                            }),
-                        });
-                    }
+                    // 무엇이 비었는지만 알려주면 결국 노션에서 그 행을 다시 찾아야 한다. 링크를 같이 준다.
+                    await notify('상담 안내 발송 보류',
+                        `${이름 || '(이름없음)'}\n\n${빠짐.join(', ')}이(가) 비어 있습니다.\n채우고 '발송'을 다시 켜 주세요.`,
+                        page.url);
                     r.보류++;
                 } catch (e) { r.실패.push(`보류처리/${page.id}: ${e.message}`); }
                 continue;
@@ -136,9 +149,14 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
                     '상태': { select: { name: '예약확정' } },
                 });
                 console.log(`📩 상담 예약 안내 ${경로} 발송: ${이름} (${확정일})`);
+                await notify('상담 예약 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n상담 일시: ${확정일}`, page.url);
                 r.발송++;
             } catch (e) {
                 r.실패.push(`발송/${이름}: ${e.message}`);
+                // 안 나간 것을 아무도 모르는 게 제일 나쁘다. 체크는 이미 꺼졌으니 다시 켜야 한다고 알린다.
+                try {
+                    await notify('🔴 상담 안내 발송 실패', `${이름} 학부모님께 보내지 못했습니다.\n\n${e.message}\n\n확인 후 '발송'을 다시 켜 주세요.`, page.url);
+                } catch (_) { /* 실패 알림까지 실패하면 로그만 남는다 */ }
             }
         }
         return r;

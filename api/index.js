@@ -862,7 +862,8 @@ try {
     initializeAdmissionRoutes({
         app, requireAuth, fetchNotion, sendSms, cron,
         dbId: process.env.ADMISSION_DB_ID || '18609320-bce2-804c-9aaa-ca82ca1256ff',
-        alertConv: process.env.KAKAOWORK_APPROVAL_CONV,   // 보류 알림은 원장 DM 으로
+        // 신입생 상담알림_BOT 채널. 신청 알림이 이미 여기로 오므로 발송 결과도 같은 자리에 모은다.
+        alertConv: process.env.KAKAOWORK_ADMISSION_CONV || '1004431253274498',
     });
 } catch(e) { console.error('Admission Module Init Error', e); }
 
