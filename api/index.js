@@ -861,7 +861,8 @@ try {
 try {
     initializeAdmissionRoutes({
         app, requireAuth, fetchNotion, sendSms, cron,
-        dbId: process.env.ADMISSION_DB_ID || '18609320-bce2-804c-9aaa-ca82ca1256ff',
+        // 신입생 상담 관리 데이터베이스. 이름이 비슷한 '상담신청서 관리'(18609320…)는 7/21 에서 멈춘 옛 폼이다.
+        dbId: process.env.ADMISSION_DB_ID || '1a109320-bce2-8042-b1b8-d13661def917',
         // 신입생 상담알림_BOT 채널. 신청 알림이 이미 여기로 오므로 발송 결과도 같은 자리에 모은다.
         alertConv: process.env.KAKAOWORK_ADMISSION_CONV || '1004431253274498',
     });

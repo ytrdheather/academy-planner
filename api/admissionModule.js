@@ -4,10 +4,11 @@
  * 원래는 노션 버튼 → Make 웹훅 → 솔라피였다. 2026-08-06 에 Make 를 끄면서 그 버튼이 죽었다.
  * 노션 버튼은 우리 서버를 직접 부를 수 없어서, 교재비에서 검증된 방식(체크박스 + 5분 크론)을 그대로 쓴다.
  *
- *   원장이 '상담 확정일'·'안내 문구'를 쓰고 '발송'을 체크
- *     → 5분 안에 알림톡 발송 → '발송 일시' 기록 → '발송' 자동 해제 → '상태'=예약확정
+ *   원장이 '상담 예약일'·'💌 상담 코멘트'를 쓰고 '상담예약함'을 체크
+ *     → 5분 안에 알림톡 발송 → '알림톡 발송완료' 체크 → 결과를 채널에 알림
  *
- * 신청서가 노션에 쌓이는 것은 구글폼 응답 시트의 Apps Script 가 한다(이 파일 소관이 아니다).
+ * 대상 DB 는 `신입생 상담 관리 데이터베이스`. 속성을 새로 만들지 않고 이미 있는 칸을 그대로 쓴다.
+ * (비슷한 이름의 `상담신청서 관리`(18609320…)는 7/21 에서 멈춘 옛 폼이다. 쓰지 말 것.)
  */
 import crypto from 'crypto';
 
@@ -17,25 +18,7 @@ const PF_ID = 'KA01PF250113084507284jSE3GEmbOOw';
 // 템플릿 버튼이 'https://#{homepage}' 라서 앞의 https:// 를 빼고 넣어야 한다.
 const HOMEPAGE = process.env.ACADEMY_HOMEPAGE || 'blog.naver.com/readitude';
 
-const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const plain = p => ((p?.title || p?.rich_text || []).map(t => t.plain_text).join('') || '').trim();
-
-/** 노션 날짜(시간 포함 가능)를 "8월 12일 (수) 오후 3시 30분" 으로 바꾼다. */
-function formatKst(iso) {
-    if (!iso) return '';
-    const hasTime = iso.length > 10;
-    const d = new Date(hasTime ? iso : `${iso}T00:00:00+09:00`);
-    const k = new Date(d.getTime() + 9 * 3600 * 1000);
-    const [m, day, wd] = [k.getUTCMonth() + 1, k.getUTCDate(), WD[k.getUTCDay()]];
-    let s = `${m}월 ${day}일 (${wd})`;
-    if (hasTime) {
-        const h = k.getUTCHours(), mi = k.getUTCMinutes();
-        const ampm = h < 12 ? '오전' : '오후';
-        const h12 = h % 12 === 0 ? 12 : h % 12;
-        s += ` ${ampm} ${h12}시` + (mi ? ` ${mi}분` : '');
-    }
-    return s;
-}
 
 export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendSms, cron, dbId, alertConv }) {
     const DB = dbId;
@@ -43,8 +26,7 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
 
     /**
      * 솔라피 알림톡. textbookFeeModule 에도 거의 같은 함수가 있다.
-     * 지금 그쪽이 라이브로 나가는 중이라 건드리지 않으려고 일부러 복제했다.
-     * 나중에 한 곳으로 합칠 것.
+     * 그쪽이 라이브로 나가는 중이라 건드리지 않으려고 일부러 복제했다. 나중에 한 곳으로 합칠 것.
      */
     async function sendAlimtalk(to, variables, fallbackText) {
         const key = process.env.SOLAPI_API_KEY, secret = process.env.SOLAPI_API_SECRET, from = process.env.SOLAPI_SENDER;
@@ -87,7 +69,7 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
             { type: 'header', text: title, style: 'blue' },
             { type: 'text', text: body, markdown: false },
         ];
-        if (url) blocks.push({ type: 'button', text: '노션에서 고치기', style: 'default', action_type: 'open_system_browser', value: url });
+        if (url) blocks.push({ type: 'button', text: '노션에서 열기', style: 'default', action_type: 'open_system_browser', value: url });
 
         const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
             method: 'POST',
@@ -99,33 +81,45 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
         return true;
     }
 
+    /** 폼이 채우는 칸은 `전화번호`(텍스트)다. `전화번호 1`(phone_number)은 손으로 넣는 자리라 비어 있을 때가 많다. */
+    const 연락처of = p =>
+        (plain(p['전화번호']) || p['전화번호 1']?.phone_number || p['전화번호 2']?.phone_number || '').trim();
+
     async function tick() {
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${DB}/query`, {
             method: 'POST',
-            body: JSON.stringify({ filter: { property: '발송', checkbox: { equals: true } }, page_size: 50 }),
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '상담예약함', checkbox: { equals: true } },
+                        // 이미 나간 건을 다시 보내지 않는다. 체크를 되돌리지 않아도 안전하도록.
+                        { property: '알림톡 발송완료', checkbox: { equals: false } },
+                    ],
+                },
+                page_size: 50,
+            }),
         });
 
         const r = { 발송: 0, 보류: 0, 실패: [] };
         for (const page of (data.results || [])) {
             const p = page.properties;
             const 이름 = plain(p['이름']);
-            const 연락처 = p['학부모님 연락처']?.phone_number || '';
-            const 확정일 = formatKst(p['상담 확정일']?.date?.start || '');
-            const 문구 = plain(p['안내 문구']);
+            const 연락처 = 연락처of(p);
+            const 예약일 = plain(p['상담 예약일']);
+            const 코멘트 = plain(p['💌 상담 코멘트']);
 
             // 알림톡은 변수가 비면 카카오가 거부한다. 무엇이 비었는지 알려주고 체크는 꺼 준다.
             const 빠짐 = [];
             if (!이름) 빠짐.push('이름');
-            if (!연락처) 빠짐.push('학부모님 연락처');
-            if (!확정일) 빠짐.push('상담 확정일');
-            if (!문구) 빠짐.push('안내 문구');
+            if (!연락처) 빠짐.push('전화번호');
+            if (!예약일) 빠짐.push('상담 예약일');
+            if (!코멘트) 빠짐.push('💌 상담 코멘트');
 
             if (빠짐.length) {
                 try {
-                    await patch(page.id, { '발송': { checkbox: false } });
-                    // 무엇이 비었는지만 알려주면 결국 노션에서 그 행을 다시 찾아야 한다. 링크를 같이 준다.
+                    await patch(page.id, { '상담예약함': { checkbox: false } });
                     await notify('상담 안내 발송 보류',
-                        `${이름 || '(이름없음)'}\n\n${빠짐.join(', ')}이(가) 비어 있습니다.\n채우고 '발송'을 다시 켜 주세요.`,
+                        `${이름 || '(이름없음)'}\n\n${빠짐.join(', ')}이(가) 비어 있습니다.\n채우고 '상담예약함'을 다시 켜 주세요.`,
                         page.url);
                     r.보류++;
                 } catch (e) { r.실패.push(`보류처리/${page.id}: ${e.message}`); }
@@ -133,29 +127,27 @@ export function initializeAdmissionRoutes({ app, requireAuth, fetchNotion, sendS
             }
 
             try {
-                // 발송 직전에 체크를 먼저 끈다. 크론이 겹쳐도 두 번 나가지 않게.
-                await patch(page.id, { '발송': { checkbox: false } });
+                // 발송 직전에 '발송완료'를 먼저 켠다. 크론이 겹쳐도 두 번 나가지 않게.
+                await patch(page.id, { '알림톡 발송완료': { checkbox: true } });
+
                 const 경로 = await sendAlimtalk(연락처,
                     {
                         '#{학생이름}': 이름,
-                        '#{상담예약일}': 확정일,
-                        '#{상담메세지}': 문구,
+                        '#{상담예약일}': 예약일,
+                        '#{상담메세지}': 코멘트,
                         '#{homepage}': HOMEPAGE,
                     },
-                    `[리디튜드] ${이름} 학부모님, 상담 예약 안내드립니다.\n\n상담 일시: ${확정일}\n${문구}\n\n${'https://' + HOMEPAGE}`);
+                    `[리디튜드] ${이름} 학부모님, 상담 예약 안내드립니다.\n\n상담 일시: ${예약일}\n${코멘트}\n\nhttps://${HOMEPAGE}`);
 
-                await patch(page.id, {
-                    '발송 일시': { date: { start: new Date().toISOString() } },
-                    '상태': { select: { name: '예약확정' } },
-                });
-                console.log(`📩 상담 예약 안내 ${경로} 발송: ${이름} (${확정일})`);
-                await notify('상담 예약 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n상담 일시: ${확정일}`, page.url);
+                console.log(`📩 상담 예약 안내 ${경로} 발송: ${이름} (${예약일})`);
+                await notify('상담 예약 안내 발송 완료', `${이름} 학부모님께 ${경로} 보냈습니다.\n\n상담 일시: ${예약일}`, page.url);
                 r.발송++;
             } catch (e) {
                 r.실패.push(`발송/${이름}: ${e.message}`);
-                // 안 나간 것을 아무도 모르는 게 제일 나쁘다. 체크는 이미 꺼졌으니 다시 켜야 한다고 알린다.
+                // 안 나갔는데 '발송완료'가 켜져 있으면 영영 안 나간다. 되돌려 놓는다.
+                try { await patch(page.id, { '알림톡 발송완료': { checkbox: false } }); } catch (_) { }
                 try {
-                    await notify('🔴 상담 안내 발송 실패', `${이름} 학부모님께 보내지 못했습니다.\n\n${e.message}\n\n확인 후 '발송'을 다시 켜 주세요.`, page.url);
+                    await notify('🔴 상담 안내 발송 실패', `${이름} 학부모님께 보내지 못했습니다.\n\n${e.message}\n\n확인 후 다시 시도해 주세요.`, page.url);
                 } catch (_) { /* 실패 알림까지 실패하면 로그만 남는다 */ }
             }
         }

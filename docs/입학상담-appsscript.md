@@ -29,7 +29,9 @@
  */
 
 const KAKAOWORK_ADMISSION_CONV = '1004431253274498';           // 신입생 상담알림_BOT 채널
-const NOTION_DB_ID = '18609320-bce2-804c-9aaa-ca82ca1256ff';   // 상담신청서 관리
+// 🔴 '신입생 상담 관리 데이터베이스'. 이름이 비슷한 '상담신청서 관리'(18609320…)는
+//    7/21 에서 멈춘 옛 폼이니 쓰지 말 것.
+const NOTION_DB_ID = '1a109320-bce2-8042-b1b8-d13661def917';
 
 const GROUPS = [
   {
@@ -67,18 +69,32 @@ const GROUPS = [
  */
 const NOTION_MAP = [
   { key: '학생 이름', prop: '이름', type: 'title' },
-  { key: '학부모님 전화번호', prop: '학부모님 연락처', type: 'phone' },
-  { key: '학생 학년', prop: '학생 학년' },
-  { key: '학교 이름', prop: '학교 이름' },
-  { key: '상담 관심 과목', prop: '상담 관심과목', type: 'select' },
+  { key: '학부모님 전화번호', prop: '전화번호' },                 // 텍스트 칸. 폼이 채우는 자리
+  { key: '학생 학년', prop: '학생의 학년', type: 'select' },
+  { key: '학교 이름', prop: '학교' },
+  { key: '상담 관심 과목', prop: '상담관심과목', type: 'multi' },
+  { key: '주로 상담하고 싶으신 내용에 체크해주세요.', prop: '상담하고 싶은 내용', type: 'select' },
   { key: '상담을 원하는 날짜와 시간', prop: '상담을 원하는 날짜' },
-  { key: '주로 상담하고 싶으신 내용에 체크해주세요.', prop: '주로 상담하고 싶은 내용 1' },
-  { key: '총 영어 학습 기간 (영어를 학습적으로 배운 기간 / 학원을 다닌 기간 을 위주로 적어주세요.)', prop: '학생의 총 학습 기간' },
-  { key: '가장 최근의 AR 점수가 있다면 써주세요. (상담시 테스트지를 가지고 오시면 보다 더 정확한 상담에 도움이 됩니다.)', prop: '최근의 AR 점수 혹은 내신 영어 점수' },
-  { key: '중학생의 경우 가장 최근의 영어 내신성적과 전체 평균 성적을 적어주세요.', prop: '주로 상담하고 싶은 내용 2' },
-  { key: '리디튜드를 어떻게 알게 되셨나요?', prop: '알게 된 경로' },
-  { key: '재원생 추천인', prop: '재원생 추천인' },
+  { key: '총 영어 학습 기간 (영어를 학습적으로 배운 기간 / 학원을 다닌 기간 을 위주로 적어주세요.)', prop: '영어 학습 기간', type: 'select' },
+  { key: '가장 최근의 AR 점수가 있다면 써주세요. (상담시 테스트지를 가지고 오시면 보다 더 정확한 상담에 도움이 됩니다.)', prop: 'AR 점수' },
+  { key: '중학생의 경우 가장 최근의 영어 내신성적과 전체 평균 성적을 적어주세요.', prop: '내신점수' },
 ];
+
+/**
+ * 노션에 전용 칸이 없는 답변들. 하나로 묶어 '전달 사항 등 메세지' 에 넣는다.
+ * 버리면 나중에 "어디서 알고 오셨더라" 를 알 수 없다.
+ */
+const EXTRA_KEYS = [
+  { key: '리디튜드를 어떻게 알게 되셨나요?', label: '알게 된 경로' },
+  { key: '재원생 추천인', label: '재원생 추천인' },
+];
+
+/**
+ * 🔴 아래 두 칸은 폼이 건드리지 않는다. 원장이 상담 일정을 잡고 직접 채우는 자리다.
+ *    '상담 예약일'   ← 확정된 일시 (알림톡 #{상담예약일})
+ *    '💌 상담 코멘트' ← 학부모께 보낼 말 (알림톡 #{상담메세지})
+ *    학부모가 폼에 적은 희망 일시는 '상담을 원하는 날짜' 로 따로 들어간다.
+ */
 
 function onSubmit() {
   const row = readLastResponse_();
@@ -149,20 +165,27 @@ function writeNotion_(row) {
   const token = PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
   if (!token) throw new Error('스크립트 속성 NOTION_TOKEN 이 없습니다');
 
-  const props = {
-    '접수 경로': { rich_text: [{ text: { content: '구글폼(Apps Script)' } }] },
-    '상태': { select: { name: '접수' } },
-  };
+  const props = {};
 
   NOTION_MAP.forEach(function (f) {
     const v = clean_(row[f.key]);
     if (!v) return;                                  // 빈 값은 아예 안 넣는다
+    // 선택지 이름에 앞뒤 공백이 있으면 노션이 다른 값으로 본다. 다듬어서 넣는다.
+    const one = v.replace(/\s+/g, ' ').slice(0, 100);
     if (f.type === 'title') props[f.prop] = { title: [{ text: { content: v.slice(0, 200) } }] };
     else if (f.type === 'phone') props[f.prop] = { phone_number: v };
-    // 선택지 이름에 앞뒤 공백이 있으면 노션이 다른 값으로 본다. 다듬어서 넣는다.
-    else if (f.type === 'select') props[f.prop] = { select: { name: v.replace(/\s+/g, ' ').slice(0, 100) } };
+    else if (f.type === 'select') props[f.prop] = { select: { name: one } };
+    else if (f.type === 'multi') props[f.prop] = { multi_select: [{ name: one }] };
     else props[f.prop] = { rich_text: [{ text: { content: v.slice(0, 2000) } }] };
   });
+
+  // 전용 칸이 없는 답변은 묶어서 한 칸에 남긴다
+  const extra = [];
+  EXTRA_KEYS.forEach(function (f) {
+    const v = clean_(row[f.key]);
+    if (v) extra.push(f.label + ': ' + v);
+  });
+  if (extra.length) props['전달 사항 등 메세지'] = { rich_text: [{ text: { content: extra.join('\n').slice(0, 2000) } }] };
 
   if (!props['이름']) props['이름'] = { title: [{ text: { content: '(이름 없음)' } }] };
 
@@ -228,12 +251,16 @@ function testNotify() {
 ## 그다음 원장이 하는 일
 
 1. 카카오워크 알림의 **[노션에서 열기]** 버튼을 누른다
-2. **`상담 확정일`** 에 날짜와 **시간까지** 넣는다 (시간을 넣어야 "오후 3시 30분"이 문자에 들어간다)
-3. **`안내 문구`** 에 하고 싶은 말을 쓴다 (템플릿의 `#{상담메세지}` 자리)
-4. **`발송`** 체크 → 5분 안에 알림톡이 나가고, 체크는 자동으로 꺼지며
-   `발송 일시`·`상태=예약확정` 이 기록된다. 결과는 같은 채널에 뜬다
+2. **`상담 예약일`** 에 확정된 일시를 적는다 (자유 텍스트다. 적은 그대로 문자에 나간다)
+3. **`💌 상담 코멘트`** 에 하고 싶은 말을 쓴다 (템플릿의 `#{상담메세지}` 자리)
+4. **`상담예약함`** 체크 → 5분 안에 알림톡이 나가고 **`알림톡 발송완료`** 가 켜진다.
+   결과는 같은 채널에 뜬다
 
-값이 비어 있으면 발송하지 않고 체크만 꺼진 뒤 **무엇이 비었는지 + 노션 링크**가 채널에 온다.
+값이 비어 있으면 발송하지 않고 `상담예약함` 만 꺼진 뒤
+**무엇이 비었는지 + 노션 링크**가 채널에 온다.
+
+> `알림톡 발송완료` 가 켜진 건은 다시 보내지 않는다. `상담예약함` 을 껐다 켜도 마찬가지다.
+> 일부러 다시 보내려면 **`알림톡 발송완료` 를 먼저 끄고** `상담예약함` 을 켠다.
 
 사용 템플릿: `상담예약 안내확인` (`KA01TP250223163830368xwWO2Ze1CcQ`).
 버튼 링크는 `blog.naver.com/readitude` 고정이며 `ACADEMY_HOMEPAGE` env 로 바꿀 수 있다.
