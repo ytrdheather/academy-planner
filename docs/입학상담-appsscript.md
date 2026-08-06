@@ -246,6 +246,38 @@ function sendKakaoWork_(text, url) {
 function testNotify() {
   onSubmit();
 }
+
+/**
+ * 설정이 제대로 들어갔는지만 본다. 아무것도 보내지 않는다.
+ * 노션에 안 들어갈 때 제일 먼저 이걸 돌려 볼 것.
+ */
+function checkSetup() {
+  const p = PropertiesService.getScriptProperties();
+  const kw = p.getProperty('KAKAOWORK_APP_KEY');
+  const nt = p.getProperty('NOTION_TOKEN');
+  Logger.log('KAKAOWORK_APP_KEY : ' + (kw ? '있음 (' + kw.slice(0, 6) + '…)' : '❌ 없음'));
+  Logger.log('NOTION_TOKEN      : ' + (nt ? '있음 (' + nt.slice(0, 6) + '…)' : '❌ 없음'));
+
+  if (!nt) { Logger.log('→ 프로젝트 설정 → 스크립트 속성에 NOTION_TOKEN 을 넣으세요'); return; }
+
+  // 토큰이 그 DB 를 실제로 열 수 있는지까지 확인한다
+  const res = UrlFetchApp.fetch('https://api.notion.com/v1/databases/' + NOTION_DB_ID, {
+    headers: { 'Authorization': 'Bearer ' + nt, 'Notion-Version': '2022-06-28' },
+    muteHttpExceptions: true,
+  });
+  const code = res.getResponseCode();
+  if (code < 300) {
+    const t = JSON.parse(res.getContentText()).title.map(function (x) { return x.plain_text; }).join('');
+    Logger.log('노션 DB 접근 OK : "' + t + '"');
+  } else {
+    Logger.log('❌ 노션 ' + code + ': ' + res.getContentText().slice(0, 300));
+  }
+
+  // 시트 헤더가 NOTION_MAP 의 key 와 맞는지도 본다
+  const row = readLastResponse_();
+  const 없는키 = NOTION_MAP.filter(function (f) { return !(f.key in row); }).map(function (f) { return f.key; });
+  Logger.log(없는키.length ? '❌ 시트에 없는 헤더: ' + 없는키.join(' / ') : '시트 헤더 매핑 OK');
+}
 ```
 
 ## 그다음 원장이 하는 일
