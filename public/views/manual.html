@@ -95,6 +95,10 @@
   .phase-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
   .pnum{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--accent-ink);background:var(--accent-wash);
     border-radius:8px;padding:3px 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  /* 조교 담당 구간. 선생님이 훑을 때 "여기부터 내 일이 아니다"가 한눈에 보여야 한다. */
+  .pnum.who{font-size:14.5px;color:#fff;background:#0d7a5f;padding:5px 13px}
+  .phase.assistant{border-left:4px solid #0d7a5f;padding-left:18px;margin-left:-22px}
+  @media (max-width:560px){.phase.assistant{margin-left:0;padding-left:12px}}
   .phase-head h2{font-size:24px;font-weight:820;letter-spacing:-.025em;margin:0;text-wrap:balance}
   .phase-sub{color:var(--ink-soft);font-size:15px;margin:2px 0 20px}
 
@@ -872,7 +876,7 @@
 
       <section class="glance">
         <h2>먼저, 이것만 기억하세요</h2>
-        <p class="sub">교재를 바꿀 때 선생님이 하는 일은 <b>노션에 한 줄 만들고 교재를 고르는 것</b>뿐입니다. 금액 계산·원장님 승인 요청·학부모님 문자는 전부 자동입니다. <b>학부모님께 직접 연락하지 마세요.</b></p>
+        <p class="sub">교재를 바꿀 때 선생님이 하는 일은 <b>노션에 한 줄 만들고 교재를 고르는 것</b>뿐입니다. 금액 계산·원장님 승인 요청·학부모님 문자는 전부 자동입니다.</p>
         <div class="twotab">
           <div class="tabcard">
             <div class="tname">✍️ 선생님이 하는 것</div>
@@ -881,8 +885,8 @@
           </div>
           <div class="tabcard">
             <div class="tname">🤖 자동으로 되는 것</div>
-            <div class="twhen">승인은 5분 · 발송은 월/목</div>
-            <p>금액 계산 → 원장님 승인 요청 → 승인되면 선생님께 알림 → <b>매주 월·목 오후 2시</b>에 학부모님께 입금 안내.</p>
+            <div class="twhen">승인은 5분 · 발송은 금요일 밤</div>
+            <p>금액 계산 → 원장님 승인 요청 → 승인되면 선생님께 알림 → <b>매주 금요일 오후 9시</b>에 학부모님께 입금 안내.</p>
           </div>
         </div>
       </section>
@@ -892,10 +896,10 @@
         <span class="tab">📚 교재 고르기</span><span class="arrow">→</span>
         <span class="tab">🙋 승인대기</span><span class="arrow">→</span>
         <span class="tab">👩‍💼 원장님 승인</span><span class="arrow">→</span>
-        <span class="tab">💬 월·목 학부모 안내</span>
+        <span class="tab">💬 금요일 밤 학부모 안내</span>
       </div>
 
-      <div class="note tip"><span class="lbl">발송 시점</span>학부모님께 나가는 입금 안내는 <b>매주 월요일·목요일 오후 2시</b>에 모아서 한 번에 나갑니다. 승인이 나도 바로 나가지 않습니다. <b>전날까지 올려 두시면</b> 다음 발송에 실립니다.</div>
+      <div class="note tip"><span class="lbl">발송 시점</span>학부모님께 나가는 입금 안내는 <b>매주 금요일 오후 9시</b>에 모아서 한 번에 나갑니다. <b>목요일 밤 10시까지 올려 두시면</b> 그 주 발송에 실립니다.</div>
 
       <section class="phase">
         <div class="phase-head"><span class="pnum">STEP 1</span><h2>교재비 관리 DB에 한 줄 만들기</h2></div>
@@ -912,7 +916,8 @@
           <li><div class="st">(선택) <b>요청 메모</b>에 사유를 적습니다</div>
             <div class="sd">“레벨업 교체”, “분실 재구매” 처럼 짧게. 원장님 승인 화면에 같이 보입니다.</div></li>
         </ol>
-        <div class="note tip"><span class="lbl">참고</span>교재 이름은 <b>손으로 적지 않습니다.</b> 고른 교재에서 이름과 가격을 그대로 가져오기 때문에 오타가 학부모님께 나갈 일이 없습니다. 금액도 자동입니다 — <b>계산기를 두드리지 마세요.</b></div>
+        <div class="note tip"><span class="lbl">참고</span>교재 이름은 <b>손으로 적지 않습니다.</b> 고른 교재에서 이름과 가격을 그대로 가져오기 때문에 오타가 학부모님께 나갈 일이 없습니다.</div>
+        <div class="note warn"><span class="lbl">교재가 안 보이거나 금액이 안 뜰 때</span><b>교재 데이터베이스에 업데이트가 안 되어 있는 것입니다.</b> 그 교재를 찾아 <b>책 이름과 가격</b>을 채워 주세요. 가격이 빈 교재를 그대로 담으면 그 책값이 <b>0원으로 빠진 채</b> 청구되기 때문에, 발송 직전에 막히고 <b>보류</b>가 됩니다.</div>
       </section>
 
       <section class="phase">
@@ -925,21 +930,24 @@
             <div class="sd">원장님 화면에 학생·기존 교재·변경 교재·청구 금액과 <b>승인 / 반려</b> 버튼이 뜹니다.</div></li>
           <li><div class="st">승인되면 <b>선생님께 카카오워크 알림</b>이 옵니다</div>
             <div class="sd">반려된 경우에도 <b>반려 사유와 함께</b> 옵니다. 노션을 계속 들여다보지 않으셔도 됩니다.</div></li>
-          <li><div class="st">학부모님께는 <b>다음 월·목 오후 2시</b>에 나갑니다</div>
-            <div class="sd">승인된 건이 그날 한꺼번에 나갑니다. 학부모님은 <b>본인 아이 것만</b> 받으십니다. 선생님이 따로 누르실 것은 없습니다.</div></li>
+          <li><div class="st">학부모님께는 <b>금요일 오후 9시</b>에 나갑니다</div>
+            <div class="sd">그 주에 승인된 건이 한꺼번에 나갑니다. 학부모님은 <b>본인 아이 것만</b> 받으십니다. 선생님이 따로 누르실 것은 없습니다.</div></li>
         </ol>
-        <div class="note warn"><span class="lbl">주의</span><b>발송 예약</b> 칸은 <b>선생님이 켜지 마세요.</b> 이건 월·목을 못 기다리는 급한 건을 <b>즉시</b> 내보내는 칸이고, 켜면 5분 안에 학부모님께 입금 안내가 실제로 나갑니다. <b>원장님이 켜는 칸</b>입니다.</div>
+        <div class="note warn"><span class="lbl">주의</span><b>발송 예약</b> 칸은 <b>선생님이 켜지 마세요.</b> 이건 금요일을 못 기다리는 급한 건을 <b>즉시</b> 내보내는 칸이고, 켜면 5분 안에 학부모님께 입금 안내가 실제로 나갑니다. <b>원장님이 켜는 칸</b>입니다.</div>
       </section>
 
-      <section class="phase">
-        <div class="phase-head"><span class="pnum">STEP 3</span><h2>승인된 뒤 — 교재 준비와 입금 확인</h2></div>
-        <p class="phase-sub">교재를 챙기고 결과를 적는 단계입니다.</p>
+      <section class="phase assistant">
+        <div class="phase-head"><span class="pnum who">🧺 조교가 할 일</span><h2>교재 준비와 입금 확인</h2></div>
+        <p class="phase-sub"><b>선생님은 여기부터 손대지 않으셔도 됩니다.</b> 조교가 월·화에 교재를 사 와서 배부하고 결과를 적는 단계입니다.</p>
+        <div class="note tip"><span class="lbl">월요일 오전 10시</span><b>데스크&amp;조교 알림</b> 채널로 <b>장보기 목록</b>이 옵니다. 학생별이 아니라 <b>교재별로 몇 권</b>인지 합쳐서 나오고, 입금이 안 된 학생은 이름 뒤에 <b>(미입금)</b>이 붙습니다.</div>
         <ol class="steps">
-          <li><div class="st"><b>구매 상태</b>를 바꿉니다</div>
-            <div class="sd">미구매 → 일부구매 → 구매완료. 조교쌤이 무엇을 몇 권 사야 하는지 여기서 봅니다.</div></li>
-          <li><div class="st">못 구한 교재가 있으면 <b>미확보 교재</b>에 적습니다</div>
+          <li><div class="st">🧺 목록대로 <b>교재를 사 옵니다</b></div>
+            <div class="sd">메시지의 <b>목록 열기</b> 버튼을 누르면 체크하며 지워 나갈 수 있는 화면이 열립니다. 카톡은 위로 밀려 올라가니 장 보실 땐 이 화면을 쓰세요.</div></li>
+          <li><div class="st">🧺 배부한 뒤 <b>구매 상태</b>를 바꿉니다</div>
+            <div class="sd">미구매 → 일부구매 → <b>구매완료</b>. 구매완료로 바꿔야 다음 주 장보기 목록에서 빠집니다. <b>안 바꾸면 계속 올라옵니다.</b></div></li>
+          <li><div class="st">🧺 못 구한 교재가 있으면 <b>미확보 교재</b>에 적습니다</div>
             <div class="sd">품절·입고 지연처럼 학생에게 바로 못 주는 것을 적어 두세요.</div></li>
-          <li><div class="st">입금이 확인되면 <b>입금 확인</b>을 켜고 날짜를 적습니다</div>
+          <li><div class="st">🧺 입금이 확인되면 <b>입금 확인</b>을 켜고 날짜를 적습니다</div>
             <div class="sd">이 기록이 남아야 나중에 “누가 아직 안 냈는지”를 뽑을 수 있습니다.</div></li>
         </ol>
       </section>
@@ -974,10 +982,10 @@
             <b>10% 할인</b>이 들어가서입니다. 교재값을 모두 더한 뒤 <b>한 번에</b> 10%를 뺍니다. 학부모님께는 <b>할인된 금액만</b> 나갑니다. 계산이 이상해 보이면 담은 교재 중에 <b>가격이 비어 있는 것</b>이 있는지부터 보세요.
           </div></details>
           <details><summary>학부모님이 “문자를 못 받았다”고 하십니다</summary><div class="ans">
-            그 줄의 <b>진행상태</b>를 보세요. <b>발송완료</b>면 나간 것이고 <b>발송 일시</b>에 시각이 적혀 있습니다. <b>승인됨</b>이면 아직 <b>다음 월·목을 기다리는 중</b>입니다. <b>보류</b>면 위 “막힐 때”를 보세요.
+            그 줄의 <b>진행상태</b>를 보세요. <b>발송완료</b>면 나간 것이고 <b>발송 일시</b>에 시각이 적혀 있습니다. <b>승인됨</b>이면 아직 <b>금요일 오후 9시를 기다리는 중</b>입니다. <b>보류</b>면 위 “막힐 때”를 보세요.
           </div></details>
           <details><summary>오늘 승인됐는데 학부모님께 급히 안내해야 합니다</summary><div class="ans">
-            <b>원장님께 말씀드리세요.</b> 원장님이 그 줄의 <b>발송 예약</b>을 켜시면 월·목을 기다리지 않고 <b>5분 안에</b> 나갑니다. 선생님이 직접 켜지는 마세요.
+            <b>원장님께 말씀드리세요.</b> 원장님이 그 줄의 <b>발송 예약</b>을 켜시면 금요일을 기다리지 않고 <b>5분 안에</b> 나갑니다. 선생님이 직접 켜지는 마세요.
           </div></details>
           <details><summary>잘못 만들었어요. 지워도 되나요?</summary><div class="ans">
             <b>발송완료가 아니라면</b> 지우셔도 됩니다. 이미 <b>발송완료</b>인 줄은 <b>지우지 마세요</b> — 학부모님께 실제로 청구가 나간 기록이고, 입금 확인을 여기에 적어야 합니다. 잘못 나갔으면 원장님께 알려 주세요.

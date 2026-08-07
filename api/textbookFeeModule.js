@@ -2,10 +2,18 @@
  * 교재비 관리 — 신청 → 승인 → 알림톡 발송까지.
  * 설계 문서: docs/교재비관리-설계.md
  *
- * 흐름 (5분 크론 한 개가 전부 처리한다)
+ * 주간 흐름 (2026-08-07 확정)
+ *   월~목 밤 10시  선생이 노션에 신청 (진행상태=승인대기)
+ *   금요일         원장이 모아서 승인
+ *   금요일 21:00   학부모께 일괄 알림톡
+ *   월요일 10:00   조교에게 장보기 목록
+ *   월·화          조교가 서점에서 사 와 배부하고 구매완료 체크
+ *
+ * 5분 크론이 하는 일
+ *   0) 상태와 안 맞는 알림함 플래그 정리 (없으면 재신청이 조용히 묻힌다)
  *   1) 진행상태=승인대기 & 원장알림함=false  → 원장 DM(승인/반려 버튼) → 원장알림함=true
- *   2) 진행상태=승인됨|반려 & 교사알림함=false → 담당쌤 DM            → 교사알림함=true
- *   3) 진행상태=승인됨 & 발송예약=true       → 발송중 선점 → 검증 → 알림톡 → 발송완료
+ *   2) 진행상태=승인됨|반려 & 교사알림함=false → 담당쌤 DM(반려면 사유 포함) → 교사알림함=true
+ *   3) 진행상태=승인됨 & 발송예약=true       → 즉시 발송 (금요일을 못 기다리는 급한 건만)
  *   4) 발송중인데 30분 넘게 멈춘 행          → 원장에게 알림 (조용히 안 나가는 게 제일 나쁘다)
  *
  * 중복 발송 방지가 이 모듈에서 제일 중요하다. 학부모가 입금 요청을 두 번 받으면 안 된다.
@@ -260,7 +268,7 @@ export function initializeTextbookFeeRoutes({
     // ── 발송 한 건 ─────────────────────────────────────────────────
     /**
      * 🔴 중복 발송 방지가 여기 전부 걸려 있다. 학부모가 같은 입금 요청을 두 번 받으면 안 된다.
-     * 5분 크론(즉시 발송)과 월·목 배치가 같은 시각에 겹칠 수 있어서 세 겹으로 막는다.
+     * 5분 크론(즉시 발송)과 금요일 배치가 같은 시각에 겹칠 수 있어서 세 겹으로 막는다.
      *   1) 같은 프로세스 안에서 같은 행을 동시에 집지 않도록 잠금
      *   2) 보내기 직전에 노션을 다시 읽어 아직 '승인됨' 인지 확인 (다른 크론이 이미 가져갔을 수 있다)
      *   3) '발송중' 으로 먼저 PATCH 해서 선점
@@ -310,7 +318,7 @@ export function initializeTextbookFeeRoutes({
         }
     }
 
-    // ── 월·목 묶음 발송 ────────────────────────────────────────────
+    // ── 금요일 묶음 발송 ────────────────────────────────────────────
     /**
      * 원장이 승인해 둔 것을 모아서 한 번에 보낸다. 행마다 발송 예약을 켜는 수고를 없앤다.
      * 알림톡 자체는 학부모별로 각각 나간다 — 묶는 것은 발송 작업이지 메시지가 아니다.
@@ -493,7 +501,7 @@ export function initializeTextbookFeeRoutes({
             } catch (e) { r.실패.push(`교사알림/${row.id}: ${e.message}`); }
         }
 
-        // 3) 승인됨 + 발송예약 → 즉시 발송 (월·목 배치를 못 기다리는 급한 건)
+        // 3) 승인됨 + 발송예약 → 즉시 발송 (금요일 배치를 못 기다리는 급한 건)
         for (const row of await queryFee({
             and: [{ property: '진행상태', select: { equals: '승인됨' } }, { property: '발송 예약', checkbox: { equals: true } }],
         })) {
@@ -591,7 +599,7 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
-    // 월·목을 못 기다릴 때 묶음 발송을 손으로 돌린다
+    // 금요일을 못 기다릴 때 묶음 발송을 손으로 돌린다
     app.post('/api/textbook/send-batch', requireAuth, async (req, res) => {
         try { res.json({ success: true, ...(await sendBatch()) }); }
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
@@ -623,17 +631,19 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('교재비 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    // 월·목 오후 2시 묶음 발송. 은행 업무시간 안이고, 데일리 리포트(10:20)·숙제 알림(11:00)과 안 겹친다.
-    cron.schedule('0 14 * * 1,4', async () => {
+    // 금요일 밤 9시 묶음 발송.
+    // 선생이 월~목 밤 10시까지 신청 → 원장이 금요일에 승인 → 금요일 밤에 학부모께 일괄 →
+    // 월·화에 조교가 사 와서 배부. 주 1회로 줄이니 각자 할 일이 요일로 딱 갈린다.
+    cron.schedule('0 21 * * 5', async () => {
         try {
             const r = await sendBatch();
             console.log(`📚 교재비 묶음 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
         } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    // 화·금 오전 10시 장보기 목록. 학부모 발송(월·목 14시) **다음 날 아침**이다.
-    // 하루를 두면 그사이 입금이 들어와서, 조교가 입금 상태까지 보고 사러 갈 수 있다.
-    cron.schedule('0 10 * * 2,5', async () => {
+    // 월요일 오전 10시 장보기 목록. 금요일 밤 발송 뒤 주말이 지나 입금이 들어온 상태다.
+    // 조교는 월·화에 서점에서 사 오므로 월요일 아침에 목록이 손에 있어야 한다.
+    cron.schedule('0 10 * * 1', async () => {
         if (!assistantConv) return;
         try {
             const list = await shoppingList();
@@ -642,5 +652,5 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('장보기 목록 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 월·목 14시 발송 + 화·금 10시 장보기)');
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 금 21시 발송 + 월 10시 장보기)');
 }
