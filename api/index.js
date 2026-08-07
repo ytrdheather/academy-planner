@@ -15,6 +15,7 @@ import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
 import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
 import { initializeAdmissionRoutes } from './admissionModule.js';
+import { makeTeacherDm } from './teacherDm.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -317,6 +318,18 @@ const COUNSEL_DB_ID = process.env.COUNSEL_DB_ID || '3b109320-bce2-8197-a62b-e232
 const KAKAOWORK_APP_KEY = process.env.KAKAOWORK_APP_KEY || '';
 // 봇이 만든 공개 채널(channel_type: public). 사람이 UI 에서 만든 채널에는 봇이 못 들어간다.
 const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004426035560321';
+// 원장 1:1 DM. 담임에게 못 닿은 알림이 여기로 모인다.
+const KAKAOWORK_APPROVAL_CONV = process.env.KAKAOWORK_APPROVAL_CONV || '';
+
+// 담당쌤 개인 DM. 공용 채널에 뿌리면 각자 훑어야 하고 결국 아무도 안 본다.
+const teacherDm = makeTeacherDm({
+    fetchNotion,
+    teacherDbId: process.env.TEACHER_DB_ID || '27a09320-bce2-80ca-a2b2-fe0f69e52506',
+    appKey: KAKAOWORK_APP_KEY,
+});
+
+// 학부모가 "언제쯤 연락 오나" 를 알 수 있게 안내에 넣는다. 결석 알림톡 템플릿과 같은 시간대다.
+const CALL_WINDOW = '월·수·금은 오후 1~3시, 화·목은 밤 9시 30분~10시 30분';
 
 /** 카카오워크 방으로 알림을 보낸다. 키가 없으면 조용히 건너뛴다(로그는 남긴다). */
 async function sendKakaoWork(conversationId, text) {
@@ -471,13 +484,34 @@ app.post('/api/counsel', async (req, res) => {
         steps.push(`카카오워크실패:${e.message}`);
     }
 
+    // 2-b) 담임 개인 DM. 공용 채널은 모두가 훑어야 해서 자기 건을 놓치기 쉽다.
+    try {
+        const body = [
+            `학생: ${name}`,
+            `밤 10시 이후 통화: ${lateText}`,
+            `연락처: ${phone || '(없음)'}`,
+            '',
+            `문의: ${memo}`,
+        ].join('\n');
+        const sent = await teacherDm(match.teacher, '재원생 상담 신청', body, pageUrl || undefined);
+        steps.push(sent ? '담임DM:OK' : `담임DM:미연결(${match.teacher || '담임없음'})`);
+        // 못 보낸 것을 조용히 넘기면 담임은 신청이 온 줄도 모른다. 공용 채널에 남긴다.
+        if (!sent && match.teacher && match.teacher !== '미지정') {
+            await sendKakaoWork(KAKAOWORK_COUNSEL_CONV,
+                `⚠️ ${match.teacher} 님께 개인 알림을 못 보냈습니다 (카카오워크 ID 미연결). ${name} 학생 건을 직접 챙겨 주세요.`);
+        }
+    } catch (e) {
+        steps.push(`담임DM실패:${e.message}`);
+    }
+
     // 3) 학부모 접수 확인 문자
     try {
         if (phone) {
             const sent = await sendSms(phone,
                 '[리디튜드] 상담 신청이 접수되었습니다.\n'
                 + `학생: ${name}\n`
-                + '수업이 끝난 뒤 담당 선생님이 확인 후 카톡으로 답장드립니다.'
+                + '수업이 끝난 뒤 담당 선생님이 확인 후 카톡으로 답장드립니다.\n'
+                + `통화가 필요한 경우 ${CALL_WINDOW}에 연락드립니다.`
                 + (lateOk ? '\n밤 10시 이후 통화 가능으로 접수되었습니다.' : ''),
                 '상담 신청');
             // 설정이 없어 건너뛴 것을 'OK'로 적으면 나중에 원인을 못 찾는다
@@ -504,6 +538,84 @@ app.post('/api/counsel', async (req, res) => {
     // 학부모에게는 항상 접수됐다고 답한다. 카카오워크나 노션 중 하나라도 갔으면 사람에게 도달한 것이다.
     res.json({ success: true });
 });
+
+// ------------------------------------------------------------------
+// [상담 방치 점검] 상태가 '접수'에서 안 움직이는 건을 매일 한 번 짚어 준다.
+//
+// 신청은 잘 들어오는데 통화하고 나서 상태를 바꾸는 사람이 없어 쌓이기만 했다.
+// 5분마다 조르면 도배가 되므로 하루 한 번, 담임별로 묶어서 개인 DM 으로 보낸다.
+// 담임이 연결 안 됐거나 미지정인 건은 원장에게 모아 보낸다 — 아무도 안 보는 것이 최악이다.
+// ------------------------------------------------------------------
+const COUNSEL_STALE_HOURS = 24;
+
+async function remindStaleCounsel() {
+    if (!COUNSEL_DB_ID) return { 담임: 0, 원장: 0, 건수: 0 };
+
+    const cutoff = new Date(Date.now() - COUNSEL_STALE_HOURS * 3600 * 1000).toISOString();
+    const data = await fetchNotion(`https://api.notion.com/v1/databases/${COUNSEL_DB_ID}/query`, {
+        method: 'POST',
+        body: JSON.stringify({
+            filter: {
+                and: [
+                    { property: '상태', select: { equals: '접수' } },
+                    { timestamp: 'created_time', created_time: { before: cutoff } },
+                ],
+            },
+            page_size: 100,
+        }),
+    });
+
+    const rows = (data.results || []).map(p => ({
+        url: p.url,
+        이름: noticePlainText(p.properties['학생명']),
+        담임: p.properties['담임']?.select?.name || '미지정',
+        문의: noticePlainText(p.properties['문의 내용']),
+        접수: (p.created_time || '').slice(0, 10),
+    }));
+    if (!rows.length) return { 담임: 0, 원장: 0, 건수: 0 };
+
+    const 묶음 = new Map();
+    for (const r of rows) {
+        if (!묶음.has(r.담임)) 묶음.set(r.담임, []);
+        묶음.get(r.담임).push(r);
+    }
+
+    let 담임 = 0;
+    const 미전달 = [];
+    for (const [teacher, list] of 묶음) {
+        const body = list.map(r => `· ${r.이름} (${r.접수} 접수)\n  ${r.문의.slice(0, 60)}`).join('\n\n')
+            + '\n\n통화·답장이 끝났으면 노션에서 상태를 바꿔 주세요.';
+        let sent = false;
+        try {
+            sent = await teacherDm(teacher, `아직 처리 안 된 상담 ${list.length}건`, body, list[0].url);
+        } catch (e) { console.error('상담 리마인드 DM 실패:', teacher, e.message); }
+        if (sent) 담임++;
+        else 미전달.push(`${teacher}: ${list.map(r => r.이름).join(', ')}`);
+    }
+
+    let 원장 = 0;
+    if (미전달.length && KAKAOWORK_APPROVAL_CONV) {
+        try {
+            await sendKakaoWork(KAKAOWORK_APPROVAL_CONV,
+                `[처리 안 된 상담 ${rows.length}건]\n담임에게 못 보낸 건입니다.\n\n${미전달.join('\n')}`);
+            원장 = 미전달.length;
+        } catch (e) { console.error('상담 리마인드 원장 알림 실패:', e.message); }
+    }
+    return { 담임, 원장, 건수: rows.length };
+}
+
+app.post('/api/counsel/remind', requireAuth, async (req, res) => {
+    try { res.json({ success: true, ...(await remindStaleCounsel()) }); }
+    catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// 매일 오후 4시. 수업 시작 전이라 선생님이 확인하고 그날 처리할 수 있다.
+cron.schedule('0 16 * * *', async () => {
+    try {
+        const r = await remindStaleCounsel();
+        if (r.건수) console.log(`📞 상담 방치 알림: ${r.건수}건 (담임 ${r.담임}명 / 원장 ${r.원장}건)`);
+    } catch (e) { console.error('상담 방치 점검 Cron Error', e); }
+}, { timezone: 'Asia/Seoul' });
 
 // ------------------------------------------------------------------
 // [결석·보강 신청] 학부모가 카카오톡 채널에서 여는 공개 폼.
@@ -851,7 +963,7 @@ try {
             TEXTBOOK_FEE_DB_ID: process.env.TEXTBOOK_FEE_DB_ID,
             TEACHER_DB_ID: process.env.TEACHER_DB_ID,
         },
-        approvalConv: process.env.KAKAOWORK_APPROVAL_CONV,
+        approvalConv: KAKAOWORK_APPROVAL_CONV,
         // 조교 장보기 목록을 밀어넣을 채널. 없으면 목록 페이지만 쓰고 발송은 건너뛴다.
         assistantConv: process.env.KAKAOWORK_ASSISTANT_CONV,
     });
