@@ -283,6 +283,8 @@ async function loadNotices() {
             image: (p['이미지']?.files || []).map(f => f?.file?.url || f?.external?.url || '').filter(Boolean)[0] || '',
             start: p['날짜']?.date?.start || '',
             end: p['날짜']?.date?.end || '',
+            // 보강일에만 있다. 학부모 화면에 "8월 22일 (토) · 오전 10시" 로 보여 준다.
+            time: noticePlainText(p['보강시간']),
             pinned: !!p['고정']?.checkbox,
             // '게시' 칸 자체가 없으면 숨기지 않는다. 있으면 체크된 것만 내보낸다.
             published: p['게시'] ? !!p['게시'].checkbox : true,
@@ -894,9 +896,10 @@ app.post('/api/calendar', requireAuth, async (req, res) => {
                         '유형': { select: { name: m.type } },
                         '날짜': { date: { start: m.date } },
                         '보강시간': { rich_text: m.time ? [{ text: { content: m.time } }] : [] },
-                        // 휴강·이벤트는 학부모 안내 페이지에도 바로 보이게 한다.
-                        // 보강일은 달력 이미지로 안내하므로 목록에는 띄우지 않는다.
-                        '게시': { checkbox: m.type !== '보강일' },
+                        // 세 유형 모두 학부모 안내 페이지에 보인다.
+                        // 보강일도 2026-08-07부터 목록에 띄운다 — 달력의 점만으로는
+                        // 몇 시에 오는지 알 수 없어서 결국 학원에 물어보게 된다.
+                        '게시': { checkbox: true },
                     },
                 }),
             });

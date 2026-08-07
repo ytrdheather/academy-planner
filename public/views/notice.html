@@ -89,6 +89,9 @@
   .tag.news{background:var(--warn-wash); color:var(--warn)}
   .tag.off{background:var(--warn-wash); color:var(--warn); margin-right:6px}
   .tag.ev{background:var(--accent-wash); color:var(--accent-ink); margin-right:6px}
+  /* 보강은 달력 점 색(#ef9ec4)과 맞춰 학부모가 위아래를 같은 것으로 읽게 한다 */
+  .tag.mk{background:#fce4ee; color:#b03a68; margin-right:6px}
+  @media (prefers-color-scheme:dark){.tag.mk{background:rgba(239,158,196,.16); color:#f2a8c8}}
   .post .t{font-weight:700; font-size:15.5px; letter-spacing:-.2px}
   .post .date{color:var(--ink-faint); font-size:12.5px; margin-left:auto; flex:0 0 auto}
   .post .b{color:var(--ink-soft); font-size:14.5px; white-space:pre-wrap; margin-top:5px}
@@ -268,21 +271,29 @@ function renderSchedule(){
   }
 
   // 그 달에 적힌 설명(휴강 사유 등)과 제목이 따로 있는 일정만 아래에 덧붙인다.
+  // 보강일은 시간만 적혀 있어도 띄운다 — 언제 오는지가 학부모에게 제일 중요한 정보다.
   const list = NOTICE_ITEMS
     .filter(it => it.start && it.start.slice(0,7) === prefix)
-    .filter(it => (it.type === '학사일정' && !it.image) || ((it.type === '휴강' || it.type === '이벤트') && it.body))
+    .filter(it => (it.type === '학사일정' && !it.image)
+      || ((it.type === '휴강' || it.type === '이벤트') && it.body)
+      || (it.type === '보강일' && (it.time || it.body)))
     .sort((a,b) => a.start.localeCompare(b.start));
 
   if(list.length){
     html += '<div class="card">' + list.map(it => {
       const isToday = it.start <= today && (it.end || it.start) >= today;
       const badge = it.type === '휴강' ? '<span class="tag off">휴강</span>'
-        : it.type === '이벤트' ? '<span class="tag ev">행사</span>' : '';
+        : it.type === '이벤트' ? '<span class="tag ev">행사</span>'
+        : it.type === '보강일' ? '<span class="tag mk">보강</span>' : '';
+      // 달력에서 찍은 표시는 제목이 유형 이름 그대로("휴강")라 다시 보여줄 필요가 없다
       const label = (it.title === it.type) ? '' : esc(it.title);
+      const memo = it.type === '보강일'
+        ? [it.time, it.body].filter(Boolean).join(' · ')
+        : it.body;
       return '<div class="sch'+(isToday?' today':'')+'">'
         + '<div class="when">'+esc(fmtRange(it.start, it.end))+'</div>'
         + '<div><div class="what">'+badge+label+'</div>'
-        + (it.body ? '<div class="memo">'+esc(it.body)+'</div>' : '')
+        + (memo ? '<div class="memo">'+esc(memo)+'</div>' : '')
         + '</div></div>';
     }).join('') + '</div>';
   }
