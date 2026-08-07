@@ -377,16 +377,38 @@ document.getElementById('calNext').onclick = () => {
   renderSchedule();
 };
 
-fetch('/api/notice')
-  .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
-  .then(render)
-  .catch(err => {
-    console.error(err);
-    // 공지를 못 불러와도 신청 링크는 보여야 한다.
-    render({ items: [], forms: [] });
-    document.getElementById('loading').hidden = false;
-    document.getElementById('loading').textContent = '잠시 후 다시 열어 주세요.';
-  });
+// 학원 내부 안내라 로그인한 사람만 본다. 카톡 채널 메뉴에 주소가 걸려 있어서
+// 주소만 알면 누구나 보던 것을 막는다.
+// 학부모·학생은 리디플랜 계정(authToken), 선생님은 teacher_auth_token 을 쓴다.
+const token = localStorage.getItem('authToken') || localStorage.getItem('teacher_auth_token');
+
+function toLogin() {
+  location.replace('/?next=' + encodeURIComponent('/notice'));
+}
+
+if (!token) {
+  toLogin();
+} else {
+  fetch('/api/notice', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => {
+      // 토큰이 만료됐으면 붙잡고 있어 봐야 계속 막힌다. 지우고 다시 로그인시킨다.
+      if (r.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('teacher_auth_token');
+        toLogin();
+        return null;
+      }
+      return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status));
+    })
+    .then(d => { if (d) render(d); })
+    .catch(err => {
+      console.error(err);
+      // 공지를 못 불러와도 신청 링크는 보여야 한다.
+      render({ items: [], forms: [] });
+      document.getElementById('loading').hidden = false;
+      document.getElementById('loading').textContent = '잠시 후 다시 열어 주세요.';
+    });
+}
 </script>
 </body>
 </html>

@@ -62,8 +62,13 @@
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
         }
 
-        // 이미 로그인된 상태(앱 아이콘으로 재실행)면 로그인 화면 건너뛰고 바로 플래너로
-        if (localStorage.getItem('authToken')) window.location.replace('/planner');
+        // 로그인 뒤 돌아갈 곳. 공지사항처럼 다른 페이지에서 밀려온 경우 ?next=/notice 가 붙는다.
+        // 바깥 주소로 튕기지 않게 '/' 로 시작하는 우리 경로만 받는다.
+        const nextParam = new URLSearchParams(location.search).get('next');
+        const NEXT = (nextParam && /^\/[^/]/.test(nextParam)) ? nextParam : '/planner';
+
+        // 이미 로그인된 상태(앱 아이콘으로 재실행)면 로그인 화면 건너뛰고 바로 이동
+        if (localStorage.getItem('authToken')) window.location.replace(NEXT);
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             console.log("로그인 폼 제출 이벤트가 감지되었습니다!");
@@ -90,9 +95,9 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    console.log("로그인 성공! 플래너 페이지로 이동합니다.");
+                    console.log("로그인 성공! 이동합니다:", NEXT);
                     localStorage.setItem('authToken', result.token);
-                    window.location.href = '/planner';
+                    window.location.href = NEXT;
                 } else {
                     console.log("로그인 실패. 서버가 보낸 메시지:", result.message);
                     errorDiv.textContent = result.message;

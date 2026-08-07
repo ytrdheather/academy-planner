@@ -297,7 +297,10 @@ async function loadNotices() {
 
 app.get('/notice', (req, res) => res.sendFile(path.join(publicPath, 'views', 'notice.html')));
 
-app.get('/api/notice', async (req, res) => {
+// 🔴 로그인 필수. 학원 내부 안내(휴강·보강 시간·공지)라 주소만 알면 보이면 안 된다.
+// 카톡 채널 커스텀 메뉴에 주소가 걸려 있어서 더 그렇다.
+// 학부모·학생은 리디플랜 계정, 선생님은 선생님 계정으로 본다(둘 다 requireAuth 를 통과한다).
+app.get('/api/notice', requireAuth, async (req, res) => {
     try {
         res.json({ items: await loadNotices(), forms: NOTICE_FORMS });
     } catch (e) {
