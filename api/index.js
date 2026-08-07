@@ -249,7 +249,8 @@ let noticeCache = { data: null, lastFetch: 0 };
 const NOTICE_FORMS = [
     // 자체 폼. 구글폼을 쓰려면 FORM_ABSENCE_URL 을 채우면 그쪽이 우선한다(되돌릴 여지를 남겨 둔다).
     { label: '결석 · 보강 신청', desc: '결석 알림과 보강 희망 시간 접수', url: process.env.FORM_ABSENCE_URL || '/absence' },
-    { label: '재원생 상담 신청', desc: '담임 선생님 전화 상담 예약', url: process.env.FORM_COUNSEL_URL || '' },
+    // 전화 예약이 아니다. 문의를 남기면 담임이 확인 후 카톡으로 답장하고, 필요할 때만 통화한다.
+    { label: '재원생 상담 신청', desc: '담임 선생님께 상담 내용 접수', url: process.env.FORM_COUNSEL_URL || '/counsel' },
     { label: '입학 상담 신청', desc: '신규 등록 문의', url: process.env.FORM_ADMISSION_URL || '' },
 ];
 
