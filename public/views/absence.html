@@ -106,8 +106,14 @@
     </div>
 
     <div class="field">
-      <label for="date">결석일 <span class="req">필수</span></label>
+      <label for="date">결석 시작일 <span class="req">필수</span></label>
       <input type="date" id="date" required>
+    </div>
+
+    <div class="field">
+      <label for="endDate">결석 종료일</label>
+      <p class="help">하루만 결석하면 비워 두세요. 며칠 이어서 빠지시면 마지막 날을 골라 주세요.</p>
+      <input type="date" id="endDate">
     </div>
 
     <div class="field">
@@ -202,12 +208,14 @@ $('form').addEventListener('submit', async (e) => {
 
   const name = $('name').value.trim();
   const date = $('date').value;
+  const endDate = $('endDate').value;
   const memo = $('memo').value.trim();
   const phone = $('phone').value.trim();
   const makeups = [...$('makeups').querySelectorAll('input:checked')].map(i => i.value);
 
   if(!name) return showErr('학생 이름을 적어 주세요.');
-  if(!date) return showErr('결석일을 골라 주세요.');
+  if(!date) return showErr('결석 시작일을 골라 주세요.');
+  if(endDate && endDate < date) return showErr('종료일이 시작일보다 빠릅니다. 다시 골라 주세요.');
   if(!reason) return showErr('결석 사유를 골라 주세요.');
 
   $('submit').disabled = true;
@@ -217,7 +225,7 @@ $('form').addEventListener('submit', async (e) => {
     const r = await fetch('/api/absence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, date, reason, memo, phone, makeups })
+      body: JSON.stringify({ name, date, endDate, reason, memo, phone, makeups })
     });
     const d = await r.json().catch(() => ({}));
     if(!r.ok) throw new Error(d.error || '잠시 후 다시 시도해 주세요.');

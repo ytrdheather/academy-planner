@@ -686,6 +686,8 @@ app.get('/api/absence/options', async (req, res) => {
 app.post('/api/absence', async (req, res) => {
     const name = String(req.body?.name || '').trim();
     const date = String(req.body?.date || '').trim();
+    // 며칠 이어서 빠지는 경우. 노션 `결석일`이 날짜 범위를 담는 타입이라 속성을 더 만들지 않았다.
+    const endDate = String(req.body?.endDate || '').trim();
     const reason = String(req.body?.reason || '').trim();
     const memo = String(req.body?.memo || '').trim();
     const typedPhone = String(req.body?.phone || '').replace(/[^0-9]/g, '');
@@ -694,6 +696,8 @@ app.post('/api/absence', async (req, res) => {
 
     if (!name || !date) return res.status(400).json({ error: '학생 이름과 결석일을 적어 주세요' });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: '결석일 형식이 올바르지 않습니다' });
+    if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return res.status(400).json({ error: '종료일 형식이 올바르지 않습니다' });
+    if (endDate && endDate < date) return res.status(400).json({ error: '종료일이 시작일보다 빠릅니다' });
     if (!ABSENCE_REASONS.includes(reason)) return res.status(400).json({ error: '결석 사유를 골라 주세요' });
     if (name.length > 20 || memo.length > 2000) return res.status(400).json({ error: '입력이 너무 깁니다' });
 
@@ -707,6 +711,8 @@ app.post('/api/absence', async (req, res) => {
     }
 
     const phone = typedPhone || match.phone;
+    // 하루면 그냥 날짜, 며칠이면 "8월 7일 ~ 8월 9일" 처럼 보여 준다.
+    const 결석표기 = endDate && endDate !== date ? `${date} ~ ${endDate}` : date;
 
     // 1) 노션 기록
     let pageUrl = '';
@@ -719,7 +725,7 @@ app.post('/api/absence', async (req, res) => {
                     '학생명': { title: [{ text: { content: name } }] },
                     '학생ID': { rich_text: match.studentId ? [{ text: { content: match.studentId } }] : [] },
                     '담임': { select: { name: match.teacher || '미지정' } },
-                    '결석일': { date: { start: date } },
+                    '결석일': { date: { start: date, ...(endDate && endDate !== date ? { end: endDate } : {}) } },
                     '사유': { select: { name: reason } },
                     '요청사항': { rich_text: memo ? [{ text: { content: memo } }] : [] },
                     // 노션은 없는 multi_select 옵션을 알아서 만들어 준다. 날짜가 바뀌어도 그대로 쌓인다.
@@ -741,7 +747,7 @@ app.post('/api/absence', async (req, res) => {
         const lines = [
             '[결석 · 보강 신청]',
             `학생: ${name} (담임: ${match.teacher || '미지정'})`,
-            `결석일: ${date}`,
+            `결석일: ${결석표기}`,
             `사유: ${reason}`,
             `보강 희망: ${makeups.length ? makeups.join(' / ') : '(선택 없음)'}`,
         ];
@@ -764,7 +770,7 @@ app.post('/api/absence', async (req, res) => {
         if (phone) {
             const sent = await sendSms(phone,
                 '[리디튜드] 결석 신청이 접수되었습니다.\n'
-                + `학생: ${name}\n결석일: ${date}\n`
+                + `학생: ${name}\n결석일: ${결석표기}\n`
                 + '담당 선생님이 확인 후 보강 일정을 안내드립니다.',
                 '결석 신청');
             steps.push(sent ? '문자:OK' : '문자:미설정');
@@ -780,11 +786,11 @@ app.post('/api/absence', async (req, res) => {
         console.error('결석 신청 처리 실패:', name, steps.join(' | '));
         try {
             await sendSms(process.env.ADMIN_PHONE || '',
-                `[자동화 오류] ${name} 결석 신청 처리 실패\n${failed.join('\n')}\n결석일: ${date} / 사유: ${reason}`,
+                `[자동화 오류] ${name} 결석 신청 처리 실패\n${failed.join('\n')}\n결석일: ${결석표기} / 사유: ${reason}`,
                 '자동화 오류');
         } catch (_) { /* 오류 알림까지 실패하면 로그만 남는다 */ }
     }
-    console.log(`📆 결석 신청: ${name} ${date} — ${steps.join(' | ')}`);
+    console.log(`📆 결석 신청: ${name} ${결석표기} — ${steps.join(' | ')}`);
 
     res.json({ success: true });
 });
