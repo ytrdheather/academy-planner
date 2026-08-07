@@ -460,7 +460,7 @@ app.post('/api/counsel', async (req, res) => {
         if (!phone) lines.push('', '⚠️ 연락처가 없어 접수 문자를 보내지 못했습니다. 직접 연락이 필요합니다.');
 
         if (pageUrl) {
-            lines.push('', '→ 통화 후 노션에서 상태를 바꿔주세요', pageUrl);
+            lines.push('', '→ 답장·통화 후 노션에서 상태를 바꿔주세요', pageUrl);
         } else {
             lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.',
                 `연락처: ${phone || '없음'}`, `문의: ${memo}`);
@@ -477,7 +477,7 @@ app.post('/api/counsel', async (req, res) => {
             const sent = await sendSms(phone,
                 '[리디튜드] 상담 신청이 접수되었습니다.\n'
                 + `학생: ${name}\n`
-                + '수업이 끝난 뒤 담당 선생님이 전화드립니다.'
+                + '수업이 끝난 뒤 담당 선생님이 확인 후 카톡으로 답장드립니다.'
                 + (lateOk ? '\n밤 10시 이후 통화 가능으로 접수되었습니다.' : ''),
                 '상담 신청');
             // 설정이 없어 건너뛴 것을 'OK'로 적으면 나중에 원인을 못 찾는다
