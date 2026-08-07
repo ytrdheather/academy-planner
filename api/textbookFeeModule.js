@@ -409,7 +409,37 @@ export function initializeTextbookFeeRoutes({
 
     // ── 크론 한 바퀴 ───────────────────────────────────────────────
     async function tick() {
-        const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 실패: [] };
+        const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 정리: 0, 실패: [] };
+
+        // 0) 알림함 플래그 정리 — 이게 없으면 재신청이 조용히 묻힌다.
+        //
+        // 알림함은 "지금 상태에 대해 알렸는가"를 뜻한다. 그런데 상태가 바뀌어도 켜진 채로 남아서,
+        // 승인된 건에 교재를 더 넣고 다시 '승인대기'로 돌리면 원장에게 알림이 가지 않았다.
+        // 상태가 바뀐 행의 플래그를 먼저 내려서, 사람이 노션에서 손으로 상태를 바꿔도 자가 복구되게 한다.
+        for (const [플래그, filter] of [
+            // 승인대기가 아닌데 원장알림함이 켜져 있다 → 그 알림은 지난 상태의 것이다
+            ['원장알림함', {
+                and: [
+                    { property: '원장알림함', checkbox: { equals: true } },
+                    { property: '진행상태', select: { does_not_equal: '승인대기' } },
+                ],
+            }],
+            // 승인됨·반려가 아닌데 교사알림함이 켜져 있다 → 마찬가지
+            ['교사알림함', {
+                and: [
+                    { property: '교사알림함', checkbox: { equals: true } },
+                    { property: '진행상태', select: { does_not_equal: '승인됨' } },
+                    { property: '진행상태', select: { does_not_equal: '반려' } },
+                ],
+            }],
+        ]) {
+            for (const row of await queryFee(filter)) {
+                try {
+                    await patch(row.id, { [플래그]: { checkbox: false } });
+                    r.정리++;
+                } catch (e) { r.실패.push(`플래그정리/${row.id}: ${e.message}`); }
+            }
+        }
 
         // 1) 승인대기 → 원장에게
         for (const row of await queryFee({
@@ -587,7 +617,7 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         try {
             const r = await tick();
             if (r.원장알림 || r.교사알림 || r.발송 || r.보류 || r.실패.length) {
-                console.log(`📚 교재비: 원장알림 ${r.원장알림} / 교사알림 ${r.교사알림} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패.length}`);
+                console.log(`📚 교재비: 원장알림 ${r.원장알림} / 교사알림 ${r.교사알림} / 발송 ${r.발송} / 보류 ${r.보류} / 플래그정리 ${r.정리} / 실패 ${r.실패.length}`);
                 if (r.실패.length) console.error('교재비 실패 목록:', r.실패);
             }
         } catch (e) { console.error('교재비 Cron Error', e); }
