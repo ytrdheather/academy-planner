@@ -110,6 +110,10 @@
   .empty{color:var(--ink-faint); font-size:14px; text-align:center; padding:16px 0}
   .foot{margin-top:30px; text-align:center; color:var(--ink-faint); font-size:12.5px; line-height:1.7}
   .foot a{color:var(--ink-faint)}
+  /* 학원 이름을 글자 대신 로고로. 로그인 화면과 같은 크기(124px)로 맞춘다. */
+  .foot img{width:124px; height:auto; display:block; margin:0 auto 10px}
+  /* 어두운 화면에서는 로고가 배경에 묻혀서 살짝 띄운다 */
+  @media (prefers-color-scheme:dark){.foot img{filter:brightness(1.9) contrast(.95)}}
 </style>
 </head>
 <body>
@@ -130,14 +134,14 @@
     <div id="schList"></div>
   </section>
 
-  <section id="forms">
-    <h2><span class="ico">📝</span>신청하기</h2>
-    <div id="formList"></div>
-  </section>
-
   <section id="news" hidden>
     <h2><span class="ico">📢</span>공지 · 소식</h2>
     <div id="newsList"></div>
+  </section>
+
+  <section id="forms">
+    <h2><span class="ico">📝</span>신청하기</h2>
+    <div id="formList"></div>
   </section>
 
   <section id="faq" hidden>
@@ -148,7 +152,7 @@
   <div id="loading" class="empty">불러오는 중…</div>
 
   <p class="foot">
-    리디튜드 영어학원<br>
+    <img src="/assets/logo.png" alt="리디튜드 영어학원">
     더 궁금한 점은 카카오톡 채널로 문의해 주세요.
   </p>
 
