@@ -16,6 +16,7 @@ import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
 import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
 import { initializeAdmissionRoutes } from './admissionModule.js';
 import { makeTeacherDm } from './teacherDm.js';
+import { initializeKakaoSkill } from './kakaoSkill.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -1004,6 +1005,11 @@ try {
         alertConv: process.env.KAKAOWORK_ADMISSION_CONV || '1004431253274498',
     });
 } catch(e) { console.error('Admission Module Init Error', e); }
+
+// 카카오톡 채널 챗봇이 학부모 발화를 보내오는 자리
+try {
+    initializeKakaoSkill({ app, domainUrl: DOMAIN_URL, sendKakaoWork, ownerConv: KAKAOWORK_APPROVAL_CONV });
+} catch(e) { console.error('Kakao Skill Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;
