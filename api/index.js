@@ -248,7 +248,7 @@ let noticeCache = { data: null, lastFetch: 0 };
 // 폼 주소는 env로 둔다. 구글폼을 새로 만들거나 갈아끼울 때 재배포가 필요 없도록.
 const NOTICE_FORMS = [
     // 자체 폼. 구글폼을 쓰려면 FORM_ABSENCE_URL 을 채우면 그쪽이 우선한다(되돌릴 여지를 남겨 둔다).
-    { label: '결석 · 보강 신청', desc: '결석 알림과 보강 희망 시간 접수', url: process.env.FORM_ABSENCE_URL || '/absence' },
+    { label: '결석 · 지각 · 조퇴', desc: '미리 알려주시면 보강 일정을 잡아드립니다', url: process.env.FORM_ABSENCE_URL || '/absence' },
     // 전화 예약이 아니다. 문의를 남기면 담임이 확인 후 카톡으로 답장하고, 필요할 때만 통화한다.
     { label: '재원생 상담 신청', desc: '담임 선생님께 상담 내용 접수', url: process.env.FORM_COUNSEL_URL || '/counsel' },
     { label: '입학 상담 신청', desc: '신규 등록 문의', url: process.env.FORM_ADMISSION_URL || '' },
@@ -637,6 +637,8 @@ const ABSENCE_DB_ID = process.env.ABSENCE_DB_ID || '3b009320-bce2-8182-b306-ee8f
 // 결석보강 신청알림_BOT — 사람이 만든 채널이라 봇이 이미 들어가 있다.
 const KAKAOWORK_ABSENCE_CONV = process.env.KAKAOWORK_ABSENCE_CONV || '1004426035560320';
 const ABSENCE_REASONS = ['질병', '가족행사', '학교일정', '기타'];
+// 지각은 늦게라도 수업을 받으므로 보강 대상이 아니다. 결석·조퇴만 보강 희망을 받는다.
+const ABSENCE_KINDS = { '결석': { 보강: true }, '지각': { 보강: false }, '조퇴': { 보강: true } };
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 /** 날짜가 없는 고정 선택지. 특정 날짜와 무관해서 달력에서 오지 않는다. */
 const MAKEUP_ANYTIME = '평일 보강 (30분~1시간씩 나눠서)';
@@ -684,21 +686,27 @@ app.get('/api/absence/options', async (req, res) => {
 });
 
 app.post('/api/absence', async (req, res) => {
+    const kind = String(req.body?.kind || '결석').trim();
     const name = String(req.body?.name || '').trim();
     const date = String(req.body?.date || '').trim();
     // 며칠 이어서 빠지는 경우. 노션 `결석일`이 날짜 범위를 담는 타입이라 속성을 더 만들지 않았다.
     const endDate = String(req.body?.endDate || '').trim();
+    // 지각이면 예상 도착 시간, 조퇴면 나가는 시간. 자유 텍스트라 적으신 그대로 전달된다.
+    const time = String(req.body?.time || '').trim().slice(0, 40);
     const reason = String(req.body?.reason || '').trim();
     const memo = String(req.body?.memo || '').trim();
     const typedPhone = String(req.body?.phone || '').replace(/[^0-9]/g, '');
     const makeups = (Array.isArray(req.body?.makeups) ? req.body.makeups : [])
         .map(s => String(s).trim()).filter(Boolean).slice(0, 5);
 
-    if (!name || !date) return res.status(400).json({ error: '학생 이름과 결석일을 적어 주세요' });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: '결석일 형식이 올바르지 않습니다' });
+    if (!ABSENCE_KINDS[kind]) return res.status(400).json({ error: '결석·지각·조퇴 중에서 골라 주세요' });
+    if (!name || !date) return res.status(400).json({ error: `학생 이름과 ${kind}하는 날을 적어 주세요` });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: '날짜 형식이 올바르지 않습니다' });
     if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return res.status(400).json({ error: '종료일 형식이 올바르지 않습니다' });
     if (endDate && endDate < date) return res.status(400).json({ error: '종료일이 시작일보다 빠릅니다' });
-    if (!ABSENCE_REASONS.includes(reason)) return res.status(400).json({ error: '결석 사유를 골라 주세요' });
+    // 지각·조퇴는 몇 시인지가 선생님께 제일 필요한 정보다. 없으면 받아도 쓸모가 없다.
+    if (kind !== '결석' && !time) return res.status(400).json({ error: `${kind === '지각' ? '예상 도착 시간' : '나가는 시간'}을 적어 주세요` });
+    if (!ABSENCE_REASONS.includes(reason)) return res.status(400).json({ error: '사유를 골라 주세요' });
     if (name.length > 20 || memo.length > 2000) return res.status(400).json({ error: '입력이 너무 깁니다' });
 
     const steps = [];
@@ -712,7 +720,9 @@ app.post('/api/absence', async (req, res) => {
 
     const phone = typedPhone || match.phone;
     // 하루면 그냥 날짜, 며칠이면 "8월 7일 ~ 8월 9일" 처럼 보여 준다.
-    const 결석표기 = endDate && endDate !== date ? `${date} ~ ${endDate}` : date;
+    // 지각·조퇴는 날짜 뒤에 시간을 붙인다 — 그게 선생님이 제일 먼저 보는 값이다.
+    const 결석표기 = (endDate && endDate !== date ? `${date} ~ ${endDate}` : date) + (time ? ` ${time}` : '');
+    const 보강받음 = ABSENCE_KINDS[kind].보강;
 
     // 1) 노션 기록
     let pageUrl = '';
@@ -725,11 +735,13 @@ app.post('/api/absence', async (req, res) => {
                     '학생명': { title: [{ text: { content: name } }] },
                     '학생ID': { rich_text: match.studentId ? [{ text: { content: match.studentId } }] : [] },
                     '담임': { select: { name: match.teacher || '미지정' } },
+                    '유형': { select: { name: kind } },
                     '결석일': { date: { start: date, ...(endDate && endDate !== date ? { end: endDate } : {}) } },
+                    '시각': { rich_text: time ? [{ text: { content: time } }] : [] },
                     '사유': { select: { name: reason } },
                     '요청사항': { rich_text: memo ? [{ text: { content: memo } }] : [] },
                     // 노션은 없는 multi_select 옵션을 알아서 만들어 준다. 날짜가 바뀌어도 그대로 쌓인다.
-                    '보강 희망': { multi_select: makeups.map(n => ({ name: n })) },
+                    '보강 희망': { multi_select: (보강받음 ? makeups : []).map(n => ({ name: n })) },
                     '상태': { select: { name: '접수' } },
                     '학부모 연락처': { phone_number: phone || null },
                     '매칭상태': { select: { name: match.status } },
@@ -745,18 +757,18 @@ app.post('/api/absence', async (req, res) => {
     // 2) 카카오워크 알림. 담임 이름을 넣어야 공용 채널에서 각자 자기 학생을 찾는다.
     try {
         const lines = [
-            '[결석 · 보강 신청]',
+            `[${kind} 신청]`,
             `학생: ${name} (담임: ${match.teacher || '미지정'})`,
-            `결석일: ${결석표기}`,
+            `${kind === '결석' ? '결석일' : kind === '지각' ? '지각' : '조퇴'}: ${결석표기}`,
             `사유: ${reason}`,
-            `보강 희망: ${makeups.length ? makeups.join(' / ') : '(선택 없음)'}`,
         ];
+        if (보강받음) lines.push(`보강 희망: ${makeups.length ? makeups.join(' / ') : '(선택 없음)'}`);
         if (memo) lines.push(`요청사항: ${memo}`);
         if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
         if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
         if (!phone) lines.push('', '⚠️ 연락처가 없어 접수 문자를 보내지 못했습니다.');
 
-        if (pageUrl) lines.push('', '→ 보강 일정을 잡고 노션에서 상태를 바꿔주세요', pageUrl);
+        if (pageUrl) lines.push('', 보강받음 ? '→ 보강 일정을 잡고 노션에서 상태를 바꿔주세요' : '→ 확인 후 노션에서 상태를 바꿔주세요', pageUrl);
         else lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.', `연락처: ${phone || '없음'}`);
 
         await sendKakaoWork(KAKAOWORK_ABSENCE_CONV, lines.join('\n'));
@@ -769,10 +781,10 @@ app.post('/api/absence', async (req, res) => {
     try {
         if (phone) {
             const sent = await sendSms(phone,
-                '[리디튜드] 결석 신청이 접수되었습니다.\n'
-                + `학생: ${name}\n결석일: ${결석표기}\n`
-                + '담당 선생님이 확인 후 보강 일정을 안내드립니다.',
-                '결석 신청');
+                `[리디튜드] ${kind} 신청이 접수되었습니다.\n`
+                + `학생: ${name}\n${kind}: ${결석표기}\n`
+                + (보강받음 ? '담당 선생님이 확인 후 보강 일정을 안내드립니다.' : '담당 선생님께 전달되었습니다.'),
+                `${kind} 신청`);
             steps.push(sent ? '문자:OK' : '문자:미설정');
         } else {
             steps.push('문자:번호없음');
@@ -786,11 +798,11 @@ app.post('/api/absence', async (req, res) => {
         console.error('결석 신청 처리 실패:', name, steps.join(' | '));
         try {
             await sendSms(process.env.ADMIN_PHONE || '',
-                `[자동화 오류] ${name} 결석 신청 처리 실패\n${failed.join('\n')}\n결석일: ${결석표기} / 사유: ${reason}`,
+                `[자동화 오류] ${name} ${kind} 신청 처리 실패\n${failed.join('\n')}\n결석일: ${결석표기} / 사유: ${reason}`,
                 '자동화 오류');
         } catch (_) { /* 오류 알림까지 실패하면 로그만 남는다 */ }
     }
-    console.log(`📆 결석 신청: ${name} ${결석표기} — ${steps.join(' | ')}`);
+    console.log(`📆 ${kind} 신청: ${name} ${결석표기} — ${steps.join(' | ')}`);
 
     res.json({ success: true });
 });

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0d9488">
-<title>결석 · 보강 신청 · 리디튜드</title>
+<title>결석 · 지각 · 조퇴 신청 · 리디튜드</title>
 <style>
   :root{
     --bg:#f4f7f7; --surface:#ffffff; --surface-2:#eef3f3;
@@ -89,15 +89,24 @@
 <div class="wrap">
 
   <div class="top">
-    <h1>결석 · 보강 신청</h1>
+    <h1>결석 · 지각 · 조퇴 신청</h1>
     <p class="lede">리디튜드 영어학원</p>
   </div>
 
   <form id="form" class="card">
     <p class="notice">
-      결석을 미리 알려주시면 <strong>보강 일정을 잡아드립니다.</strong><br>
-      담당 선생님이 확인 후 연락드립니다.
+      미리 알려주시면 <strong>담당 선생님이 확인 후 준비합니다.</strong><br>
+      결석·조퇴는 보강 일정도 함께 잡아드립니다.
     </p>
+
+    <div class="field">
+      <label>어떤 건가요? <span class="req">필수</span></label>
+      <div class="choice" id="kind">
+        <button type="button" data-v="결석">결석</button>
+        <button type="button" data-v="지각">지각</button>
+        <button type="button" data-v="조퇴">조퇴</button>
+      </div>
+    </div>
 
     <div class="field">
       <label for="name">학생 이름 <span class="req">필수</span></label>
@@ -106,22 +115,31 @@
     </div>
 
     <div class="field">
-      <label for="date">결석 시작일 <span class="req">필수</span></label>
+      <label for="date" id="dateLabel">날짜 <span class="req">필수</span></label>
       <input type="date" id="date" required>
     </div>
 
-    <div class="field">
+    <!-- 결석일 때만. 며칠 이어서 빠지는 경우 -->
+    <div class="field" id="endField" hidden>
       <label for="endDate">결석 종료일</label>
       <p class="help">하루만 결석하면 비워 두세요. 며칠 이어서 빠지시면 마지막 날을 골라 주세요.</p>
       <input type="date" id="endDate">
     </div>
 
-    <div class="field">
-      <label>결석 사유 <span class="req">필수</span></label>
-      <div class="choice" id="reason"></div>
+    <!-- 지각·조퇴일 때만. 몇 시인지가 선생님께 제일 필요한 정보다 -->
+    <div class="field" id="timeField" hidden>
+      <label for="time" id="timeLabel">시간 <span class="req">필수</span></label>
+      <p class="help" id="timeHelp"></p>
+      <input type="text" id="time" maxlength="40" placeholder="예: 오후 3시 30분" autocomplete="off">
     </div>
 
     <div class="field">
+      <label id="reasonLabel">사유 <span class="req">필수</span></label>
+      <div class="choice" id="reason"></div>
+    </div>
+
+    <!-- 지각은 늦게라도 수업을 받으므로 보강 대상이 아니다 -->
+    <div class="field" id="makeupField">
       <label>보강 희망</label>
       <p class="help" id="makeupHelp">가능한 날짜를 모두 골라 주세요. 여러 개 고르시면 일정 잡기가 수월합니다.</p>
       <div class="picks" id="makeups"></div>
@@ -146,7 +164,7 @@
   <div class="card done" id="done" hidden>
     <div class="mark">✅</div>
     <h2>접수되었습니다</h2>
-    <p>담당 선생님이 확인 후 보강 일정을 안내드립니다.</p>
+    <p id="doneLead">담당 선생님이 확인 후 보강 일정을 안내드립니다.</p>
     <p id="doneNote"></p>
   </div>
 
@@ -160,9 +178,49 @@
 <script>
 const $ = id => document.getElementById(id);
 let reason = null;
+let kind = '결석';          // 결석 | 지각 | 조퇴
 
 function showErr(msg){ $('err').textContent = msg; $('err').hidden = false; }
 function hideErr(){ $('err').hidden = true; }
+
+// 유형마다 물어볼 것이 다르다. 안 쓰는 칸은 감춰서 학부모가 고민할 거리를 줄인다.
+const KIND_UI = {
+  '결석': { date: '결석 시작일', end: true,  time: false, makeup: true,
+            reason: '결석 사유' },
+  '지각': { date: '지각하는 날', end: false, time: true,  makeup: false,
+            reason: '지각 사유', timeLabel: '예상 도착 시간', timeHelp: '몇 시쯤 도착할지 적어 주세요. 정확하지 않아도 됩니다.' },
+  '조퇴': { date: '조퇴하는 날', end: false, time: true,  makeup: true,
+            reason: '조퇴 사유', timeLabel: '나가는 시간',   timeHelp: '몇 시에 나가야 하는지 적어 주세요.' },
+};
+
+function applyKind(){
+  const u = KIND_UI[kind];
+  $('dateLabel').innerHTML = u.date + ' <span class="req">필수</span>';
+  $('reasonLabel').innerHTML = u.reason + ' <span class="req">필수</span>';
+  $('endField').hidden = !u.end;
+  $('timeField').hidden = !u.time;
+  $('makeupField').hidden = !u.makeup;
+  if(u.time){
+    $('timeLabel').innerHTML = u.timeLabel + ' <span class="req">필수</span>';
+    $('timeHelp').textContent = u.timeHelp;
+  }
+  // 감춘 칸의 값은 지운다. 유형을 바꿨는데 예전 값이 딸려 가면 안 된다.
+  if(!u.end) $('endDate').value = '';
+  if(!u.time) $('time').value = '';
+  if(!u.makeup) [...$('makeups').querySelectorAll('input:checked')].forEach(cb => { cb.checked = false; cb.closest('.pick').classList.remove('on'); });
+}
+
+[...$('kind').querySelectorAll('button')].forEach(b => {
+  b.onclick = () => {
+    kind = b.dataset.v;
+    [...$('kind').querySelectorAll('button')].forEach(x => x.classList.toggle('on', x === b));
+    applyKind();
+    hideErr();
+  };
+});
+// 기본은 결석. 제일 잦다.
+$('kind').querySelector('button').classList.add('on');
+applyKind();
 
 // 결석일 기본값은 오늘. 지난 날짜도 받는다 — 이미 결석한 뒤에 알리는 경우가 흔하다.
 (function initDate(){
@@ -206,17 +264,20 @@ $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   hideErr();
 
+  const u = KIND_UI[kind];
   const name = $('name').value.trim();
   const date = $('date').value;
-  const endDate = $('endDate').value;
+  const endDate = u.end ? $('endDate').value : '';
+  const time = u.time ? $('time').value.trim() : '';
   const memo = $('memo').value.trim();
   const phone = $('phone').value.trim();
-  const makeups = [...$('makeups').querySelectorAll('input:checked')].map(i => i.value);
+  const makeups = u.makeup ? [...$('makeups').querySelectorAll('input:checked')].map(i => i.value) : [];
 
   if(!name) return showErr('학생 이름을 적어 주세요.');
-  if(!date) return showErr('결석 시작일을 골라 주세요.');
+  if(!date) return showErr(u.date + '을 골라 주세요.');
   if(endDate && endDate < date) return showErr('종료일이 시작일보다 빠릅니다. 다시 골라 주세요.');
-  if(!reason) return showErr('결석 사유를 골라 주세요.');
+  if(u.time && !time) return showErr(u.timeLabel + '을 적어 주세요.');
+  if(!reason) return showErr(u.reason + '를 골라 주세요.');
 
   $('submit').disabled = true;
   $('submit').textContent = '보내는 중…';
@@ -225,13 +286,16 @@ $('form').addEventListener('submit', async (e) => {
     const r = await fetch('/api/absence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, date, endDate, reason, memo, phone, makeups })
+      body: JSON.stringify({ kind, name, date, endDate, time, reason, memo, phone, makeups })
     });
     const d = await r.json().catch(() => ({}));
     if(!r.ok) throw new Error(d.error || '잠시 후 다시 시도해 주세요.');
 
     $('form').hidden = true;
     $('done').hidden = false;
+    $('doneLead').textContent = u.makeup
+      ? '담당 선생님이 확인 후 보강 일정을 안내드립니다.'
+      : '담당 선생님께 전달되었습니다.';
     $('doneNote').textContent = makeups.length
       ? '희망하신 보강 일정: ' + makeups.join(', ')
       : '';
