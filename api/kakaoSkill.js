@@ -60,10 +60,16 @@ const RULES = [
     },
 ];
 
-/** 오픈빌더가 알아듣는 응답 모양. 버튼이 없으면 그냥 글만 보낸다. */
+/**
+ * 오픈빌더가 알아듣는 응답 모양. 버튼이 없으면 그냥 글만 보낸다.
+ *
+ * 🔴 basicCard 를 쓰면 안 된다. thumbnail 이 필수라 카카오가 "말풍선 가이드 위반"으로
+ *    잡고 곧 미발송 처리하겠다고 예고한다(2026-08-10 실제로 오류 알림을 받았다).
+ *    textCard 는 썸네일 없이 버튼을 달 수 있다.
+ */
 function reply(text, button) {
     const outputs = button
-        ? [{ basicCard: { description: text, buttons: [{ action: 'webLink', label: button.label, webLinkUrl: button.url }] } }]
+        ? [{ textCard: { description: text, buttons: [{ action: 'webLink', label: button.label, webLinkUrl: button.url }] } }]
         : [{ simpleText: { text } }];
     return { version: '2.0', template: { outputs } };
 }

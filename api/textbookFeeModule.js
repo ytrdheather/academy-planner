@@ -12,9 +12,11 @@
  * 5분 크론이 하는 일
  *   0) 상태와 안 맞는 알림함 플래그 정리 (없으면 재신청이 조용히 묻힌다)
  *   1) 진행상태=승인대기 & 원장알림함=false  → 원장 DM(승인/반려 버튼) → 원장알림함=true
- *   2) 진행상태=승인됨|반려 & 교사알림함=false → 담당쌤 DM(반려면 사유 포함) → 교사알림함=true
- *   3) 진행상태=승인됨 & 발송예약=true       → 즉시 발송 (금요일을 못 기다리는 급한 건만)
- *   4) 발송중인데 30분 넘게 멈춘 행          → 원장에게 알림 (조용히 안 나가는 게 제일 나쁘다)
+ *   2) 진행상태=승인됨 & 발송예약=true       → 즉시 발송 (금요일을 못 기다리는 급한 건만)
+ *   3) 발송중인데 30분 넘게 멈춘 행          → 원장에게 알림 (조용히 안 나가는 게 제일 나쁘다)
+ *
+ * 담당쌤 알림은 **평일 14시에 묶어서** 보낸다(notifyTeachers). 건별로 보내면 한 선생이
+ * 하루에 대여섯 통을 받고, 그러면 알림을 닫아 버려서 정작 봐야 할 것도 안 본다.
  *
  * 중복 발송 방지가 이 모듈에서 제일 중요하다. 학부모가 입금 요청을 두 번 받으면 안 된다.
  * 그래서 발송 직전에 진행상태를 '발송중'으로 먼저 PATCH 하고, 그 PATCH 가 성공한 행만 보낸다.
@@ -42,6 +44,8 @@ export function initializeTextbookFeeRoutes({
 }) {
     const FEE_DB = dbIds?.TEXTBOOK_FEE_DB_ID;
     const TEACHER_DB = dbIds?.TEACHER_DB_ID;
+    // 묶음 알림은 여러 건이라 특정 행이 아니라 DB 를 연다
+    const FEE_DB_URL = `https://www.notion.so/${String(FEE_DB || '').replace(/-/g, '')}`;
 
     if (!FEE_DB) {
         console.warn('⚠️ TEXTBOOK_FEE_DB_ID 없음 — 교재비 기능 비활성화');
@@ -415,6 +419,84 @@ export function initializeTextbookFeeRoutes({
         return lines.join('\n');
     }
 
+    // ── 담당쌤 알림 (평일 14시 묶음) ───────────────────────────────
+    /**
+     * 승인·반려 결과를 담당쌤별로 묶어 하루 한 번 보낸다.
+     *
+     * 건별로 보내던 것을 묶었다(2026-08-10). 한 선생이 하루에 대여섯 통씩 받으면
+     * 알림을 닫아 버리고, 그러면 정작 봐야 할 것도 안 본다.
+     * 승인과 반려를 한 통에 나눠 담아서 "내가 올린 것들이 어떻게 됐나"를 한눈에 본다.
+     */
+    async function notifyTeachers() {
+        const rows = await queryFee({
+            and: [
+                { or: [{ property: '진행상태', select: { equals: '승인됨' } }, { property: '진행상태', select: { equals: '반려' } }] },
+                { property: '교사알림함', checkbox: { equals: false } },
+            ],
+        });
+        const r = { 선생: 0, 건수: rows.length, 실패: [] };
+        if (!rows.length) return r;
+
+        // 담당쌤 이름 → 그 선생의 건들
+        const 묶음 = new Map();
+        const 담임없음 = [];
+        for (const row of rows) {
+            row._이름 = await studentName(row.학생Id);
+            if (!row.담당쌤.length) { 담임없음.push(row); continue; }
+            for (const t of row.담당쌤) {
+                if (!묶음.has(t)) 묶음.set(t, []);
+                묶음.get(t).push(row);
+            }
+        }
+
+        const map = await teacherMap();
+        const 못보냄 = [];
+
+        for (const [teacher, list] of 묶음) {
+            const uid = map.get(teacher);
+            if (!uid) { 못보냄.push(`${teacher}: ${list.map(x => x._이름).join(', ')}`); continue; }
+
+            const 승인 = list.filter(x => x.진행상태 === '승인됨');
+            const 반려 = list.filter(x => x.진행상태 === '반려');
+            const lines = [];
+            if (승인.length) {
+                lines.push(`✅ 승인 ${승인.length}건`);
+                for (const x of 승인) lines.push(`· ${x._이름}  ${won(x.청구금액)}\n   ${x.교재목록}`);
+            }
+            if (반려.length) {
+                if (lines.length) lines.push('');
+                lines.push(`❌ 반려 ${반려.length}건`);
+                for (const x of 반려) lines.push(`· ${x._이름}\n   사유: ${x.반려사유 || '(사유 없음)'}`);
+            }
+            lines.push('', '승인된 건은 금요일 밤에 학부모님께 안내가 나갑니다.');
+
+            try {
+                await sendCard(await openDm(uid), `교재 변경 결과 ${list.length}건`, lines.join('\n'),
+                    [{ text: '노션에서 열기', url: FEE_DB_URL }]);
+                r.선생++;
+            } catch (e) { r.실패.push(`${teacher}: ${e.message}`); }
+        }
+
+        // 알림이 안 간 걸 아무도 모르는 게 제일 나쁘다. 원장에게 알린다.
+        if (못보냄.length || 담임없음.length) {
+            const lines = [];
+            if (못보냄.length) lines.push('카카오워크 ID 가 없어 못 보냈습니다', ...못보냄.map(s => `· ${s}`));
+            if (담임없음.length) {
+                if (lines.length) lines.push('');
+                lines.push('담당쌤이 지정돼 있지 않습니다', ...담임없음.map(x => `· ${x._이름}`));
+            }
+            try { await notifyOwner('교사 알림 못 보낸 건', lines.join('\n')); } catch (_) { }
+        }
+
+        // 보냈든 못 보냈든 플래그는 올린다. 못 보낸 건은 위에서 원장이 이미 알았고,
+        // 안 올리면 내일도 모레도 같은 실패가 반복된다.
+        for (const row of rows) {
+            try { await patch(row.id, { '교사알림함': { checkbox: true } }); }
+            catch (e) { r.실패.push(`플래그/${row.id}: ${e.message}`); }
+        }
+        return r;
+    }
+
     // ── 크론 한 바퀴 ───────────────────────────────────────────────
     async function tick() {
         const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 정리: 0, 실패: [] };
@@ -471,35 +553,8 @@ export function initializeTextbookFeeRoutes({
             } catch (e) { r.실패.push(`원장알림/${row.id}: ${e.message}`); }
         }
 
-        // 2) 승인됨·반려 → 담당쌤에게
-        for (const row of await queryFee({
-            and: [
-                { or: [{ property: '진행상태', select: { equals: '승인됨' } }, { property: '진행상태', select: { equals: '반려' } }] },
-                { property: '교사알림함', checkbox: { equals: false } },
-            ],
-        })) {
-            try {
-                const 이름 = await studentName(row.학생Id);
-                const map = await teacherMap();
-                const 승인 = row.진행상태 === '승인됨';
-                const title = 승인 ? '교재 변경 승인됨' : '교재 변경 반려';
-                const body = summary(row, 이름) + (승인 ? '' : `\n\n반려 사유\n${row.반려사유 || '(사유 없음)'}`);
-
-                const 못보냄 = [];
-                for (const t of row.담당쌤) {
-                    const uid = map.get(t);
-                    if (!uid) { 못보냄.push(t); continue; }
-                    await sendCard(await openDm(uid), title, body, [{ text: '노션에서 열기', url: row.url }]);
-                }
-                // 알림이 안 간 걸 아무도 모르는 게 제일 나쁘다. 원장에게 알린다.
-                if (못보냄.length) {
-                    await notifyOwner('교사 알림 실패',
-                        `${이름} 건 — ${못보냄.join(', ')} 의 카카오워크 ID 가 없어 알림을 못 보냈습니다.\n선생님 명부에서 연결해 주세요.`);
-                }
-                await patch(row.id, { '교사알림함': { checkbox: true } });
-                r.교사알림++;
-            } catch (e) { r.실패.push(`교사알림/${row.id}: ${e.message}`); }
-        }
+        // 2) 담당쌤 알림은 여기서 하지 않는다. 평일 14시에 묶어서 보낸다 → notifyTeachers()
+        //    건별로 보내면 선생 한 명이 하루에 대여섯 통을 받는다.
 
         // 3) 승인됨 + 발송예약 → 즉시 발송 (금요일 배치를 못 기다리는 급한 건)
         for (const row of await queryFee({
@@ -605,6 +660,12 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
+    // 평일 14시를 못 기다릴 때 담당쌤 알림을 손으로 돌린다
+    app.post('/api/textbook/notify-teachers', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await notifyTeachers()) }); }
+        catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    });
+
     // 조교 장보기 목록
     app.get('/shopping', (req, res) => res.sendFile(path.join(publicPath, 'views', 'shopping.html')));
     app.get('/api/textbook/shopping-list', requireAuth, async (req, res) => {
@@ -624,8 +685,8 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
     cron.schedule('*/5 * * * *', async () => {
         try {
             const r = await tick();
-            if (r.원장알림 || r.교사알림 || r.발송 || r.보류 || r.실패.length) {
-                console.log(`📚 교재비: 원장알림 ${r.원장알림} / 교사알림 ${r.교사알림} / 발송 ${r.발송} / 보류 ${r.보류} / 플래그정리 ${r.정리} / 실패 ${r.실패.length}`);
+            if (r.원장알림 || r.발송 || r.보류 || r.정리 || r.실패.length) {
+                console.log(`📚 교재비: 원장알림 ${r.원장알림} / 발송 ${r.발송} / 보류 ${r.보류} / 플래그정리 ${r.정리} / 실패 ${r.실패.length}`);
                 if (r.실패.length) console.error('교재비 실패 목록:', r.실패);
             }
         } catch (e) { console.error('교재비 Cron Error', e); }
@@ -641,6 +702,16 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
+    // 평일 오후 2시 담당쌤 알림. 건별로 보내면 한 선생이 하루에 대여섯 통을 받고,
+    // 그러면 알림을 닫아 버려서 정작 봐야 할 것도 안 본다. 하루치를 묶어 한 통으로 보낸다.
+    cron.schedule('0 14 * * 1-5', async () => {
+        try {
+            const r = await notifyTeachers();
+            if (r.건수) console.log(`📚 교재비 교사 알림: ${r.건수}건 → 선생 ${r.선생}명 / 실패 ${r.실패.length}`);
+            if (r.실패.length) console.error('교사 알림 실패:', r.실패);
+        } catch (e) { console.error('교재비 교사 알림 Cron Error', e); }
+    }, { timezone: 'Asia/Seoul' });
+
     // 월요일 오전 10시 장보기 목록. 금요일 밤 발송 뒤 주말이 지나 입금이 들어온 상태다.
     // 조교는 월·화에 서점에서 사 오므로 월요일 아침에 목록이 손에 있어야 한다.
     cron.schedule('0 10 * * 1', async () => {
@@ -652,5 +723,5 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('장보기 목록 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 금 21시 발송 + 월 10시 장보기)');
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 교사알림 + 금 21시 발송 + 월 10시 장보기)');
 }
