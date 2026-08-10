@@ -188,6 +188,7 @@
         <button class="sw" onclick="showGuide('welcome',this)">📨 신입생 등록 안내서</button>
         <button class="sw" onclick="showGuide('textbook',this)">💰 교재 변경·교재비</button>
         <button class="sw" onclick="showGuide('notice',this)">📅 공지사항·학사일정</button>
+        <button class="sw" onclick="showGuide('absence',this)">🙋 결석·지각·조퇴</button>
       </div>
     </header>
 
@@ -1055,22 +1056,15 @@
       </section>
 
       <section class="phase">
-        <div class="phase-head"><span class="pnum">STEP 3</span><h2>결석·보강 신청 받기</h2></div>
-        <p class="phase-sub">학부모님이 신청하는 창구입니다.</p>
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>찍어 둔 보강일은 결석 폼으로 이어집니다</h2></div>
+        <p class="phase-sub">달력과 결석 신청은 한 덩어리입니다.</p>
         <ol class="steps">
-          <li><div class="st">학부모님은 <b>readitude.onrender.com/absence</b> 에서 신청하십니다</div>
-            <div class="sd">학원 자체 폼입니다. 안내 페이지의 <b>결석 · 지각 · 조퇴</b> 버튼이 여기로 갑니다.</div></li>
-          <li><div class="st">맨 위에서 <b>결석 · 지각 · 조퇴</b> 중 하나를 고릅니다</div>
-            <div class="sd">고른 것에 따라 물어보는 게 달라집니다. <b>결석</b>은 시작일·종료일과 보강 희망, <b>지각</b>은 예상 도착 시간, <b>조퇴</b>는 나가는 시간과 보강 희망입니다. 지각은 늦게라도 수업을 받으므로 보강을 묻지 않습니다.</div></li>
-          <li><div class="st">🔴 <b>보강 희망 선택지는 달력에서 자동으로 옵니다</b></div>
-            <div class="sd">STEP 1에서 찍어 둔 <b>다가오는 보강일</b>이 시간과 함께 뜹니다. 지난 날짜는 자동으로 빠집니다. <b>선택지를 손으로 고칠 일이 없습니다.</b> 달력에 보강일이 하나도 없으면 “아직 정해진 보강일이 없습니다”라고 안내됩니다.</div></li>
-          <li><div class="st">신청이 들어오면 노션 <b>결석·보강 신청</b> DB에 쌓입니다</div>
-            <div class="sd">학생 이름으로 <b>담임과 학부모 연락처가 자동으로</b> 채워집니다. 카카오워크 <b>결석보강 신청알림_BOT</b> 채널로도 알림이 오는데 담임 이름이 함께 오니 자기 학생인지 보고 챙기시면 됩니다. 학부모님께는 접수 확인 문자가 자동 발송됩니다.</div></li>
-          <li><div class="st">담임이 보강 일정을 조율하고 <b>상태</b>를 바꿉니다</div>
-            <div class="sd">접수 → 조율중 → 확정 → 완료 순입니다.</div></li>
+          <li><div class="st">STEP 1에서 찍은 <b>다가오는 보강일</b>이 결석 폼의 선택지가 됩니다</div>
+            <div class="sd">시간까지 함께 뜨고 지난 날짜는 자동으로 빠집니다. <b>선택지를 손으로 고칠 일이 없습니다.</b> 달력에 보강일이 없으면 학부모님이 토요 보강을 고르실 수 없으니 미리 찍어 두세요.</div></li>
+          <li><div class="st">신청을 받고 처리하는 방법은 따로 정리해 두었습니다</div>
+            <div class="sd">위쪽 <span class="tab">🙋 결석·지각·조퇴</span> 탭을 보세요. 유형별 차이, 노션에서 어느 칸을 보는지, 상태를 어떻게 옮기는지가 들어 있습니다.</div></li>
         </ol>
-        <div class="note warn"><span class="lbl">주의</span>알림에 <b>“학생 명부에서 찾지 못했습니다”</b>가 붙어 있으면 학부모님이 이름을 다르게 적으신 것입니다. 담임과 연락처가 비어 있으니 <b>사람이 직접 확인</b>해야 합니다. 동명이인일 때도 자동 배정하지 않고 표시만 합니다.</div>
-        <div class="note tip"><span class="lbl">참고</span>보강일 시간 칸에는 <b>시간만</b> 적어 주세요. “일요일 오후 4시”처럼 요일을 적으면 폼에 <b>“8월 29일 (토) 일요일 오후 4시”</b>처럼 날짜와 요일이 어긋나 보입니다.</div>
+        <div class="note warn"><span class="lbl">주의</span>보강일 시간 칸에는 <b>시간만</b> 적어 주세요. “일요일 오후 4시”처럼 요일을 적으면 폼에 <b>“8월 29일 (토) 일요일 오후 4시”</b>처럼 날짜와 요일이 어긋나 보입니다.</div>
       </section>
 
       <section class="phase">
@@ -1094,6 +1088,127 @@
         </div>
       </section>
     </div><!-- /guide-notice -->
+
+    <!-- ============ 가이드 · 결석·지각·조퇴 ============ -->
+    <div id="guide-absence" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">학부모님은 <b>폼 하나</b>로 결석·지각·조퇴를 모두 신청하십니다. 신청은 <b>담임에게 자동 배정</b>되고, 담임은 노션 <b>결석·보강 신청</b> DB에서 확인하고 처리합니다.</p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">📥 학부모님이 넣는 곳</div>
+            <div class="twhen">/absence</div>
+            <p>안내 페이지의 <b>결석 · 지각 · 조퇴</b> 버튼과 카톡 채널이 여기로 옵니다. 학원 자체 폼입니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">📒 선생님이 보는 곳</div>
+            <div class="twhen">노션 · 결석·보강 신청</div>
+            <p>카카오워크로 알림이 먼저 오고, <b>기록과 처리는 노션</b>에서 합니다. 알림창에서는 상태를 못 바꿉니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="flow" style="margin-left:0">
+        <span class="tab">학부모 신청</span><span class="arrow">→</span>
+        <span class="tab">카카오워크 알림</span><span class="arrow">→</span>
+        <span class="tab">노션에 행 생성</span><span class="arrow">→</span>
+        <span class="tab">담임이 보강 조율</span><span class="arrow">→</span>
+        <span class="tab">상태 완료</span>
+      </div>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>세 가지 유형 — 무엇이 다른가</h2></div>
+        <p class="phase-sub">학부모님이 맨 위에서 고르시면, 고른 것에 따라 <b>묻는 칸이 달라집니다.</b></p>
+        <div class="modes" style="margin-left:0">
+          <div class="mode"><span class="k">결석</span><span class="v"><b>시작일 · 종료일 · 사유 · 보강 희망</b>을 받습니다. 며칠 이어서 빠지시면 종료일까지 적으시므로 노션에 <b>기간</b>으로 들어옵니다. 하루면 날짜 하나만 보입니다.</span></div>
+          <div class="mode"><span class="k">지각</span><span class="v"><b>날짜 · 예상 도착 시간 · 사유</b>를 받습니다. <b>보강은 묻지 않습니다</b> — 늦게라도 수업을 받으시니 보강 대상이 아닙니다. 시간은 필수라 비워서 낼 수 없습니다.</span></div>
+          <div class="mode"><span class="k">조퇴</span><span class="v"><b>날짜 · 나가는 시간 · 사유 · 보강 희망</b>을 받습니다. 수업 일부를 놓치시니 보강을 묻습니다. 시간은 필수입니다.</span></div>
+        </div>
+        <div class="note tip"><span class="lbl">참고</span>사유는 <b>질병 · 가족행사 · 학교일정 · 기타</b> 네 가지 중에서 고르십니다. 자세한 사정은 <b>요청사항</b> 칸에 적어 주십니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>신청이 들어오면 세 곳이 동시에 움직입니다</h2></div>
+        <p class="phase-sub">선생님이 누르실 것은 없습니다. 전부 자동입니다.</p>
+        <ol class="steps">
+          <li><div class="st">카카오워크 <b>결석보강 신청알림_BOT</b> 채널로 알림이 옵니다</div>
+            <div class="sd">선생님 여덟 분이 함께 계신 <b>공용 채널</b>입니다. 그래서 알림 안에 <b>담임 이름이 같이</b> 옵니다 — 내 학생인지 보고 챙기시면 됩니다. 맨 아래 <b>노션 링크</b>를 누르면 그 신청 건이 바로 열립니다.</div></li>
+          <li><div class="st">노션 <b>결석·보강 신청</b> DB에 한 줄이 쌓입니다</div>
+            <div class="sd">학생 이름으로 <b>담임과 학부모 연락처가 자동으로</b> 채워집니다. 학부모님이 연락처를 적으셨으면 그 번호가, 안 적으셨으면 명부의 번호가 들어갑니다.</div></li>
+          <li><div class="st">학부모님께 <b>접수 확인 문자</b>가 나갑니다</div>
+            <div class="sd">“접수되었습니다”와 신청 내용이 갑니다. 결석·조퇴는 “선생님이 확인 후 보강 일정을 안내드립니다”가 붙습니다. <b>선생님이 따로 답장하지 않으셔도 접수는 알려집니다.</b></div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>알림에 <b>“학생 명부에서 찾지 못했습니다”</b>가 붙었으면 학부모님이 이름을 다르게 적으신 것입니다. <b>담임과 연락처가 비어 있어</b> 아무에게도 배정되지 않으니, 보신 분이 이름을 확인하고 노션에서 채워 주세요. 동명이인일 때도 자동 배정하지 않고 표시만 합니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>노션에서 어느 칸을 보나</h2></div>
+        <p class="phase-sub">노션 <b>결석·보강 신청</b> DB를 여시면 이렇게 읽으시면 됩니다.</p>
+        <div class="modes" style="margin-left:0">
+          <div class="mode"><span class="k">담임</span><span class="v">내 학생만 보시려면 이 칸으로 <b>필터</b>를 거세요. 자동 배정된 값이라, <b>미지정</b>이면 이름을 못 찾은 건입니다.</span></div>
+          <div class="mode"><span class="k">유형</span><span class="v"><b>결석 · 지각 · 조퇴</b>. 예전 신청 건은 이 칸이 비어 있는데, <b>전부 결석</b>이라고 보시면 됩니다(유형을 나중에 만들었습니다).</span></div>
+          <div class="mode"><span class="k">결석일</span><span class="v">하루면 날짜 하나, 며칠이면 <b>기간</b>으로 들어 있습니다. 지각·조퇴도 이 칸에 그날 날짜가 들어갑니다.</span></div>
+          <div class="mode"><span class="k">시각</span><span class="v">지각이면 <b>예상 도착 시간</b>, 조퇴면 <b>나가는 시간</b>입니다. 학부모님이 적으신 그대로라 “4시 반쯤”처럼 들어올 수 있습니다. 결석이면 비어 있습니다.</span></div>
+          <div class="mode"><span class="k">보강 희망</span><span class="v">학부모님이 고르신 <b>보강 날짜</b>입니다. 여러 개 고르실 수 있습니다. <b>희망일 뿐 확정이 아닙니다</b> — 정원이 차면 담임이 다시 잡으셔야 합니다. <span class="field">평일 보강 (30분~1시간씩 나눠서)</span>은 토요 보강에 못 오시는 분이 고르는 선택지입니다.</span></div>
+          <div class="mode"><span class="k">사유 · 요청사항</span><span class="v">사유는 네 가지 중 하나, <b>요청사항</b>에 사정이 적혀 있습니다. 숙제 조정이나 교재 부탁 같은 것이 여기 들어오니 꼭 읽어 주세요.</span></div>
+          <div class="mode"><span class="k">매칭상태</span><span class="v"><b>OK</b>면 명부와 맞은 것, <b>UNMATCHED</b>는 못 찾은 것, <b>DUPLICATE</b>는 동명이인이라 사람이 정해야 하는 것입니다.</span></div>
+          <div class="mode"><span class="k">접수일시</span><span class="v">신청이 들어온 시각입니다. 자동입니다. <b>오래 묵은 건</b>을 찾을 때 이 칸으로 정렬하세요.</span></div>
+        </div>
+        <div class="note tip"><span class="lbl">추천</span>노션에서 <b>담임 = 나</b> 이면서 <b>상태 ≠ 완료</b> 인 뷰를 하나 만들어 두시면, 그 뷰가 비어 있을 때 <b>내 할 일이 없다</b>는 뜻이 됩니다. 매번 전체를 훑지 않으셔도 됩니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 4</span><h2>🔴 상태를 옮기는 것이 담임의 일입니다</h2></div>
+        <p class="phase-sub">신청을 받는 것까지가 자동이고, <b>여기서부터는 사람이 합니다.</b></p>
+        <div class="modes" style="margin-left:0">
+          <div class="mode"><span class="k">접수</span><span class="v">신청이 들어오면 자동으로 붙는 값입니다. <b>“아직 아무도 안 봤다”</b>는 뜻입니다.</span></div>
+          <div class="mode"><span class="k">조율중</span><span class="v">담임이 보고 <b>학부모님과 보강 날짜를 맞추는 중</b>. 희망일에 못 오시거나 자리가 없어 다시 잡을 때입니다.</span></div>
+          <div class="mode"><span class="k">확정</span><span class="v">보강 날짜와 시간이 <b>정해지고 학부모님께 알려 드린</b> 상태. 여기까지 왔으면 학부모님이 언제 오실지 아십니다.</span></div>
+          <div class="mode"><span class="k">완료</span><span class="v">보강을 <b>실제로 마친</b> 상태. 지각처럼 보강이 없는 건은 <b>확인만 하고 바로 완료</b>로 두시면 됩니다.</span></div>
+        </div>
+        <div class="note warn"><span class="lbl">주의</span>지금 대부분의 신청이 <b>접수</b>에 멈춰 있습니다. 상태를 안 옮기면 <b>누가 챙기고 있는지 아무도 모릅니다</b> — 학부모님이 “보강 언제예요?”라고 물으실 때 확인할 곳이 없어집니다. 보시는 즉시 <b>조율중</b>으로만 바꿔 주셔도 “내가 맡았다”는 표시가 됩니다.</div>
+        <div class="note tip"><span class="lbl">참고</span>보강 날짜를 학부모님께 알려 드리는 것은 <b>담임이 직접</b> 하십니다. 확정 문자는 자동으로 나가지 않습니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 5</span><h2>보강 날짜 선택지는 달력에서 옵니다</h2></div>
+        <p class="phase-sub">폼에 뜨는 보강일은 손으로 관리하지 않습니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>/calendar</b> 에서 보강일을 찍고 <b>시간</b>을 적습니다</div>
+            <div class="sd">자세한 방법은 <span class="tab">📅 공지사항·학사일정</span> 탭 STEP 1에 있습니다.</div></li>
+          <li><div class="st">찍은 보강일이 <b>바로 폼의 선택지</b>가 됩니다</div>
+            <div class="sd"><b>오늘 이후</b> 것만 뜨고 지난 날짜는 자동으로 빠집니다. 가까운 순서로 최대 12개입니다. <b>선택지를 손으로 고칠 일이 없습니다.</b></div></li>
+          <li><div class="st">달력에 보강일이 하나도 없으면</div>
+            <div class="sd">평일 보강 선택지만 뜹니다. 학부모님이 토요 보강을 고르실 수 없으니, <b>미리 찍어 두세요.</b></div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>보강일 <b>시간 칸에는 시간만</b> 적어 주세요. “일요일 오후 4시”처럼 요일을 적으면 폼에 <b>“8월 29일 (토) 일요일 오후 4시”</b>로 어긋나 보입니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">FAQ</span><h2>자주 묻는 것</h2></div>
+        <div class="faq">
+          <details><summary>학부모님이 카톡으로 “오늘 늦어요”라고 보내시면요?</summary><div class="ans">
+            카톡 채널 챗봇이 <b>지각 알려주기</b> 버튼을 자동으로 띄워 드립니다. 그래도 그냥 말로만 보내시는 분이 계시면, <b>폼 주소를 안내</b>해 주세요. 폼으로 받아야 담임·연락처가 붙고 기록이 남습니다. <b>카톡으로 받은 것은 노션에 안 남습니다.</b>
+          </div></details>
+          <details><summary>알림은 왔는데 노션에 행이 없어요</summary><div class="ans">
+            노션 기록에 실패하면 알림 맨 아래에 <b>“※ 노션 기록에 실패했습니다”</b>와 함께 학부모 연락처가 같이 옵니다. 그 경우엔 <b>알림 내용을 보고 직접 행을 만들어</b> 주세요. 드물지만 신청이 조용히 사라지지 않도록 이렇게 해 두었습니다.
+          </div></details>
+          <details><summary>학부모님이 보강 희망을 안 고르셨어요</summary><div class="ans">
+            결석·조퇴인데 비어 있으면 <b>담임이 먼저 연락해</b> 잡으셔야 합니다. 폼에서 필수가 아니라 그냥 넘어가실 수 있습니다. 지각이면 원래 안 묻는 것이니 비어 있는 게 정상입니다.
+          </div></details>
+          <details><summary>같은 학생이 며칠 빠지는데 매일 신청해야 하나요?</summary><div class="ans">
+            아닙니다. 결석은 <b>종료일</b>이 있어서 한 번에 내실 수 있습니다. 노션에는 <b>8월 12일 → 8월 14일</b> 처럼 기간으로 들어옵니다.
+          </div></details>
+          <details><summary>담임이 미지정으로 들어왔어요</summary><div class="ans">
+            학생 이름을 명부에서 못 찾은 것입니다. 별명이나 띄어쓰기가 다른 경우가 대부분입니다. 학생을 확인하시고 <b>담임 칸을 직접 고쳐</b> 주세요. 그대로 두면 아무도 안 챙깁니다.
+          </div></details>
+          <details><summary>지각도 보강해 드려야 하나요?</summary><div class="ans">
+            아닙니다. 늦게라도 수업을 받으시므로 보강 대상이 아니고, 폼에서도 묻지 않습니다. <b>확인하고 완료</b>로 두시면 됩니다.
+          </div></details>
+        </div>
+      </section>
+    </div><!-- /guide-absence -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>
