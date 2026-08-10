@@ -358,41 +358,6 @@ async function sendKakaoWork(conversationId, text) {
     return true;
 }
 
-/**
- * 솔라피 알림톡. 승인된 템플릿으로만 나간다.
- *
- * 🔴 `disableSms: true` — 문자를 병행하지 않는다(2026-08-10 원장 확정).
- *    학부모가 같은 얘기를 알림톡과 문자로 두 번 받는 것이 더 나쁘다.
- *    실패하면 던지므로, 호출부가 사람에게 알릴 것.
- */
-async function sendAlimtalk(to, templateId, variables) {
-    const key = process.env.SOLAPI_API_KEY;
-    const secret = process.env.SOLAPI_API_SECRET;
-    const from = process.env.SOLAPI_SENDER;
-    const pfId = process.env.ALIMTALK_PF_ID || 'KA01PF250113084507284jSE3GEmbOOw';
-    if (!key || !secret || !from || !to || !templateId) return false;
-
-    const date = new Date().toISOString();
-    const salt = crypto.randomBytes(16).toString('hex');
-    const signature = crypto.createHmac('sha256', secret).update(date + salt).digest('hex');
-
-    const res = await fetch('https://api.solapi.com/messages/v4/send', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `HMAC-SHA256 apiKey=${key}, date=${date}, salt=${salt}, signature=${signature}`,
-        },
-        body: JSON.stringify({
-            message: { to: String(to).replace(/[^0-9]/g, ''), from, kakaoOptions: { pfId, templateId, disableSms: true, variables } },
-        }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || body?.failedMessageList?.length) {
-        throw new Error(`알림톡 ${res.status}: ${JSON.stringify(body?.failedMessageList || body).slice(0, 200)}`);
-    }
-    return true;
-}
-
 /** 솔라피 문자 발송. 한글은 EUC-KR 기준 2바이트라 90바이트를 넘으면 LMS로 보낸다. */
 async function sendSms(to, text, subject = '리디튜드') {
     const key = process.env.SOLAPI_API_KEY;
@@ -675,17 +640,7 @@ const ABSENCE_DB_ID = process.env.ABSENCE_DB_ID || '3b009320-bce2-8182-b306-ee8f
 const KAKAOWORK_ABSENCE_CONV = process.env.KAKAOWORK_ABSENCE_CONV || '1004426035560320';
 const ABSENCE_REASONS = ['질병', '가족행사', '학교일정', '기타'];
 // 지각은 늦게라도 수업을 받으므로 보강 대상이 아니다. 결석·조퇴만 보강 희망을 받는다.
-//
-// 접수확인: 신청 즉시 학부모께 알림톡을 보낼지. 결석은 보내지 않는다 —
-// 보강이 잡히면 `보강 확정 안내`가 나가므로 접수까지 보내면 같은 건으로 두 통이 된다.
-// 지각은 확정 안내가 영영 없고, 조퇴는 "오늘 조퇴 알겠습니다"를 바로 알려야 해서 보낸다.
-const ABSENCE_KINDS = {
-    '결석': { 보강: true, 접수확인: false },
-    '지각': { 보강: false, 접수확인: true },
-    '조퇴': { 보강: true, 접수확인: true },
-};
-// 지각·조퇴 접수 안내 템플릿. 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다.
-const ALIMTALK_TPL_ABSENCE_RECEIPT = process.env.ALIMTALK_TPL_ABSENCE_RECEIPT || '';
+const ABSENCE_KINDS = { '결석': { 보강: true }, '지각': { 보강: false }, '조퇴': { 보강: true } };
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 /** 날짜가 없는 고정 선택지. 특정 날짜와 무관해서 달력에서 오지 않는다. */
 const MAKEUP_ANYTIME = '평일 보강 (30분~1시간씩 나눠서)';
@@ -813,7 +768,8 @@ app.post('/api/absence', async (req, res) => {
         if (memo) lines.push(`요청사항: ${memo}`);
         if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
         if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
-        if (!phone) lines.push('', '⚠️ 연락처가 없어 접수 문자를 보내지 못했습니다.');
+        // 보강 확정 안내가 이 번호로 나가므로, 비어 있으면 담임이 채워 두어야 한다.
+        if (!phone && 보강받음) lines.push('', '⚠️ 연락처가 없습니다. 보강 확정 안내를 보내려면 노션에 채워 주세요.');
 
         if (pageUrl) lines.push('', 보강받음 ? '→ 보강 일정을 잡고 노션에서 상태를 바꿔주세요' : '→ 확인 후 노션에서 상태를 바꿔주세요', pageUrl);
         else lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.', `연락처: ${phone || '없음'}`);
@@ -824,32 +780,11 @@ app.post('/api/absence', async (req, res) => {
         steps.push(`카카오워크실패:${e.message}`);
     }
 
-    // 3) 학부모 접수 확인 — 지각·조퇴만, 알림톡으로.
+    // 3) 학부모에게는 아무것도 보내지 않는다 (2026-08-10 원장 확정).
     //
-    // 🔴 결석은 접수 확인을 보내지 않는다(2026-08-10 원장 확정).
-    //    보강 일정이 잡히면 `보강 확정 안내` 알림톡이 나가므로, 접수까지 보내면 두 통이 된다.
-    //    지각·조퇴는 보강 확정이 영영 없어서 이것 말고는 학부모가 받을 확인이 없다.
-    // 🔴 문자를 병행하지 않는다. 알림톡이 실패해도 문자로 다시 보내지 않는다.
-    try {
-        if (!ABSENCE_KINDS[kind].접수확인) {
-            steps.push('접수알림:해당없음');
-        } else if (!ALIMTALK_TPL_ABSENCE_RECEIPT) {
-            steps.push('접수알림:템플릿미설정');
-        } else if (!phone) {
-            steps.push('접수알림:번호없음');
-        } else {
-            const [y, m, d] = date.split('-').map(Number);
-            const sent = await sendAlimtalk(phone, ALIMTALK_TPL_ABSENCE_RECEIPT, {
-                '#{학생명}': name,
-                '#{날짜}': `${m}월 ${d}일 (${WEEKDAY_KO[new Date(y, m - 1, d).getDay()]})`,
-                '#{유형}': kind,
-                '#{시각}': time,
-            });
-            steps.push(sent ? '접수알림:OK' : '접수알림:미설정');
-        }
-    } catch (e) {
-        steps.push(`접수알림실패:${e.message}`);
-    }
+    //    접수 확인은 폐지했다 — 폼 제출 후 완료 화면이 확인 역할을 한다.
+    //    결석·조퇴는 보강이 잡히면 `보강 확정 안내` 알림톡이 나간다(makeupNotifyModule.js).
+    //    지각은 학부모가 알려 주는 쪽이라 따로 회신하지 않는다.
 
     const failed = steps.filter(s => s.includes('실패'));
     if (failed.length) {
@@ -1068,7 +1003,7 @@ try {
     initializeKakaoSkill({ app, domainUrl: DOMAIN_URL, sendKakaoWork, ownerConv: KAKAOWORK_APPROVAL_CONV });
 } catch(e) { console.error('Kakao Skill Init Error', e); }
 
-// 보강 확정 안내 + 전날 리마인더. 담임이 노션에서 `확정발송`을 누르는 것이 방아쇠
+// 보강 확정 안내 + 알림톡 발송함(/messages). 담임이 노션에서 `확정발송`을 누르는 것이 방아쇠
 try {
     initializeMakeupNotify({
         app, fetchNotion, requireAuth, absenceDbId: ABSENCE_DB_ID, publicPath, path,

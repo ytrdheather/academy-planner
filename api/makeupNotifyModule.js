@@ -1,11 +1,13 @@
 /**
- * 보강 확정 안내 · 보강 전날 리마인더 알림톡.
+ * 보강 확정 안내 알림톡 + 알림톡 발송함(`/messages`).
  *
  * 흐름
  *   담임이 노션에서 `보강 확정일`·`보강 시간`을 채우고 상태를 `확정`으로 바꾼 뒤
- *   `확정발송`을 체크한다
- *      → 5분 크론이 잡아 학부모께 확정 알림톡 → `확정발송일시` 기록
- *      → 보강 전날 20시 크론이 리마인더 → `리마인드발송일시` 기록
+ *   `확정발송`을 체크한다 → 5분 크론이 잡아 학부모께 발송 → `확정발송일시` 기록
+ *
+ * 🔴 학부모에게 나가는 것은 이 한 통뿐이다(2026-08-10 원장 확정).
+ *    접수 확인과 전날 리마인더는 만들었다가 폐기했다 — 한 건으로 여러 통을 받는 것이 싫다는 판단.
+ *    되살릴 일이 있으면 리마인더는 `보강 확정일 == 내일`인 행을 훑는 일간 크론이면 된다.
  *
  * 🔴 문자를 병행하지 않는다(2026-08-10 원장 확정).
  *    알림톡이 실패해도 문자로 다시 보내지 않는다 — 학부모가 같은 얘기를 두 번 받는 게 더 나쁘다.
@@ -21,15 +23,8 @@ import cron from 'node-cron';
 const PF_ID = process.env.ALIMTALK_PF_ID || 'KA01PF250113084507284jSE3GEmbOOw';
 /** 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다. 없으면 발송을 건너뛴다(서버는 정상 기동). */
 const TPL_확정 = process.env.ALIMTALK_TPL_MAKEUP_CONFIRM || '';
-const TPL_리마인드 = process.env.ALIMTALK_TPL_MAKEUP_REMIND || '';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
-
-/** KST 기준 오늘. toISOString() 은 UTC 라 새벽에 전날로 찍힌다. */
-function kstDate(offsetDays = 0) {
-    const now = new Date(Date.now() + 9 * 3600 * 1000 + offsetDays * 86400 * 1000);
-    return now.toISOString().slice(0, 10);
-}
 
 /** "2026-08-22" + "오전 10시" → "8월 22일 (토) 오전 10시" */
 function 보강일시(dateStr, timeStr) {
@@ -134,37 +129,6 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         return r;
     }
 
-    // ── 2) 보강 전날 리마인더 ──────────────────────────────────────
-    async function sendReminders() {
-        const r = { 보냄: 0, 실패: [] };
-        if (!TPL_리마인드) return r;
-
-        const 내일 = kstDate(1);
-        // 확정 안내를 받은 사람에게만 보낸다. 확정 통보도 못 받았는데 리마인더부터 오면 이상하다.
-        const rows = await query({
-            and: [
-                { property: '보강 확정일', date: { equals: 내일 } },
-                { property: '확정발송일시', date: { is_not_empty: true } },
-                { property: '리마인드발송일시', date: { is_empty: true } },
-            ],
-        });
-
-        for (const row of rows) {
-            if (!row.연락처) { r.실패.push(`${row.이름}: 연락처 없음`); continue; }
-            try {
-                await sendAlimtalk(TPL_리마인드, row.연락처, {
-                    '#{학생명}': row.이름,
-                    '#{보강일시}': 보강일시(row.확정일, row.시간),
-                });
-                await patch(row.id, { '리마인드발송일시': { date: { start: new Date().toISOString() } } });
-                r.보냄++;
-            } catch (e) {
-                r.실패.push(`${row.이름}: ${e.message}`);
-            }
-        }
-        return r;
-    }
-
     // ── 크론 ──────────────────────────────────────────────────────
     // 확정은 담임이 누르는 즉시 나가야 하므로 5분마다 본다.
     cron.schedule('*/5 * * * *', async () => {
@@ -184,22 +148,9 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         } catch (e) { console.error('보강 확정 크론 오류:', e.message); }
     }, { timezone: 'Asia/Seoul' });
 
-    // 전날 20시. 학부모가 퇴근 후 확인하기 좋고, 기존 크론(10:20·11:00·14:00·21:00)과 안 겹친다.
-    cron.schedule('0 20 * * *', async () => {
-        try {
-            const r = await sendReminders();
-            console.log(`⏰ 보강 전날 리마인더: 보냄 ${r.보냄} / 실패 ${r.실패.length}`);
-            if (r.실패.length) await notifyOwner('보강 리마인더 실패', r.실패.join('\n'));
-        } catch (e) { console.error('보강 리마인더 크론 오류:', e.message); }
-    }, { timezone: 'Asia/Seoul' });
-
     // 수동 실행. 크론을 기다리지 않고 확인할 때 쓴다.
     app.post('/api/makeup/send-confirms', requireAuth, async (req, res) => {
         try { res.json({ success: true, ...(await sendConfirms()) }); }
-        catch (e) { res.status(500).json({ error: e.message }); }
-    });
-    app.post('/api/makeup/send-reminders', requireAuth, async (req, res) => {
-        try { res.json({ success: true, ...(await sendReminders()) }); }
         catch (e) { res.status(500).json({ error: e.message }); }
     });
 
@@ -243,8 +194,7 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         }
     });
 
-    const 준비 = [TPL_확정 ? null : 'ALIMTALK_TPL_MAKEUP_CONFIRM', TPL_리마인드 ? null : 'ALIMTALK_TPL_MAKEUP_REMIND'].filter(Boolean);
-    console.log(준비.length
-        ? `⚠️ 보강 알림 모듈 로드됨 — ${준비.join(', ')} 없음. 템플릿 승인 후 넣으면 발송이 켜집니다`
-        : '✅ 보강 알림 모듈 로드됨 (5분 확정 발송 + 전날 20시 리마인더)');
+    console.log(TPL_확정
+        ? '✅ 보강 알림 모듈 로드됨 (5분 확정 발송 + 발송함 /messages)'
+        : '⚠️ 보강 알림 모듈 로드됨 — ALIMTALK_TPL_MAKEUP_CONFIRM 없음. 템플릿 승인 후 넣으면 발송이 켜집니다 (발송함은 지금도 됩니다)');
 }
