@@ -1007,7 +1007,8 @@ try {
 try {
     initializeMakeupNotify({
         app, fetchNotion, requireAuth, absenceDbId: ABSENCE_DB_ID, publicPath, path,
-        notifyOwner: (title, body) =>
+        // 결석보강 신청알림_BOT 채널. 신청 알림이 이미 여기로 오므로 명단·실패 통지도 같은 자리에 모은다.
+        notifyChannel: (title, body) =>
             sendKakaoWork(KAKAOWORK_ABSENCE_CONV, `[${title}]\n\n${body}`).catch(e => console.error('보강 알림 통지 실패:', e.message)),
     });
 } catch(e) { console.error('Makeup Notify Init Error', e); }

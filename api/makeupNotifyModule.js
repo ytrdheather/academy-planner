@@ -1,9 +1,14 @@
-/**
- * 보강 확정 안내 알림톡 + 알림톡 발송함(`/messages`).
+﻿/**
+ * 보강 확정 안내 알림톡 + 보강 당일 명단 + 알림톡 발송함(`/messages`).
  *
  * 흐름
- *   담임이 노션에서 `보강 확정일`·`보강 시간`을 채우고 상태를 `확정`으로 바꾼 뒤
+ *   원장·부원장이 노션에서 `보강 확정일`·`보강 시간`을 채우고 상태를 `확정`으로 바꾼 뒤
  *   `확정발송`을 체크한다 → 5분 크론이 잡아 학부모께 발송 → `확정발송일시` 기록
+ *   보강 당일 08시 → 그날 오는 학생 명단을 결석보강 채널로
+ *
+ * 🔴 담임에게 "아직 접수 상태인 건" 같은 알림을 보내지 않는다(2026-08-10 원장 확정).
+ *    보강 확정은 원장·부원장이 하는 일이라 담임이 볼 이유가 없다. 담임에게 필요한 것은
+ *    ① 신청이 들어왔다는 사실(신청 즉시 채널 알림, index.js) ② 당일 누가 오는지 이 두 가지뿐이다.
  *
  * 🔴 학부모에게 나가는 것은 이 한 통뿐이다(2026-08-10 원장 확정).
  *    접수 확인과 전날 리마인더는 만들었다가 폐기했다 — 한 건으로 여러 통을 받는 것이 싫다는 판단.
@@ -26,6 +31,44 @@ const TPL_확정 = process.env.ALIMTALK_TPL_MAKEUP_CONFIRM || '';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
+/** KST 기준 오늘. toISOString() 은 UTC 라 새벽에 전날로 찍힌다. */
+function kstToday() {
+    return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * `보강 희망` 텍스트에서 날짜를 뽑는다. `보강 확정일`이 비어 있는 옛 건을 위한 보조 수단이다.
+ *
+ * 실제로 섞여 있는 형식(2026-08-10 확인):
+ *   "토요 보강 — 8월 22일 (토) 오전 10시"
+ *   "8월 29일 (토) 오전 10시까지 등원해주세요."
+ *   "평일 보강 (30분~1시간씩 나눠서)"        ← 날짜가 없다. null 을 준다
+ *
+ * 연도가 안 적혀 있으므로 오늘을 기준으로 고른다. 12월 건을 1월에 읽으면 내년으로 넘어가는데,
+ * 지난 보강을 다시 띄우는 것보다 낫다(명단은 "오늘" 만 보므로 어차피 안 걸린다).
+ */
+function 희망에서날짜(texts) {
+    const 오늘 = kstToday();
+    const [ty, tm] = 오늘.split('-').map(Number);
+    for (const t of texts) {
+        const m = String(t).match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+        if (!m) continue;
+        const mo = Number(m[1]), d = Number(m[2]);
+        const y = mo < tm - 6 ? ty + 1 : ty;   // 반년 넘게 과거면 내년 것으로 본다
+        return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+    return '';
+}
+
+/** "오전 10시", "오후 4시 30분" 만 뽑아낸다. 없으면 빈 문자열. */
+function 희망에서시간(texts) {
+    for (const t of texts) {
+        const m = String(t).match(/(오전|오후)\s*\d{1,2}\s*시(\s*\d{1,2}\s*분)?/);
+        if (m) return m[0].replace(/\s+/g, ' ').trim();
+    }
+    return '';
+}
+
 /** "2026-08-22" + "오전 10시" → "8월 22일 (토) 오전 10시" */
 function 보강일시(dateStr, timeStr) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return timeStr || '';
@@ -34,7 +77,7 @@ function 보강일시(dateStr, timeStr) {
     return `${m}월 ${d}일 (${wd})` + (timeStr ? ` ${timeStr}` : '');
 }
 
-export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireAuth, notifyOwner, publicPath, path }) {
+export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireAuth, notifyChannel, publicPath, path }) {
     app.get('/messages', (req, res) => res.sendFile(path.join(publicPath, 'views', 'messages.html')));
 
     if (!absenceDbId) { console.warn('⚠️ ABSENCE_DB_ID 없음 — 보강 확정 알림 비활성화'); return; }
@@ -55,6 +98,7 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
             확정일: p['보강 확정일']?.date?.start || '',
             시간: plain(p['보강 시간']),
             연락처: p['학부모 연락처']?.phone_number || '',
+            희망: (p['보강 희망']?.multi_select || []).map(o => o.name),
         };
     }));
 
@@ -129,6 +173,49 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         return r;
     }
 
+    // ── 2) 보강 당일 아침 명단 ─────────────────────────────────────
+    //
+    // 담임이 그날 출근해서 "누가 오나"만 알면 되는 자리다. 신청 알림은 신청 순간 한 번 울리고
+    // 끝이라 그때 못 보면 다시 알려 주는 게 없다. 그래서 당일 아침에 한 번 더 모아 준다.
+    //
+    // 🔴 0명이면 보내지 않는다. 매일 아침 "0명"이 오면 그 채널을 통째로 무시하게 된다.
+    async function roster(dateStr) {
+        const 오늘 = dateStr || kstToday();
+        // 확정된 것만. 접수·조율중은 아직 날짜가 안 정해진 것이고, 완료는 이미 끝난 것이다.
+        const rows = await query({ property: '상태', select: { equals: '확정' } });
+
+        const 대상 = [];
+        for (const row of rows) {
+            // `보강 확정일`이 정답이다. 비어 있는 옛 건만 `보강 희망` 텍스트에서 날짜를 읽는다.
+            const 날짜 = row.확정일 || 희망에서날짜(row.희망);
+            if (날짜 !== 오늘) continue;
+            대상.push({ ...row, 시간: row.시간 || 희망에서시간(row.희망), 추정: !row.확정일 });
+        }
+        return { 날짜: 오늘, 명단: 대상 };
+    }
+
+    async function sendRoster(dateStr) {
+        const { 날짜, 명단 } = await roster(dateStr);
+        if (!명단.length) return { 날짜, 인원: 0, 보냄: false };
+
+        // 시간이 다 같으면 제목에 한 번만 쓴다. 다르면 사람마다 붙인다.
+        const 시간들 = [...new Set(명단.map(x => x.시간).filter(Boolean))];
+        const 공통시간 = 시간들.length === 1 ? 시간들[0] : '';
+
+        const lines = [];
+        for (const x of 명단) {
+            const 꼬리 = !공통시간 && x.시간 ? `  ${x.시간}` : '';
+            lines.push(`· ${x.이름} (${x.담임 || '담임 미지정'})${꼬리}`);
+        }
+        lines.push('', `총 ${명단.length}명`);
+        // 날짜를 텍스트에서 읽어 온 건은 담임이 노션에서 확인할 수 있게 표시해 둔다.
+        const 추정 = 명단.filter(x => x.추정).length;
+        if (추정) lines.push(`※ ${추정}명은 보강 확정일 칸이 비어 있어 신청 내용에서 읽었습니다.`);
+
+        await notifyChannel(`${보강일시(날짜, 공통시간)} 보강 명단`, lines.join('\n'));
+        return { 날짜, 인원: 명단.length, 보냄: true };
+    }
+
     // ── 크론 ──────────────────────────────────────────────────────
     // 확정은 담임이 누르는 즉시 나가야 하므로 5분마다 본다.
     cron.schedule('*/5 * * * *', async () => {
@@ -138,20 +225,37 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
                 console.log(`📮 보강 확정: 보냄 ${r.보냄} / 막힘 ${r.막힘.length} / 실패 ${r.실패.length}`);
             }
             if (r.막힘.length) {
-                await notifyOwner('보강 확정 발송이 막혔습니다',
+                await notifyChannel('보강 확정 발송이 막혔습니다',
                     `아래 건은 칸이 비어 있어 보내지 못했습니다.\n채우시면 5분 안에 자동으로 나갑니다.\n\n${r.막힘.join('\n')}`);
             }
             if (r.실패.length) {
-                await notifyOwner('보강 확정 알림톡 실패',
+                await notifyChannel('보강 확정 알림톡 실패',
                     `${r.실패.join('\n')}\n\n문자로 다시 보내지 않습니다. 직접 연락해 주세요.`);
             }
         } catch (e) { console.error('보강 확정 크론 오류:', e.message); }
+    }, { timezone: 'Asia/Seoul' });
+
+    // 보강 당일 아침 8시. 보강은 보통 오전 10시라 출근 전에 손에 들어온다.
+    // 매일 돌지만 그날 보강이 없으면 아무것도 안 보내므로 조용하다.
+    cron.schedule('0 8 * * *', async () => {
+        try {
+            const r = await sendRoster();
+            if (r.보냄) console.log(`📋 보강 명단 발송: ${r.날짜} ${r.인원}명`);
+        } catch (e) { console.error('보강 명단 크론 오류:', e.message); }
     }, { timezone: 'Asia/Seoul' });
 
     // 수동 실행. 크론을 기다리지 않고 확인할 때 쓴다.
     app.post('/api/makeup/send-confirms', requireAuth, async (req, res) => {
         try { res.json({ success: true, ...(await sendConfirms()) }); }
         catch (e) { res.status(500).json({ error: e.message }); }
+    });
+    // ?date=2026-08-22 로 특정 날짜를 볼 수 있다. ?dry=1 이면 보내지 않고 명단만 돌려준다.
+    app.post('/api/makeup/roster', requireAuth, async (req, res) => {
+        try {
+            const date = String(req.query.date || '').trim() || undefined;
+            if (req.query.dry) return res.json({ success: true, ...(await roster(date)) });
+            res.json({ success: true, ...(await sendRoster(date)) });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     // ── 3) 발송함 — 실제로 나간 문구를 되읽는다 ────────────────────
@@ -195,6 +299,6 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
     });
 
     console.log(TPL_확정
-        ? '✅ 보강 알림 모듈 로드됨 (5분 확정 발송 + 발송함 /messages)'
-        : '⚠️ 보강 알림 모듈 로드됨 — ALIMTALK_TPL_MAKEUP_CONFIRM 없음. 템플릿 승인 후 넣으면 발송이 켜집니다 (발송함은 지금도 됩니다)');
+        ? '✅ 보강 알림 모듈 로드됨 (5분 확정 발송 + 08시 보강 명단 + 발송함 /messages)'
+        : '⚠️ 보강 알림 모듈 로드됨 — ALIMTALK_TPL_MAKEUP_CONFIRM 없음. 학부모 발송만 꺼져 있고 08시 보강 명단·발송함은 됩니다');
 }
