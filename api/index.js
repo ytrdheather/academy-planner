@@ -689,7 +689,14 @@ app.get('/api/absence/options', async (req, res) => {
 
 app.post('/api/absence', async (req, res) => {
     const kind = String(req.body?.kind || '결석').trim();
-    const name = String(req.body?.name || '').trim();
+    // 형제·자매가 같이 빠지는 집이 많다. 학부모께 폼을 두 번 쓰게 하지 않는다.
+    // `name` 은 옛 폼(그리고 챗봇 링크)이 보내는 필드라 계속 받는다.
+    const names = [...new Set(
+        (Array.isArray(req.body?.names) && req.body.names.length ? req.body.names : [req.body?.name])
+            .flatMap(v => String(v || '').split(/[,、/]/))
+            .map(s => s.trim())
+            .filter(Boolean),
+    )].slice(0, 6);
     const date = String(req.body?.date || '').trim();
     // 며칠 이어서 빠지는 경우. 노션 `결석일`이 날짜 범위를 담는 타입이라 속성을 더 만들지 않았다.
     const endDate = String(req.body?.endDate || '').trim();
@@ -702,77 +709,89 @@ app.post('/api/absence', async (req, res) => {
         .map(s => String(s).trim()).filter(Boolean).slice(0, 5);
 
     if (!ABSENCE_KINDS[kind]) return res.status(400).json({ error: '결석·지각·조퇴 중에서 골라 주세요' });
-    if (!name || !date) return res.status(400).json({ error: `학생 이름과 ${kind}하는 날을 적어 주세요` });
+    if (!names.length || !date) return res.status(400).json({ error: `학생 이름과 ${kind}하는 날을 적어 주세요` });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: '날짜 형식이 올바르지 않습니다' });
     if (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return res.status(400).json({ error: '종료일 형식이 올바르지 않습니다' });
     if (endDate && endDate < date) return res.status(400).json({ error: '종료일이 시작일보다 빠릅니다' });
     // 지각·조퇴는 몇 시인지가 선생님께 제일 필요한 정보다. 없으면 받아도 쓸모가 없다.
     if (kind !== '결석' && !time) return res.status(400).json({ error: `${kind === '지각' ? '예상 도착 시간' : '나가는 시간'}을 적어 주세요` });
     if (!ABSENCE_REASONS.includes(reason)) return res.status(400).json({ error: '사유를 골라 주세요' });
-    if (name.length > 20 || memo.length > 2000) return res.status(400).json({ error: '입력이 너무 깁니다' });
+    if (names.some(n => n.length > 20) || memo.length > 2000) return res.status(400).json({ error: '입력이 너무 깁니다' });
 
     const steps = [];
-    let match = { status: 'UNMATCHED', studentId: '', teacher: '', phone: '' };
-    try {
-        match = await lookupStudentByName(name);
-        steps.push(`조회:${match.status}`);
-    } catch (e) {
-        steps.push(`조회실패:${e.message}`);
-    }
-
-    const phone = typedPhone || match.phone;
     // 하루면 그냥 날짜, 며칠이면 "8월 7일 ~ 8월 9일" 처럼 보여 준다.
     // 지각·조퇴는 날짜 뒤에 시간을 붙인다 — 그게 선생님이 제일 먼저 보는 값이다.
     const 결석표기 = (endDate && endDate !== date ? `${date} ~ ${endDate}` : date) + (time ? ` ${time}` : '');
     const 보강받음 = ABSENCE_KINDS[kind].보강;
 
-    // 1) 노션 기록
-    let pageUrl = '';
-    try {
-        const page = await fetchNotion('https://api.notion.com/v1/pages', {
-            method: 'POST',
-            body: JSON.stringify({
-                parent: { database_id: ABSENCE_DB_ID },
-                properties: {
-                    '학생명': { title: [{ text: { content: name } }] },
-                    '학생ID': { rich_text: match.studentId ? [{ text: { content: match.studentId } }] : [] },
-                    '담임': { select: { name: match.teacher || '미지정' } },
-                    '유형': { select: { name: kind } },
-                    '결석일': { date: { start: date, ...(endDate && endDate !== date ? { end: endDate } : {}) } },
-                    '시각': { rich_text: time ? [{ text: { content: time } }] : [] },
-                    '사유': { select: { name: reason } },
-                    '요청사항': { rich_text: memo ? [{ text: { content: memo } }] : [] },
-                    // 노션은 없는 multi_select 옵션을 알아서 만들어 준다. 날짜가 바뀌어도 그대로 쌓인다.
-                    '보강 희망': { multi_select: (보강받음 ? makeups : []).map(n => ({ name: n })) },
-                    '상태': { select: { name: '접수' } },
-                    '학부모 연락처': { phone_number: phone || null },
-                    '매칭상태': { select: { name: match.status } },
-                },
-            }),
-        });
-        pageUrl = page.url || '';
-        steps.push('노션:OK');
-    } catch (e) {
-        steps.push(`노션실패:${e.message}`);
-    }
+    // 1) 학생마다 조회 + 노션 기록.
+    //    형제라도 담임이 다를 수 있어(실제로 조연서=주디쌤, 조연우=소영쌤) 행을 반드시 나눈다.
+    //    한 명이 실패해도 나머지는 넣는다 — 통째로 버리면 신청이 통째로 사라진다.
+    const 결과 = [];
+    for (const name of names) {
+        const one = { name, match: { status: 'UNMATCHED', studentId: '', teacher: '', phone: '' }, pageUrl: '', error: '' };
+        try {
+            one.match = await lookupStudentByName(name);
+        } catch (e) {
+            one.error = `조회실패:${e.message}`;
+        }
+        one.phone = typedPhone || one.match.phone;
 
-    // 2) 카카오워크 알림. 담임 이름을 넣어야 공용 채널에서 각자 자기 학생을 찾는다.
+        try {
+            const page = await fetchNotion('https://api.notion.com/v1/pages', {
+                method: 'POST',
+                body: JSON.stringify({
+                    parent: { database_id: ABSENCE_DB_ID },
+                    properties: {
+                        '학생명': { title: [{ text: { content: name } }] },
+                        '학생ID': { rich_text: one.match.studentId ? [{ text: { content: one.match.studentId } }] : [] },
+                        '담임': { select: { name: one.match.teacher || '미지정' } },
+                        '유형': { select: { name: kind } },
+                        '결석일': { date: { start: date, ...(endDate && endDate !== date ? { end: endDate } : {}) } },
+                        '시각': { rich_text: time ? [{ text: { content: time } }] : [] },
+                        '사유': { select: { name: reason } },
+                        '요청사항': { rich_text: memo ? [{ text: { content: memo } }] : [] },
+                        // 노션은 없는 multi_select 옵션을 알아서 만들어 준다. 날짜가 바뀌어도 그대로 쌓인다.
+                        '보강 희망': { multi_select: (보강받음 ? makeups : []).map(n => ({ name: n })) },
+                        '상태': { select: { name: '접수' } },
+                        '학부모 연락처': { phone_number: one.phone || null },
+                        '매칭상태': { select: { name: one.match.status } },
+                    },
+                }),
+            });
+            one.pageUrl = page.url || '';
+        } catch (e) {
+            one.error = `노션실패:${e.message}`;
+        }
+        결과.push(one);
+    }
+    const 성공 = 결과.filter(x => x.pageUrl);
+    steps.push(`노션:${성공.length}/${결과.length}`);
+    for (const x of 결과.filter(x => x.error)) steps.push(`${x.name}/${x.error}`);
+
+    // 2) 카카오워크 알림. 신청 한 건에 한 통이다 — 형제라고 두 통 울리면 시끄럽다.
+    //    대신 담임 이름을 학생마다 붙여 공용 채널에서 각자 자기 학생을 찾게 한다.
     try {
         const lines = [
-            `[${kind} 신청]`,
-            `학생: ${name} (담임: ${match.teacher || '미지정'})`,
-            `${kind === '결석' ? '결석일' : kind === '지각' ? '지각' : '조퇴'}: ${결석표기}`,
+            names.length > 1 ? `[${kind} 신청 · ${names.length}명]` : `[${kind} 신청]`,
+            `${kind === '결석' ? '결석일' : kind}: ${결석표기}`,
             `사유: ${reason}`,
         ];
         if (보강받음) lines.push(`보강 희망: ${makeups.length ? makeups.join(' / ') : '(선택 없음)'}`);
         if (memo) lines.push(`요청사항: ${memo}`);
-        if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
-        if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
-        // 보강 확정 안내가 이 번호로 나가므로, 비어 있으면 담임이 채워 두어야 한다.
-        if (!phone && 보강받음) lines.push('', '⚠️ 연락처가 없습니다. 보강 확정 안내를 보내려면 노션에 채워 주세요.');
 
-        if (pageUrl) lines.push('', 보강받음 ? '→ 보강 일정을 잡고 노션에서 상태를 바꿔주세요' : '→ 확인 후 노션에서 상태를 바꿔주세요', pageUrl);
-        else lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.', `연락처: ${phone || '없음'}`);
+        lines.push('');
+        for (const x of 결과) {
+            lines.push(`· ${x.name} (담임: ${x.match.teacher || '미지정'})`);
+            if (x.match.status === 'UNMATCHED') lines.push('  ⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
+            if (x.match.status === 'DUPLICATE') lines.push('  ⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
+            // 보강 확정 안내가 이 번호로 나가므로, 비어 있으면 담임이 채워 두어야 한다.
+            if (!x.phone && 보강받음) lines.push('  ⚠️ 연락처가 없습니다. 보강 확정 안내를 보내려면 노션에 채워 주세요.');
+            if (x.pageUrl) lines.push(`  ${x.pageUrl}`);
+            else lines.push(`  ※ 노션 기록 실패 — 직접 넣어 주세요 (연락처: ${x.phone || '없음'})`);
+        }
+
+        if (성공.length) lines.push('', 보강받음 ? '→ 보강 일정을 잡고 노션에서 상태를 바꿔주세요' : '→ 확인 후 노션에서 상태를 바꿔주세요');
 
         await sendKakaoWork(KAKAOWORK_ABSENCE_CONV, lines.join('\n'));
         steps.push('카카오워크:OK');
@@ -786,18 +805,22 @@ app.post('/api/absence', async (req, res) => {
     //    결석·조퇴는 보강이 잡히면 `보강 확정 안내` 알림톡이 나간다(makeupNotifyModule.js).
     //    지각은 학부모가 알려 주는 쪽이라 따로 회신하지 않는다.
 
+    const 표기이름 = names.join(' · ');
     const failed = steps.filter(s => s.includes('실패'));
     if (failed.length) {
-        console.error('결석 신청 처리 실패:', name, steps.join(' | '));
+        console.error('결석 신청 처리 실패:', 표기이름, steps.join(' | '));
+        // 🔴 오류 통지를 문자로 보내면 안 된다. 발신번호가 막히면 오류 통지까지 같이 죽어서
+        //    아무도 모르게 된다(2026-08-10 실제로 그랬다). 카카오워크는 다른 경로다.
         try {
-            await sendSms(process.env.ADMIN_PHONE || '',
-                `[자동화 오류] ${name} ${kind} 신청 처리 실패\n${failed.join('\n')}\n결석일: ${결석표기} / 사유: ${reason}`,
-                '자동화 오류');
+            await sendKakaoWork(KAKAOWORK_ABSENCE_CONV,
+                `[자동화 오류] ${표기이름} ${kind} 신청 처리 실패\n${failed.join('\n')}\n${결석표기} / 사유: ${reason}\n\n위 내용을 노션에 직접 넣어 주세요.`);
         } catch (_) { /* 오류 알림까지 실패하면 로그만 남는다 */ }
     }
-    console.log(`📆 ${kind} 신청: ${name} ${결석표기} — ${steps.join(' | ')}`);
+    console.log(`📆 ${kind} 신청: ${표기이름} ${결석표기} — ${steps.join(' | ')}`);
 
-    res.json({ success: true });
+    // 한 명이라도 들어갔으면 학부모께는 성공으로 보인다. 못 들어간 건은 위에서 사람에게 넘겼다.
+    if (!성공.length) return res.status(500).json({ error: '접수에 실패했습니다. 학원으로 연락 주세요. 031-273-6737' });
+    res.json({ success: true, 접수: 성공.length });
 });
 
 // ------------------------------------------------------------------
