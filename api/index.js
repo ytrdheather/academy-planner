@@ -469,30 +469,9 @@ app.post('/api/counsel', async (req, res) => {
         steps.push(`노션실패:${e.message}`);
     }
 
-    // 2) 카카오워크 알림. 노션 기록이 실패했으면 원문을 그대로 실어 보낸다.
-    try {
-        const lines = [
-            '[재원생 상담 신청]',
-            `학생: ${name} (담임: ${match.teacher || '미지정'})`,
-            `밤 10시 이후 통화: ${lateText}`,
-        ];
-        if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
-        if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
-        if (!phone) lines.push('', '⚠️ 연락처가 없어 접수 문자를 보내지 못했습니다. 직접 연락이 필요합니다.');
-
-        if (pageUrl) {
-            lines.push('', '→ 답장·통화 후 노션에서 상태를 바꿔주세요', pageUrl);
-        } else {
-            lines.push('', '※ 노션 기록에 실패했습니다. 아래 내용을 직접 처리해 주세요.',
-                `연락처: ${phone || '없음'}`, `문의: ${memo}`);
-        }
-        await sendKakaoWork(KAKAOWORK_COUNSEL_CONV, lines.join('\n'));
-        steps.push('카카오워크:OK');
-    } catch (e) {
-        steps.push(`카카오워크실패:${e.message}`);
-    }
-
-    // 2-b) 담임 개인 DM. 공용 채널은 모두가 훑어야 해서 자기 건을 놓치기 쉽다.
+    // 2) 담임 개인 DM 을 먼저 보낸다. 채널 알림에 "담임에게 갔는지"를 같이 실으려면 결과가 필요하다.
+    //    공용 채널만 쓰면 각자 훑어야 해서 자기 건을 놓치고, 개인 DM 만 쓰면 원장이 모른다.
+    let dm = false;
     try {
         const body = [
             `학생: ${name}`,
@@ -501,15 +480,41 @@ app.post('/api/counsel', async (req, res) => {
             '',
             `문의: ${memo}`,
         ].join('\n');
-        const sent = await teacherDm(match.teacher, '재원생 상담 신청', body, pageUrl || undefined);
-        steps.push(sent ? '담임DM:OK' : `담임DM:미연결(${match.teacher || '담임없음'})`);
-        // 못 보낸 것을 조용히 넘기면 담임은 신청이 온 줄도 모른다. 공용 채널에 남긴다.
-        if (!sent && match.teacher && match.teacher !== '미지정') {
-            await sendKakaoWork(KAKAOWORK_COUNSEL_CONV,
-                `⚠️ ${match.teacher} 님께 개인 알림을 못 보냈습니다 (카카오워크 ID 미연결). ${name} 학생 건을 직접 챙겨 주세요.`);
-        }
+        dm = await teacherDm(match.teacher, '재원생 상담 신청', body, pageUrl || undefined);
+        steps.push(dm ? '담임DM:OK' : `담임DM:미연결(${match.teacher || '담임없음'})`);
     } catch (e) {
         steps.push(`담임DM실패:${e.message}`);
+    }
+
+    // 2-b) 재원생 상담알림_BOT 채널.
+    //
+    // 🔴 채널에도 담임 DM 과 **같은 내용**을 보낸다. 예전에는 학생 이름만 가고 문의 원문이 빠져서,
+    //    원장이 "내가 챙길지 담임에게 맡길지"를 채널만 보고 판단할 수 없었다(2026-08-11).
+    //    상담은 내용에 따라 원장이 직접 받아야 하는 건이 섞여 있다.
+    try {
+        const lines = [
+            `학생: ${name} (담임: ${match.teacher || '미지정'})`,
+            `밤 10시 이후 통화: ${lateText}`,
+            `연락처: ${phone || '(없음)'}`,
+            '',
+            `문의: ${memo}`,
+        ];
+        if (match.status === 'UNMATCHED') lines.push('', '⚠️ 학생 명부에서 찾지 못했습니다. 이름 확인이 필요합니다.');
+        if (match.status === 'DUPLICATE') lines.push('', '⚠️ 동명이인이 있어 자동 배정하지 않았습니다.');
+        if (!phone) lines.push('', '⚠️ 연락처가 없습니다. 직접 연락이 필요합니다.');
+
+        // 담임에게 안 갔으면 이 건은 채널이 유일한 통로다. 반드시 눈에 띄어야 한다.
+        if (dm) lines.push('', `📨 ${match.teacher} 님께 개인 알림도 보냈습니다.`);
+        else if (match.teacher && match.teacher !== '미지정') {
+            lines.push('', `🔴 ${match.teacher} 님께 개인 알림을 못 보냈습니다 (카카오워크 ID 미연결). 이 건은 직접 챙겨 주세요.`);
+        } else lines.push('', '🔴 담임이 정해지지 않아 개인 알림을 못 보냈습니다. 이 건은 직접 챙겨 주세요.');
+
+        if (!pageUrl) lines.push('', '※ 노션 기록에 실패했습니다. 위 내용을 직접 옮겨 주세요.');
+
+        await teacherDm.sendCard(KAKAOWORK_COUNSEL_CONV, '재원생 상담 신청', lines.join('\n'), pageUrl || undefined);
+        steps.push('채널:OK');
+    } catch (e) {
+        steps.push(`채널실패:${e.message}`);
     }
 
     // 3) 학부모 접수 확인 문자
@@ -534,11 +539,11 @@ app.post('/api/counsel', async (req, res) => {
     const failed = steps.filter(s => s.includes('실패'));
     if (failed.length) {
         console.error('상담 신청 처리 실패:', name, steps.join(' | '));
-        // 조용히 넘기지 않는다. 원장에게 원문을 통째로 보낸다.
+        // 조용히 넘기지 않는다. 원문을 통째로 보낸다.
+        // 🔴 문자로 보내지 않는다 — 발신번호가 막히면 오류 통지까지 같이 죽는다(2026-08-10 실제로 그랬다).
         try {
-            await sendSms(process.env.ADMIN_PHONE || '',
-                `[자동화 오류] ${name} 상담 신청 처리 실패\n${failed.join('\n')}\n문의: ${memo.slice(0, 200)}`,
-                '자동화 오류');
+            await sendKakaoWork(KAKAOWORK_COUNSEL_CONV,
+                `[자동화 오류] ${name} 상담 신청 처리 실패\n${failed.join('\n')}\n\n연락처: ${phone || '없음'}\n문의: ${memo.slice(0, 500)}\n\n위 내용을 직접 처리해 주세요.`);
         } catch (_) { /* 오류 알림까지 실패하면 로그만 남는다 */ }
     }
     console.log(`📞 상담 신청: ${name} — ${steps.join(' | ')}`);
