@@ -1168,9 +1168,10 @@
           <div class="mode"><span class="k">접수</span><span class="v">신청이 들어오면 자동으로 붙는 값입니다. <b>“아직 아무도 안 봤다”</b>는 뜻입니다.</span></div>
           <div class="mode"><span class="k">조율중</span><span class="v">담임이 보고 <b>학부모님과 보강 날짜를 맞추는 중</b>. 희망일에 못 오시거나 자리가 없어 다시 잡을 때입니다.</span></div>
           <div class="mode"><span class="k">확정</span><span class="v">보강 날짜와 시간이 <b>정해진</b> 상태. 여기까지 오면 아래 STEP 5로 학부모님께 안내를 보냅니다.</span></div>
-          <div class="mode"><span class="k">완료</span><span class="v">보강을 <b>실제로 마친</b> 상태. 지각처럼 보강이 없는 건은 <b>확인만 하고 바로 완료</b>로 두시면 됩니다.</span></div>
+          <div class="mode"><span class="k">완료</span><span class="v">보강을 <b>실제로 마친</b> 상태. <b>대부분 자동으로 됩니다</b> — 아래를 보세요.</span></div>
         </div>
-        <div class="note warn"><span class="lbl">주의</span>지금 대부분의 신청이 <b>접수</b>에 멈춰 있습니다. 상태를 안 옮기면 <b>누가 챙기고 있는지 아무도 모릅니다</b> — 학부모님이 “보강 언제예요?”라고 물으실 때 확인할 곳이 없어집니다. 보시는 즉시 <b>조율중</b>으로만 바꿔 주셔도 “내가 맡았다”는 표시가 됩니다.</div>
+        <div class="note tip"><span class="lbl">쉬운 방법</span>🔴 <b>완료는 손대지 않으셔도 됩니다.</b> 매일 새벽에 서버가 <b>지난 건을 알아서 닫습니다</b>:<br>· <b>확정</b>인데 <b>보강일이 지난</b> 건 → 완료<br>· <b>지각</b>인데 <b>그날이 지난</b> 건 → 완료 (보강이 없으니 더 할 일이 없습니다)</div>
+        <div class="note warn"><span class="lbl">주의</span>대신 <b>결석·조퇴가 접수에 남아 있으면 자동으로 닫히지 않습니다.</b> 그건 <b>보강을 아직 안 잡았다는 뜻</b>이라 일부러 남겨 둡니다. 남아 있는 건 = 아직 할 일이라고 보시면 됩니다. 보시는 즉시 <b>조율중</b>으로만 바꿔 주셔도 “내가 맡았다”는 표시가 됩니다.</div>
       </section>
 
       <section class="phase">
@@ -1243,7 +1244,10 @@
             학생 이름을 명부에서 못 찾은 것입니다. 별명이나 띄어쓰기가 다른 경우가 대부분입니다. 학생을 확인하시고 <b>담임 칸을 직접 고쳐</b> 주세요. 그대로 두면 아무도 안 챙깁니다.
           </div></details>
           <details><summary>지각도 보강해 드려야 하나요?</summary><div class="ans">
-            아닙니다. 늦게라도 수업을 받으시므로 보강 대상이 아니고, 폼에서도 묻지 않습니다. <b>확인하고 완료</b>로 두시면 됩니다.
+            아닙니다. 늦게라도 수업을 받으시므로 보강 대상이 아니고, 폼에서도 묻지 않습니다. <b>상태도 손대지 않으셔도 됩니다</b> — 그날이 지나면 자동으로 완료됩니다.
+          </div></details>
+          <details><summary>완료로 바꾸는 게 일이 너무 많아요</summary><div class="ans">
+            <b>완료는 이제 거의 자동입니다.</b> 보강일이 지난 건과 지각 건은 새벽에 서버가 닫습니다. 상담도 통화 예정일이 지나면 자동이고, 카톡으로 끝난 건은 오후 4시 알림의 <b>✅ 완료 버튼</b> 하나로 닫힙니다.<br><br>손으로 하실 일은 <b>결석·조퇴를 접수 → 확정으로 옮기는 것</b> 하나만 남습니다. 그건 <b>보강 날짜를 정하는 일</b>이라 사람이 판단해야 합니다.
           </div></details>
           <details><summary>확정발송을 눌렀는데 학부모님이 못 받으셨대요</summary><div class="ans">
             <b>readitude.onrender.com/messages</b> 에서 학생 이름으로 찾아보세요. <b>전달됨</b>이면 나간 것이니 학부모님 카톡을 다시 확인해 달라고 하시면 되고, <b>실패</b>로 떠 있으면 나가지 않은 것이니 <b>직접 연락</b>해 주세요. 실패한 건은 <b>문자로 다시 보내지 않습니다</b> — 같은 얘기를 두 번 받으시는 것을 막기 위해서입니다.
@@ -1305,7 +1309,8 @@
           <div class="mode"><span class="k">통화예정</span><span class="v">카톡으로 다 풀리지 않아 <b>통화 시간을 잡은</b> 상태. 여기까지 오면 STEP 3으로 학부모님께 안내를 보냅니다.</span></div>
           <div class="mode"><span class="k">완료</span><span class="v">카톡 답장이나 통화로 <b>정리가 끝난</b> 상태. 통화 없이 카톡으로 끝났으면 <b>접수 → 완료</b>로 바로 가셔도 됩니다.</span></div>
         </div>
-        <div class="note warn"><span class="lbl">주의</span>매일 <b>오후 4시</b>, 하루가 지나도 <b>접수</b>에 머물러 있는 건을 담임별로 묶어 개인 DM으로 다시 알려 드립니다. 상태를 옮기시면 그 알림이 멈춥니다.</div>
+        <div class="note tip"><span class="lbl">쉬운 방법</span>🔴 <b>노션을 열지 않으셔도 됩니다.</b> 매일 <b>오후 4시</b>에 아직 <b>접수</b>인 건을 담임별로 묶어 카카오워크로 보내드리는데, 그 메시지에 <b>✅ ○○○ 완료</b> 버튼이 학생마다 달려 있습니다. <b>한 번 누르면 바로 닫힙니다.</b> 두 번 눌러도 탈이 없습니다.</div>
+        <div class="note tip"><span class="lbl">참고</span><b>통화예정</b>으로 두신 건은 <b>통화 예정일이 지나면 자동으로 완료</b>됩니다. 손대실 필요 없습니다.</div>
       </section>
 
       <section class="phase">

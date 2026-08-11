@@ -45,17 +45,31 @@ export function makeTeacherDm({ fetchNotion, teacherDbId, appKey }) {
         return b.conversation.id;
     }
 
+    /**
+     * `url` 은 두 가지를 받는다.
+     *   문자열            → `노션에서 열기` 버튼 하나 (예전 호출부가 이렇게 쓴다)
+     *   [{text, url, style}] → 그대로 버튼 여러 개
+     * 버튼을 여러 개 다는 이유는 알림에서 바로 처리하게 하려는 것이다 — 노션을 열게 하면 아무도 안 한다.
+     */
     async function sendCard(conversationId, title, body, url) {
+        const buttons = !url ? []
+            : typeof url === 'string' ? [{ text: '노션에서 열기', url }]
+                : url.filter(b => b && b.url);
+
         const blocks = [
             { type: 'header', text: title, style: 'blue' },
             { type: 'text', text: body, markdown: false },
         ];
-        if (url) blocks.push({ type: 'button', text: '노션에서 열기', style: 'default', action_type: 'open_system_browser', value: url });
+        for (const b of buttons) {
+            blocks.push({ type: 'button', text: b.text, style: b.style || 'default', action_type: 'open_system_browser', value: b.url });
+        }
+        // 카카오워크 앱이 아닌 곳(알림 미리보기 등)에서는 text 만 보이므로 주소도 같이 실어 준다.
+        const tail = buttons.map(b => `\n${b.text}: ${b.url}`).join('');
 
         const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
             method: 'POST',
             headers: { Authorization: `Bearer ${appKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversation_id: conversationId, text: `${title}\n\n${body}${url ? '\n' + url : ''}`, blocks }),
+            body: JSON.stringify({ conversation_id: conversationId, text: `${title}\n\n${body}${tail}`, blocks }),
         });
         const b = await res.json();
         if (!b?.success) throw new Error(`messages.send 실패: ${JSON.stringify(b).slice(0, 200)}`);

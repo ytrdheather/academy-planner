@@ -603,6 +603,47 @@ app.post('/api/counsel', async (req, res) => {
 // ------------------------------------------------------------------
 const COUNSEL_STALE_HOURS = 24;
 
+// ── 완료 버튼 ──────────────────────────────────────────────────────
+// 카톡으로 답장하고 끝난 건은 서버가 알 방법이 없어서 사람이 닫아야 한다.
+// 노션을 열게 하면 아무도 안 한다(실제로 거의 다 '접수'에 멈춰 있었다).
+// 그래서 알림에 버튼을 달아 한 번 누르면 닫히게 한다 — 교재비 승인 버튼과 같은 방식이다.
+//
+// 🔴 이 링크 자체가 열쇠다. 서명이 없으면 페이지 id 만 알아도 남의 건을 닫을 수 있다.
+const signDone = id => crypto.createHmac('sha256', JWT_SECRET).update(`${id}:done`).digest('hex').slice(0, 32);
+const doneUrl = id => `${DOMAIN_URL}/api/counsel/done?id=${id}&t=${signDone(id)}`;
+
+const donePage = (title, msg, tone = '#0d9488') => `<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;background:#f4f7f7;margin:0;
+padding:48px 18px;display:flex;justify-content:center}.c{background:#fff;border-radius:14px;padding:32px 28px;
+max-width:420px;width:100%;box-shadow:0 2px 16px rgba(0,0,0,.08)}h1{font-size:19px;margin:0 0 12px;color:${tone}}
+p{margin:0;color:#444;line-height:1.7;white-space:pre-wrap}</style>
+<div class="c"><h1>${title}</h1><p>${msg}</p></div>`;
+
+app.get('/api/counsel/done', async (req, res) => {
+    const id = String(req.query.id || '');
+    if (String(req.query.t || '') !== signDone(id)) {
+        return res.status(403).send(donePage('링크가 올바르지 않습니다', '다시 시도해 주세요.', '#c33'));
+    }
+    try {
+        const page = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
+        const 이름 = noticePlainText(page.properties?.['학생명']) || '이 건';
+        const 상태 = page.properties?.['상태']?.select?.name || '';
+        // 이미 닫힌 건을 다시 눌러도 놀라지 않게 그대로 알려 준다.
+        if (상태 === '완료') return res.send(donePage('이미 완료된 건입니다', `${이름} 건은 이미 완료로 되어 있습니다.`));
+
+        await fetchNotion(`https://api.notion.com/v1/pages/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ properties: { '상태': { select: { name: '완료' } } } }),
+        });
+        console.log(`✅ 상담 완료 처리(버튼): ${이름}`);
+        res.send(donePage('완료 처리했습니다', `${이름} 건을 완료로 바꿨습니다.\n내일부터 이 건으로 알림이 오지 않습니다.`));
+    } catch (e) {
+        console.error('상담 완료 버튼 오류:', e.message);
+        res.status(500).send(donePage('처리하지 못했습니다', e.message, '#c33'));
+    }
+});
+
 async function remindStaleCounsel() {
     if (!COUNSEL_DB_ID) return { 담임: 0, 원장: 0, 건수: 0 };
 
@@ -621,6 +662,7 @@ async function remindStaleCounsel() {
     });
 
     const rows = (data.results || []).map(p => ({
+        id: p.id,
         url: p.url,
         이름: noticePlainText(p.properties['학생명']),
         담임: p.properties['담임']?.select?.name || '미지정',
@@ -639,10 +681,14 @@ async function remindStaleCounsel() {
     const 미전달 = [];
     for (const [teacher, list] of 묶음) {
         const body = list.map(r => `· ${r.이름} (${r.접수} 접수)\n  ${r.문의.slice(0, 60)}`).join('\n\n')
-            + '\n\n통화·답장이 끝났으면 노션에서 상태를 바꿔 주세요.';
+            + '\n\n답장·통화가 끝난 건은 아래 버튼을 누르시면 바로 닫힙니다.';
+        // 버튼이 너무 많으면 카드가 길어져 오히려 안 읽는다. 다섯 개까지만 달고 나머지는 노션으로 보낸다.
+        const buttons = list.slice(0, 5).map(r => ({ text: `✅ ${r.이름} 완료`, url: doneUrl(r.id), style: 'default' }));
+        if (list.length > 5) buttons.push({ text: `나머지 ${list.length - 5}건은 노션에서`, url: list[5].url });
+
         let sent = false;
         try {
-            sent = await teacherDm(teacher, `아직 처리 안 된 상담 ${list.length}건`, body, list[0].url);
+            sent = await teacherDm(teacher, `아직 처리 안 된 상담 ${list.length}건`, body, buttons);
         } catch (e) { console.error('상담 리마인드 DM 실패:', teacher, e.message); }
         if (sent) 담임++;
         else 미전달.push(`${teacher}: ${list.map(r => r.이름).join(', ')}`);

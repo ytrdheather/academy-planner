@@ -288,6 +288,66 @@ export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counsel
         return { 날짜, 인원: 명단.length, 보냄: true };
     }
 
+    // ── 3) 지난 건 자동 마감 ───────────────────────────────────────
+    //
+    // 🔴 사람이 판단할 게 없는 상태 변경은 사람에게 시키지 않는다(2026-08-12 원장 요청).
+    //    보강일이 지났으면 보강은 끝난 것이고, 통화 예정일이 지났으면 통화도 끝난 것이다.
+    //    "하나 할 때마다 전부 완료로 바꿔야 한다"가 실제로 부담이었고, 그래서 아무도 안 바꿨다.
+    //
+    // 자동으로 닫지 않는 것 — 여기 남아 있는 게 곧 "아직 할 일"이라는 신호다:
+    //   · 결석·조퇴가 `접수`로 남은 것 → 보강을 아직 안 잡았다는 뜻
+    //   · 상담이 `접수`로 남은 것      → 답장을 했는지 서버가 알 수 없다(알림의 완료 버튼으로 닫는다)
+    async function autoClose(todayStr) {
+        const 오늘 = todayStr || kstToday();
+        const r = { 보강: 0, 지각: 0, 상담: 0, 실패: [] };
+
+        const 닫기 = async (id, 이름, 갈래) => {
+            try {
+                await fetchNotion(`https://api.notion.com/v1/pages/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ properties: { '상태': { select: { name: '완료' } } } }),
+                });
+                r[갈래]++;
+            } catch (e) { r.실패.push(`${이름}: ${e.message}`); }
+        };
+
+        // (1) 보강이 끝난 건. `보강 확정일`이 있는 것만 닫는다 —
+        //     비어 있으면 언제 하기로 했는지 확실치 않아 함부로 닫으면 안 된다.
+        for (const row of await query({
+            and: [
+                { property: '상태', select: { equals: '확정' } },
+                { property: '보강 확정일', date: { before: 오늘 } },
+            ],
+        })) await 닫기(row.id, row.이름, '보강');
+
+        // (2) 지각은 보강이 없다. 그날이 지나면 더 할 일이 없으므로 접수 상태 그대로 닫는다.
+        for (const row of await query({
+            and: [
+                { property: '유형', select: { equals: '지각' } },
+                { property: '상태', select: { equals: '접수' } },
+                { property: '결석일', date: { before: 오늘 } },
+            ],
+        })) await 닫기(row.id, row.이름, '지각');
+
+        // (3) 통화가 끝난 상담
+        if (counselDbId) {
+            const d = await fetchNotion(`https://api.notion.com/v1/databases/${counselDbId}/query`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filter: {
+                        and: [
+                            { property: '상태', select: { equals: '통화예정' } },
+                            { property: '통화 예정일', date: { before: 오늘 } },
+                        ],
+                    },
+                    page_size: 50,
+                }),
+            });
+            for (const page of d.results || []) await 닫기(page.id, plain(page.properties?.['학생명']), '상담');
+        }
+        return r;
+    }
+
     // ── 크론 ──────────────────────────────────────────────────────
     /** 막힘·실패를 해당 채널에 알린다. 둘 다 사람이 손대야 끝나는 일이라 조용히 넘기지 않는다. */
     async function 보고(알림, 무엇, r) {
@@ -322,7 +382,21 @@ export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counsel
         } catch (e) { console.error('보강 명단 크론 오류:', e.message); }
     }, { timezone: 'Asia/Seoul' });
 
+    // 매일 새벽 4시. 어제까지 끝난 건을 닫는다. 아무도 안 쓰는 시각이라 겹칠 일이 없다.
+    cron.schedule('0 4 * * *', async () => {
+        try {
+            const r = await autoClose();
+            const 합 = r.보강 + r.지각 + r.상담;
+            if (합 || r.실패.length) console.log(`🧹 자동 마감: 보강 ${r.보강} / 지각 ${r.지각} / 상담 ${r.상담} / 실패 ${r.실패.length}`);
+            if (r.실패.length) await notifyChannel('자동 마감 실패', r.실패.join('\n'));
+        } catch (e) { console.error('자동 마감 크론 오류:', e.message); }
+    }, { timezone: 'Asia/Seoul' });
+
     // 수동 실행. 크론을 기다리지 않고 확인할 때 쓴다.
+    app.post('/api/confirm/auto-close', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await autoClose(String(req.query.date || '').trim() || undefined)) }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
+    });
     app.post('/api/makeup/send-confirms', requireAuth, async (req, res) => {
         try { res.json({ success: true, ...(await sendConfirms()) }); }
         catch (e) { res.status(500).json({ error: e.message }); }
@@ -385,6 +459,6 @@ export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counsel
         TPL_통화 ? null : 'ALIMTALK_TPL_COUNSEL_CONFIRM',
     ].filter(Boolean);
     console.log(없는템플릿.length
-        ? `⚠️ 확정 알림 모듈 로드됨 — ${없는템플릿.join(', ')} 없음. 그 발송만 꺼져 있고 08시 보강 명단·발송함은 됩니다`
-        : '✅ 확정 알림 모듈 로드됨 (5분 확정 발송 2종 + 08시 보강 명단 + 발송함 /messages)');
+        ? `⚠️ 확정 알림 모듈 로드됨 — ${없는템플릿.join(', ')} 없음. 그 발송만 꺼져 있고 08시 보강 명단·04시 자동 마감·발송함은 됩니다`
+        : '✅ 확정 알림 모듈 로드됨 (5분 확정 발송 2종 + 08시 보강 명단 + 04시 자동 마감 + 발송함 /messages)');
 }
