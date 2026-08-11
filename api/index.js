@@ -17,7 +17,7 @@ import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
 import { initializeAdmissionRoutes } from './admissionModule.js';
 import { makeTeacherDm } from './teacherDm.js';
 import { initializeKakaoSkill } from './kakaoSkill.js';
-import { initializeMakeupNotify } from './makeupNotifyModule.js';
+import { initializeConfirmNotify } from './confirmNotifyModule.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -1016,15 +1016,20 @@ try {
     initializeKakaoSkill({ app, domainUrl: DOMAIN_URL, sendKakaoWork, ownerConv: KAKAOWORK_APPROVAL_CONV });
 } catch(e) { console.error('Kakao Skill Init Error', e); }
 
-// 보강 확정 안내 + 알림톡 발송함(/messages). 담임이 노션에서 `확정발송`을 누르는 것이 방아쇠
+// 확정 안내 알림톡(보강 확정 · 상담 통화 확정) + 보강 당일 명단 + 발송함(/messages).
+// 노션에서 `확정발송`을 체크하는 것이 방아쇠다.
 try {
-    initializeMakeupNotify({
-        app, fetchNotion, requireAuth, absenceDbId: ABSENCE_DB_ID, publicPath, path,
-        // 결석보강 신청알림_BOT 채널. 신청 알림이 이미 여기로 오므로 명단·실패 통지도 같은 자리에 모은다.
+    initializeConfirmNotify({
+        app, fetchNotion, requireAuth, publicPath, path,
+        absenceDbId: ABSENCE_DB_ID,
+        counselDbId: COUNSEL_DB_ID,
+        // 신청 알림이 이미 각 채널로 가므로, 명단·실패 통지도 같은 자리에 모은다.
         notifyChannel: (title, body) =>
             sendKakaoWork(KAKAOWORK_ABSENCE_CONV, `[${title}]\n\n${body}`).catch(e => console.error('보강 알림 통지 실패:', e.message)),
+        notifyCounsel: (title, body) =>
+            sendKakaoWork(KAKAOWORK_COUNSEL_CONV, `[${title}]\n\n${body}`).catch(e => console.error('상담 알림 통지 실패:', e.message)),
     });
-} catch(e) { console.error('Makeup Notify Init Error', e); }
+} catch(e) { console.error('Confirm Notify Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;

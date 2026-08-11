@@ -189,6 +189,7 @@
         <button class="sw" onclick="showGuide('textbook',this)">💰 교재 변경·교재비</button>
         <button class="sw" onclick="showGuide('notice',this)">📅 공지사항·학사일정</button>
         <button class="sw" onclick="showGuide('absence',this)">🙋 결석·지각·조퇴</button>
+        <button class="sw" onclick="showGuide('counsel',this)">💬 재원생 상담</button>
       </div>
     </header>
 
@@ -1253,6 +1254,95 @@
         </div>
       </section>
     </div><!-- /guide-absence -->
+
+    <!-- ============ 가이드 · 재원생 상담 ============ -->
+    <div id="guide-counsel" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">학부모님이 <b>문의를 남기시면</b> 담임 선생님께 카카오워크로 바로 갑니다. <b>전화 예약이 아닙니다</b> — 카톡으로 답장드리고, 통화가 필요할 때만 시간을 잡습니다.</p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">📥 학부모님이 넣는 곳</div>
+            <div class="twhen">/counsel</div>
+            <p>문의 내용과 <b>밤 10시 이후 통화 가능 여부</b>를 남기십니다. 연락처는 비워두시면 명부 번호를 씁니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">📒 선생님이 보는 곳</div>
+            <div class="twhen">노션 · 재원생 상담 신청</div>
+            <p>개인 카카오워크 <b>DM</b>과 <b>재원생 상담알림_BOT</b> 채널에 <b>같은 내용</b>이 옵니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="flow" style="margin-left:0">
+        <span class="tab">학부모 문의</span><span class="arrow">→</span>
+        <span class="tab">담임 DM + 채널</span><span class="arrow">→</span>
+        <span class="tab">카톡으로 답장</span><span class="arrow">→</span>
+        <span class="tab">필요하면 통화 확정</span><span class="arrow">→</span>
+        <span class="tab">완료</span>
+      </div>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>알림은 두 군데로 갑니다</h2></div>
+        <p class="phase-sub">담임 개인 DM 과 공용 채널에 <b>문의 원문까지 똑같이</b> 갑니다.</p>
+        <ol class="steps">
+          <li><div class="st">담임 선생님께 <b>개인 DM</b></div>
+            <div class="sd">학생·통화 가능 여부·연락처·<b>문의 전문</b>이 카드로 옵니다. 아래 <b>노션에서 열기</b> 버튼으로 바로 들어가실 수 있습니다.</div></li>
+          <li><div class="st"><b>재원생 상담알림_BOT</b> 채널에도 같은 내용</div>
+            <div class="sd">원장님이 내용을 보고 <b>직접 받으실 건인지</b> 판단하시기 위한 것입니다. 담임께 개인 알림이 갔는지도 메시지 아래에 적혀 있습니다.</div></li>
+          <li><div class="st">🔴 학부모님께는 <b>아무것도 나가지 않습니다</b></div>
+            <div class="sd">접수 확인은 보내지 않습니다. 학부모님은 폼 완료 화면으로 확인하시고, <b>선생님 답장을 기다리십니다.</b> 그러니 <b>보시면 되도록 그날 안에</b> 답장해 주세요.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>알림 아래에 <b>🔴 …께 개인 알림을 못 보냈습니다</b>가 붙어 있으면, 그 건은 <b>채널이 유일한 통로</b>입니다. 담임이 모르고 있으니 보신 분이 챙겨 주세요.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>답장하고 상태를 옮깁니다</h2></div>
+        <p class="phase-sub">노션 <b>재원생 상담 신청</b> DB에서 합니다.</p>
+        <div class="modes" style="margin-left:0">
+          <div class="mode"><span class="k">접수</span><span class="v">자동으로 붙는 값. <b>“아직 아무도 안 봤다”</b>는 뜻입니다.</span></div>
+          <div class="mode"><span class="k">통화예정</span><span class="v">카톡으로 다 풀리지 않아 <b>통화 시간을 잡은</b> 상태. 여기까지 오면 STEP 3으로 학부모님께 안내를 보냅니다.</span></div>
+          <div class="mode"><span class="k">완료</span><span class="v">카톡 답장이나 통화로 <b>정리가 끝난</b> 상태. 통화 없이 카톡으로 끝났으면 <b>접수 → 완료</b>로 바로 가셔도 됩니다.</span></div>
+        </div>
+        <div class="note warn"><span class="lbl">주의</span>매일 <b>오후 4시</b>, 하루가 지나도 <b>접수</b>에 머물러 있는 건을 담임별로 묶어 개인 DM으로 다시 알려 드립니다. 상태를 옮기시면 그 알림이 멈춥니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>통화 시간이 잡히면 — 확정 안내 보내기</h2></div>
+        <p class="phase-sub"><b>세 칸을 채우고 체크 하나</b>를 누르면 학부모님께 알림톡이 나갑니다. 보강 확정과 방식이 같습니다.</p>
+        <ol class="steps">
+          <li><div class="st"><span class="field">통화 예정일</span> 에 날짜를 넣습니다</div>
+            <div class="sd">학부모님과 맞추신 날짜입니다. 요일은 자동으로 붙습니다.</div></li>
+          <li><div class="st"><span class="field">통화 시간</span> 에 <b>밤 9시 30분</b> 처럼 적습니다</div>
+            <div class="sd"><b>시간만</b> 적어 주세요. 밤 10시 이후 통화가 <b>어려움</b>으로 접수된 분께 늦은 시간을 잡지 않도록 확인해 주세요.</div></li>
+          <li><div class="st"><b>상태</b>를 <b>통화예정</b>으로 바꿉니다</div>
+            <div class="sd">이 상태가 아니면 발송되지 않습니다.</div></li>
+          <li><div class="st">🔴 <span class="field">확정발송</span> 을 체크합니다</div>
+            <div class="sd">누르면 <b>5분 안에</b> “○월 ○일 ○시에 전화드리겠습니다” 알림톡이 나갑니다. 학부모님이 받으시는 <b>유일한 안내</b>이니 시간을 다시 확인하고 눌러 주세요.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>세 칸 중 하나라도 비어 있으면 <b>보내지 않고</b> 채널로 “발송이 막혔습니다”라고 알려 드립니다. 채우시면 <b>5분 안에 자동으로</b> 나가니 체크를 다시 누르지 않으셔도 됩니다.</div>
+        <div class="note tip"><span class="lbl">참고</span>같은 건에 두 번 나가지 않습니다. 체크를 껐다 켜도 마찬가지입니다. 실제로 뭐라고 나갔는지는 <b>readitude.onrender.com/messages</b> 에서 학생 이름으로 확인하실 수 있습니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">FAQ</span><h2>자주 묻는 것</h2></div>
+        <div class="faq">
+          <details><summary>통화까지 안 가고 카톡으로 끝났어요</summary><div class="ans">
+            그게 보통입니다. <b>확정발송을 누르실 필요가 없고</b>, 상태만 <b>완료</b>로 옮겨 주세요. 통화 확정 알림톡은 <b>통화 시간을 잡았을 때만</b> 씁니다.
+          </div></details>
+          <details><summary>밤 10시 이후 통화가 “어려움”인데 늦게밖에 안 되면요?</summary><div class="ans">
+            먼저 <b>카톡으로 여쭤보고</b> 시간을 맞춰 주세요. 어려움으로 적으신 분께 밤늦게 전화가 예정되면 안내를 받고도 못 받으십니다.
+          </div></details>
+          <details><summary>원장님이 직접 받으시는 건은 어떻게 아나요?</summary><div class="ans">
+            채널에 같은 내용이 가므로 원장님이 보고 <b>직접 챙기실 건은 말씀해</b> 주십니다. 별도 표시는 없으니, 담임께 DM이 왔으면 <b>일단 내 건</b>이라고 보시면 됩니다.
+          </div></details>
+          <details><summary>학부모님이 “접수됐다”는 연락을 못 받으셨다고 하세요</summary><div class="ans">
+            맞습니다. <b>접수 확인은 보내지 않습니다.</b> 폼을 내시면 완료 화면이 뜨는 것이 전부입니다. 그래서 <b>선생님 답장이 곧 접수 확인</b>이 됩니다 — 되도록 그날 안에 한 줄이라도 보내 주세요.
+          </div></details>
+        </div>
+      </section>
+    </div><!-- /guide-counsel -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>

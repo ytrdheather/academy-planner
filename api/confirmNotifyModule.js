@@ -1,22 +1,23 @@
 ﻿/**
- * 보강 확정 안내 알림톡 + 보강 당일 명단 + 알림톡 발송함(`/messages`).
+ * 확정 안내 알림톡 두 가지 + 보강 당일 명단 + 알림톡 발송함(`/messages`).
  *
- * 흐름
- *   원장·부원장이 노션에서 `보강 확정일`·`보강 시간`을 채우고 상태를 `확정`으로 바꾼 뒤
- *   `확정발송`을 체크한다 → 5분 크론이 잡아 학부모께 발송 → `확정발송일시` 기록
- *   보강 당일 08시 → 그날 오는 학생 명단을 결석보강 채널로
+ *   보강 확정   결석·보강 신청 DB  상태=확정      → "○월 ○일 ○시에 보강입니다"
+ *   통화 확정   재원생 상담 신청 DB 상태=통화예정  → "○월 ○일 ○시에 전화드리겠습니다"
+ *
+ * 흐름은 둘이 같다. 담당자가 노션에서 날짜·시간을 채우고 상태를 바꾼 뒤 `확정발송`을 체크하면
+ * 5분 크론이 잡아 학부모께 보내고 `확정발송일시`를 찍는다. 보강은 당일 08시에 명단도 나간다.
  *
  * 🔴 담임에게 "아직 접수 상태인 건" 같은 알림을 보내지 않는다(2026-08-10 원장 확정).
  *    보강 확정은 원장·부원장이 하는 일이라 담임이 볼 이유가 없다. 담임에게 필요한 것은
  *    ① 신청이 들어왔다는 사실(신청 즉시 채널 알림, index.js) ② 당일 누가 오는지 이 두 가지뿐이다.
  *
- * 🔴 학부모에게 나가는 것은 이 한 통뿐이다(2026-08-10 원장 확정).
+ * 🔴 학부모에게 나가는 것은 건마다 이 한 통뿐이다(2026-08-10 원장 확정).
  *    접수 확인과 전날 리마인더는 만들었다가 폐기했다 — 한 건으로 여러 통을 받는 것이 싫다는 판단.
  *    되살릴 일이 있으면 리마인더는 `보강 확정일 == 내일`인 행을 훑는 일간 크론이면 된다.
  *
  * 🔴 문자를 병행하지 않는다(2026-08-10 원장 확정).
  *    알림톡이 실패해도 문자로 다시 보내지 않는다 — 학부모가 같은 얘기를 두 번 받는 게 더 나쁘다.
- *    대신 실패는 원장 카카오워크로 올려서 사람이 전화하게 한다.
+ *    대신 실패는 카카오워크로 올려서 사람이 전화하게 한다.
  *
  * 🔴 발송 여부는 `확정발송` 체크가 아니라 `확정발송일시`로 판단한다.
  *    체크박스는 사람이 실수로 껐다 켤 수 있고, 그때마다 다시 나가면 안 된다.
@@ -26,8 +27,9 @@ import crypto from 'crypto';
 import cron from 'node-cron';
 
 const PF_ID = process.env.ALIMTALK_PF_ID || 'KA01PF250113084507284jSE3GEmbOOw';
-/** 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다. 없으면 발송을 건너뛴다(서버는 정상 기동). */
+/** 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다. 없으면 그 종류만 발송을 건너뛴다(서버는 정상 기동). */
 const TPL_확정 = process.env.ALIMTALK_TPL_MAKEUP_CONFIRM || '';
+const TPL_통화 = process.env.ALIMTALK_TPL_COUNSEL_CONFIRM || '';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -77,7 +79,7 @@ function 보강일시(dateStr, timeStr) {
     return `${m}월 ${d}일 (${wd})` + (timeStr ? ` ${timeStr}` : '');
 }
 
-export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireAuth, notifyChannel, publicPath, path }) {
+export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counselDbId, requireAuth, notifyChannel, notifyCounsel, publicPath, path }) {
     app.get('/messages', (req, res) => res.sendFile(path.join(publicPath, 'views', 'messages.html')));
 
     if (!absenceDbId) { console.warn('⚠️ ABSENCE_DB_ID 없음 — 보강 확정 알림 비활성화'); return; }
@@ -173,6 +175,66 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         return r;
     }
 
+    // ── 1-b) 재원생 상담 통화 확정 알림톡 ──────────────────────────
+    //
+    // 보강 확정과 구조가 같다. 담임이 학부모와 통화 시간을 맞춘 뒤 노션에서
+    // `통화 예정일`·`통화 시간`을 채우고 상태를 `통화예정`으로 바꾸고 `확정발송`을 체크한다.
+    // 학부모는 "언제 전화 오나" 를 몰라 계속 기다리게 되는데, 그걸 없애는 것이 목적이다.
+    async function sendCounselConfirms() {
+        const r = { 보냄: 0, 막힘: [], 실패: [] };
+        if (!TPL_통화 || !counselDbId) return r;
+
+        const d = await fetchNotion(`https://api.notion.com/v1/databases/${counselDbId}/query`, {
+            method: 'POST',
+            body: JSON.stringify({
+                filter: {
+                    and: [
+                        { property: '상태', select: { equals: '통화예정' } },
+                        { property: '확정발송', checkbox: { equals: true } },
+                        { property: '확정발송일시', date: { is_empty: true } },
+                    ],
+                },
+                page_size: 50,
+            }),
+        });
+
+        for (const page of d.results || []) {
+            const p = page.properties || {};
+            const row = {
+                id: page.id,
+                이름: plain(p['학생명']),
+                담임: p['담임']?.select?.name || '',
+                예정일: p['통화 예정일']?.date?.start || '',
+                시간: plain(p['통화 시간']),
+                연락처: p['학부모 연락처']?.phone_number || '',
+            };
+
+            const 빈칸 = [];
+            if (!row.예정일) 빈칸.push('통화 예정일');
+            if (!row.시간) 빈칸.push('통화 시간');
+            if (!row.연락처) 빈칸.push('학부모 연락처');
+            if (빈칸.length) { r.막힘.push(`${row.이름}: ${빈칸.join('·')} 비어 있음`); continue; }
+
+            const 일시 = 보강일시(row.예정일, row.시간);
+            try {
+                await sendAlimtalk(TPL_통화, row.연락처, {
+                    '#{학생명}': row.이름,
+                    '#{담당쌤}': row.담임 && row.담임 !== '미지정' ? row.담임 : '담임 선생님',
+                    '#{통화일시}': 일시,
+                });
+                await fetchNotion(`https://api.notion.com/v1/pages/${row.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ properties: { '확정발송일시': { date: { start: new Date().toISOString() } } } }),
+                });
+                r.보냄++;
+                console.log(`📞 통화 확정 안내: ${row.이름} → ${일시}`);
+            } catch (e) {
+                r.실패.push(`${row.이름}: ${e.message}`);
+            }
+        }
+        return r;
+    }
+
     // ── 2) 보강 당일 아침 명단 ─────────────────────────────────────
     //
     // 담임이 그날 출근해서 "누가 오나"만 알면 되는 자리다. 신청 알림은 신청 순간 한 번 울리고
@@ -217,22 +279,28 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
     }
 
     // ── 크론 ──────────────────────────────────────────────────────
-    // 확정은 담임이 누르는 즉시 나가야 하므로 5분마다 본다.
+    /** 막힘·실패를 해당 채널에 알린다. 둘 다 사람이 손대야 끝나는 일이라 조용히 넘기지 않는다. */
+    async function 보고(알림, 무엇, r) {
+        if (r.보냄 || r.막힘.length || r.실패.length) {
+            console.log(`📮 ${무엇}: 보냄 ${r.보냄} / 막힘 ${r.막힘.length} / 실패 ${r.실패.length}`);
+        }
+        if (r.막힘.length) {
+            await 알림(`${무엇} 발송이 막혔습니다`,
+                `아래 건은 칸이 비어 있어 보내지 못했습니다.\n채우시면 5분 안에 자동으로 나갑니다.\n\n${r.막힘.join('\n')}`);
+        }
+        if (r.실패.length) {
+            await 알림(`${무엇} 알림톡 실패`,
+                `${r.실패.join('\n')}\n\n문자로 다시 보내지 않습니다. 직접 연락해 주세요.`);
+        }
+    }
+
+    // 확정은 담당자가 누르는 즉시 나가야 하므로 5분마다 본다.
+    // 두 종류를 한 크론에서 돌린다 — 노션 호출 몇 개 차이라 따로 돌릴 이유가 없다.
     cron.schedule('*/5 * * * *', async () => {
-        try {
-            const r = await sendConfirms();
-            if (r.보냄 || r.막힘.length || r.실패.length) {
-                console.log(`📮 보강 확정: 보냄 ${r.보냄} / 막힘 ${r.막힘.length} / 실패 ${r.실패.length}`);
-            }
-            if (r.막힘.length) {
-                await notifyChannel('보강 확정 발송이 막혔습니다',
-                    `아래 건은 칸이 비어 있어 보내지 못했습니다.\n채우시면 5분 안에 자동으로 나갑니다.\n\n${r.막힘.join('\n')}`);
-            }
-            if (r.실패.length) {
-                await notifyChannel('보강 확정 알림톡 실패',
-                    `${r.실패.join('\n')}\n\n문자로 다시 보내지 않습니다. 직접 연락해 주세요.`);
-            }
-        } catch (e) { console.error('보강 확정 크론 오류:', e.message); }
+        try { await 보고(notifyChannel, '보강 확정', await sendConfirms()); }
+        catch (e) { console.error('보강 확정 크론 오류:', e.message); }
+        try { await 보고(notifyCounsel || notifyChannel, '통화 확정', await sendCounselConfirms()); }
+        catch (e) { console.error('통화 확정 크론 오류:', e.message); }
     }, { timezone: 'Asia/Seoul' });
 
     // 보강 당일 아침 8시. 보강은 보통 오전 10시라 출근 전에 손에 들어온다.
@@ -247,6 +315,10 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
     // 수동 실행. 크론을 기다리지 않고 확인할 때 쓴다.
     app.post('/api/makeup/send-confirms', requireAuth, async (req, res) => {
         try { res.json({ success: true, ...(await sendConfirms()) }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
+    });
+    app.post('/api/counsel/send-confirms', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await sendCounselConfirms()) }); }
         catch (e) { res.status(500).json({ error: e.message }); }
     });
     // ?date=2026-08-22 로 특정 날짜를 볼 수 있다. ?dry=1 이면 보내지 않고 명단만 돌려준다.
@@ -298,7 +370,11 @@ export function initializeMakeupNotify({ app, fetchNotion, absenceDbId, requireA
         }
     });
 
-    console.log(TPL_확정
-        ? '✅ 보강 알림 모듈 로드됨 (5분 확정 발송 + 08시 보강 명단 + 발송함 /messages)'
-        : '⚠️ 보강 알림 모듈 로드됨 — ALIMTALK_TPL_MAKEUP_CONFIRM 없음. 학부모 발송만 꺼져 있고 08시 보강 명단·발송함은 됩니다');
+    const 없는템플릿 = [
+        TPL_확정 ? null : 'ALIMTALK_TPL_MAKEUP_CONFIRM',
+        TPL_통화 ? null : 'ALIMTALK_TPL_COUNSEL_CONFIRM',
+    ].filter(Boolean);
+    console.log(없는템플릿.length
+        ? `⚠️ 확정 알림 모듈 로드됨 — ${없는템플릿.join(', ')} 없음. 그 발송만 꺼져 있고 08시 보강 명단·발송함은 됩니다`
+        : '✅ 확정 알림 모듈 로드됨 (5분 확정 발송 2종 + 08시 보강 명단 + 발송함 /messages)');
 }
