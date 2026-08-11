@@ -336,9 +336,6 @@ const teacherDm = makeTeacherDm({
     appKey: KAKAOWORK_APP_KEY,
 });
 
-// 학부모가 "언제쯤 연락 오나" 를 알 수 있게 안내에 넣는다. 결석 알림톡 템플릿과 같은 시간대다.
-const CALL_WINDOW = '월·수·금은 오후 1~3시, 화·목은 밤 9시 30분~10시 30분';
-
 /** 카카오워크 방으로 알림을 보낸다. 키가 없으면 조용히 건너뛴다(로그는 남긴다). */
 async function sendKakaoWork(conversationId, text) {
     if (!KAKAOWORK_APP_KEY || !conversationId) {
@@ -517,24 +514,12 @@ app.post('/api/counsel', async (req, res) => {
         steps.push(`채널실패:${e.message}`);
     }
 
-    // 3) 학부모 접수 확인 문자
-    try {
-        if (phone) {
-            const sent = await sendSms(phone,
-                '[리디튜드] 상담 신청이 접수되었습니다.\n'
-                + `학생: ${name}\n`
-                + '수업이 끝난 뒤 담당 선생님이 확인 후 카톡으로 답장드립니다.\n'
-                + `통화가 필요한 경우 ${CALL_WINDOW}에 연락드립니다.`
-                + (lateOk ? '\n밤 10시 이후 통화 가능으로 접수되었습니다.' : ''),
-                '상담 신청');
-            // 설정이 없어 건너뛴 것을 'OK'로 적으면 나중에 원인을 못 찾는다
-            steps.push(sent ? '문자:OK' : '문자:미설정');
-        } else {
-            steps.push('문자:번호없음');
-        }
-    } catch (e) {
-        steps.push(`문자실패:${e.message}`);
-    }
+    // 3) 학부모에게는 아무것도 보내지 않는다 (2026-08-11 원장 확정).
+    //
+    //    접수 확인 문자를 폐지했다. 문자는 알림톡보다 훨씬 비싼데, 상담은 어차피 담임이
+    //    카톡으로 답장하는 흐름이라 "접수됐습니다" 한 통이 더 얹힐 이유가 없다.
+    //    학부모는 폼 제출 후 완료 화면으로 접수를 확인한다.
+    //    나중에 접수 확인을 되살린다면 문자가 아니라 알림톡 템플릿으로 할 것.
 
     const failed = steps.filter(s => s.includes('실패'));
     if (failed.length) {
