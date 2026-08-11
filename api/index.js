@@ -326,6 +326,9 @@ const COUNSEL_DB_ID = process.env.COUNSEL_DB_ID || '3b109320-bce2-8197-a62b-e232
 const KAKAOWORK_APP_KEY = process.env.KAKAOWORK_APP_KEY || '';
 // 봇이 만든 공개 채널(channel_type: public). 사람이 UI 에서 만든 채널에는 봇이 못 들어간다.
 const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004426035560321';
+// 재원생 상담 접수 확인 알림톡. 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다.
+// 없으면 발송만 건너뛴다(서버는 정상 기동).
+const ALIMTALK_TPL_COUNSEL_RECEIPT = process.env.ALIMTALK_TPL_COUNSEL_RECEIPT || '';
 // 원장 1:1 DM. 담임에게 못 닿은 알림이 여기로 모인다.
 const KAKAOWORK_APPROVAL_CONV = process.env.KAKAOWORK_APPROVAL_CONV || '';
 
@@ -352,6 +355,41 @@ async function sendKakaoWork(conversationId, text) {
         }),
     });
     if (!res.ok) throw new Error(`카카오워크 ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return true;
+}
+
+/**
+ * 솔라피 알림톡. 승인된 템플릿으로만 나간다.
+ *
+ * 🔴 `disableSms: true` — 문자를 병행하지 않는다(2026-08-10 원장 확정).
+ *    학부모가 같은 얘기를 알림톡과 문자로 두 번 받는 것이 더 나쁘다. 문자는 값도 비싸다.
+ * 🔴 변수를 비워서 보내지 말 것. 거부되거나 자리표시자가 그대로 나간다.
+ */
+async function sendAlimtalk(to, templateId, variables) {
+    const key = process.env.SOLAPI_API_KEY;
+    const secret = process.env.SOLAPI_API_SECRET;
+    const from = process.env.SOLAPI_SENDER;
+    const pfId = process.env.ALIMTALK_PF_ID || 'KA01PF250113084507284jSE3GEmbOOw';
+    if (!key || !secret || !from || !to || !templateId) return false;
+
+    const date = new Date().toISOString();
+    const salt = crypto.randomBytes(16).toString('hex');
+    const signature = crypto.createHmac('sha256', secret).update(date + salt).digest('hex');
+
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `HMAC-SHA256 apiKey=${key}, date=${date}, salt=${salt}, signature=${signature}`,
+        },
+        body: JSON.stringify({
+            message: { to: String(to).replace(/[^0-9]/g, ''), from, kakaoOptions: { pfId, templateId, disableSms: true, variables } },
+        }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body?.failedMessageList?.length) {
+        throw new Error(`알림톡 ${res.status}: ${JSON.stringify(body?.failedMessageList || body).slice(0, 200)}`);
+    }
     return true;
 }
 
@@ -514,12 +552,31 @@ app.post('/api/counsel', async (req, res) => {
         steps.push(`채널실패:${e.message}`);
     }
 
-    // 3) 학부모에게는 아무것도 보내지 않는다 (2026-08-11 원장 확정).
+    // 3) 학부모께 접수 확인 알림톡.
     //
-    //    접수 확인 문자를 폐지했다. 문자는 알림톡보다 훨씬 비싼데, 상담은 어차피 담임이
-    //    카톡으로 답장하는 흐름이라 "접수됐습니다" 한 통이 더 얹힐 이유가 없다.
-    //    학부모는 폼 제출 후 완료 화면으로 접수를 확인한다.
-    //    나중에 접수 확인을 되살린다면 문자가 아니라 알림톡 템플릿으로 할 것.
+    //    문자로 보내던 것을 폐지했다가(비싸다) 알림톡으로 되살렸다(2026-08-12 원장 확정).
+    //    🔴 상담은 결석과 다르다. 결석은 대부분 보강 확정 안내가 뒤따르지만,
+    //       상담은 카톡 답장으로 끝나는 건이 대부분이라 확정 안내가 영영 안 나간다.
+    //       그래서 이 한 통이 학부모가 받는 유일한 회신인 경우가 많다.
+    //    본문에 "수업이 끝난 뒤 순차적으로 연락드린다"가 들어 있어, 바로 전화가 안 와도
+    //    학부모가 기다릴 수 있게 된다. 그게 이 알림톡의 값어치다.
+    try {
+        if (!ALIMTALK_TPL_COUNSEL_RECEIPT) {
+            steps.push('접수알림:템플릿미설정');
+        } else if (!phone) {
+            steps.push('접수알림:번호없음');
+        } else {
+            const t = new Date(Date.now() + 9 * 3600 * 1000);   // KST
+            const 접수일 = `${t.getUTCMonth() + 1}월 ${t.getUTCDate()}일 (${WEEKDAY_KO[t.getUTCDay()]})`;
+            const sent = await sendAlimtalk(phone, ALIMTALK_TPL_COUNSEL_RECEIPT, {
+                '#{이름}': name,
+                '#{날짜}': 접수일,
+            });
+            steps.push(sent ? '접수알림:OK' : '접수알림:미설정');
+        }
+    } catch (e) {
+        steps.push(`접수알림실패:${e.message}`);
+    }
 
     const failed = steps.filter(s => s.includes('실패'));
     if (failed.length) {

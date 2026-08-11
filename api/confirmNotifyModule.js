@@ -33,6 +33,13 @@ const TPL_통화 = process.env.ALIMTALK_TPL_COUNSEL_CONFIRM || '';
 
 const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
+/**
+ * 보강 확정 템플릿 맨 끝 `#{보강안내}` 자리의 기본값.
+ * 🔴 알림톡 변수는 비워서 보내면 안 된다 — 거부되거나 자리표시자가 그대로 나간다.
+ *    노션 `보강 안내` 칸을 채우면 그 내용이, 비었으면 이 문구가 나간다.
+ */
+const 기본보강안내 = '시간 조정이 필요하시면 학원으로 미리 연락 주세요.';
+
 /** KST 기준 오늘. toISOString() 은 UTC 라 새벽에 전날로 찍힌다. */
 function kstToday() {
     return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -99,6 +106,7 @@ export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counsel
             유형: p['유형']?.select?.name || '결석',
             확정일: p['보강 확정일']?.date?.start || '',
             시간: plain(p['보강 시간']),
+            안내: plain(p['보강 안내']),
             연락처: p['학부모 연락처']?.phone_number || '',
             희망: (p['보강 희망']?.multi_select || []).map(o => o.name),
         };
@@ -164,6 +172,8 @@ export function initializeConfirmNotify({ app, fetchNotion, absenceDbId, counsel
                 await sendAlimtalk(TPL_확정, row.연락처, {
                     '#{학생명}': row.이름,
                     '#{보강일시}': 보강일시(row.확정일, row.시간),
+                    // 🔴 알림톡 변수는 비워서 보내면 안 된다. 안 적었으면 기본 문구를 넣는다.
+                    '#{보강안내}': row.안내 || 기본보강안내,
                 });
                 await patch(row.id, { '확정발송일시': { date: { start: new Date().toISOString() } } });
                 r.보냄++;
