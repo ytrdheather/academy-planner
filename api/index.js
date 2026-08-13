@@ -568,9 +568,10 @@ app.post('/api/counsel', async (req, res) => {
         } else {
             const t = new Date(Date.now() + 9 * 3600 * 1000);   // KST
             const 접수일 = `${t.getUTCMonth() + 1}월 ${t.getUTCDate()}일 (${WEEKDAY_KO[t.getUTCDay()]})`;
+            // 변수 이름은 템플릿에 적힌 그대로여야 한다. 이 템플릿은 `#{날짜}` 가 아니라 `#{오늘날짜}` 다.
             const sent = await sendAlimtalk(phone, ALIMTALK_TPL_COUNSEL_RECEIPT, {
                 '#{이름}': name,
-                '#{날짜}': 접수일,
+                '#{오늘날짜}': 접수일,
             });
             steps.push(sent ? '접수알림:OK' : '접수알림:미설정');
         }
