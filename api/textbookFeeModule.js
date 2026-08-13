@@ -66,6 +66,11 @@ export function initializeTextbookFeeRoutes({
     /** 교재비 행 하나를 쓰기 편한 모양으로 바꾼다. 속성 타입별 접근법은 설계 §8 참조. */
     function readRow(page) {
         const p = page.properties;
+        // 🔴 노션에서 이 롤업 이름이 `담당쌤` → `담임쌤` 으로 바뀐 적이 있다(2026-08-13 사고).
+        //    이름이 안 맞으면 undefined 인데 예전 코드가 그걸 "담임이 지정 안 됨"과 똑같이 취급해서,
+        //    담임이 멀쩡히 있는 14건의 알림이 통째로 안 나갔다. 둘 다 받아 주고,
+        //    아예 없으면 `담임속성없음` 으로 구분해 "설정이 잘못됐다"고 알린다.
+        const 담임롤업 = p['담임쌤'] ?? p['담당쌤'];
         return {
             id: page.id,
             url: page.url,
@@ -77,7 +82,8 @@ export function initializeTextbookFeeRoutes({
             합계금액: p['합계 금액']?.rollup?.number ?? null,
             청구금액: p['청구 금액']?.formula?.number ?? null,
             연락처: p['학부모 연락처']?.rollup?.array?.[0]?.phone_number || '',
-            담당쌤: (p['담당쌤']?.rollup?.array?.[0]?.multi_select || []).map(o => o.name),
+            담당쌤: (담임롤업?.rollup?.array?.[0]?.multi_select || []).map(o => o.name),
+            담임속성없음: !담임롤업,
             진행상태: p['진행상태']?.select?.name || '',
             요청메모: plain(p['요청 메모']),
             반려사유: plain(p['반려 사유']),
@@ -440,8 +446,10 @@ export function initializeTextbookFeeRoutes({
         // 담당쌤 이름 → 그 선생의 건들
         const 묶음 = new Map();
         const 담임없음 = [];
+        const 설정오류 = [];   // 롤업 속성 자체를 못 읽은 건. 사람 잘못이 아니라 설정 문제다.
         for (const row of rows) {
             row._이름 = await studentName(row.학생Id);
+            if (row.담임속성없음) { 설정오류.push(row); continue; }
             if (!row.담당쌤.length) { 담임없음.push(row); continue; }
             for (const t of row.담당쌤) {
                 if (!묶음.has(t)) 묶음.set(t, []);
@@ -478,9 +486,18 @@ export function initializeTextbookFeeRoutes({
         }
 
         // 알림이 안 간 걸 아무도 모르는 게 제일 나쁘다. 원장에게 알린다.
-        if (못보냄.length || 담임없음.length) {
+        if (못보냄.length || 담임없음.length || 설정오류.length) {
             const lines = [];
-            if (못보냄.length) lines.push('카카오워크 ID 가 없어 못 보냈습니다', ...못보냄.map(s => `· ${s}`));
+            if (설정오류.length) {
+                lines.push('🔴 담임쌤 롤업을 읽지 못했습니다 (노션 설정 문제)',
+                    '   교재비 DB 에 `담임쌤` 롤업이 있는지, 이름이 바뀌지 않았는지 확인해 주세요.',
+                    '   고치면 다음 평일 14시에 자동으로 다시 나갑니다.',
+                    ...설정오류.map(x => `· ${x._이름}`));
+            }
+            if (못보냄.length) {
+                if (lines.length) lines.push('');
+                lines.push('카카오워크 ID 가 없어 못 보냈습니다', ...못보냄.map(s => `· ${s}`));
+            }
             if (담임없음.length) {
                 if (lines.length) lines.push('');
                 lines.push('담당쌤이 지정돼 있지 않습니다', ...담임없음.map(x => `· ${x._이름}`));
@@ -488,9 +505,14 @@ export function initializeTextbookFeeRoutes({
             try { await notifyOwner('교사 알림 못 보낸 건', lines.join('\n')); } catch (_) { }
         }
 
-        // 보냈든 못 보냈든 플래그는 올린다. 못 보낸 건은 위에서 원장이 이미 알았고,
-        // 안 올리면 내일도 모레도 같은 실패가 반복된다.
+        // 플래그를 올린다 — 안 올리면 내일도 모레도 같은 알림이 반복된다.
+        //
+        // 🔴 단, 설정 오류 건은 올리지 않는다(2026-08-13). 사람이 노션 설정을 고치면 나가야 하는데,
+        //    플래그가 올라가 있으면 고쳐도 영영 안 나간다. 실제로 그래서 14건이 묻혔다.
+        //    "고치면 해결되는 실패"와 "사람이 손대야 끝나는 실패"를 구분해야 한다.
+        const 오류Id = new Set(설정오류.map(x => x.id));
         for (const row of rows) {
+            if (오류Id.has(row.id)) continue;
             try { await patch(row.id, { '교사알림함': { checkbox: true } }); }
             catch (e) { r.실패.push(`플래그/${row.id}: ${e.message}`); }
         }
