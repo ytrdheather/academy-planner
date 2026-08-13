@@ -1072,6 +1072,34 @@
             if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">데이터 없음</td></tr>'; return; }
             tbody.innerHTML = data.map(getAttendanceHwRow).join('');
             autoGrowAllHw();
+            paintAllLeftBadges(); // 학생 설정이 아직 없으면 백그라운드로 받아온 뒤 다시 칠한다
+        }
+
+        // 남은 횟수 배지는 학생 명부(커서·교재)가 있어야 계산된다. 출결·숙제 탭은 그 데이터를 안 쓰므로
+        // 표를 먼저 그려놓고 뒤에서 한 번만 받아온다 — 표 렌더를 기다리게 하지 않기 위함.
+        let progressCfgLoading = null;
+        async function ensureProgressConfig() {
+            if (progressData && progressData.length) return progressData;
+            if (!progressCfgLoading) {
+                progressCfgLoading = fetch(`${API_BASE_URL}/api/progress-config-data`, { headers: { Authorization: 'Bearer ' + authToken } })
+                    .then(r => r.json())
+                    .then(j => { if (j.success) progressData = j.students || []; return progressData; })
+                    .catch(() => progressData);
+            }
+            return progressCfgLoading;
+        }
+        async function paintAllLeftBadges() {
+            const slots = [...document.querySelectorAll('#attendanceTableBody .hw-left-badge')];
+            if (!slots.length) return;
+            const cfgs = await ensureProgressConfig();
+            if (!cfgs || !cfgs.length) return;
+            const byName = {};
+            cfgs.forEach(c => { byName[c.name] = c; });
+            slots.forEach(el => {
+                const cfg = byName[el.dataset.name];
+                if (!cfg) return;
+                paintLeftBadge(el, { times: remainingTimesFor(cfg, el.dataset.key) });
+            });
         }
 
         // 숙제칸 높이를 내용에 맞춰 늘림(최대 높이는 CSS max-height, 넘치면 칸 안에서 스크롤)
@@ -1088,15 +1116,20 @@
             const absent = isAbsent(st);
             // 숙제칸: 한 줄 input이면 문구가 잘려서 '숙제 보기'를 눌러야 했음 → 줄바꿈되는 textarea로 내용 전체 노출
             const hwInput = (prop, val) => `<textarea class="editable-input hw-cell-input" rows="1" title="${escAttr(val || '')}" data-page-id="${st.pageId}" data-property-name="${prop}" data-property-type="rich_text" oninput="autoGrowHw(this)" onchange="updateField(this)">${escAttr(val || '')}</textarea>`;
-            const hwCell = (prop, val, prefix) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}<button title="이 과목 진도 한 칸 되돌림(커서 -1, 다음 생성 때 재출제)" onclick="deferHomework('${escAttr(st.studentName)}','${prefix}',this)" style="border:none;background:#eef2ff;color:#4338ca;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">↩</button><button title="이 과목 진도 한 칸 앞으로(커서 +1, 오늘 숙제 문구도 즉시 갱신)" onclick="advanceHomework('${escAttr(st.studentName)}','${prefix}',this,'${st.pageId}')" style="border:none;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">→</button></div>`;
+            // 오디오 플레이어처럼 << >> 로 트랙(=숙제 한 묶음) 이동. 누르면 오늘 문구와 커서가 함께 움직인다.
+            const trackBtn = (prefix, dir, label, bg, fg, tip) => `<button title="${tip}" onclick="moveHomeworkTrack('${escAttr(st.studentName)}','${prefix}',${dir},this,'${st.pageId}')" style="border:none;background:${bg};color:${fg};border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;font-weight:700;">${label}</button>`;
+            const hwCell = (prop, val, prefix, key) => `<div style="display:flex;align-items:center;gap:3px;">${hwInput(prop, val)}`
+                + trackBtn(prefix, -1, '&laquo;', '#eef2ff', '#4338ca', '이전 숙제로 (안 해온 숙제를 그대로 다시 냅니다)')
+                + trackBtn(prefix, 1, '&raquo;', '#e4f3f0', '#0a6c62', '다음 숙제로 (이번 것을 건너뜁니다)')
+                + `<span class="hw-left-badge" data-name="${escAttr(st.studentName)}" data-key="${key}"></span></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
                 <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button><button onclick="openHomeworkPreview('${escAttr(st.studentName)}')" title="이 학생만 다음 숙제 생성" style="border:1px solid #ddd0f5;background:#f5f3ff;color:#5b21b6;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">🔮 생성</button></div></div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
-                <td>${hwCell('어휘숙제', st.assignedHw?.vocab, '어휘')}</td>
-                <td>${hwCell('주독해숙제', st.assignedHw?.mainR, '주독해')}</td>
-                <td>${hwCell('부독해숙제', st.assignedHw?.subR, '부독해')}</td>
+                <td>${hwCell('어휘숙제', st.assignedHw?.vocab, '어휘', 'vocab')}</td>
+                <td>${hwCell('주독해숙제', st.assignedHw?.mainR, '주독해', 'mainR')}</td>
+                <td>${hwCell('부독해숙제', st.assignedHw?.subR, '부독해', 'subR')}</td>
                 <td>${hwInput('문법 숙제 내용', st.assignedHw?.grammar)}</td>
             </tr>`;
         }
@@ -1391,36 +1424,76 @@
             } catch (e) { showToast('삭제 실패: ' + e.message, 'error'); }
         }
 
-        // 숙제 미룸(이월): 그 학생·그 과목만 커서 되돌려 다음 생성 때 재출제
-        async function deferHomework(name, prefix, btn) {
-            if (!confirm(`${name} 학생의 ${prefix} 숙제를 다음 등원까지 미룰까요?\n(그 과목 커서를 직전 배정량만큼 되돌려 다음 생성 때 다시 나옵니다)`)) return;
+        // [트랙 이동] << / >> — 오늘 낸 숙제를 한 묶음 뒤/앞으로. 서버가 문구와 커서를 함께 다시 쓴다.
+        // 확인창은 두지 않는다(반대쪽 버튼이 곧 되돌리기라 잘못 눌러도 한 번에 복구된다).
+        const SUBJ_KEY_BY_PREFIX = { '어휘': 'vocab', '주독해': 'mainR', '부독해': 'subR' };
+        async function moveHomeworkTrack(name, prefix, direction, btn, dailyPageId) {
+            const row = btn.closest('tr');
             if (btn) btn.disabled = true;
             try {
-                const res = await fetch(`${API_BASE_URL}/api/defer-homework`, {
+                const res = await fetch(`${API_BASE_URL}/api/move-homework-track`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ name, prefix })
+                    body: JSON.stringify({ name, prefix, dailyPageId, direction })
                 });
                 const j = await res.json();
-                if (!j.success) { showToast(j.message || '미룸 실패', 'error'); return; }
-                showToast(`${prefix} 미룸 완료 (커서 ${j.newCursor}로 되돌림, ${j.rolledBack}개). 다음 생성 때 재출제됩니다.`);
-            } catch (e) { showToast('미룸 실패: ' + e.message, 'error'); }
+                if (!j.success) { showToast(j.message || '이동 실패', 'error'); return; }
+
+                if (j.textUpdated) {
+                    // 탭 전체를 새로 불러오면 노션 조회로 몇 초 멈춘다 → 그 칸만 즉시 반영
+                    const ta = row?.querySelector(`textarea[data-property-name="${prefix}숙제"]`);
+                    if (ta) { ta.value = j.text; ta.title = j.text; autoGrowHw(ta); }
+                    const st = (allReportData || []).find(x => x.pageId === dailyPageId);
+                    if (st && st.assignedHw) st.assignedHw[SUBJ_KEY_BY_PREFIX[prefix]] = j.text;
+                    showToast(`${prefix} ${direction < 0 ? '이전' : '다음'} 숙제로 이동했습니다.`);
+                } else {
+                    showToast(`${prefix} 진도만 이동했습니다 (오늘 숙제 문구가 없어 다음 생성 때 반영됩니다).`);
+                }
+
+                // 남은 횟수 배지 갱신 — 이 학생·과목의 커서가 방금 바뀌었다
+                const key = SUBJ_KEY_BY_PREFIX[prefix];
+                const cfg = (progressData || []).find(x => x.name === name);
+                if (cfg && cfg[key]) cfg[key].unit = j.newCursor;
+                paintLeftBadge(row?.querySelector(`.hw-left-badge[data-key="${key}"]`), j.remaining);
+            } catch (e) { showToast('이동 실패: ' + e.message, 'error'); }
             finally { if (btn) btn.disabled = false; }
         }
 
-        async function advanceHomework(name, prefix, btn, dailyPageId) {
-            if (!confirm(`${name} 학생의 ${prefix} 진도를 한 칸 앞으로 보낼까요?\n(그 과목 커서를 +1 전진 — 오늘 숙제 문구도 있으면 같이 갱신됩니다. ↩로 되돌릴 수 있어요)`)) return;
-            if (btn) btn.disabled = true;
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/advance-homework`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-                    body: JSON.stringify({ name, prefix, dailyPageId })
-                });
-                const j = await res.json();
-                if (!j.success) { showToast(j.message || '전진 실패', 'error'); return; }
-                showToast(j.updatedText ? `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 오늘 숙제 문구도 갱신됨.` : `${prefix} 진도 한 칸 전진 (커서 ${j.newCursor}). 다음 생성 때 반영됩니다.`);
-                if (j.updatedText) loadDataForCurrentTab(true);
-            } catch (e) { showToast('전진 실패: ' + e.message, 'error'); }
-            finally { if (btn) btn.disabled = false; }
+        // ===== 남은 횟수 배지 (교재 끝 5회 전부터 표시) =====
+        // remaining = { times } — 앞으로 이 교재가 몇 번 더 나갈지. 마지막 한 번은 last.
+        function leftBadgeInfo(times) {
+            if (times == null || times > 5) return null;
+            if (times <= 0) return ['#991b1b', '#fee2e2', '교재 끝'];
+            if (times === 1) return ['#991b1b', '#fee2e2', 'last'];
+            return ['#9a3412', '#ffedd5', `${times}회`];
+        }
+        function paintLeftBadge(el, remaining) {
+            if (!el) return;
+            const info = leftBadgeInfo(remaining ? remaining.times : null);
+            el.innerHTML = info ? mcBadge(info[0], info[1], info[2]) : '';
+        }
+        // 학생 설정(커서·교재 길이·진도량)으로 남은 횟수를 직접 계산 — 목록을 그릴 때 쓴다.
+        function remainingTimesFor(cfg, key) {
+            const d = cfg && cfg[key];
+            if (!d || !d.bookId || !d.total) return null;      // 교재 없음 / 총유닛수 미입력
+            const left = d.total - (Number(d.unit) || 1) + 1;
+            if (left <= 0) return 0;
+            const per = avgAssignmentSize(cfg, key);
+            return Math.max(1, Math.ceil(left / Math.max(1, per)));
+        }
+        // 한 번 나갈 때 평균 몇 개인지 — 등원마다=N, 매일=요일별 환산, 불규칙=요일별 입력값 평균
+        function avgAssignmentSize(cfg, key) {
+            const d = cfg[key], method = d.method || '등원마다';
+            const attend = parseAttendDays(cfg.days);
+            if (!attend.length) return Number(d.amount) || 1;
+            if (method === '불규칙') {
+                const wm = parseWeekly(d.weekly);
+                const vals = attend.map(x => Number(wm[x]) || 0).filter(v => v > 0);
+                return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 1;
+            }
+            const N = Number(d.amount) || 1;
+            const map = computeWeeklyMap(method, N, attend);
+            const vals = attend.map(x => Number(map[x]) || 0);
+            return vals.reduce((a, b) => a + b, 0) / vals.length;
         }
 
         // 오늘 리포트 수동 생성(크론 누락 복구용). 서버가 멱등이라 이미 있는 학생은 건너뜀.
@@ -2105,8 +2178,12 @@
         function cursorCell(s, key) {
             const d = s[key]; const prop = SUBJ_PREFIX[key] + '현재유닛';
             const hintId = `curhint-${key}-${s.pageId}`;
+            const left = leftBadgeInfo(remainingTimesFor(s, key)); // 교재 끝이 가까우면 5회·4회…last
             return `<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-start">
-                <input class="editable-input" type="number" style="width:52px" value="${d.unit === '' ? '' : d.unit}" data-bookid="${d.bookId || ''}" data-hint="${hintId}" oninput="updateCursorHint(this)" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')">
+                <div style="display:flex;align-items:center;gap:3px">
+                    <input class="editable-input" type="number" style="width:52px" value="${d.unit === '' ? '' : d.unit}" data-bookid="${d.bookId || ''}" data-hint="${hintId}" oninput="updateCursorHint(this)" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')">
+                    ${left ? mcBadge(left[0], left[1], left[2]) : ''}
+                </div>
                 <span id="${hintId}" style="font-size:11px;color:#94a3b8;max-width:160px;line-height:1.3;word-break:break-word"></span>
             </div>`;
         }

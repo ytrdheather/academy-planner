@@ -2948,6 +2948,8 @@ async function readStudentConfigs(onlyName = '') {
     try { byId = (await loadTextbooks()).byId; } catch (e) { /* 교재 못 읽어도 진행 */ }
     const relName = (prop) => (prop?.relation?.map(r => byId[r.id]?.name || '').filter(Boolean).join(', ')) || '';
     const relId = (prop) => prop?.relation?.[0]?.id || '';
+    // 교재 전체 길이(지문 수). 남은 횟수 배지가 이걸로 "앞으로 몇 번 더" 를 센다.
+    const relTotal = (prop) => { const b = byId[prop?.relation?.[0]?.id]; return b ? ((b.totalUnits || 0) * (b.perPassage || 1)) : 0; };
     const nameFilter = onlyName ? { property: '이름', title: { equals: onlyName } } : null;
 
     const students = [];
@@ -2969,9 +2971,9 @@ async function readStudentConfigs(onlyName = '') {
                 days: p['수강요일']?.multi_select?.map(d => d.name).join('') || '',
                 status: p['학습상태']?.select?.name || '',
                 fixed: p['고정숙제']?.rich_text?.map(t => t.plain_text).join('') || '',
-                vocab: { bookId: relId(p['어휘교재']),   bookName: relName(p['어휘교재']),   unit: p['어휘현재유닛']?.number ?? '',   amount: p['어휘진도량']?.number ?? '',   method: p['어휘진도방식']?.select?.name || '',   weekly: p['어휘요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
-                mainR: { bookId: relId(p['주독해교재']), bookName: relName(p['주독해교재']), unit: p['주독해현재유닛']?.number ?? '', amount: p['주독해진도량']?.number ?? '', method: p['주독해진도방식']?.select?.name || '', weekly: p['주독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
-                subR:  { bookId: relId(p['부독해교재']), bookName: relName(p['부독해교재']), unit: p['부독해현재유닛']?.number ?? '', amount: p['부독해진도량']?.number ?? '', method: p['부독해진도방식']?.select?.name || '', weekly: p['부독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '' },
+                vocab: { bookId: relId(p['어휘교재']),   bookName: relName(p['어휘교재']),   unit: p['어휘현재유닛']?.number ?? '',   amount: p['어휘진도량']?.number ?? '',   method: p['어휘진도방식']?.select?.name || '',   weekly: p['어휘요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '',   total: relTotal(p['어휘교재']) },
+                mainR: { bookId: relId(p['주독해교재']), bookName: relName(p['주독해교재']), unit: p['주독해현재유닛']?.number ?? '', amount: p['주독해진도량']?.number ?? '', method: p['주독해진도방식']?.select?.name || '', weekly: p['주독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '', total: relTotal(p['주독해교재']) },
+                subR:  { bookId: relId(p['부독해교재']), bookName: relName(p['부독해교재']), unit: p['부독해현재유닛']?.number ?? '', amount: p['부독해진도량']?.number ?? '', method: p['부독해진도방식']?.select?.name || '', weekly: p['부독해요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '', total: relTotal(p['부독해교재']) },
             });
         }
         hasMore = data.has_more; cursor = data.next_cursor;
@@ -3136,6 +3138,7 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
         if (typeof workbook === 'boolean') bookProps['워크북'] = { checkbox: workbook };
         await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: bookProps }) });
         if (typeof textbookCache !== 'undefined') textbookCache.lastFetch = 0;
+        if (typeof bookUnitCache !== 'undefined') bookUnitCache.delete(bookId); // 목차가 바뀌었으니 캐시 폐기
 
         res.write(JSON.stringify({ success: true, message: `${created}개 항목 저장 완료 (총 ${totalItems}개)` }) + '\n');
         res.end();
@@ -3630,79 +3633,74 @@ async function rollbackHomeworkForAbsence(dailyPageId) {
     return { rolledBack, name };
 }
 
-// 숙제 미룸(이월): 그 과목 커서를 직전배정량만큼 되돌려 다음 생성 때 재출제(A방식: 밀린 것만)
-app.post('/api/defer-homework', requireAuth, async (req, res) => {
-    const { name, prefix } = req.body; // prefix ∈ 어휘/주독해/부독해
-    if (!name || !prefix) return res.status(400).json({ success: false, message: 'name/prefix 필요' });
-    if (!['어휘', '주독해', '부독해'].includes(prefix)) return res.status(400).json({ success: false, message: 'prefix 오류' });
-    try {
-        const q = await fetchNotion(`https://api.notion.com/v1/databases/${STUDENT_DATABASE_ID}/query`, {
-            method: 'POST', body: JSON.stringify({ filter: { property: '이름', title: { equals: name } }, page_size: 1 })
-        });
-        if (!q.results.length) return res.status(404).json({ success: false, message: '학생 명부에서 찾을 수 없음' });
-        const page = q.results[0], p = page.properties;
-        const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량';
-        const cursor = p[cursorField]?.number ?? null;
-        const lastAmt = p[amtField]?.number ?? 0;
-        if (!(lastAmt > 0)) return res.json({ success: false, message: '미룰 직전 숙제 내역이 없습니다(이미 미뤘거나 생성 전).' });
-        const newCursor = Math.max(1, (cursor ?? 1) - lastAmt);
-        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
-            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: 0 } } })
-        });
-        res.json({ success: true, newCursor, rolledBack: lastAmt });
-    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
-
-// 특정 학생·과목의 오늘 이미 생성된 숙제 문구를 새 커서 기준으로 다시 계산해 덮어씀
-// (마감일·개수는 생성 로직과 동일하게 새로 계산 — 기존 문구는 수기 수정 등으로 형식이 깨져 있을 수 있어 파싱하지 않음)
-async function regenerateDailyHwText(prefix, studentProps, dailyPageId, newCursor) {
-    const bookId = studentProps[prefix + '교재']?.relation?.[0]?.id || null;
-    if (!bookId) return null;
-    const hwField = prefix + '숙제';
-    const dp = await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`);
-    const existingText = (dp.properties?.[hwField]?.rich_text?.map(t => t.plain_text).join('') || '').trim();
-    if (!existingText) return null; // 오늘 이 과목 숙제가 아직 생성 안 된 경우엔 건드리지 않음
-
-    const { byId: bookById } = await loadTextbooks();
-    const book = bookById[bookId];
-    if (!book) return null;
-    let units = [];
-    if (TEXTBOOK_UNIT_DB_ID) {
-        const uq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
-            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
-        });
-        units = uq.results.map(pg => {
-            const up = pg.properties;
-            return { order: up['순번']?.number ?? null, group: up['그룹']?.rich_text?.map(t => t.plain_text).join('') || '', title: up['제목']?.title?.[0]?.plain_text || '', startPage: up['시작페이지']?.number ?? null, endPage: up['끝페이지']?.number ?? null };
-        }).sort((a, b) => (a.order || 0) - (b.order || 0));
-    }
-
-    const todayStr = getKSTTodayRange().dateString;
-    const attendArr = parseAttendDays(studentProps['수강요일']?.multi_select?.map(d => d.name).join('') || '');
-    const pausePeriods = await getActivePausePeriodList();
-    const isHoliday = (ds) => pausePeriods.some(pp => ds >= pp.start && ds <= pp.end);
-    const nc = nextClassInfo(todayStr, attendArr, isHoliday);
-    if (!nc) return null;
-    const subjCfg = {
-        method: studentProps[prefix + '진도방식']?.select?.name || '',
-        amount: studentProps[prefix + '진도량']?.number ?? '',
-        weekly: studentProps[prefix + '요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '',
-    };
-    const qty = deadlineQuantity(subjCfg, nc);
-    if (!(qty > 0)) return null;
-
-    const asg = buildAssignment(book, units, newCursor, qty, nc.label);
-    if (!asg) return null;
-    await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`, {
-        method: 'PATCH', body: JSON.stringify({ properties: { [hwField]: { rich_text: [{ text: { content: asg.text.substring(0, 2000) } }] } } })
+// 교재 유닛(목차) 목록 — 프로세스 캐시. 목차는 거의 안 바뀌는 정적 데이터라 매번 다시 읽을 이유가 없다.
+const bookUnitCache = new Map(); // bookId -> { units, at }
+const BOOK_UNIT_CACHE_MS = 10 * 60 * 1000;
+async function fetchBookUnits(bookId) {
+    if (!bookId || !TEXTBOOK_UNIT_DB_ID) return [];
+    const hit = bookUnitCache.get(bookId);
+    if (hit && (Date.now() - hit.at) < BOOK_UNIT_CACHE_MS) return hit.units;
+    const uq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+        method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
     });
-    return asg.text;
+    const units = uq.results.map(pg => {
+        const up = pg.properties;
+        return {
+            order: up['순번']?.number ?? null,
+            group: up['그룹']?.rich_text?.map(t => t.plain_text).join('') || '',
+            title: up['제목']?.title?.[0]?.plain_text || '',
+            startPage: up['시작페이지']?.number ?? null,
+            endPage: up['끝페이지']?.number ?? null,
+        };
+    }).sort((a, b) => (a.order || 0) - (b.order || 0));
+    bookUnitCache.set(bookId, { units, at: Date.now() });
+    return units;
 }
 
-// 숙제 진도 전진: 그 과목 커서를 +step(기본 1) 앞으로. 직전배정량=이동한 칸수 기록(↩ 미룸으로 되돌리기 가능)
-app.post('/api/advance-homework', requireAuth, async (req, res) => {
-    const { name, prefix, dailyPageId, setCursor } = req.body; // prefix ∈ 어휘/주독해/부독해, dailyPageId 주면 오늘 숙제 문구도 갱신, setCursor 주면 그 절대값으로 지정(오타·오류 커서 교정용)
-    const step = Math.max(1, Number(req.body?.step) || 1);
+// 교재 끝까지 앞으로 몇 번 더 나갈지. 목차가 있으면 그 행 수가, 없으면 총유닛수×유닛당지문수가 전체 길이다.
+// (커서는 '다음에 낼 유닛'이므로 여기서 나오는 횟수는 오늘 낸 것 다음부터 센 값)
+function remainingInfo(book, units, cursor, qty) {
+    const total = (units && units.length) ? units.length : ((book?.totalUnits || 0) * (book?.perPassage || 1));
+    if (!total) return null; // 총유닛수가 비어 있는 교재는 셀 수 없음
+    const left = total - Math.max(1, Number(cursor) || 1) + 1;
+    if (left <= 0) return { passages: 0, times: 0, total };
+    return { passages: left, times: Math.max(1, Math.ceil(left / Math.max(1, Number(qty) || 1))), total };
+}
+
+// 오늘 숙제 문구에서 "지금 화면에 보이는 시작 유닛"과 "몇 개짜리인지"를 읽어낸다.
+// 커서에서 역산(커서−직전배정량)하지 않는 이유: 선생님이 진도 관리 탭에서 커서를 직접 고쳐온 학생이 많아
+// 커서와 화면 문구가 이미 어긋나 있다. 버튼은 선생님이 '보고 있는 것'을 기준으로 움직여야 한다.
+// 문구 형식: "{마감}까지 {N}개: {교재명} · {범위}{ (p.x~y)}{ + 워크북 ...}"
+function parseAssignedFromText(book, units, text) {
+    if (!text) return null;
+    const countM = text.match(/까지\s*(\d+)\s*개/);
+    const count = countM ? Number(countM[1]) : null;
+    const afterBook = text.split(' · ').slice(1).join(' · ');
+    const range = (afterBook || '').split(' (p.')[0].split(' + 워크북')[0].trim();
+    if (!range) return null;
+    let start = null;
+    if (units && units.length) {
+        const firstLabel = range.split(' ~ ')[0].trim();
+        const u = units.find(x => unitLabel(x) === firstLabel);
+        if (u) start = u.order;
+    } else {
+        const m = range.match(/Unit\s+(\d+)/);
+        if (m) start = (Number(m[1]) - 1) * (book.perPassage || 1) + 1;
+    }
+    if (start == null) return null;
+    return { start, count: count && count > 0 ? count : null };
+}
+
+// [트랙 이동] 오늘 낸 숙제를 한 묶음 뒤(<<)/앞(>>)으로 옮긴다.
+//
+// 핵심: 명부의 '현재유닛'은 **다음에 낼** 유닛을 가리킨다(Unit 11을 내면 커서는 12).
+// 그런데 선생님이 화면에서 보는 건 **방금 낸** 숙제 문구다. 예전 ↩/→ 버튼은 커서를 기준으로
+// 움직여서 → 는 한 칸 건너뛰고(11 → 13) ↩ 는 문구를 아예 안 고쳐 아무 일도 안 일어난 것처럼 보였다.
+// 그래서 여기서는 '오늘 문구가 시작된 유닛'(= 커서 − 직전배정량)을 옮기고 문구와 커서를 함께 다시 쓴다.
+// 한 번에 한 묶음(직전배정량)씩 = << 한 번이면 지난 수업에 낸 그 숙제가 그대로 다시 나온다.
+app.post('/api/move-homework-track', requireAuth, async (req, res) => {
+    const { name, prefix, dailyPageId } = req.body; // prefix ∈ 어휘/주독해/부독해
+    const dir = (Number(req.body?.direction) || 0) >= 0 ? 1 : -1;
     if (!name || !prefix) return res.status(400).json({ success: false, message: 'name/prefix 필요' });
     if (!['어휘', '주독해', '부독해'].includes(prefix)) return res.status(400).json({ success: false, message: 'prefix 오류' });
     try {
@@ -3711,19 +3709,72 @@ app.post('/api/advance-homework', requireAuth, async (req, res) => {
         });
         if (!q.results.length) return res.status(404).json({ success: false, message: '학생 명부에서 찾을 수 없음' });
         const page = q.results[0], p = page.properties;
-        const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량';
-        const cursor = p[cursorField]?.number ?? 1;
-        const newCursor = (setCursor != null && setCursor !== '') ? Math.max(1, Number(setCursor) || 1) : Math.max(1, (cursor || 1) + step);
-        const advancedAmt = newCursor - (cursor || 1);
-        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
-            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: advancedAmt } } })
-        });
-        let updatedText = null;
+        const cursorField = prefix + '현재유닛', amtField = prefix + '직전배정량', hwField = prefix + '숙제';
+
+        const bookId = p[prefix + '교재']?.relation?.[0]?.id || null;
+        if (!bookId) return res.json({ success: false, message: `${prefix} 교재가 배정되지 않았습니다.` });
+        const { byId: bookById } = await loadTextbooks();
+        const book = bookById[bookId];
+        if (!book) return res.json({ success: false, message: '교재 정보를 찾을 수 없습니다.' });
+
+        const cursor = Math.max(1, p[cursorField]?.number ?? 1);
+        const lastAmt = p[amtField]?.number ?? 0;
+
+        // 마감일은 그 행의 날짜를 기준으로 다시 센다. 서버의 '오늘'을 쓰면 지난 날짜를 열어놓고
+        // 버튼을 눌렀을 때 그 행과 상관없는 마감일이 찍힌다.
+        let existingText = '', baseDate = '';
         if (dailyPageId) {
-            try { updatedText = await regenerateDailyHwText(prefix, p, dailyPageId, newCursor); }
-            catch (e) { /* 오늘 문구 갱신 실패해도 커서 전진 자체는 이미 반영됨 */ }
+            const dp = await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`);
+            existingText = (dp.properties?.[hwField]?.rich_text?.map(t => t.plain_text).join('') || '').trim();
+            baseDate = dp.properties?.['🕐 날짜']?.date?.start || '';
         }
-        res.json({ success: true, newCursor, advanced: advancedAmt, updatedText });
+        const todayStr = baseDate || getKSTTodayRange().dateString;
+        const attendArr = parseAttendDays(p['수강요일']?.multi_select?.map(d => d.name).join('') || '');
+        const pausePeriods = await getActivePausePeriodList();
+        const isHoliday = (ds) => pausePeriods.some(pp => ds >= pp.start && ds <= pp.end);
+        const nc = nextClassInfo(todayStr, attendArr, isHoliday);
+        if (!nc) return res.json({ success: false, message: '다음 등원일을 계산할 수 없습니다(수강요일 확인).' });
+        const qty = deadlineQuantity({
+            method: p[prefix + '진도방식']?.select?.name || '',
+            amount: p[prefix + '진도량']?.number ?? '',
+            weekly: p[prefix + '요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '',
+        }, nc);
+        if (!(qty > 0)) return res.json({ success: false, message: `${prefix} 진도량이 설정되지 않았습니다(진도 관리 탭에서 입력).` });
+
+        const units = await fetchBookUnits(bookId);
+
+        // 오늘 문구가 없으면(아직 생성 전이거나 결석으로 지워짐) 문구를 새로 만들지 않고 커서만 옮긴다.
+        if (!existingText) {
+            const newCursor = Math.max(1, cursor + dir * (lastAmt > 0 ? lastAmt : qty));
+            await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+                method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: 0 } } })
+            });
+            return res.json({ success: true, textUpdated: false, newCursor, remaining: remainingInfo(book, units, newCursor, qty) });
+        }
+
+        // 화면 문구에서 지금 위치를 읽는다. 못 읽고 기계가 만든 적도 없는 문구면(선생님이 손으로 쓴 숙제)
+        // 덮어쓰지 않고 막는다 — 수기 내용을 자동 생성 문구로 날려버리면 안 된다.
+        const shown = parseAssignedFromText(book, units, existingText);
+        if (!shown && !(lastAmt > 0)) {
+            return res.json({ success: false, message: '직접 입력한 숙제라 트랙 이동을 쓸 수 없습니다. 숙제칸에서 바로 고쳐주세요.' });
+        }
+        const todayStart = shown ? shown.start : Math.max(1, cursor - lastAmt);
+        const step = (shown && shown.count) || (lastAmt > 0 ? lastAmt : qty);
+        const newStart = todayStart + dir * step;
+        if (newStart < 1) return res.json({ success: false, message: '교재 맨 앞이라 더 뒤로 갈 수 없습니다.' });
+
+        const asg = buildAssignment(book, units, newStart, qty, nc.label);
+        if (!asg) return res.json({ success: false, message: '교재 끝이라 더 앞으로 갈 수 없습니다. 새 교재를 배정해 주세요.' });
+
+        await fetchNotion(`https://api.notion.com/v1/pages/${dailyPageId}`, {
+            method: 'PATCH', body: JSON.stringify({ properties: { [hwField]: { rich_text: [{ text: { content: asg.text.substring(0, 2000) } }] } } })
+        });
+        await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
+            method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: asg.newCursor }, [amtField]: { number: asg.count } } })
+        });
+        if (typeof dashboardCache !== 'undefined') dashboardCache.dailyReport.lastFetch = 0;
+
+        res.json({ success: true, textUpdated: true, text: asg.text, newCursor: asg.newCursor, remaining: remainingInfo(book, units, asg.newCursor, qty) });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
