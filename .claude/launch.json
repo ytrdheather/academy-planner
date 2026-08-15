@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "readiplan",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["api/index.js"],
+      "port": 5001
+    }
+  ]
+}
