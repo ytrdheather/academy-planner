@@ -2683,9 +2683,18 @@ cron.schedule('0 22 * * *', async () => {
 // 이름·날짜·학생 relation만 채운 페이지를 만든다 (나머지는 롤업/수식/기본값).
 // 같은 날짜에 이미 페이지가 있는 학생은 건너뛰므로 몇 번을 실행해도 안전(멱등).
 // ------------------------------------------------------------------
-async function generateDailyReports() {
+// force=true 면 정지 기간이어도 만든다(사람이 수동으로 부를 때만).
+async function generateDailyReports({ force = false } = {}) {
     const { dateString } = getKSTTodayRange();
     const todayChar = new Intl.DateTimeFormat('ko-KR', { weekday: 'short', timeZone: 'Asia/Seoul' }).format(new Date());
+
+    // 공휴일·학원 휴무면 진도 행을 만들지 않는다. 행이 생기면 그날 리포트가 나가고
+    // 선생님 화면에도 등원한 것처럼 뜬다. 숙제 자동 생성(11시)과 같은 스위치를 본다.
+    if (!force) {
+        const pause = await getActivePause(dateString);
+        if (pause) return { date: dateString, day: todayChar, created: [], skipped: [], paused: true, pause };
+    }
+
     const students = (await readStudentConfigs()).filter(s => s.days.includes(todayChar));
 
     // 오늘 날짜로 이미 생성된 페이지의 학생 relation 수집 → 중복 생성 방지
@@ -2723,9 +2732,10 @@ async function generateDailyReports() {
 }
 
 // 수동 실행용 (크론이 못 돌았을 때 복구 등)
+// 정지 기간이어도 사람이 직접 부르면 만든다 — 휴무를 잘못 걸어 둔 날을 복구해야 할 때가 있다.
 app.post('/api/generate-daily-reports', requireAuth, async (req, res) => {
     try {
-        const result = await generateDailyReports();
+        const result = await generateDailyReports({ force: req.body?.force === true });
         res.json({ success: true, ...result });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -2733,6 +2743,7 @@ app.post('/api/generate-daily-reports', requireAuth, async (req, res) => {
 cron.schedule('20 10 * * *', async () => {
     try {
         const r = await generateDailyReports();
+        if (r.paused) { console.log(`⏸️ 데일리 리포트 생성 건너뜀(정지 기간): ${r.pause?.reason || ''}`); return; }
         console.log(`✅ 데일리 리포트 자동 생성: ${r.date}(${r.day}) 신규 ${r.created.length}명, 기존 ${r.skipped.length}명`);
     } catch (e) { console.error('데일리 리포트 생성 Cron Error', e); }
 }, { timezone: "Asia/Seoul" });
