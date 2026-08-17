@@ -13,6 +13,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
 import { initializeExamAnalyzerRoutes } from './examAnalyzerModule.js';
+import { initializeCalendarRoutes } from './calendarModule.js';
 import { initializeTextbookFeeRoutes } from './textbookFeeModule.js';
 import { initializeAdmissionRoutes } from './admissionModule.js';
 import { makeTeacherDm } from './teacherDm.js';
@@ -918,152 +919,19 @@ app.post('/api/absence', async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// [학사일정 달력] 원장·선생님용 도구.
-// 휴강일을 고르면 트랙별 수업 시수를 즉시 다시 세어 준다.
-// 손으로 세면 휴강 하나 바꿀 때마다 세 트랙을 전부 다시 세야 해서 실수가 난다.
+// [학사일정 달력] 원장·선생님용 도구. 라우트는 api/calendarModule.js 로 분리했다.
+// 휴강·이벤트는 기간(18일~20일)으로, 보강일은 하루 단위로 찍는다.
 // 저장은 위 공지사항 DB를 그대로 쓴다(유형: 휴강 / 이벤트 / 보강일).
 // ------------------------------------------------------------------
-const CALENDAR_TYPES = ['휴강', '이벤트', '보강일'];
-
-app.get('/calendar', (req, res) => res.sendFile(path.join(publicPath, 'views', 'calendar.html')));
-
-// 그 달에 찍힌 표시를 읽어 온다. 달력을 그리는 데만 쓰므로 인증을 걸지 않는다.
-app.get('/api/calendar', async (req, res) => {
-    const month = String(req.query.m || '');            // YYYY-MM
-    if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: '월 형식은 YYYY-MM' });
-    if (!NOTICE_DB_ID) return res.json({ marks: [], configured: false });
-
-    try {
-        const data = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
-            method: 'POST',
-            body: JSON.stringify({
-                filter: {
-                    and: [
-                        { property: '날짜', date: { on_or_after: month + '-01' } },
-                        { property: '날짜', date: { before: nextMonth_(month) } },
-                    ],
-                },
-                page_size: 100,
-            }),
-        });
-
-        const marks = (data.results || []).map(page => {
-            const p = page.properties || {};
-            return {
-                id: page.id,
-                type: p['유형']?.select?.name || '',
-                date: p['날짜']?.date?.start || '',
-                title: noticePlainText(p['제목']),
-                // 보강일에만 쓴다. 보강 시간이 토 10시·일 4시처럼 매번 달라서
-                // 날짜만으로는 결석 폼에 무엇을 고르는지 보여줄 수 없다.
-                time: noticePlainText(p['보강시간']),
-            };
-        }).filter(m => CALENDAR_TYPES.includes(m.type) && m.date);
-
-        res.json({ marks, configured: true });
-    } catch (e) {
-        console.error('달력 조회 실패:', e.message);
-        res.status(502).json({ error: '노션에서 읽지 못했습니다' });
-    }
-});
-
-// 그 달 표시를 통째로 맞춘다. 없어진 건 지우고 새로 생긴 건 만든다.
-app.post('/api/calendar', requireAuth, async (req, res) => {
-    const { month, marks } = req.body || {};
-    if (!/^\d{4}-\d{2}$/.test(String(month || ''))) return res.status(400).json({ error: '월 형식은 YYYY-MM' });
-    if (!Array.isArray(marks)) return res.status(400).json({ error: 'marks 배열이 필요합니다' });
-    if (!NOTICE_DB_ID) return res.status(500).json({ error: 'NOTICE_DB_ID 미설정' });
-
-    const wanted = marks
-        .filter(m => CALENDAR_TYPES.includes(m.type) && /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')))
-        .filter(m => m.date.slice(0, 7) === month)
-        .map(m => ({ ...m, time: m.type === '보강일' ? String(m.time || '').trim().slice(0, 40) : '' }));
-
-    try {
-        const current = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
-            method: 'POST',
-            body: JSON.stringify({
-                filter: {
-                    and: [
-                        { property: '날짜', date: { on_or_after: month + '-01' } },
-                        { property: '날짜', date: { before: nextMonth_(month) } },
-                    ],
-                },
-                page_size: 100,
-            }),
-        });
-
-        const existing = (current.results || []).map(page => ({
-            id: page.id,
-            type: page.properties?.['유형']?.select?.name || '',
-            date: page.properties?.['날짜']?.date?.start || '',
-            time: noticePlainText(page.properties?.['보강시간']),
-        })).filter(m => CALENDAR_TYPES.includes(m.type));
-
-        const key = m => m.date + '|' + m.type;
-        const wantedKeys = new Set(wanted.map(key));
-        const existingKeys = new Set(existing.map(key));
-
-        // 빠진 것 지우기 (아카이브라 노션 휴지통에서 되살릴 수 있다)
-        let removed = 0;
-        for (const m of existing) {
-            if (wantedKeys.has(key(m))) continue;
-            await fetchNotion(`https://api.notion.com/v1/pages/${m.id}`, {
-                method: 'PATCH', body: JSON.stringify({ archived: true }),
-            });
-            removed++;
-        }
-
-        // 새로 생긴 것 만들기
-        let added = 0;
-        for (const m of wanted) {
-            if (existingKeys.has(key(m))) continue;
-            await fetchNotion('https://api.notion.com/v1/pages', {
-                method: 'POST',
-                body: JSON.stringify({
-                    parent: { database_id: NOTICE_DB_ID },
-                    properties: {
-                        '제목': { title: [{ text: { content: m.title || m.type } }] },
-                        '유형': { select: { name: m.type } },
-                        '날짜': { date: { start: m.date } },
-                        '보강시간': { rich_text: m.time ? [{ text: { content: m.time } }] : [] },
-                        // 세 유형 모두 학부모 안내 페이지에 보인다.
-                        // 보강일도 2026-08-07부터 목록에 띄운다 — 달력의 점만으로는
-                        // 몇 시에 오는지 알 수 없어서 결국 학원에 물어보게 된다.
-                        '게시': { checkbox: true },
-                    },
-                }),
-            });
-            added++;
-        }
-
-        // 날짜는 그대로인데 시간만 바뀐 보강일을 갱신한다.
-        // 위 add/remove 는 date|type 로만 비교하므로 시간 변경은 여기서 잡아야 한다.
-        let retimed = 0;
-        const byKey = new Map(existing.map(m => [key(m), m]));
-        for (const m of wanted) {
-            if (m.type !== '보강일') continue;
-            const old = byKey.get(key(m));
-            if (!old || old.time === m.time) continue;
-            await fetchNotion(`https://api.notion.com/v1/pages/${old.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ properties: { '보강시간': { rich_text: m.time ? [{ text: { content: m.time } }] : [] } } }),
-            });
-            retimed++;
-        }
-
-        noticeCache.lastFetch = 0;   // 학부모 페이지가 바로 반영되도록 캐시를 비운다
-        res.json({ success: true, added, removed, retimed });
-    } catch (e) {
-        console.error('달력 저장 실패:', e.message);
-        res.status(502).json({ error: '노션에 저장하지 못했습니다' });
-    }
-});
-
-function nextMonth_(month) {
-    const [y, m] = month.split('-').map(Number);
-    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
-}
+try {
+    initializeCalendarRoutes({
+        app, requireAuth, fetchNotion,
+        plainText: noticePlainText,
+        dbIds: { NOTICE_DB_ID, calendarHtmlPath: path.join(publicPath, 'views', 'calendar.html') },
+        // 학부모 안내 페이지가 5분 캐시를 쓴다. 달력을 저장하면 바로 보이게 비운다.
+        invalidateNoticeCache: () => { noticeCache.lastFetch = 0; },
+    });
+} catch (e) { console.error('Calendar Init Error', e); }
 
 app.use('/assets', express.static(path.join(publicPath, 'assets')));
 
@@ -3104,10 +2972,16 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
     try {
         // 1) 이 교재의 기존 유닛 행 archive (교체 방식)
-        const existing = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
-            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
-        });
-        for (const pg of existing.results) {
+        // 100행씩 끝까지 긁는다. 예전엔 첫 100행만 지워서 목차가 긴 교재를 다시 저장하면
+        // 옛 항목이 남아 새 항목과 섞였다(= 책 길이가 부풀고 배지·숙제 범위가 어긋난다).
+        const existingRows = []; let esc, emore = true;
+        while (emore) {
+            const eq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+                method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100, start_cursor: esc })
+            });
+            existingRows.push(...eq.results); emore = eq.has_more; esc = eq.next_cursor;
+        }
+        for (const pg of existingRows) {
             await fetchNotion(`https://api.notion.com/v1/pages/${pg.id}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) });
             await new Promise(r => setTimeout(r, 120));
         }
@@ -3132,8 +3006,11 @@ app.post('/api/save-textbook-units', requireAuth, async (req, res) => {
             await new Promise(r => setTimeout(r, 200));
         }
 
-        // 3) 교재 데이터 베이스의 총유닛수(=총 항목수) + 워크북 유무 갱신
-        const totalItems = units.length;
+        // 3) 교재 데이터 베이스의 총유닛수 + 워크북 유무 갱신
+        // 커서는 순번으로 비교하므로 '책 끝'도 순번 기준이다(bookLength 와 같은 규칙).
+        // 순번을 1..N 로 붙이면 항목 수와 같은 값이 된다.
+        const maxOrder = units.reduce((m, u, i) => Math.max(m, Number(u.order) || (i + 1)), 0);
+        const totalItems = Math.max(units.length, maxOrder);
         const bookProps = { '총유닛수': { number: totalItems } };
         if (typeof workbook === 'boolean') bookProps['워크북'] = { checkbox: workbook };
         await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, { method: 'PATCH', body: JSON.stringify({ properties: bookProps }) });
@@ -3415,19 +3292,8 @@ async function computeHomeworkProposals({ dateStr, onlyName = '', requireAttenda
     const cfgByName = {};
     (await readStudentConfigs(onlyName)).forEach(c => { cfgByName[c.name] = c; });
     const { byId: bookById } = await loadTextbooks();
-    const unitCache = {};
-    const getUnits = async (bookId) => {
-        if (unitCache[bookId]) return unitCache[bookId];
-        if (!TEXTBOOK_UNIT_DB_ID) { unitCache[bookId] = []; return []; }
-        const q = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
-            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
-        });
-        const units = q.results.map(pg => {
-            const p = pg.properties;
-            return { order: p['순번']?.number ?? null, group: p['그룹']?.rich_text?.map(t => t.plain_text).join('') || '', title: p['제목']?.title?.[0]?.plain_text || '', startPage: p['시작페이지']?.number ?? null, endPage: p['끝페이지']?.number ?? null };
-        }).sort((a, b) => (a.order || 0) - (b.order || 0));
-        unitCache[bookId] = units; return units;
-    };
+    // 목차 조회는 fetchBookUnits 하나로 통일한다. 여기 있던 사본은 페이지네이션이 없어 100항목이 넘는
+    // 교재의 뒤쪽을 못 읽었고, 캐시도 이 호출 안에서만 살아서 크론이 돌 때마다 다시 읽었다.
 
     const results = [];
     for (const page of daily) {
@@ -3478,7 +3344,7 @@ async function computeHomeworkProposals({ dateStr, onlyName = '', requireAttenda
                 subjectsOut.push({ ...base, qty: 0, text: why, newCursor: null, advanced: 0, reachedEnd: false, blocked: true });
                 continue;
             }
-            const units = await getUnits(s2.bookId);
+            const units = await fetchBookUnits(s2.bookId);
             const asg = buildAssignment(book, units, s2.unit, qty, nc.label);
             if (!asg) {
                 subjectsOut.push({
@@ -3640,10 +3506,16 @@ async function fetchBookUnits(bookId) {
     if (!bookId || !TEXTBOOK_UNIT_DB_ID) return [];
     const hit = bookUnitCache.get(bookId);
     if (hit && (Date.now() - hit.at) < BOOK_UNIT_CACHE_MS) return hit.units;
-    const uq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
-        method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100 })
-    });
-    const units = uq.results.map(pg => {
+    // 한 번에 100행까지만 오므로 끝까지 넘긴다. 예전엔 첫 100행에서 끊겨 목차가 긴 교재는
+    // 책 뒤쪽이 통째로 없는 것처럼 보였다(숙제 생성도 100번째에서 멈춘다).
+    const rows = []; let sc, more = true;
+    while (more) {
+        const uq = await fetchNotion(`https://api.notion.com/v1/databases/${TEXTBOOK_UNIT_DB_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter: { property: '교재', relation: { contains: bookId } }, page_size: 100, start_cursor: sc })
+        });
+        rows.push(...uq.results); more = uq.has_more; sc = uq.next_cursor;
+    }
+    const units = rows.map(pg => {
         const up = pg.properties;
         return {
             order: up['순번']?.number ?? null,
@@ -3654,17 +3526,69 @@ async function fetchBookUnits(bookId) {
         };
     }).sort((a, b) => (a.order || 0) - (b.order || 0));
     bookUnitCache.set(bookId, { units, at: Date.now() });
+    // 보정이 실패해도 조회는 그대로 진행한다. 대신 조용히 넘기지는 않는다(로그로 남긴다).
+    syncBookTotalUnits(bookId, units).catch(e => console.warn('총유닛수 보정 실패:', bookId, e.message));
     return units;
 }
 
-// 교재 끝까지 앞으로 몇 번 더 나갈지. 목차가 있으면 그 행 수가, 없으면 총유닛수×유닛당지문수가 전체 길이다.
+// 교재 전체 길이 — 커서와 같은 단위로 센다.
+// 🔴 목차가 진실이다. 목차에 지문 순번을 다 적어두므로 '마지막 순번'이 곧 책 끝이고,
+// buildAssignment 도 행 수가 아니라 순번으로 커서를 비교한다(3246). 그래서 행 수가 아니라 순번을 본다.
+// 목차가 없는 교재만 총유닛수×유닛당지문수로 폴백한다(유닛당지문수는 현재 전부 1).
+function bookLength(book, units) {
+    if (units && units.length) {
+        return Math.max(units.length, Number(units[units.length - 1]?.order) || 0);
+    }
+    return (book?.totalUnits || 0) * (book?.perPassage || 1);
+}
+
+// 목차를 끝까지 읽은 김에 교재 DB의 총유닛수가 목차와 어긋나 있으면 맞춰둔다.
+// 노션에서 목차 행을 직접 더하거나 지우면 총유닛수는 따라오지 않는데, 목록 화면의 남은 횟수 배지는
+// 그 숫자로 계산한다 → 어긋난 채 두면 배지만 딴소리를 한다. 목차가 없는 교재의 총유닛수는
+// 사람이 직접 넣은 값이므로 건드리지 않는다.
+async function syncBookTotalUnits(bookId, units) {
+    if (!units || !units.length) return;
+    const { byId } = await loadTextbooks();
+    const book = byId[bookId];
+    if (!book) return;
+    const len = bookLength(book, units);
+    if (!len || book.totalUnits === len) return;
+    await fetchNotion(`https://api.notion.com/v1/pages/${bookId}`, {
+        method: 'PATCH', body: JSON.stringify({ properties: { '총유닛수': { number: len } } })
+    });
+    console.log(`📚 총유닛수 보정: ${book.name} ${book.totalUnits} → ${len} (목차 기준)`);
+    book.totalUnits = len; // 캐시된 교재 객체에도 즉시 반영
+}
+
+// 교재 끝까지 앞으로 몇 번 더 나갈지.
 // (커서는 '다음에 낼 유닛'이므로 여기서 나오는 횟수는 오늘 낸 것 다음부터 센 값)
-function remainingInfo(book, units, cursor, qty) {
-    const total = (units && units.length) ? units.length : ((book?.totalUnits || 0) * (book?.perPassage || 1));
-    if (!total) return null; // 총유닛수가 비어 있는 교재는 셀 수 없음
+// perTime 은 '한 번 나갈 때 평균 몇 개'다 — 특정 요일의 분량이 아니다. avgPerTime 주석 참고.
+function remainingInfo(book, units, cursor, perTime) {
+    const total = bookLength(book, units);
+    if (!total) return null; // 목차도 총유닛수도 없는 교재는 셀 수 없음
     const left = total - Math.max(1, Number(cursor) || 1) + 1;
     if (left <= 0) return { passages: 0, times: 0, total };
-    return { passages: left, times: Math.max(1, Math.ceil(left / Math.max(1, Number(qty) || 1))), total };
+    const per = Math.max(1, Number(perTime) || 1);
+    return { passages: left, times: Math.max(1, Math.ceil(left / per)), total };
+}
+
+// 한 번 나갈 때 평균 몇 개인지 (주간 평균).
+// 🔴 배지는 '앞으로 몇 번 더 나가나 = 교재를 언제 갈아주나'를 보여주는 것이라 특정 요일의 분량
+// (deadlineQuantity)으로 나누면 안 된다. 매일·불규칙 방식은 요일마다 분량이 달라(월6·수4·금4)
+// 같은 학생·같은 교재인데 오늘이 무슨 요일이냐에 따라 배지 숫자가 달라진다.
+// teacher.html 의 avgAssignmentSize 와 같은 계산이다. 한쪽만 고치지 마라.
+function avgPerTime(subjCfg, attendArr) {
+    const method = subjCfg.method || '등원마다';
+    if (!attendArr || !attendArr.length) return Number(subjCfg.amount) || 1;
+    if (method === '불규칙') {
+        const wm = parseWeeklyStr(subjCfg.weekly);
+        const vals = attendArr.map(d => Number(wm[d]) || 0).filter(v => v > 0);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 1;
+    }
+    const N = Number(subjCfg.amount) || 1;
+    const map = computeWeeklyMap(method, N, attendArr);
+    const vals = attendArr.map(d => Number(map[d]) || 0);
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 // 오늘 숙제 문구에서 "지금 화면에 보이는 시작 유닛"과 "몇 개짜리인지"를 읽어낸다.
@@ -3734,11 +3658,13 @@ app.post('/api/move-homework-track', requireAuth, async (req, res) => {
         const isHoliday = (ds) => pausePeriods.some(pp => ds >= pp.start && ds <= pp.end);
         const nc = nextClassInfo(todayStr, attendArr, isHoliday);
         if (!nc) return res.json({ success: false, message: '다음 등원일을 계산할 수 없습니다(수강요일 확인).' });
-        const qty = deadlineQuantity({
+        const subjCfg = {
             method: p[prefix + '진도방식']?.select?.name || '',
             amount: p[prefix + '진도량']?.number ?? '',
             weekly: p[prefix + '요일별진도량']?.rich_text?.map(t => t.plain_text).join('') || '',
-        }, nc);
+        };
+        const qty = deadlineQuantity(subjCfg, nc);              // 이번에 낼 분량 = 다음 등원일 기준
+        const perTime = avgPerTime(subjCfg, attendArr);         // 배지용 = 주간 평균 (요일에 흔들리면 안 됨)
         if (!(qty > 0)) return res.json({ success: false, message: `${prefix} 진도량이 설정되지 않았습니다(진도 관리 탭에서 입력).` });
 
         const units = await fetchBookUnits(bookId);
@@ -3749,7 +3675,7 @@ app.post('/api/move-homework-track', requireAuth, async (req, res) => {
             await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, {
                 method: 'PATCH', body: JSON.stringify({ properties: { [cursorField]: { number: newCursor }, [amtField]: { number: 0 } } })
             });
-            return res.json({ success: true, textUpdated: false, newCursor, remaining: remainingInfo(book, units, newCursor, qty) });
+            return res.json({ success: true, textUpdated: false, newCursor, remaining: remainingInfo(book, units, newCursor, perTime) });
         }
 
         // 화면 문구에서 지금 위치를 읽는다. 못 읽고 기계가 만든 적도 없는 문구면(선생님이 손으로 쓴 숙제)
@@ -3774,7 +3700,7 @@ app.post('/api/move-homework-track', requireAuth, async (req, res) => {
         });
         if (typeof dashboardCache !== 'undefined') dashboardCache.dailyReport.lastFetch = 0;
 
-        res.json({ success: true, textUpdated: true, text: asg.text, newCursor: asg.newCursor, remaining: remainingInfo(book, units, asg.newCursor, qty) });
+        res.json({ success: true, textUpdated: true, text: asg.text, newCursor: asg.newCursor, remaining: remainingInfo(book, units, asg.newCursor, perTime) });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 

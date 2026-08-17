@@ -38,7 +38,7 @@
 | 페이지 | 한 줄 |
 |---|---|
 | [textbook-fee](systems/textbook-fee.md) | 🔴 교재비. 금요일 21시 학부모 일괄 발송. **중복 발송이 최악의 사고** |
-| [absence-notice](systems/absence-notice.md) | 🔴 결석·지각·조퇴 + 달력·공지. **알림 늘리자는 제안 금지** |
+| [absence-notice](systems/absence-notice.md) | 🔴 결석·지각·조퇴 + 달력·공지. **알림 늘리자는 제안 금지** · 기간 일정은 시작일 달이 주인 |
 | [counsel](systems/counsel.md) | 🔴 상담 **두 갈래** — 재원생(자체 폼) / 신입생(구글폼+Apps Script) |
 | [homework-automation](systems/homework-automation.md) | 11시 크론이 전원 생성. 결석 자동 롤백. 버튼 3종 구분 |
 | [daily-report](systems/daily-report.md) | 🔴 AI 코멘트 프롬프트 확정안 (`~니다`체, 압축 금지) |
