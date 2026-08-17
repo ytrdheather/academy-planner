@@ -1472,6 +1472,9 @@
             el.innerHTML = info ? mcBadge(info[0], info[1], info[2]) : '';
         }
         // 학생 설정(커서·교재 길이·진도량)으로 남은 횟수를 직접 계산 — 목록을 그릴 때 쓴다.
+        // 서버 remainingInfo() 와 같은 값이 나와야 한다: << >> 를 누르면 서버가 계산한 값으로 이 배지를
+        // 덮어쓰기 때문에, 공식이 어긋나면 버튼 한 번에 숫자가 튄다. 길이(d.total)는 교재의 총유닛수인데
+        // 서버가 목차를 읽을 때마다 목차 기준으로 맞춰두므로(syncBookTotalUnits) 양쪽이 같은 길이를 본다.
         function remainingTimesFor(cfg, key) {
             const d = cfg && cfg[key];
             if (!d || !d.bookId || !d.total) return null;      // 교재 없음 / 총유닛수 미입력
@@ -1480,7 +1483,8 @@
             const per = avgAssignmentSize(cfg, key);
             return Math.max(1, Math.ceil(left / Math.max(1, per)));
         }
-        // 한 번 나갈 때 평균 몇 개인지 — 등원마다=N, 매일=요일별 환산, 불규칙=요일별 입력값 평균
+        // 한 번 나갈 때 평균 몇 개인지 — 등원마다=N, 매일=요일별 환산, 불규칙=요일별 입력값 평균.
+        // 서버 avgPerTime() 과 같은 계산이다. 한쪽만 고치지 마라.
         function avgAssignmentSize(cfg, key) {
             const d = cfg[key], method = d.method || '등원마다';
             const attend = parseAttendDays(cfg.days);
