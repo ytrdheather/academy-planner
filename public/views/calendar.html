@@ -566,8 +566,15 @@ async function save(){
     const d = await r.json();
     if(!r.ok) throw new Error(d.error || 'http ' + r.status);
     dirty = false;
+    // 휴강을 찍으면 숙제·리포트 생성을 멈추는 정지 기간에도 자동으로 들어간다.
+    // 그 결과를 같이 보여줘야 "찍었는데 왜 숙제가 나갔지" 를 막을 수 있다.
+    let extra = '';
+    if (d.pause && d.pause.error) extra = ' · ⚠ 정지 기간 반영 실패 (노션에서 직접 확인하세요)';
+    else if (d.pause && (d.pause.added || d.pause.removed)) {
+      extra = ' · 휴무 등록 ' + (d.pause.added || 0) + (d.pause.removed ? ' · 휴무 해제 ' + d.pause.removed : '');
+    }
     setMsg('저장됨 (추가 ' + d.added + ' · 삭제 ' + d.removed
-      + (d.retimed ? ' · 시간수정 ' + d.retimed : '') + ')');
+      + (d.retimed ? ' · 시간수정 ' + d.retimed : '') + ')' + extra);
   }catch(e){
     setMsg('저장 실패: ' + e.message, true);
   }

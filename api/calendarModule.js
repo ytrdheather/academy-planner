@@ -32,6 +32,82 @@ function overlapsMonth(start, end, month) {
 
 export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainText, dbIds, invalidateNoticeCache }) {
     const NOTICE_DB_ID = dbIds?.NOTICE_DB_ID || '';
+    const PAUSE_DB_ID = dbIds?.PAUSE_DB_ID || '';
+
+    // ── 휴강 → 숙제 정지 기간 자동 반영 ──
+    // 달력에 휴강을 찍는 것과 크론을 멈추는 것이 따로 놀아서 2026-08-17에 사고가 났다.
+    // 휴강으로 찍어 뒀는데 진도 행 57건이 그대로 생성됐다. 이제 저장할 때 같이 맞춘다.
+    //
+    // 🔴 사람이 노션에서 직접 만든 정지 기간은 절대 건드리지 않는다.
+    //    우리가 만든 것만 사유 앞에 [달력] 을 붙여 표시하고, 그것만 지우고 만든다.
+    const PAUSE_TAG = '[달력]';
+
+    async function syncPausePeriods(month, offItems) {
+        if (!PAUSE_DB_ID) return { skipped: true };
+
+        // 현재 정지 기간 전부 읽기 (건수가 적다)
+        const rows = [];
+        let cursor;
+        do {
+            const body = { page_size: 100 };
+            if (cursor) body.start_cursor = cursor;
+            const q = await fetchNotion(`https://api.notion.com/v1/databases/${PAUSE_DB_ID}/query`, {
+                method: 'POST', body: JSON.stringify(body),
+            });
+            (q.results || []).forEach(pg => {
+                const p = pg.properties || {};
+                const start = p['시작일']?.date?.start || null;
+                if (!start) return;
+                rows.push({
+                    id: pg.id,
+                    start,
+                    end: p['종료일']?.date?.start || p['시작일']?.date?.end || start,
+                    reason: (p['사유']?.title || []).map(t => t.plain_text).join(''),
+                    active: p['활성']?.checkbox === true,
+                });
+            });
+            cursor = q.has_more ? q.next_cursor : null;
+        } while (cursor);
+
+        const mine = rows.filter(r => r.reason.startsWith(PAUSE_TAG) && monthOf(r.start) === month);
+        const wanted = offItems.map(it => ({
+            start: it.start,
+            end: it.end || it.start,
+            reason: `${PAUSE_TAG} ${it.title && it.title !== '휴강' ? it.title : '휴강'}`,
+        }));
+
+        const key = x => x.start + '|' + x.end;
+        const wantedKeys = new Set(wanted.map(key));
+        const mineKeys = new Set(mine.map(key));
+
+        let added = 0, removed = 0;
+        for (const r of mine) {
+            if (wantedKeys.has(key(r))) continue;
+            await fetchNotion(`https://api.notion.com/v1/pages/${r.id}`, {
+                method: 'PATCH', body: JSON.stringify({ archived: true }),
+            });
+            removed++;
+        }
+        for (const w of wanted) {
+            if (mineKeys.has(key(w))) continue;
+            // 원장이 손으로 넣어 둔 같은 기간이 이미 있으면 또 만들지 않는다
+            if (rows.some(r => r.active && r.start === w.start && r.end === w.end)) continue;
+            await fetchNotion('https://api.notion.com/v1/pages', {
+                method: 'POST',
+                body: JSON.stringify({
+                    parent: { database_id: PAUSE_DB_ID },
+                    properties: {
+                        '사유': { title: [{ text: { content: w.reason } }] },
+                        '시작일': { date: { start: w.start } },
+                        '종료일': { date: { start: w.end } },
+                        '활성': { checkbox: true },
+                    },
+                }),
+            });
+            added++;
+        }
+        return { added, removed };
+    }
 
     // 공지 DB는 건수가 적다. 노션 날짜 필터가 기간 속성의 시작·종료 중 무엇을 보는지
     // 애매해서, 전부 읽어 와 JS에서 정확히 거른다. loadNotices() 도 같은 방식이다.
@@ -176,7 +252,18 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
             }
 
             invalidateNoticeCache?.();   // 학부모 페이지가 바로 반영되도록
-            res.json({ success: true, added, removed, retimed });
+
+            // 🔴 정지 기간 반영이 실패해도 달력 저장은 성공으로 둔다.
+            // 여기서 통째로 500을 내면 원장이 다시 저장을 눌러 앞의 쓰기가 두 번 돈다.
+            let pause = null;
+            try {
+                pause = await syncPausePeriods(month, wanted.filter(m => m.type === '휴강'));
+            } catch (e) {
+                console.error('정지 기간 반영 실패:', e.message);
+                pause = { error: true };
+            }
+
+            res.json({ success: true, added, removed, retimed, pause });
         } catch (e) {
             console.error('달력 저장 실패:', e.message);
             res.status(502).json({ error: '노션에 저장하지 못했습니다' });

@@ -927,7 +927,8 @@ try {
     initializeCalendarRoutes({
         app, requireAuth, fetchNotion,
         plainText: noticePlainText,
-        dbIds: { NOTICE_DB_ID, calendarHtmlPath: path.join(publicPath, 'views', 'calendar.html') },
+        // 휴강을 찍으면 숙제 정지 기간에도 자동으로 넣기 위해 PAUSE_DB_ID 를 함께 넘긴다
+        dbIds: { NOTICE_DB_ID, PAUSE_DB_ID, calendarHtmlPath: path.join(publicPath, 'views', 'calendar.html') },
         // 학부모 안내 페이지가 5분 캐시를 쓴다. 달력을 저장하면 바로 보이게 비운다.
         invalidateNoticeCache: () => { noticeCache.lastFetch = 0; },
     });
