@@ -31,7 +31,7 @@ wiki/log.md        ← 작업 이력
 - **Notion 속성은 반드시 헬퍼로 읽는다** (`getRollupValue`, `getPropByKeywords` 등, `api/index.js:147`). 속성명이 노션에서 자주 바뀐다. → `wiki/patterns/notion-prop-read.md`
 - **새 기능은 `api/*Module.js`로 분리하고 `initializeXxx({ app, fetchNotion, requireAuth, ... })`로 주입받는다.** `api/index.js`를 더 키우지 마라. → `wiki/patterns/module-di.md`
 - **자동 배포가 꺼져 있다.** push해도 라이브에 반영되지 않는다. Render 대시보드에서 수동 배포. → `wiki/decisions/render-manual-deploy.md`
-- 커밋·푸시·배포는 요청받았을 때만.
+- 커밋·푸시는 요청받았을 때만. **배포는 원장이 직접 한다 — 배포를 제안하거나 "배포할까요"라고 묻지 마라.** 코드를 바꿨으면 "배포 필요" 한 줄만 남기고 끝낸다.
 
 ## 🔴 이 파일을 키우지 마라
 

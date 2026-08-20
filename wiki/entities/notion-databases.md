@@ -4,7 +4,7 @@ title: Notion 데이터베이스 맵
 type: entity
 status: verified
 source: api/index.js:23-42, 1082-1114, .env
-updated: 2026-08-15
+updated: 2026-08-20
 tags: [notion, database, schema]
 ---
 
@@ -45,5 +45,7 @@ tags: [notion, database, schema]
 - ⚠️ **이름이 비슷한 옛 DB가 있다.** `상담신청서 관리`(`18609320…`)는 2025-07-21에 멈춘 폐기 폼이다. 현행은 `ADMISSION_DB_ID`(`1a109320…`) — `api/index.js:1111` 주석 참고.
 - **속성 이름이 사람 손으로 바뀐다.** 하드코딩 키 대신 `getPropByKeywords`를 써라 → [[notion-prop-read]]
 - 페이지네이션(100건 상한)을 `fetchNotion`이 처리하지 않는다 → [[notion-fetch]]
+- 🔴 **노션 `title` 을 키로 쓰지 마라.** 교재 제목 끝에 눈에 안 보이는 NBSP가 섞여 배정이 막힌 적이 있다 → [[textbook-name-whitespace]]
+- 교재 DB의 `총유닛수` 는 사람이 쓰는 값이 아니라 **목차(교재 유닛 DB)에서 나온 사본**이다. 서버가 목차를 읽을 때 맞춰 쓴다 → [[homework-track-move]]
 
 관련: [[notion-fetch]] · [[notion-prop-read]] · [[env-vars]] · [[notion-latency]]

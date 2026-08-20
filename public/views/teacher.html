@@ -2028,6 +2028,10 @@
         let textbookByName = {};
         const STATUS_OPTIONS = ['정상', '내신대비', '여행·휴가', '휴원', '병결'];
 
+        // 교재 이름 정규화 — 서버 normalizeBookName 과 같은 규칙이다. 한쪽만 고치지 마라.
+        // 노션 제목 끝에 NBSP 같은 안 보이는 공백이 붙은 교재가 있어서, 목록에서 골라도 이름이 안 맞았다.
+        function normBookName(s) { return String(s == null ? '' : s).replace(/[\u00a0\u200b\ufeff]/g, ' ').trim(); }
+
         function escAttr(s) {
             return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
         }
@@ -2056,9 +2060,11 @@
             textbookByName = {};
             const vocab = [], reading = [];
             textbookList.forEach(t => {
-                textbookByName[t.name] = t.id;
-                if (t.subject === '어휘서') vocab.push(t.name);
-                else if (t.subject === '독해서') reading.push(t.name);
+                const nm = normBookName(t.name);
+                if (!nm) return;
+                textbookByName[nm] = t.id;
+                if (t.subject === '어휘서') vocab.push(nm);
+                else if (t.subject === '독해서') reading.push(nm);
             });
             document.getElementById('dl-vocab').innerHTML = vocab.map(n => `<option value="${escAttr(n)}">`).join('');
             document.getElementById('dl-reading').innerHTML = reading.map(n => `<option value="${escAttr(n)}">`).join('');
@@ -2270,7 +2276,7 @@
         }
 
         async function saveTextbook(el) {
-            const name = el.value.trim();
+            const name = normBookName(el.value);
             const prop = el.dataset.prop, pid = el.dataset.pid;
             if (name === '') { el.value = ''; return; } // 빈 입력은 무시(변경 안 함)
             const id = textbookByName[name];

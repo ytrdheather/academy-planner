@@ -41,6 +41,7 @@
 | [absence-notice](systems/absence-notice.md) | 🔴 결석·지각·조퇴 + 달력·공지. **알림 늘리자는 제안 금지** · 기간 일정은 시작일 달이 주인 |
 | [counsel](systems/counsel.md) | 🔴 상담 **두 갈래** — 재원생(자체 폼) / 신입생(구글폼+Apps Script) |
 | [homework-automation](systems/homework-automation.md) | 11시 크론이 전원 생성. 결석 자동 롤백. 버튼 3종 구분 |
+| [homework-track-move](systems/homework-track-move.md) | `<< >>` 트랙 이동과 **남은 횟수 배지**. 배지 공식은 화면·서버 두 곳에 있다 |
 | [daily-report](systems/daily-report.md) | 🔴 AI 코멘트 프롬프트 확정안 (`~니다`체, 압축 금지) |
 | [grammar-comment](systems/grammar-comment.md) | 반별 문법을 한 번 쓰면 학생 코멘트에 원문 그대로 삽입 |
 | [exam-analyzer](systems/exam-analyzer.md) | 시험지 분석 + 학생 채점. 원장 전용. **유일하게 Claude 사용** |
@@ -63,6 +64,7 @@
 | [teacher-rollup-name](pitfalls/teacher-rollup-name.md) | 🔴 롤업 이름이 바뀌어 14건이 묻혔다. **"고치면 되는 실패"에 플래그 금지** |
 | [solapi-sender-typo](pitfalls/solapi-sender-typo.md) | 🔴 발신번호 오타로 문자 6일 전멸. **실패 통지를 실패하는 경로로 보내지 마라** |
 | [notion-latency](pitfalls/notion-latency.md) | 15초 → 1~2초. **노션에 필터를 넘겨라. JS로 거르지 마라** |
+| [textbook-name-whitespace](pitfalls/textbook-name-whitespace.md) | 🔴 교재 제목 끝 **NBSP** 때문에 "목록에 없는 이름입니다". 노션 title을 키로 쓰지 마라 |
 
 ---
 

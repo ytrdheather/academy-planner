@@ -2781,6 +2781,12 @@ app.post('/api/set-write-complete', requireAuth, async (req, res) => {
 let textbookCache = { list: null, byId: {}, lastFetch: 0 };
 const TEXTBOOK_CACHE_MS = 10 * 60 * 1000; // 10분 (교재는 거의 안 바뀌는 정적 데이터)
 
+// 교재 이름 정규화 — 노션 제목에 섞여 들어오는 '눈에 안 보이는 공백'을 없앤다.
+// 🔴 NBSP(U+00A0)는 화면에서 일반 공백과 똑같이 보이지만 문자열 비교에서는 다른 글자다.
+// 진도 관리 탭은 교재를 '이름'으로 찾는데(teacher.html saveTextbook) 입력값은 trim 되어 들어오므로,
+// 제목 끝에 이런 공백이 붙은 교재는 목록에서 골라도 "목록에 없는 이름입니다"가 떴다(2026-08-20, 11권).
+function normalizeBookName(s) { return String(s || '').replace(/[\u00a0\u200b\ufeff]/g, ' ').trim(); }
+
 async function loadTextbooks(force = false) {
     if (!force && textbookCache.list && (Date.now() - textbookCache.lastFetch < TEXTBOOK_CACHE_MS)) {
         return textbookCache;
@@ -2796,7 +2802,8 @@ async function loadTextbooks(force = false) {
         for (const page of data.results) {
             const props = page.properties;
             const nameProp = Object.values(props).find(p => p.type === 'title');
-            const name = nameProp?.title?.[0]?.plain_text || '';
+            // 제목이 여러 조각으로 나뉘어 올 수 있다(일부만 서식이 걸린 경우) → 첫 조각만 읽으면 이름이 잘린다
+            const name = normalizeBookName((nameProp?.title || []).map(t => t.plain_text).join(''));
             if (!name) continue;
             const subject = props['과목']?.select?.name || '';
             const workbook = props['워크북']?.checkbox || false;

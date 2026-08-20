@@ -4,13 +4,15 @@ title: Render 자동 배포를 꺼 둔다
 type: decision
 status: verified
 source: memory/render-manual-deploy.md (2026-08-07)
-updated: 2026-08-15
+updated: 2026-08-20
 tags: [render, deploy, cron]
 ---
 
 ## 결정
 
 **Render 자동 배포는 꺼져 있다. push해도 라이브에 반영되지 않는다.** 사용자가 Render 대시보드에서 `Manual Deploy`를 눌러야 배포된다.
+
+🔴 **배포는 원장이 직접 한다.** 배포를 제안하거나 "배포할까요"라고 묻지 마라. 코드를 바꿨으면 "배포 필요" 한 줄만 남긴다(2026-08-20 지적).
 
 🔴 **push 후 "배포됐다"거나 "Render가 자동 배포할 것"이라고 말하지 마라.** "푸시했으니 Manual Deploy 눌러 달라"고 안내한다.
 
