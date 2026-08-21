@@ -712,7 +712,60 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
                 if (r.실패.length) console.error('교재비 실패 목록:', r.실패);
             }
         } catch (e) { console.error('교재비 Cron Error', e); }
+
+        // 일회성 예약 발송. 5분 크론에 얹었다 — 이것 때문에 크론을 하나 더 늘리지 않는다.
+        try { await runOneShot(); } catch (e) { console.error('교재비 일회성 발송 오류:', e.message); }
     }, { timezone: 'Asia/Seoul' });
+
+    // ── 일회성 예약 발송 ───────────────────────────────────────────
+    //
+    // 금요일 21시를 놓쳤을 때 쓴다. 두 번 겪었다 —
+    //   2026-08-07 선생 신청이 늦어 원장이 22:45 에 승인 → 배치는 이미 지나간 뒤
+    //   2026-08-21 21시에 전부 `승인대기` 라 0건으로 끝남
+    // 그때마다 코드를 고치는 대신 환경변수 하나로 걸 수 있게 했다.
+    //
+    //   TEXTBOOK_ONESHOT_AT=2026-08-23T11:05   (KST 벽시계, 분까지)
+    //
+    // 지정 시각부터 30분 안에 5분 크론이 잡아서 sendBatch() 를 한 번 돌린다.
+    // 30분 창을 두는 이유: 배포·재시작으로 한두 틱을 놓쳐도 그날 안에 나가야 하기 때문이다.
+    // 다 쓰면 환경변수를 지운다. 안 지워도 시각이 지나면 다시 안 돈다.
+    const ONESHOT_AT = process.env.TEXTBOOK_ONESHOT_AT || '';
+    const ONESHOT_WINDOW_MS = 30 * 60 * 1000;
+    let oneshotDone = false;
+
+    /**
+     * 'YYYY-MM-DDTHH:mm' 을 **KST 벽시계**로 읽어 절대시각(ms)으로 바꾼다.
+     * 🔴 맨 `new Date(문자열)` 을 쓰면 서버 시간대로 해석된다(Render 는 UTC).
+     */
+    function kstStampToMs(stamp) {
+        const m = String(stamp).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/);
+        if (!m) return null;
+        return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - 9 * 3600 * 1000;
+    }
+
+    async function runOneShot() {
+        if (!ONESHOT_AT || oneshotDone) return;
+        const at = kstStampToMs(ONESHOT_AT);
+        if (at == null) return;   // 형식이 틀리면 조용히 넘어간다(기동 로그에서 이미 경고했다)
+
+        const now = Date.now();
+        if (now < at || now >= at + ONESHOT_WINDOW_MS) return;
+
+        // 먼저 막아 둔다. sendBatch 가 오래 걸리면 다음 틱이 겹쳐 들어올 수 있다.
+        oneshotDone = true;
+        console.log(`📚 교재비 일회성 발송 시작 (예약 ${ONESHOT_AT} KST)`);
+        try {
+            const r = await sendBatch();
+            console.log(`📚 교재비 일회성 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+        } catch (e) {
+            // 실패해도 다시 시도하지 않는다. 반쯤 나간 상태에서 또 돌면 학부모가 두 번 받을 수 있다.
+            console.error('교재비 일회성 발송 Cron Error', e);
+            try {
+                await notifyOwner('교재비 일회성 발송 실패',
+                    `${e.message}\n\n자동으로 다시 시도하지 않습니다.\n노션을 확인하시고 필요하면 발송을 다시 걸어 주세요.`);
+            } catch (_) { }
+        }
+    }
 
     // 금요일 밤 9시 묶음 발송.
     // 선생이 월~목 밤 10시까지 신청 → 원장이 금요일에 승인 → 금요일 밤에 학부모께 일괄 →
@@ -746,4 +799,11 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
     }, { timezone: 'Asia/Seoul' });
 
     console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 교사알림 + 금 21시 발송 + 월 10시 장보기)');
+    // 예약을 걸어 뒀는데 조용히 안 나가는 것이 제일 나쁘다. 기동할 때 확실히 찍어 준다.
+    if (ONESHOT_AT) {
+        const at = kstStampToMs(ONESHOT_AT);
+        if (at == null) console.error(`🔴 TEXTBOOK_ONESHOT_AT 형식이 틀렸습니다: "${ONESHOT_AT}" — 2026-08-23T11:05 처럼 적어 주세요. 일회성 발송은 돌지 않습니다`);
+        else if (Date.now() >= at + ONESHOT_WINDOW_MS) console.warn(`⚠️ TEXTBOOK_ONESHOT_AT(${ONESHOT_AT} KST) 가 이미 지났습니다 — 일회성 발송은 돌지 않습니다`);
+        else console.log(`⏰ 교재비 일회성 발송 예약됨: ${ONESHOT_AT} KST (이후 30분 안에 한 번)`);
+    }
 }
