@@ -31,6 +31,8 @@ tags: [homework, progress, cron, textbook]
 
 `computeHomeworkProposals({ dateStr, onlyName, requireAttendance })`가 미리보기 화면과 크론이 **공유하는 계산부**다. `requireAttendance`는 수동 전체 생성일 때만 `true`.
 
+**2026-08-22부터 `출석`의 주인이 바뀌었다** — 선생님이 찍던 것을 학생이 플래너를 저장할 때 서버가 켠다. 수동 전체 생성(`requireAttendance:true`)의 대상이 "플래너를 저장한 아이"가 된다 → [[arrival-alert]]
+
 ## 결석 자동 롤백
 
 11시에 전원 생성하므로 결석자에게도 숙제가 나간다. 이를 **결석사유를 입력하는 순간** 자동 정리한다 — `rollbackHomeworkForAbsence()`. 그날 문구를 지우고 커서를 직전배정량만큼 되돌린 뒤 **직전배정량=0**으로 두어 이중 롤백을 막는다.

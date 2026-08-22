@@ -49,6 +49,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | `KAKAOWORK_ADMISSION_CONV` | 신입생 상담 |
 | `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM (폴백 목적지) |
 | `KAKAOWORK_ASSISTANT_CONV` | 조교 장보기 |
+| `KAKAOWORK_ARRIVAL_CONV` | 미도착 알림. **없으면 원장 DM 으로 간다**(첫 주 운영). 선생님들께 열 때 결석 채널 ID를 넣는다 → [[arrival-alert]] |
 
 **폼 링크 / 기타**
 
@@ -56,6 +57,9 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 |---|---|
 | `FORM_ABSENCE_URL` / `FORM_COUNSEL_URL` / `FORM_ADMISSION_URL` | `/notice` 허브가 노출하는 폼 주소 |
 | `SHOW_GENERATED_HOMEWORK` | 자동 생성 숙제 노출 토글 (`api/index.js:2556`) |
+| `ARRIVAL_GRACE_MIN` | 미도착 판정 유예(분). 기본 15 |
+| `ARRIVAL_LATE_WINDOW_MIN` | 이 분수를 넘게 지난 건은 안 알린다. 기본 90 |
+| `ARRIVAL_AUDIT_AFTER` | 등원시간 점검을 돌릴 시각(시). 기본 13 |
 
 ## 주의
 
@@ -63,4 +67,4 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 - 대부분의 변수는 없어도 서버가 뜬다. **조용히 기능만 꺼진다.** 배포 후 Render 로그에서 `⚠️ ... 설정 없음`과 `Init Error`를 확인하라.
 - 🔴 **`DOMAIN_URL`은 환경변수가 아니라 코드 상수다** (`api/index.js:45`, `https://readitude.onrender.com`). 도메인을 바꾸면 코드를 고쳐야 한다.
 
-관련: [[notion-databases]] · [[external-services]] · [[render-manual-deploy]]
+관련: [[notion-databases]] · [[external-services]] · [[render-manual-deploy]] · [[arrival-alert]]

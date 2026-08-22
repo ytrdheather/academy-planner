@@ -19,6 +19,7 @@ import { initializeAdmissionRoutes } from './admissionModule.js';
 import { makeTeacherDm } from './teacherDm.js';
 import { initializeKakaoSkill } from './kakaoSkill.js';
 import { initializeConfirmNotify } from './confirmNotifyModule.js';
+import { initializeArrivalAlert } from './arrivalAlertModule.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -1003,6 +1004,24 @@ try {
             sendKakaoWork(KAKAOWORK_COUNSEL_CONV, `[${title}]\n\n${body}`).catch(e => console.error('상담 알림 통지 실패:', e.message)),
     });
 } catch(e) { console.error('Confirm Notify Init Error', e); }
+
+// 미도착 알림 — 등원 시각 + 유예가 지났는데 출석이 안 켜진 학생을 선생님께 알린다.
+// 출석은 학생이 리디플래너에 숙제를 저장하면 자동으로 켜진다(아래 /save-progress).
+try {
+    initializeArrivalAlert({
+        app, requireAuth, fetchNotion, cron,
+        dbIds: { STUDENT_DATABASE_ID, PROGRESS_DATABASE_ID, ABSENCE_DB_ID },
+        // 🔴 첫 주는 원장 DM 으로만 간다 (2026-08-22 원장). 강사들이 등원시간을 채우는 동안은
+        // 오탐이 섞이기 때문에, 쓸 만한지 원장이 먼저 보고 나서 선생님들께 연다.
+        // 여는 방법: Render 환경변수 KAKAOWORK_ARRIVAL_CONV 에 결석 채널 ID 를 넣는다(배포 불필요).
+        notifyChannel: (title, body) =>
+            sendKakaoWork(
+                process.env.KAKAOWORK_ARRIVAL_CONV || KAKAOWORK_APPROVAL_CONV || KAKAOWORK_ABSENCE_CONV,
+                `[${title}]\n\n${body}`,
+            ),
+        getKSTTodayRange, getActivePause,
+    });
+} catch(e) { console.error('Arrival Alert Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;
@@ -2384,14 +2403,36 @@ app.post('/save-progress', requireAuth, async (req, res) => {
         
         const existingPageQuery = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter, page_size: 1 }) });
         
+        let savedPageId = '';
+        let alreadyPresent = false;
         if (existingPageQuery.results.length > 0) { 
-            await fetchNotion(`https://api.notion.com/v1/pages/${existingPageQuery.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties }) }); 
+            const row = existingPageQuery.results[0];
+            savedPageId = row.id;
+            alreadyPresent = row.properties['출석']?.checkbox || false;
+            await fetchNotion(`https://api.notion.com/v1/pages/${savedPageId}`, { method: 'PATCH', body: JSON.stringify({ properties }) }); 
         } else { 
             properties['이름'] = { title: [{ text: { content: studentName } }] }; 
             properties['🕐 날짜'] = { date: { start: dateString } }; 
             const studentPageId = await findPageIdByTitle(STUDENT_DATABASE_ID, studentName, '이름'); 
             if (studentPageId) properties['학생'] = { relation: [{ id: studentPageId }] }; 
-            await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
+            const createdPage = await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: PROGRESS_DATABASE_ID }, properties }) }); 
+            savedPageId = createdPage?.id || '';
+        }
+
+        // [등원 자동 체크] 아이들은 학원에 와서 플래너를 쓴다. 저장이 곧 도착 신호다.
+        // 선생님이 출석을 손으로 찍을 일이 없어지고, 미도착 알림(arrivalAlertModule)이 이 값을 본다.
+        // 🔴 숙제 저장과 반드시 분리한다 — `등원시각` 속성이 노션에 없으면 PATCH 가 통째로 실패하는데,
+        //    그것 때문에 아이 숙제 저장이 깨지면 안 된다. 실패해도 학생에게는 저장 성공으로 돌려준다.
+        if (savedPageId && !alreadyPresent) {
+            const arriveAt = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(11, 16); // KST HH:MM
+            const stamp = (props) => fetchNotion(`https://api.notion.com/v1/pages/${savedPageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
+            try {
+                await stamp({ '출석': { checkbox: true }, '등원시각': { rich_text: [{ text: { content: arriveAt } }] } });
+            } catch (e) {
+                // `등원시각` 속성을 아직 안 만든 상태. 출석만이라도 켠다.
+                try { await stamp({ '출석': { checkbox: true } }); }
+                catch (e2) { console.error('등원 자동 체크 실패:', e2.message); }
+            }
         }
 
         // [추가됨] 학생이 진도를 저장하면 대시보드 캐시 무효화

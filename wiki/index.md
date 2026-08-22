@@ -46,6 +46,7 @@
 | [grammar-comment](systems/grammar-comment.md) | 반별 문법을 한 번 쓰면 학생 코멘트에 원문 그대로 삽입 |
 | [exam-analyzer](systems/exam-analyzer.md) | 시험지 분석 + 학생 채점. 원장 전용. **유일하게 Claude 사용** |
 | [monthly-report](systems/monthly-report.md) | ⚠️ `inferred` — 4번째 토요일 자동 생성. 코드 미정독 |
+| [arrival-alert](systems/arrival-alert.md) | 미도착 알림. **출석은 학생이 플래너를 저장하면 자동으로 켜진다** |
 | [kakao-channel-bot](systems/kakao-channel-bot.md) | 🔴 **봇은 안내판이다.** "봇이 안 뜬다"는 상담 연결 모드 때문 |
 
 ## decisions — 왜 그렇게 골랐나

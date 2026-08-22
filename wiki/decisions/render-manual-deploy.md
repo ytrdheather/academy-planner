@@ -4,7 +4,7 @@ title: Render 자동 배포를 꺼 둔다
 type: decision
 status: verified
 source: memory/render-manual-deploy.md (2026-08-07)
-updated: 2026-08-20
+updated: 2026-08-22
 tags: [render, deploy, cron]
 ---
 
@@ -36,6 +36,7 @@ Starter 플랜이라 서버가 잠들지 않아 크론이 정상 동작한다. *
 | **월 09:55~10:05** | 조교 장보기 목록 |
 | 평일 13:55~14:05 | 교재비 담당쌤 묶음 알림 |
 | 매일 07:55~08:05 | 그날 보강 명단 |
+| 수업 시간대 매시 13~17분·43~47분 | 미도착 알림 — 놓치면 그 시간대 아이는 30분 뒤에야 잡힌다 → [[arrival-alert]] |
 | `TEXTBOOK_ONESHOT_AT` 걸린 시각 ±30분 | 일회성 교재비 발송 — **창을 통째로 놓치면 그날 안 나간다** |
 
 겹쳐서 놓친 크론은 대부분 화면의 수동 버튼이나 `POST /api/textbook/tick`·`/send-batch`·`/shopping-push`로 복구할 수 있다(멱등) → [[cron-jobs]]

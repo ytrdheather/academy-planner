@@ -1,16 +1,16 @@
 ---
 id: cron-jobs
-title: 크론 잡 전체 (13개)
+title: 크론 잡 전체 (14개)
 type: entity
 status: verified
-source: api/index.js, api/confirmNotifyModule.js, api/textbookFeeModule.js, api/monthlyReportModule.js, api/admissionModule.js
-updated: 2026-08-15
+source: api/index.js, api/confirmNotifyModule.js, api/textbookFeeModule.js, api/monthlyReportModule.js, api/admissionModule.js, api/arrivalAlertModule.js
+updated: 2026-08-22
 tags: [cron, schedule, automation]
 ---
 
 ## 정체
 
-`node-cron`으로 서버 프로세스 안에서 도는 스케줄 13개. **전부 `{ timezone: 'Asia/Seoul' }`을 명시**하므로 아래 시각은 한국 시간이다.
+`node-cron`으로 서버 프로세스 안에서 도는 스케줄 14개. **전부 `{ timezone: 'Asia/Seoul' }`을 명시**하므로 아래 시각은 한국 시간이다.
 
 ## 표
 
@@ -30,6 +30,7 @@ tags: [cron, schedule, automation]
 | 21:00 금요일 | `0 21 * * 5` | `textbookFeeModule.js:768` | **교재비 학부모 묶음 발송** |
 | (일회성) | `TEXTBOOK_ONESHOT_AT` | `textbookFeeModule.js:735` | 금 21시를 놓쳤을 때 **한 번만** 묶음 발송. 5분 크론에 얹혀 있다 |
 | 22:00 매일 | `0 22 * * *` | `api/index.js:2798` | 그날 진도 행에 `데일리리포트URL` 채우기 |
+| 매시 15·45분 | `15,45 * * * *` | `arrivalAlertModule.js:253` | 미도착 알림 — 등원 시각+15분 지났는데 출석 미체크. 09~23시만, 0명이면 조용 |
 
 ## 쓰는 곳
 
@@ -54,8 +55,8 @@ TEXTBOOK_ONESHOT_AT=2026-08-23T11:05   # KST 벽시계, 분까지
 ## 주의
 
 - 🔴 **크론은 서버 프로세스 안에 있다.** Render가 슬립하거나 재시작하면 그 시각 잡은 그냥 안 돈다. 재시도 큐가 없다.
-- 🔴 **새 크론에 `{ timezone: 'Asia/Seoul' }`을 빠뜨리지 마라.** 지금 13개 전부 갖고 있다.
+- 🔴 **새 크론에 `{ timezone: 'Asia/Seoul' }`을 빠뜨리지 마라.** 지금 14개 전부 갖고 있다.
 - 크론 콜백 안의 맨 `new Date()`는 서버 시간이다 → [[kst-time]]
 - 각 크론은 `try/catch`로 감싸져 있어 실패해도 다음 회차는 돈다. 다만 **실패가 콘솔에만 남는다** — 조용한 실패를 잡으려면 Render 로그를 봐야 한다.
 
-관련: [[kst-time]] · [[textbook-fee]] · [[homework-automation]] · [[daily-report]] · [[absence-notice]] · [[counsel]]
+관련: [[kst-time]] · [[textbook-fee]] · [[homework-automation]] · [[daily-report]] · [[absence-notice]] · [[counsel]] · [[arrival-alert]]

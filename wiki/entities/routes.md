@@ -49,6 +49,7 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 | 학생 전용 (`requireStudent`) | `/api/my-report-dates` `/api/my-report` `/api/my-homework` |
 | 교재 | `/api/textbooks` `/api/parse-toc` `/api/textbook-units` `/api/save-textbook-units` `/api/set-textbook-meta` `/api/progress-config-data` `/api/update-student-progress` |
 | 교재비 | `/api/textbook/tick` `/send-batch` `/notify-teachers` `/shopping-list` `/shopping-push` |
+| 미도착 | `/api/arrival/tick` (`{dryRun:true}` 면 명단만, 발송·기록 안 함) → [[arrival-alert]] |
 | 확정·발송 | `/api/confirm/auto-close` `/api/makeup/send-confirms` `/api/makeup/roster` `/api/counsel/send-confirms` `/api/counsel/remind` `/api/messages/sent` `/api/admission/tick` |
 | 시험 | `/api/analyze-exam` `/save-exam-analysis` `/exam-list` `/grade-student` `/save-student-result` `/student-results` `/student-result-detail` `/regrade-exam` `/student-report-data` + 학생용 `/api/student/exam-list` `/exam-questions` `/submit-exam` |
 | 기타 | `/api/calendar`(POST) `/api/prefill-holidays` `/api/manual-monthly-report-gen` |
