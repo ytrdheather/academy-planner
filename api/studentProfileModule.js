@@ -244,10 +244,8 @@ export function initializeStudentProfile({
                     age: p['나이']?.formula?.number ?? null,
                     enroll: p['재원상태']?.select?.name || '',
                     studyStatus: p['학습상태']?.select?.name || '',
-                    course: p['수강과정']?.select?.name || '',
                     subject: p['수강과목']?.select?.name || '',
                     grammarClass: className,
-                    classCode: p['Class']?.select?.name || '',
                     teachers: (p['담당쌤']?.multi_select || []).map(t => t.name),
                     notionUrl: page.url || '',
 

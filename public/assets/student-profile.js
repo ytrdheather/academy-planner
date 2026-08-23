@@ -126,8 +126,7 @@
 
     function secBasic(p) {
         var f = fld('학교', p.school) + fld('학년', p.grade) + fld('나이', p.age ? p.age + '세' : '')
-            + fld('수강과정', p.course) + fld('수강과목', p.subject)
-            + fld('문법반', p.grammarClass) + fld('클래스', p.classCode)
+            + fld('수강과목', p.subject) + fld('문법반', p.grammarClass)
             + fld('담당쌤', (p.teachers || []).join(', '));
         if (p.canSeeContact) {
             f += fld('학부모 연락처', p.parentPhone) + fld('학생 연락처', p.studentPhone);

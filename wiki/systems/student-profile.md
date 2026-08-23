@@ -3,7 +3,7 @@ id: student-profile
 title: 학생 프로필 카드
 type: system
 status: verified
-source: api/studentProfileModule.js (346줄), public/assets/student-profile.js, api/index.js:1027-1040
+source: api/studentProfileModule.js (349줄), public/assets/student-profile.js, api/index.js:1027-1040
 updated: 2026-08-23
 tags: [profile, teacher, notion, privacy]
 ---
@@ -33,6 +33,6 @@ tags: [profile, teacher, notion, privacy]
 
 붙이는 법은 `<script src="/assets/student-profile.js?v=N">` 한 줄 + 이름을 `studentNameLink(이름, 명부pageId)` 로 감싸기. 붙은 곳 — `teacher.html`(7탭+진도 관리, `nameLink()` 로 한 번 감쌌다) · `past-grammar` · `passwords` · `results-viewer`. **진도 DB의 pageId를 넘겨도 안전하다** — 명부 페이지가 아니면 이름으로 되짚는다 (`:59-77`).
 
-라우트 `api/studentProfileModule.js:192` `:292` `:318` · 주입 `api/index.js:1030` · 상담기록 DB → [[notion-databases]]
+라우트 `api/studentProfileModule.js:192` `:290` `:316` · 주입 `api/index.js:1030` · 상담기록 DB → [[notion-databases]]
 
 관련: [[counsel]] · [[arrival-alert]] · [[textbook-fee]] · [[monthly-report]] · [[module-di]] · [[auth-jwt]]
