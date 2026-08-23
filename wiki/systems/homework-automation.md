@@ -3,7 +3,7 @@ id: homework-automation
 title: 숙제·진도 자동화
 type: system
 status: verified
-source: api/index.js:3167-3520, public/views/teacher.html
+source: api/index.js:3183-3536, public/views/teacher.html
 updated: 2026-08-20
 tags: [homework, progress, cron, textbook]
 ---

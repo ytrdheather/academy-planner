@@ -163,3 +163,15 @@ Karpathy LLM-wiki 패턴으로 `wiki/` 층 신설. 목적은 세션마다 반복
 - 시간대: 월수금 14~17시, 화목 15~19시. **노션 선택 옵션은 속성마다 따로**라 요일 칸별로 그 요일 시간만 등록하면 드롭다운이 좁아진다.
 - 🔴 **하루 한 번 등원시간 점검 알림을 추가했다**(`auditRoster`). 시각이 비거나 "2시"처럼 적히면 그 아이가 조용히 판정에서 빠지는데, 조용히 빠지는 것이 이 기능의 최악 실패다.
 - 갱신: [[arrival-alert]] · [[notion-databases]] · [[env-vars]]
+
+## [2026-08-23] ingest | 학생 프로필 카드 + 상담기록 DB
+
+- 새 페이지 [[student-profile]] · 새 모듈 `api/studentProfileModule.js`(346줄) · 공용 위젯 `public/assets/student-profile.js`. 이름을 누르면 명부·문법·교재비·월간리포트·상담기록을 한 장으로 모은다. `teacher.html`(7탭+진도) · `past-grammar` · `passwords` · `results-viewer` 에 붙였다.
+- **노션 `학생 상담기록` DB 신설**(`3c509320…`). 원래 요구는 "학생 명부에 열을 옆으로 계속 추가"였는데 명부 속성이 이미 88개라 별도 DB로 뺐다. 관계는 `single_property` — 명부에 역방향 열이 안 생긴다.
+- 🔴 새 페이지 [[role-manager-is-not-owner]] — "원장만"을 `role === 'manager'` 로 걸었더니 **5명(조교 포함)이 통과했다.** 배포 전 발견, `loginId === 'manager'` 로 교체. 계정 7개 전부 실측해 원장 1명만 통과 확인.
+- 🔴 새 페이지 [[local-server-fires-crons]] — 검증하려고 `node api/index.js` 를 띄울 뻔했다. 5분 크론 셋이 실전 알림톡을 쏜다. 모듈 하나만 올린 하네스로 우회.
+- 🔴 [[arrival-alert]] 의 **요일별 옵션 결정을 내가 깰 뻔했다.** 등원시각 드롭다운을 요일 6개 합집합으로 뿌리고 있었다(월요일에 19:00 선택 가능 → 노션에 옵션 신설). 요일별로 갈랐고 저장 라우트도 그 요일 옵션 외에는 400으로 거절한다. **222칸을 채우는 자리가 노션 말고 하나 더 생겼다.**
+- 실측: 프로필 응답 0.6~0.9초. 라이브 노션에 등원시각·상담기록 쓰기 시험 후 전부 원상복구.
+- 갱신: [[notion-databases]](19개째) · [[env-vars]] · [[routes]] · [[views]](🔴 `/assets/*` 는 cache-first) · [[arrival-alert]] · [[counsel]] · [[auth-jwt]] · [[module-di]]
+- **장부 정리**: `api/index.js` 가 16줄 늘어 위키 전체의 `file:line` 참조 84개가 밀렸다. HEAD 대비 라인 매핑으로 일괄 보정.
+

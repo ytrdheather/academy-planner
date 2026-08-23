@@ -3,8 +3,8 @@ id: notion-databases
 title: Notion 데이터베이스 맵
 type: entity
 status: verified
-source: api/index.js:23-42, 1082-1114, .env
-updated: 2026-08-22
+source: api/index.js:24-43, 1082-1114, .env
+updated: 2026-08-23
 tags: [notion, database, schema]
 ---
 
@@ -16,7 +16,7 @@ tags: [notion, database, schema]
 
 | 환경변수 | 용도 | 쓰는 곳 |
 |---|---|---|
-| `STUDENT_DATABASE_ID` | 학생 원장. 이름·재원상태·담당쌤·전화번호·학생 ID | 거의 전부 |
+| `STUDENT_DATABASE_ID` | 학생 원장. 이름·재원상태·담당쌤·전화번호·학생 ID. **속성 88개** | 거의 전부 |
 | `PROGRESS_DATABASE_ID` | 일자별 진도·숙제·코멘트. **가장 뜨거운 DB** | 데일리 리포트, 숙제 자동화, 월간 리포트 |
 | `GRAMMAR_DB_ID` | 반별 문법 진도 원장 | [[grammar-comment]] |
 | `KOR_BOOKS_ID` / `ENG_BOOKS_ID` | 국어·영어 교재 목록 | `bookModule.js` |
@@ -34,19 +34,22 @@ tags: [notion, database, schema]
 | `QUESTION_DB_ID` | 문항 | [[exam-analyzer]] |
 | `STUDENT_RESULT_DB_ID` | 학생 채점 결과 | [[exam-analyzer]] |
 | `STUDENT_ANSWER_DB_ID` | 학생 답안 | [[exam-analyzer]] |
+| `COUNSEL_LOG_DB_ID` | **학생 상담기록** (선생님이 손으로 남기는 날짜+코멘트) | [[student-profile]] |
 
 ## 쓰는 곳
 
-`api/index.js:23-39`에서 한꺼번에 구조분해로 읽고, 모듈에는 `dbIds: { ... }` 객체로 넘긴다 ([[module-di]]).
+`api/index.js:24-40`에서 한꺼번에 구조분해로 읽고, 모듈에는 `dbIds: { ... }` 객체로 넘긴다 ([[module-di]]).
 
 ## 주의
 
-- 🔴 **코드에 UUID가 폴백으로 박힌 곳이 있다.** `PAUSE_DB_ID`(`api/index.js:42`), `COUNSEL_DB_ID`(`:325`), `TEACHER_DB_ID`(`:338`), `ADMISSION_DB_ID`(`:1112`). env 없이도 돌게 한 의도적 선택이지만, DB를 갈아끼우면 env만 바꿔서는 안 되고 코드도 봐야 한다.
-- ⚠️ **이름이 비슷한 옛 DB가 있다.** `상담신청서 관리`(`18609320…`)는 2025-07-21에 멈춘 폐기 폼이다. 현행은 `ADMISSION_DB_ID`(`1a109320…`) — `api/index.js:1111` 주석 참고.
+- 🔴 **코드에 UUID가 폴백으로 박힌 곳이 있다.** `PAUSE_DB_ID`(`api/index.js:43`), `COUNSEL_DB_ID`(`:325`), `TEACHER_DB_ID`(`:338`), `COUNSEL_LOG_DB_ID`(`:1037`), `ADMISSION_DB_ID`(`:1112`). env 없이도 돌게 한 의도적 선택이지만, DB를 갈아끼우면 env만 바꿔서는 안 되고 코드도 봐야 한다.
+- ⚠️ **이름이 비슷한 옛 DB가 있다.** `상담신청서 관리`(`18609320…`)는 2025-07-21에 멈춘 폐기 폼이다. 현행은 `ADMISSION_DB_ID`(`1a109320…`) — `api/index.js:1127` 주석 참고.
 - **속성 이름이 사람 손으로 바뀐다.** 하드코딩 키 대신 `getPropByKeywords`를 써라 → [[notion-prop-read]]
 - 페이지네이션(100건 상한)을 `fetchNotion`이 처리하지 않는다 → [[notion-fetch]]
 - 🔴 **노션 `title` 을 키로 쓰지 마라.** 교재 제목 끝에 눈에 안 보이는 NBSP가 섞여 배정이 막힌 적이 있다 → [[textbook-name-whitespace]]
 - **미도착 알림이 쓰는 속성 3개는 사람이 노션에서 만들어야 한다** — 명부 `월등원`~`토등원`(선택), 진도 `등원시각`·`미도착알림일시`(텍스트). 없으면 조용히 기능만 빠진다 → [[arrival-alert]]
 - 교재 DB의 `총유닛수` 는 사람이 쓰는 값이 아니라 **목차(교재 유닛 DB)에서 나온 사본**이다. 서버가 목차를 읽을 때 맞춰 쓴다 → [[homework-track-move]]
+
+- 🔴 **학생 명부(속성 88개)에 열을 더 늘리지 마라.** 상담 기록을 "옆으로 계속" 붙이는 안이 있었는데, 명부를 읽는 모든 기능(숙제 생성·월간 리포트·미도착 알림)이 같이 무거워진다. 그래서 별도 DB로 뺐고, 관계는 **`single_property`** 라 명부 쪽에 역방향 열이 생기지 않는다 → [[student-profile]]
 
 관련: [[notion-fetch]] · [[notion-prop-read]] · [[env-vars]] · [[notion-latency]]

@@ -3,7 +3,7 @@ id: notion-fetch
 title: Notion API 호출 (fetchNotion)
 type: pattern
 status: verified
-source: api/index.js:65-96
+source: api/index.js:66-97
 updated: 2026-08-15
 tags: [notion, http, retry]
 ---
@@ -14,7 +14,7 @@ Notion API를 직접 `fetch`하면 세 가지에 매번 걸린다. (1) 같은 �
 
 ## 해법
 
-`fetchNotion(url, options, retries = 3)` — `api/index.js:65`
+`fetchNotion(url, options, retries = 3)` — `api/index.js:66`
 
 - 409면 **500ms 쉬고 재귀 재시도**, 기본 3회
 - `Notion-Version: 2022-06-28` 고정

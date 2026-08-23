@@ -4,7 +4,7 @@ title: 환경변수
 type: entity
 status: verified
 source: api/index.js, .env.example
-updated: 2026-08-15
+updated: 2026-08-23
 tags: [config, env, render]
 ---
 
@@ -18,11 +18,15 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 
 | 변수 | 없으면 |
 |---|---|
-| `JWT_SECRET` | 🔴 개발용 기본값으로 폴백 (`api/index.js:24`) |
+| `JWT_SECRET` | 🔴 개발용 기본값으로 폴백 (`api/index.js:25`) |
 | `NOTION_ACCESS_TOKEN` | Notion 전부 실패 |
 | `PORT` | 5001 |
 
-**Notion DB** — 18개. → [[notion-databases]]
+**Notion DB** — 19개. → [[notion-databases]]
+
+| 변수 | 없으면 |
+|---|---|
+| `COUNSEL_LOG_DB_ID` | 폴백 상수 있음 (`api/index.js:1037`). 없으면 프로필의 상담기록 칸만 비활성 → [[student-profile]] |
 
 **AI**
 
@@ -36,7 +40,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 |---|---|
 | `SOLAPI_API_KEY` / `SOLAPI_API_SECRET` | |
 | `SOLAPI_SENDER` | 🔴 등록된 발신번호. 오타 사고 이력 → [[solapi-sender-typo]] |
-| `ALIMTALK_PF_ID` | 폴백 상수 있음 (`api/index.js:372`) |
+| `ALIMTALK_PF_ID` | 폴백 상수 있음 (`api/index.js:373`) |
 | `ALIMTALK_TPL_COUNSEL_RECEIPT` | 없으면 발송만 건너뜀 |
 
 **KakaoWork (내부 알림)** → [[kakaowork-notify]]
@@ -56,7 +60,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | 변수 | 용도 |
 |---|---|
 | `FORM_ABSENCE_URL` / `FORM_COUNSEL_URL` / `FORM_ADMISSION_URL` | `/notice` 허브가 노출하는 폼 주소 |
-| `SHOW_GENERATED_HOMEWORK` | 자동 생성 숙제 노출 토글 (`api/index.js:2556`) |
+| `SHOW_GENERATED_HOMEWORK` | 자동 생성 숙제 노출 토글 (`api/index.js:2572`) |
 | `ARRIVAL_GRACE_MIN` | 미도착 판정 유예(분). 기본 15 |
 | `ARRIVAL_LATE_WINDOW_MIN` | 이 분수를 넘게 지난 건은 안 알린다. 기본 90 |
 | `ARRIVAL_AUDIT_AFTER` | 등원시간 점검을 돌릴 시각(시). 기본 13 |
@@ -65,6 +69,6 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 
 - 🔴 **`.env.example`이 심하게 낡았다.** Vercel·Replit 시절 내용이고 실제 쓰는 변수의 대부분이 빠져 있다. **새 환경을 세팅할 때 이 파일을 믿지 마라** — 이 페이지나 Render 대시보드를 보라.
 - 대부분의 변수는 없어도 서버가 뜬다. **조용히 기능만 꺼진다.** 배포 후 Render 로그에서 `⚠️ ... 설정 없음`과 `Init Error`를 확인하라.
-- 🔴 **`DOMAIN_URL`은 환경변수가 아니라 코드 상수다** (`api/index.js:45`, `https://readitude.onrender.com`). 도메인을 바꾸면 코드를 고쳐야 한다.
+- 🔴 **`DOMAIN_URL`은 환경변수가 아니라 코드 상수다** (`api/index.js:46`, `https://readitude.onrender.com`). 도메인을 바꾸면 코드를 고쳐야 한다.
 
 관련: [[notion-databases]] · [[external-services]] · [[render-manual-deploy]] · [[arrival-alert]]

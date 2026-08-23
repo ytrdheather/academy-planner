@@ -20,6 +20,7 @@ import { makeTeacherDm } from './teacherDm.js';
 import { initializeKakaoSkill } from './kakaoSkill.js';
 import { initializeConfirmNotify } from './confirmNotifyModule.js';
 import { initializeArrivalAlert } from './arrivalAlertModule.js';
+import { initializeStudentProfile } from './studentProfileModule.js';
 import Holidays from 'date-holidays';
 
 const {
@@ -1022,6 +1023,21 @@ try {
         getKSTTodayRange, getActivePause,
     });
 } catch(e) { console.error('Arrival Alert Init Error', e); }
+
+// 학생 프로필 — 화면 어디서든 학생 이름을 누르면 뜨는 한 장짜리 요약.
+// 명부 · 교재비 · 월간 리포트 · 상담 기록을 한 번에 모아 읽는다.
+try {
+    initializeStudentProfile({
+        app, requireAuth, fetchNotion, loadTextbooks,
+        dbIds: {
+            STUDENT_DATABASE_ID, GRAMMAR_DB_ID, MONTHLY_REPORT_DB_ID,
+            TEXTBOOK_FEE_DB_ID: process.env.TEXTBOOK_FEE_DB_ID,
+            // 학생 상담기록 DB. 학생 명부(속성 88개)에 열을 늘리지 않으려고 별도 DB로 뺐다.
+            // 관계는 single_property 라서 명부 쪽에 역방향 열이 생기지 않는다.
+            COUNSEL_LOG_DB_ID: process.env.COUNSEL_LOG_DB_ID || '3c509320-bce2-819e-9709-fb72ace74bf8',
+        },
+    });
+} catch(e) { console.error('Student Profile Init Error', e); }
 
 app.post('/api/generate-daily-comment', requireAuth, async (req, res) => {
     const { pageId, studentName, keywords } = req.body;

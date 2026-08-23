@@ -3,7 +3,7 @@ id: textbook-name-whitespace
 title: 교재 제목의 안 보이는 공백 — "목록에 없는 이름입니다"
 type: pitfall
 status: verified
-source: api/index.js:2788-2810, public/views/teacher.html:2033, 2279
+source: api/index.js:2804-2826, public/views/teacher.html:2043, 2279
 updated: 2026-08-20
 tags: [notion, textbook, ui]
 ---
@@ -22,7 +22,7 @@ tags: [notion, textbook, ui]
 
 ## 고친 방법
 
-- 서버 `normalizeBookName`(`api/index.js:2788`)·화면 `normBookName`(`teacher.html:2033`)으로 **NBSP·ZWSP·BOM → 공백 후 trim**. 양쪽 같은 규칙.
+- 서버 `normalizeBookName`(`api/index.js:2804`)·화면 `normBookName`(`teacher.html:2033`)으로 **NBSP·ZWSP·BOM → 공백 후 trim**. 양쪽 같은 규칙.
 - 노션 제목을 **첫 조각만 읽던 것**을 조각 전체를 잇도록 고쳤다(서식이 일부만 걸리면 제목이 쪼개져 온다). 현재 해당 교재는 없지만 같은 방식으로 조용히 실패하는 자리였다.
 - 노션 교재 제목 **11권**의 앞뒤 공백을 실제로 정리했다(`유형독해`·`수능실전`·`Advanced Reading Expert 2`·`Bricks Phonics 3 SB/WB` 등).
 - 실데이터 551권 검증: 이름으로 못 찾는 교재 **0건**.

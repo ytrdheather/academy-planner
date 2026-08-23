@@ -3,7 +3,7 @@ id: kakaowork-notify
 title: 내부 알림 (KakaoWork)
 type: pattern
 status: verified
-source: api/index.js:342-359, api/teacherDm.js
+source: api/index.js:343-360, api/teacherDm.js
 updated: 2026-08-15
 tags: [kakaowork, notify, internal]
 ---
@@ -14,7 +14,7 @@ tags: [kakaowork, notify, internal]
 
 ## 해법
 
-`sendKakaoWork(conversationId, text)` — `api/index.js:343`. `api.kakaowork.com/v1/messages.send`, `Bearer <APP_KEY>`.
+`sendKakaoWork(conversationId, text)` — `api/index.js:344`. `api.kakaowork.com/v1/messages.send`, `Bearer <APP_KEY>`.
 
 앱 키나 conversation ID가 없으면 경고만 찍고 `false`. 실패하면 `throw`.
 
@@ -28,18 +28,18 @@ tags: [kakaowork, notify, internal]
 | `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM. **담임에게 못 닿은 알림이 여기로 모인다** |
 | `KAKAOWORK_ASSISTANT_CONV` | 조교 장보기 목록 |
 
-**개인 DM** — `makeTeacherDm({ fetchNotion, teacherDbId, appKey })` (`api/index.js:336`, `api/teacherDm.js`). 공용 채널에 뿌리면 각자 훑어야 하고 결국 아무도 안 본다. 담당쌤 건은 개인 DM으로.
+**개인 DM** — `makeTeacherDm({ fetchNotion, teacherDbId, appKey })` (`api/index.js:337`, `api/teacherDm.js`). 공용 채널에 뿌리면 각자 훑어야 하고 결국 아무도 안 본다. 담당쌤 건은 개인 DM으로.
 
 ## 쓰는 법
 
-- 모듈에는 채널이 이미 박힌 얇은 함수로 넘긴다 — `notifyChannel: (title, body) => sendKakaoWork(CONV, ...)` (`api/index.js:1131`). [[module-di]]
+- 모듈에는 채널이 이미 박힌 얇은 함수로 넘긴다 — `notifyChannel: (title, body) => sendKakaoWork(CONV, ...)` (`api/index.js:1147`). [[module-di]]
 - 통지 호출은 **`.catch()`로 감싼다.** 알림 실패가 본 작업을 죽이면 안 된다.
 - 담임에게 못 보냈으면 원장 DM으로 폴백한다.
 
 ## 안 되는 경우
 
 - 🔴 **봇은 채널을 못 만든다. 사람이 UI에서 만든 채널에는 봇이 못 들어간다.** 봇이 만든 `channel_type: public` 채널만 쓸 수 있다 → [[kakaowork-platform-limits]]
-- conversation ID가 코드에 폴백 상수로 박혀 있는 곳이 있다 (`api/index.js:328`, `1114`). env가 우선이지만, 값이 안 맞으면 엉뚱한 방으로 간다.
+- conversation ID가 코드에 폴백 상수로 박혀 있는 곳이 있다 (`api/index.js:329`, `1114`). env가 우선이지만, 값이 안 맞으면 엉뚱한 방으로 간다.
 - 마크다운 꺼짐(`markdown: false`)으로 보낸다. 서식 안 먹는다.
 
 관련: [[kakaowork-platform-limits]] · [[alimtalk-send]] · [[module-di]] · [[external-services]]

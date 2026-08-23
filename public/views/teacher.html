@@ -406,6 +406,10 @@
         </div>
     </div>
 
+    <!-- 학생 프로필 카드 — 이름을 누르면 명부·교재비·월간리포트·상담기록이 한 장으로 뜬다 -->
+    <!-- sw.js 가 /assets/* 를 cache-first 로 잡는다. 이 파일을 고치면 ?v= 숫자를 올려라 -->
+    <script src="/assets/student-profile.js?v=2"></script>
+
     <script>
         const API_BASE_URL = window.location.origin;
         let authToken = localStorage.getItem('teacher_auth_token');
@@ -620,7 +624,7 @@
                 <td class="student-name">
                     <div class="student-name-wrapper">
                         <div style="display:flex; align-items:center; gap:5px;">
-                            <span>${st.studentName}</span>${nameMetaHtml(st)}
+                            ${nameLink(st.studentName)}${nameMetaHtml(st)}
                             <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                         </div>
                         <div class="batch-controls">
@@ -648,7 +652,7 @@
             return `<tr id="row-test-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>${nameMetaHtml(st)}
+                        ${nameLink(st.studentName)}${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -671,7 +675,7 @@
             return `<tr id="row-read-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>${nameMetaHtml(st)}
+                        ${nameLink(st.studentName)}${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -692,7 +696,7 @@
             return `<tr id="row-listen-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>${nameMetaHtml(st)}
+                        ${nameLink(st.studentName)}${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -708,7 +712,7 @@
             return `<tr id="row-grammar-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                        <span>${st.studentName}</span>${nameMetaHtml(st)}
+                        ${nameLink(st.studentName)}${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                 </td>
@@ -724,7 +728,7 @@
             <tr id="row-comment-${st.pageId}">
                 <td class="student-name">
                     <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size: 16px; margin-bottom: 5px;">
-                        <span>${st.studentName}</span>${nameMetaHtml(st)}
+                        ${nameLink(st.studentName)}${nameMetaHtml(st)}
                         <button onclick="refreshSingleStudent('${st.pageId}')" title="이 학생 데이터만 새로고침" style="background:#fff; border:1px solid #cbd5e0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🔄</button>
                     </div>
                     <button class="action-btn" style="background:#f59e0b; color:white; width:90%; padding: 4px; font-size:12px;" onclick="openLastCommentWindow('${st.studentName}', '${st.date}')">👀 지난시간 코멘트</button>
@@ -1123,7 +1127,7 @@
                 + trackBtn(prefix, 1, '&raquo;', '#e4f3f0', '#0a6c62', '다음 숙제로 (이번 것을 건너뜁니다)')
                 + `<span class="hw-left-badge" data-name="${escAttr(st.studentName)}" data-key="${key}"></span></div>`;
             return `<tr id="att-row-${st.pageId}" ${absent ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span><span>${st.studentName}</span>${nameMetaHtml(st)}</div><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button><button onclick="openHomeworkPreview('${escAttr(st.studentName)}')" title="이 학생만 다음 숙제 생성" style="border:1px solid #ddd0f5;background:#f5f3ff;color:#5b21b6;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">🔮 생성</button></div></div></td>
+                <td class="student-name"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;"><div style="display:flex;align-items:center;justify-content:center;gap:5px;"><span class="att-absent-badge">${absent ? mcBadge('#475569', '#e2e8f0', '🚫 결석') : (statusBadgeInfo(st) ? mcBadge(...statusBadgeInfo(st)) : '')}</span>${nameLink(st.studentName)}${nameMetaHtml(st)}</div><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><button onclick="showStudentHomework('${st.pageId}')" title="이 학생 숙제 모아보기" style="border:1px solid #a7ddd4;background:#e4f3f0;color:#0a6c62;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">📄 숙제 보기</button><button onclick="openHomeworkPreview('${escAttr(st.studentName)}')" title="이 학생만 다음 숙제 생성" style="border:1px solid #ddd0f5;background:#f5f3ff;color:#5b21b6;border-radius:6px;cursor:pointer;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;">🔮 생성</button></div></div></td>
                 <td style="font-size:13px;">${(st.teachers || []).join(', ')}</td>
                 <td><input type="checkbox" class="att-check" data-pid="${st.pageId}" ${st.homework.attendance ? 'checked' : ''} onchange="updateField(this,'${st.pageId}','출석','checkbox',this.checked)"></td>
                 <td><input class="editable-input editable-text-input" style="width:110px;" value="${escAttr(st.homework?.absenceReason || '')}" placeholder="결석시 사유" data-page-id="${st.pageId}" data-property-name="결석 사유" data-property-type="rich_text" oninput="toggleAbsenceUI(this,'${st.pageId}')" onchange="updateField(this)"></td>
@@ -1669,6 +1673,12 @@
         //  - 셋 다(대상 항목 전부) 비어있음 → 회색 '미입력' 배지 하나
         //  - 셋 다(대상 항목 전부) 채워짐 → 녹색 'DONE!' 배지 하나
         // ==========================================
+        // 학생 이름을 프로필 카드로 여는 링크로 감싼다. 실체는 /assets/student-profile.js.
+        // 스크립트가 아직 안 떴으면 그냥 이름만 내보낸다(화면이 깨지지 않게).
+        function nameLink(name, studentPageId) {
+            return window.studentNameLink ? window.studentNameLink(name, studentPageId) : escAttr(name);
+        }
+
         // 이름 옆 메타 표시: "| 5B | 월수" (문법반 | 등원요일)
         function nameMetaHtml(st) {
             const parts = [];
@@ -2211,7 +2221,7 @@
             const num = (prop, val) => `<input class="editable-input" type="number" value="${val === '' ? '' : val}" onchange="saveStudentField('${s.pageId}','${prop}',this.value,'number')">`;
             const fixed = `<textarea class="comment-textarea" style="min-height:40px; width:150px;" onchange="saveStudentField('${s.pageId}','고정숙제',this.value,'rich_text')">${escAttr(s.fixed)}</textarea>`;
             return `<tr ${paused ? 'style="background:#fff7ed;"' : ''}>
-                <td class="student-name">${s.name}</td>
+                <td class="student-name">${nameLink(s.name, s.pageId)}</td>
                 <td>${(s.teachers || []).join(', ')}</td>
                 <td>${s.days || ''}</td>
                 <td>${statusSel}</td>

@@ -36,7 +36,7 @@ tags: [report, monthly, gemini, cron]
 
 ## 주입받는 것
 
-`api/index.js:1080` — `app, fetchNotion, geminiModel, requireAuth, dbIds{STUDENT/PROGRESS/KOR_BOOKS/ENG_BOOKS/MONTHLY_REPORT/GRAMMAR}, domainUrl, publicPath` + 노션 헬퍼 4종. → [[module-di]]
+`api/index.js:1096` — `app, fetchNotion, geminiModel, requireAuth, dbIds{STUDENT/PROGRESS/KOR_BOOKS/ENG_BOOKS/MONTHLY_REPORT/GRAMMAR}, domainUrl, publicPath` + 노션 헬퍼 4종. → [[module-di]]
 
 ## 확인해야 할 것
 

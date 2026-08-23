@@ -48,6 +48,7 @@
 | [monthly-report](systems/monthly-report.md) | ⚠️ `inferred` — 4번째 토요일 자동 생성. 코드 미정독 |
 | [arrival-alert](systems/arrival-alert.md) | 미도착 알림. **출석은 학생이 플래너를 저장하면 자동으로 켜진다** |
 | [kakao-channel-bot](systems/kakao-channel-bot.md) | 🔴 **봇은 안내판이다.** "봇이 안 뜬다"는 상담 연결 모드 때문 |
+| [student-profile](systems/student-profile.md) | 이름을 누르면 뜨는 한 장 요약. 🔴 **연락처는 원장 1명만** |
 
 ## decisions — 왜 그렇게 골랐나
 
@@ -66,6 +67,8 @@
 | [solapi-sender-typo](pitfalls/solapi-sender-typo.md) | 🔴 발신번호 오타로 문자 6일 전멸. **실패 통지를 실패하는 경로로 보내지 마라** |
 | [notion-latency](pitfalls/notion-latency.md) | 15초 → 1~2초. **노션에 필터를 넘겨라. JS로 거르지 마라** |
 | [textbook-name-whitespace](pitfalls/textbook-name-whitespace.md) | 🔴 교재 제목 끝 **NBSP** 때문에 "목록에 없는 이름입니다". 노션 title을 키로 쓰지 마라 |
+| [role-manager-is-not-owner](pitfalls/role-manager-is-not-owner.md) | 🔴 **`role: 'manager'` 는 5명이다.** 원장 1명은 `loginId === 'manager'` |
+| [local-server-fires-crons](pitfalls/local-server-fires-crons.md) | 🔴 **로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다.** 하네스를 써라 |
 
 ---
 

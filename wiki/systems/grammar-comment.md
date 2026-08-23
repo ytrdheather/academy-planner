@@ -3,7 +3,7 @@ id: grammar-comment
 title: 반별 문법 코멘트
 type: system
 status: verified
-source: api/index.js:1274-1926
+source: api/index.js:1290-1942
 updated: 2026-08-15
 tags: [grammar, projection, notion, gemini]
 ---
@@ -48,6 +48,6 @@ PROGRESS 행은 매일 아침 이미 생성돼 있어 **타이밍 구멍이 없�
 
 ## 관련 코드
 
-`api/index.js:1274`(AI 생성) · `:1611`(반 옵션) · `:1631`(과거 기록) · `:1717`(전체 저장) · `:1839`(코멘트만 저장) · `:1905`(오늘 기록 조회) · `findPageIdByTitle(..., '반이름')`은 select 필터로 분기 → [[notion-find-page]]
+`api/index.js:1290`(AI 생성) · `:1611`(반 옵션) · `:1631`(과거 기록) · `:1717`(전체 저장) · `:1839`(코멘트만 저장) · `:1905`(오늘 기록 조회) · `findPageIdByTitle(..., '반이름')`은 select 필터로 분기 → [[notion-find-page]]
 
 관련: [[daily-report]] · [[dashboard-cache]] · [[notion-find-page]] · [[notion-latency]]

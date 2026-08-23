@@ -230,7 +230,7 @@
                 resultMeta[r.resultId] = { title: labelRaw, score: r.score, fullScore: r.fullScore, report: r.report };
                 const weak = (r.weakTypes || []).map(t => `<span class="rv-badge">${escapeHtml(t)}</span>`).join(' ');
                 return `<tr class="rv-clickable" onclick="openDetail('${r.resultId}')">
-                    <td><b>${label}</b></td>
+                    <td><b>${m === 'exam' && window.studentNameLink ? studentNameLink(labelRaw) : label}</b></td>
                     <td>${r.score} / ${r.fullScore}</td>
                     <td>정답 ${r.correctCount} · 오답 ${r.wrongCount}${r.essayStatus === '대기' ? ' · <span style="color:#d97706;">서술형대기</span>' : ''}</td>
                     <td>${weak || '<span class="rv-muted">-</span>'}</td>
@@ -278,5 +278,8 @@
 
         function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
     </script>
+    <!-- 학생 프로필 카드 (이름 클릭) -->
+    <!-- sw.js 가 /assets/* 를 cache-first 로 잡는다. 이 파일을 고치면 ?v= 숫자를 올려라 -->
+    <script src="/assets/student-profile.js?v=2"></script>
 </body>
 </html>
