@@ -54,6 +54,6 @@ tags: [textbook, fee, alimtalk, approval]
 
 ## 관련 코드
 
-`api/textbookFeeModule.js` (749줄) · 초기화 `api/index.js:1110` · 화면 `/shopping`, `/messages`
+`api/textbookFeeModule.js` (749줄) · 초기화 `api/index.js:1109` · 화면 `/shopping`, `/messages`
 
 관련: [[cron-jobs]] · [[alimtalk-send]] · [[kakaowork-notify]] · [[teacher-rollup-name]] · [[render-manual-deploy]]

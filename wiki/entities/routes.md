@@ -61,6 +61,6 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 - 🔴 `/api/textbook/act`는 인증 없이 열려 있다. 선생님이 카카오워크 버튼을 누르는 자리라 그렇고, **URL에 실린 JWT가 유일한 방어**다.
 - 화면 라우트는 인증을 안 건다. 보호는 화면이 뜬 뒤 `/api/*`에서 걸린다.
 - 🔴 **`requireAuth` 만으로는 "원장만"이 안 된다.** `role === 'manager'` 는 5명이다. 원장 한 명은 `loginId === 'manager'` → [[role-manager-is-not-owner]]
-- `/manual`(교사용)과 `/install`(공유용)을 헷갈리지 마라 — `api/index.js:222` 주석.
+- `/manual`(교사용)과 `/install`(공유용)을 헷갈리지 마라 — `api/index.js:221` 주석.
 
 관련: [[auth-jwt]] · [[views]] · [[module-di]] · [[cron-jobs]]

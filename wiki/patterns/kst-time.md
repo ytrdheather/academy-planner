@@ -31,7 +31,7 @@ const { start, end, dateString } = getKSTTodayRange();
 - Notion 날짜 필터에는 `dateString`을 쓴다 (`{ date: { equals: dateString } }`).
 - 시각 범위 조회에는 `start`/`end`를 쓴다.
 - 화면·알림톡 문구에는 `getKoreanDate`.
-- 모듈에는 주입해서 쓴다 (`api/index.js:1100`).
+- 모듈에는 주입해서 쓴다 (`api/index.js:1099`).
 
 ## 안 되는 경우
 

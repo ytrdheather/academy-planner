@@ -3,7 +3,7 @@ id: alimtalk-send
 title: 알림톡·문자 발송 (Solapi)
 type: pattern
 status: verified
-source: api/index.js:362-427
+source: api/index.js:361-426
 updated: 2026-08-15
 tags: [solapi, alimtalk, sms, notify]
 ---
@@ -14,8 +14,8 @@ tags: [solapi, alimtalk, sms, notify]
 
 ## 해법
 
-`sendAlimtalk(to, templateId, variables)` — `api/index.js:369`
-`sendSms(to, text, subject)` — `api/index.js:398`
+`sendAlimtalk(to, templateId, variables)` — `api/index.js:368`
+`sendSms(to, text, subject)` — `api/index.js:397`
 
 둘 다 Solapi `messages/v4/send`. 인증은 HMAC-SHA256(`date + salt`).
 
@@ -33,7 +33,7 @@ await sendAlimtalk(phone, ALIMTALK_TPL_COUNSEL_RECEIPT, { '#{이름}': name, '#{
 새 알림톡을 추가하는 순서:
 
 1. 카카오에 템플릿 등록 → 심사 통과
-2. 템플릿 ID를 **Render 환경변수**에 추가 (코드에 박지 마라). 없으면 발송만 건너뛰도록 폴백 `''`을 둔다 — `api/index.js:332` 참고
+2. 템플릿 ID를 **Render 환경변수**에 추가 (코드에 박지 마라). 없으면 발송만 건너뛰도록 폴백 `''`을 둔다 — `api/index.js:331` 참고
 3. **변수명을 템플릿에 등록된 것과 글자 단위로 맞춘다.** 어긋나면 거부되거나 빈 값으로 나간다
 4. 실제 번호로 1건 보내고 **보낸 본문을 Solapi에서 되읽어 확인한다** → [[solapi-facts]]
 5. 실패는 반드시 잡아서 카카오워크로 통지 — 학부모에게 조용히 안 간 게 최악 ([[kakaowork-notify]])

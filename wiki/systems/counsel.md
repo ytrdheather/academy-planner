@@ -3,7 +3,7 @@ id: counsel
 title: 상담 — 재원생 / 신입생 두 갈래
 type: system
 status: verified
-source: api/index.js:316-742, api/admissionModule.js, api/confirmNotifyModule.js, docs/입학상담-appsscript.md
+source: api/index.js:315-741, api/admissionModule.js, api/confirmNotifyModule.js, docs/입학상담-appsscript.md
 updated: 2026-08-23
 tags: [counsel, admission, alimtalk, googleform]
 ---
@@ -28,11 +28,11 @@ tags: [counsel, admission, alimtalk, googleform]
 
 구글폼을 안 거치고 서버가 직접 받는다. 학원 디자인 그대로 열리고 고장 날 지점이 하나 줄어든다. 대신 **구글폼이 공짜로 주던 안전망(응답이 시트에 남는 것)이 없으므로, 노션 기록이 실패하면 신청 원문을 통째로 카카오워크와 원장 문자에 실어 보낸다.** 신청이 조용히 사라지는 게 최악이다.
 
-이름으로 학생 명부를 찾아 담임·학생ID·연락처를 자동으로 채운다(`lookupStudentByName`, `api/index.js:430` — `OK`/`UNMATCHED`/`DUPLICATE`).
+이름으로 학생 명부를 찾아 담임·학생ID·연락처를 자동으로 채운다(`lookupStudentByName`, `api/index.js:429` — `OK`/`UNMATCHED`/`DUPLICATE`).
 
 ## 계약 (건드리면 안 되는 것)
 
-- **담임은 이 DM으로 그 건의 학부모 번호를 이미 받는다** (`api/index.js:517`, `:536`). 프로필 카드가 연락처를 원장에게만 여는 것과 모순이 아니다 — 사건마다 한 건 vs 87명 일괄의 차이다 → [[student-profile]]
+- **담임은 이 DM으로 그 건의 학부모 번호를 이미 받는다** (`api/index.js:516`, `:536`). 프로필 카드가 연락처를 원장에게만 여는 것과 모순이 아니다 — 사건마다 한 건 vs 87명 일괄의 차이다 → [[student-profile]]
 - 🔴 **공용 채널과 담임 DM에 같은 내용이 가야 한다.** 예전엔 채널에 학생 이름만 가고 **문의 원문이 빠져서**, 원장이 "내가 챙길지 담임에게 맡길지"를 채널만 보고 판단할 수 없었다. 상담은 원장이 직접 받아야 하는 건이 섞여 있다. **요약해서 보내지 말 것.**
 - **담임 DM을 먼저 보내고 그 성패를 채널 메시지에 싣는다.** 담임에게 못 갔으면 채널이 유일한 통로라 눈에 띄어야 한다.
 - 🔴 **접수 확인 알림톡은 보낸다.** `ALIMTALK_TPL_COUNSEL_RECEIPT`, 변수 `#{이름}`·`#{날짜}`. **상담은 결석과 다르다** — 결석엔 보강 확정 안내가 뒤따르지만 상담은 카톡 답장으로 끝나는 건이 대부분이라 확정 안내가 영영 안 나간다. **이 한 통이 학부모가 받는 유일한 회신인 경우가 많다.** 본문의 "수업이 끝난 뒤 순차적으로 연락드린다"가 핵심 — 바로 전화가 안 와도 기다릴 수 있게 한다.
@@ -42,7 +42,7 @@ tags: [counsel, admission, alimtalk, googleform]
 
 ## 방치 알림 + 완료 버튼
 
-**매일 16:00**, `상태=접수`로 하루 넘은 건을 담임별로 묶어 DM(`remindStaleCounsel`, `api/index.js:716`). 5분마다 조르면 도배라 하루 한 번. 담임 미연결·미지정 건은 원장에게 모아 보낸다.
+**매일 16:00**, `상태=접수`로 하루 넘은 건을 담임별로 묶어 DM(`remindStaleCounsel`, `api/index.js:715`). 5분마다 조르면 도배라 하루 한 번. 담임 미연결·미지정 건은 원장에게 모아 보낸다.
 
 🔴 그 DM에 **학생마다 `✅ ○○ 완료` 버튼**이 달려 있다. **노션을 열게 하면 아무도 안 한다.** `GET /api/counsel/done?id=&t=` — HMAC 서명(`{id}:done`), 두 번 눌러도 안전, **버튼은 5개까지만**(그 이상은 카드가 길어져 안 읽는다). 교재비 승인 버튼과 같은 방식.
 

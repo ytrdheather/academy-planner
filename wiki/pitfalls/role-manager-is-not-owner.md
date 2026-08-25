@@ -27,7 +27,7 @@ tags: [auth, permission, privacy]
 
 `const isOwner = req.user?.loginId === 'manager';`
 
-`loginId` 는 JWT payload에 들어 있고(`api/index.js:1898`), `/api/teacher/user-info` 가 그대로 돌려준다(`:1899`). **화면은 이미 이 구분을 하고 있었다** — `teacher.html` 의 `owner-only-link` 가 `loginId === 'manager'`(`:459`), `manager-only-link` 가 `role === 'manager'`(`:453`). 클래스 이름 두 개가 답을 갖고 있었는데 서버 쪽에서만 놓쳤다.
+`loginId` 는 JWT payload에 들어 있고(`api/index.js:1930`), `/api/teacher/user-info` 가 그대로 돌려준다(`:1899`). **화면은 이미 이 구분을 하고 있었다** — `teacher.html` 의 `owner-only-link` 가 `loginId === 'manager'`(`:459`), `manager-only-link` 가 `role === 'manager'`(`:453`). 클래스 이름 두 개가 답을 갖고 있었는데 서버 쪽에서만 놓쳤다.
 
 ## 규칙
 

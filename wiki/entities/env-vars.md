@@ -26,7 +26,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 
 | 변수 | 없으면 |
 |---|---|
-| `COUNSEL_LOG_DB_ID` | 폴백 상수 있음 (`api/index.js:1037`). 없으면 프로필의 상담기록 칸만 비활성 → [[student-profile]] |
+| `COUNSEL_LOG_DB_ID` | 폴백 상수 있음 (`api/index.js:1036`). 없으면 프로필의 상담기록 칸만 비활성 → [[student-profile]] |
 
 **AI**
 
@@ -40,7 +40,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 |---|---|
 | `SOLAPI_API_KEY` / `SOLAPI_API_SECRET` | |
 | `SOLAPI_SENDER` | 🔴 등록된 발신번호. 오타 사고 이력 → [[solapi-sender-typo]] |
-| `ALIMTALK_PF_ID` | 폴백 상수 있음 (`api/index.js:373`) |
+| `ALIMTALK_PF_ID` | 폴백 상수 있음 (`api/index.js:372`) |
 | `ALIMTALK_TPL_COUNSEL_RECEIPT` | 없으면 발송만 건너뜀 |
 
 **KakaoWork (내부 알림)** → [[kakaowork-notify]]
@@ -60,7 +60,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | 변수 | 용도 |
 |---|---|
 | `FORM_ABSENCE_URL` / `FORM_COUNSEL_URL` / `FORM_ADMISSION_URL` | `/notice` 허브가 노출하는 폼 주소 |
-| `SHOW_GENERATED_HOMEWORK` | 자동 생성 숙제 노출 토글 (`api/index.js:2572`) |
+| `SHOW_GENERATED_HOMEWORK` | 자동 생성 숙제 노출 토글 (`api/index.js:2604`) |
 | `ARRIVAL_GRACE_MIN` | 미도착 판정 유예(분). 기본 15 |
 | `ARRIVAL_LATE_WINDOW_MIN` | 이 분수를 넘게 지난 건은 안 알린다. 기본 90 |
 | `ARRIVAL_AUDIT_AFTER` | 등원시간 점검을 돌릴 시각(시). 기본 13 |

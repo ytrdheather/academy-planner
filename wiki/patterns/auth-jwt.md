@@ -23,8 +23,8 @@ tags: [auth, jwt, middleware]
 
 미들웨어 2단:
 
-- `requireAuth` (`api/index.js:208`) — `Authorization: Bearer <token>` 검증 → `req.user`에 payload
-- `requireStudent` (`api/index.js:2689`) — `requireAuth` **뒤에** 붙여서 `role === 'student'`만 통과 (403)
+- `requireAuth` (`api/index.js:207`) — `Authorization: Bearer <token>` 검증 → `req.user`에 payload
+- `requireStudent` (`api/index.js:2721`) — `requireAuth` **뒤에** 붙여서 `role === 'student'`만 통과 (403)
 
 ```js
 app.get('/api/my-report', requireAuth, requireStudent, handler);

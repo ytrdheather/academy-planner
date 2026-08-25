@@ -3,8 +3,8 @@ id: grammar-comment
 title: 반별 문법 코멘트
 type: system
 status: verified
-source: api/index.js:1290-1942
-updated: 2026-08-15
+source: api/index.js:1177-1861, api/studentProfileModule.js:98-121
+updated: 2026-08-25
 tags: [grammar, projection, notion, gemini]
 ---
 
@@ -36,11 +36,21 @@ PROGRESS 행은 매일 아침 이미 생성돼 있어 **타이밍 구멍이 없�
 - 코멘트만 저장하는 경로가 따로 있다 — `POST /api/update-grammar-comment-by-class`는 **진도·과제를 보존**한다. 전체 저장(`update-grammar-by-class`)과 헷갈리지 말 것.
 - AI 생성(`POST /api/generate-grammar-comment`)은 **반 공통**이라 이름·점수·인사말 없이 문법 서술만 만든다.
 - `dashboardCache.pastGrammar` TTL 5분. 문법 저장 경로가 무효화한다 → [[dashboard-cache]]
+- 🔴 **원장 행은 제목(`이름` = `{반}-{날짜}`)으로 찾는다. `반이름`(select)으로 찾지 마라.** 반 이름이 바뀌면 옵션 목록에 없는 값이 되고 노션이 쿼리 자체를 거부한다 → [[grammar-class-rename]]
+- `반이름` 칸은 **사람이 노션에서 눈으로 보는 용도로만** 남아 있다. 쓰기 직전 `ensureGrammarClassOption()` 이 옵션을 자동으로 붙이므로 손으로 채울 일이 없다. 이 속성을 지워도 저장은 계속된다.
 
-## 스키마 (2026-07-12 개편)
+## 스키마
 
-- GRAMMAR_DB: `반이름` 옵션에 라이브 6개 추가(F4, AlB, LS, M12B, 2M6, 1M6), `문법 코멘트`(rich_text)·`문법 테스트 내용`(multi_select) 추가
-- PROGRESS: `문법 코멘트`(rich_text) 추가
+**2026-07-12 개편** — GRAMMAR_DB: `반이름` 옵션에 라이브 6개 추가(F4, AlB, LS, M12B, 2M6, 1M6), `문법 코멘트`(rich_text)·`문법 테스트 내용`(multi_select) 추가. PROGRESS: `문법 코멘트`(rich_text) 추가.
+
+**2026-08-25** — 손으로 채우던 그 옵션 목록이 정확히 사고를 냈다(M12B → M1B 개명). 이제 코드가 채운다.
+
+행 하나를 특정하는 열쇠:
+
+| DB | 열쇠 | 비고 |
+|---|---|---|
+| GRAMMAR_DB (원장) | 제목 `이름` = `{반}-{날짜}` | 예: `M1B-2026-08-25` |
+| PROGRESS (투사본) | `🕐 날짜` + `문법클래스` 롤업 문자열 비교 | 롤업이라 개명이 즉시 따라온다 |
 
 ## 화면
 
@@ -48,6 +58,6 @@ PROGRESS 행은 매일 아침 이미 생성돼 있어 **타이밍 구멍이 없�
 
 ## 관련 코드
 
-`api/index.js:1290`(AI 생성) · `:1611`(반 옵션) · `:1631`(과거 기록) · `:1717`(전체 저장) · `:1839`(코멘트만 저장) · `:1905`(오늘 기록 조회) · `findPageIdByTitle(..., '반이름')`은 select 필터로 분기 → [[notion-find-page]]
+`api/index.js:1177`(AI 생성) · `:1514`(테스트 태그 옵션) · `:1534`(과거 기록) · `:1628`(`grammarRowFilter` — 원장 행 열쇠) · `:1638`(`ensureGrammarClassOption`) · `:1664`(전체 저장) · `:1782`(코멘트만 저장) · `:1845`(오늘 기록 조회) · `api/studentProfileModule.js:98`(프로필 카드의 최근 문법)
 
-관련: [[daily-report]] · [[dashboard-cache]] · [[notion-find-page]] · [[notion-latency]]
+관련: [[daily-report]] · [[dashboard-cache]] · [[grammar-class-rename]] · [[notion-find-page]] · [[notion-latency]] · [[student-profile]]

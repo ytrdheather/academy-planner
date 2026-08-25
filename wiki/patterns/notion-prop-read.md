@@ -32,7 +32,7 @@ const scores  = getRollupArray(p['점수들']);
 
 - **속성명이 사람 손을 탈 수 있으면 `getPropByKeywords`를 먼저 써라.** 학생/진도 DB가 특히 그렇다.
 - 롤업에서 값 **하나**만 필요하면 `getRollupValue`. 전부 필요하면 `getRollupArray`.
-- 모듈 안에서는 주입받아 쓴다 — `monthlyReportModule`은 `getRollupValue`, `getSimpleText`를 파라미터로 받는다 (`api/index.js:1100`).
+- 모듈 안에서는 주입받아 쓴다 — `monthlyReportModule`은 `getRollupValue`, `getSimpleText`를 파라미터로 받는다 (`api/index.js:1099`).
 
 ## 안 되는 경우
 

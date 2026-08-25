@@ -3,7 +3,7 @@ id: module-di
 title: 새 기능 모듈 추가하는 정석 (의존성 주입)
 type: pattern
 status: verified
-source: api/index.js:1094-1152, api/textbookFeeModule.js:41
+source: api/index.js:1093-1151, api/textbookFeeModule.js:41
 updated: 2026-08-23
 tags: [architecture, module, di]
 ---
@@ -39,7 +39,7 @@ try {
 
 - 🔴 **`try/catch`로 감싼다.** 모듈 하나가 초기화에 실패해도 서버 전체가 죽으면 안 된다. 기존 8개 전부 이렇게 돼 있다 (`initializeBookRoutes`만 예외 — 맨 처음 것이라 안 감싸져 있다).
 - 주입 가능한 것: `app`, `requireAuth`, `fetchNotion`, `sendKakaoWork`, `sendSms`, `cron`, `geminiModel`, `publicPath`, `path`, `domainUrl`, `jwtSecret`, `dbIds`, 그리고 노션 헬퍼(`getRollupValue`, `getSimpleText`, `getKSTTodayRange`, `getKoreanDate`).
-- **알림 함수는 얇게 감싸서 넘기는 게 관례다.** `confirmNotifyModule`은 `sendKakaoWork`를 직접 받지 않고 `notifyChannel(title, body)` 형태로 채널이 이미 박힌 함수를 받는다 (`api/index.js:1147`) — 모듈이 conversation ID를 몰라도 되게.
+- **알림 함수는 얇게 감싸서 넘기는 게 관례다.** `confirmNotifyModule`은 `sendKakaoWork`를 직접 받지 않고 `notifyChannel(title, body)` 형태로 채널이 이미 박힌 함수를 받는다 (`api/index.js:1146`) — 모듈이 conversation ID를 몰라도 되게.
 - DB ID는 **낱개로 넘기지 말고 `dbIds: { ... }` 객체로** 모아 넘긴다.
 
 ## 안 되는 경우

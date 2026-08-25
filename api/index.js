@@ -192,8 +192,7 @@ async function findPageIdByTitle(databaseId, title, titlePropertyName = 'Title')
     if (!NOTION_ACCESS_TOKEN || !title || !databaseId) return null;
     try {
         let filterBody = { property: titlePropertyName, title: { equals: title } };
-        if (titlePropertyName === '반이름') filterBody = { property: titlePropertyName, select: { equals: title } };
-        else if (titlePropertyName === '책제목') filterBody = { property: titlePropertyName, rich_text: { equals: title } };
+        if (titlePropertyName === '책제목') filterBody = { property: titlePropertyName, rich_text: { equals: title } };
 
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${databaseId}/query`, {
             method: 'POST',
@@ -1618,6 +1617,50 @@ app.get('/api/past-grammar-data', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+/**
+ * GRAMMAR_DB 원장에서 (반, 날짜) 한 줄을 찾는 필터.
+ *
+ * 🔴 `반이름`(select)으로 찾지 마라. 반 이름이 바뀌면(2026-08-25 M12B → M1B) 그 값은
+ *    옵션 목록에 없는 이름이 되고, 노션은 등록되지 않은 옵션으로 필터를 걸면 쿼리 자체를
+ *    거부한다 — "select option "M1B" not found for property "반이름"". 제목은 그런 검증이
+ *    없고 `{반}-{날짜}` 로 이미 유일하다. → wiki/systems/grammar-comment.md
+ */
+const grammarRowFilter = (className, date) => ({ property: '이름', title: { equals: `${className}-${date}` } });
+
+/**
+ * `반이름` select 에 이 반이 없으면 스키마에 옵션을 붙인다.
+ *
+ * 찾는 데는 안 쓰지만 사람이 노션에서 눈으로 보는 칸이라 비워 두지 않는다. 반이 새로 생기거나
+ * 이름이 바뀔 때마다 노션에서 손으로 채우던 일을 없애는 게 목적이다.
+ * 속성이 없거나 select 가 아니면 false 를 주고, 호출부는 그 칸을 아예 안 쓴다 — 있으면 좋은
+ * 칸이지 없으면 안 되는 칸이 아니다.
+ */
+let 반이름옵션 = { list: null, at: 0 };   // list === null 이면 "속성 없음". 5분 캐시
+async function ensureGrammarClassOption(className) {
+    if (!GRAMMAR_DB_ID || !className) return false;
+    try {
+        if (Date.now() - 반이름옵션.at > 5 * 60 * 1000) {
+            const db = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}`, { method: 'GET' });
+            const prop = db.properties?.['반이름'];
+            반이름옵션 = { list: prop?.type === 'select' ? prop.select.options : null, at: Date.now() };
+        }
+        if (!반이름옵션.list) return false;
+        if (반이름옵션.list.some(o => o.name === className)) return true;
+
+        // 기존 옵션은 통째로 되돌려 보낸다 — 이름만 추려 보내면 색이 날아간다.
+        const next = [...반이름옵션.list, { name: className }];
+        await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ properties: { '반이름': { select: { options: next } } } })
+        });
+        반이름옵션 = { list: next, at: Date.now() };
+        return true;
+    } catch (e) {
+        console.error(`반이름 옵션 추가 실패(저장은 계속): ${e.message}`);
+        return false;
+    }
+}
+
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, testContent, comment, date } = req.body;
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
@@ -1657,20 +1700,16 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
                     ? testContent.split(',').map(s => s.trim()).filter(Boolean) : [];
                 const gProps = {
                     '이름': { title: [{ text: { content: `${className}-${date}` } }] },
-                    '반이름': { select: { name: className } },
                     '날짜': { date: { start: date } },
                     '오늘 문법 진도': { rich_text: [{ text: { content: topic || '' } }] },
                     '문법 과제 내용': { rich_text: [{ text: { content: homework || '' } }] },
                     '문법 테스트 내용': { multi_select: testTags.map(name => ({ name })) }
                 };
+                if (await ensureGrammarClassOption(className)) gProps['반이름'] = { select: { name: className } };
                 if (comment !== undefined) {
                     gProps['문법 코멘트'] = { rich_text: [{ text: { content: comment || '' } }] };
                 }
-                const gFilter = { "and": [
-                    { property: '반이름', select: { equals: className } },
-                    { property: '날짜', date: { equals: date } }
-                ]};
-                const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: gFilter, page_size: 1 }) });
+                const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: grammarRowFilter(className, date), page_size: 1 }) });
                 if (existing.results.length > 0) {
                     await fetchNotion(`https://api.notion.com/v1/pages/${existing.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties: gProps }) });
                 } else {
@@ -1751,20 +1790,17 @@ app.post('/api/update-grammar-comment-by-class', requireAuth, async (req, res) =
         // ① GRAMMAR_DB 원장 upsert — 코멘트 필드만 (기존 진도/과제/테스트 보존)
         if (GRAMMAR_DB_ID) {
             const commentProp = { '문법 코멘트': { rich_text: [{ text: { content: comment || '' } }] } };
-            const gFilter = { "and": [
-                { property: '반이름', select: { equals: className } },
-                { property: '날짜', date: { equals: date } }
-            ]};
-            const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: gFilter, page_size: 1 }) });
+            const existing = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: grammarRowFilter(className, date), page_size: 1 }) });
             if (existing.results.length > 0) {
                 await fetchNotion(`https://api.notion.com/v1/pages/${existing.results[0].id}`, { method: 'PATCH', body: JSON.stringify({ properties: commentProp }) });
             } else {
-                await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: GRAMMAR_DB_ID }, properties: {
+                const gProps = {
                     '이름': { title: [{ text: { content: `${className}-${date}` } }] },
-                    '반이름': { select: { name: className } },
                     '날짜': { date: { start: date } },
                     ...commentProp
-                } }) });
+                };
+                if (await ensureGrammarClassOption(className)) gProps['반이름'] = { select: { name: className } };
+                await fetchNotion(`https://api.notion.com/v1/pages`, { method: 'POST', body: JSON.stringify({ parent: { database_id: GRAMMAR_DB_ID }, properties: gProps }) });
             }
         }
 
@@ -1811,11 +1847,7 @@ app.get('/api/grammar-record', requireAuth, async (req, res) => {
     if (!className || !date) return res.status(400).json({ success: false, message: 'Missing className/date' });
     if (!GRAMMAR_DB_ID) return res.json({ success: true, record: null });
     try {
-        const filter = { "and": [
-            { property: '반이름', select: { equals: className } },
-            { property: '날짜', date: { equals: date } }
-        ]};
-        const q = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter, page_size: 1 }) });
+        const q = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: grammarRowFilter(className, date), page_size: 1 }) });
         if (q.results.length === 0) return res.json({ success: true, record: null });
         const p = q.results[0].properties;
         const testTags = (p['문법 테스트 내용']?.multi_select || []).map(t => t.name);

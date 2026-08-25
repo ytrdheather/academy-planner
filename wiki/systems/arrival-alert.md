@@ -3,7 +3,7 @@ id: arrival-alert
 title: 미도착 알림 (등원 자동 체크)
 type: system
 status: verified
-source: api/arrivalAlertModule.js, api/index.js:1012-1023, api/index.js:2416-2450
+source: api/arrivalAlertModule.js, api/index.js:1011-1022, api/index.js:2448-2482
 updated: 2026-08-23
 tags: [attendance, arrival, kakaowork, cron]
 ---
@@ -26,7 +26,7 @@ tags: [attendance, arrival, kakaowork, cron]
 ## 계약 (건드리면 안 되는 것)
 
 - 🔴 **학부모에게는 아무것도 나가지 않는다.** 카카오워크 한 통이 전부다. 원장이 알림톡 가능성을 물었지만, **도착 신호가 "플래너를 열었는가"라 오탐이 남아 있어** 사람이 보는 자리에만 올리기로 했다 → [[absence-notice]]의 학부모 알림 최소 원칙과 같은 줄기.
-- 🔴 **등원 자동 체크는 숙제 저장과 분리된 PATCH다** (`api/index.js:2435`). `등원시각` 속성이 노션에 없으면 PATCH가 통째로 실패하는데, 그것 때문에 **아이 숙제 저장이 깨지면 안 된다.** 실패해도 학생에겐 저장 성공으로 돌려주고, 출석만이라도 켜는 2차 시도를 한다.
+- 🔴 **등원 자동 체크는 숙제 저장과 분리된 PATCH다** (`api/index.js:2467`). `등원시각` 속성이 노션에 없으면 PATCH가 통째로 실패하는데, 그것 때문에 **아이 숙제 저장이 깨지면 안 된다.** 실패해도 학생에겐 저장 성공으로 돌려주고, 출석만이라도 켜는 2차 시도를 한다.
 - **이미 출석이 켜져 있으면 노션에 다시 쓰지 않는다.** 저장할 때마다 PATCH가 붙으면 느려진다.
 - 🔴 **선생님 수동 체크(`✅ 전체 출석`, `teacher.html:634`)를 지우지 마라.** 자동화됐으니 필요 없어 보이지만 **저학년은 플래너를 쓰지 않는다**(2026-08-22 원장). 그 아이들의 출석은 오직 선생님 손으로만 켜진다. 폰을 안 꺼낸 아이를 보정하는 수단이기도 하다.
 - **`등원시각`은 "학생이 플래너를 저장한 시각"만 담는다.** 선생님이 손으로 체크할 때는 찍지 않는다 — `✅ 전체 출석`은 한 번에 여러 명을 켜므로 그때 시각을 찍으면 **오지도 않은 시각을 기록으로 남기는 것**이 된다.
@@ -66,6 +66,6 @@ tags: [attendance, arrival, kakaowork, cron]
 
 ## 관련 코드
 
-`api/arrivalAlertModule.js` · 주입 `api/index.js:1012` · 등원 체크 `api/index.js:2435` · 수동/미리보기 `POST /api/arrival/tick` (`{dryRun:true}` 면 명단만)
+`api/arrivalAlertModule.js` · 주입 `api/index.js:1011` · 등원 체크 `api/index.js:2467` · 수동/미리보기 `POST /api/arrival/tick` (`{dryRun:true}` 면 명단만)
 
 관련: [[absence-notice]] · [[homework-automation]] · [[cron-jobs]] · [[kakaowork-notify]] · [[notion-databases]] · [[student-profile]]

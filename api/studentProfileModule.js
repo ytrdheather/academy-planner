@@ -95,13 +95,20 @@ export function initializeStudentProfile({
     // 하나가 실패해도 나머지는 보여야 한다. 상담 전화를 받는 중에 화면이
     // 통째로 비면 아무 쓸모가 없다. 그래서 전부 allSettled 로 묶는다.
 
-    /** 반별 문법은 학생 명부에 교재 자리가 없다. 문법반 + 최근 진도로 대신한다. */
+    /**
+     * 반별 문법은 학생 명부에 교재 자리가 없다. 문법반 + 최근 진도로 대신한다.
+     *
+     * 🔴 `반이름`(select)이 아니라 제목으로 찾는다. 반 이름이 바뀌면 옛 이름만 옵션 목록에 남아
+     *    노션이 쿼리를 거부한다(2026-08-25 M12B → M1B). 제목은 `{반}-{날짜}` 라 `"반-"` 로 시작을
+     *    보면 된다 — 하이픈이 있어서 `M1B-` 가 `M12B-` 를 물지 않는다.
+     *    대신 이름을 바꾸기 전에 쌓인 옛 이름 행은 안 잡힌다. 최근 3건만 보는 자리라 감수한다.
+     */
     async function recentGrammar(className) {
         if (!GRAMMAR_DB_ID || !className) return null;
         const data = await fetchNotion(`https://api.notion.com/v1/databases/${GRAMMAR_DB_ID}/query`, {
             method: 'POST',
             body: JSON.stringify({
-                filter: { property: '반이름', select: { equals: className } },
+                filter: { property: '이름', title: { starts_with: `${className}-` } },
                 sorts: [{ property: '날짜', direction: 'descending' }],
                 page_size: 3,
             }),

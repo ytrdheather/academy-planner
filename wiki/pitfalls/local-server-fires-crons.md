@@ -3,7 +3,7 @@ id: local-server-fires-crons
 title: 로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다
 type: pitfall
 status: verified
-source: api/index.js:3785, api/textbookFeeModule.js:707, api/admissionModule.js:162, api/confirmNotifyModule.js:369
+source: api/index.js:3817, api/textbookFeeModule.js:707, api/admissionModule.js:162, api/confirmNotifyModule.js:369
 updated: 2026-08-23
 tags: [local, cron, alimtalk, safety]
 ---

@@ -3,7 +3,7 @@ id: homework-track-move
 title: 숙제 트랙 이동(<< >>)과 남은 횟수 배지
 type: system
 status: verified
-source: api/index.js:3540-3716, public/views/teacher.html:1095-1504
+source: api/index.js:3572-3748, public/views/teacher.html:1095-1504
 updated: 2026-08-20
 tags: [homework, textbook, ui]
 ---
@@ -24,7 +24,7 @@ tags: [homework, textbook, ui]
 
 | | 규칙 | 왜 |
 |---|---|---|
-| 책 길이 | 목차의 **마지막 순번** (`bookLength`) | `buildAssignment` 가 커서를 순번으로 비교한다(`api/index.js:3151`) |
+| 책 길이 | 목차의 **마지막 순번** (`bookLength`) | `buildAssignment` 가 커서를 순번으로 비교한다(`api/index.js:3183`) |
 | 나눗수 | **주간 평균** 배정량 (`avgPerTime`) | 그날 분량(`deadlineQuantity`)으로 나누면 요일마다 달라진다. 실측(월6·수4·금2, 커서45/총60): 예전 월3·수4·금8 → 지금 항상 4 |
 
 목록 화면은 목차를 안 읽는다 — 87명×3과목을 조회하면 수십 초다([[notion-latency]]). 대신 교재 DB의 **`총유닛수` 한 칸**을 읽는다. 이건 목차의 사본이라 서버가 목차를 읽을 때 어긋나 있으면 맞춰 쓴다(`syncBookTotalUnits`). **목차 없는 교재의 `총유닛수`는 사람이 넣은 값이라 건드리지 않는다.** 2026-08-20 기준 목차 있는 교재 152권 전부 일치.

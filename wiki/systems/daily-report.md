@@ -3,7 +3,7 @@ id: daily-report
 title: 데일리 리포트 + AI 코멘트
 type: system
 status: verified
-source: api/index.js:1154-1289, 2798-2874
+source: api/index.js:1153-1288, 2798-2874
 updated: 2026-08-15
 tags: [report, gemini, prompt, parent]
 ---
@@ -26,7 +26,7 @@ tags: [report, gemini, prompt, parent]
 
 ## 계약 — AI 코멘트 프롬프트 (2026-07-12 확정·배포)
 
-`POST /api/generate-daily-comment` (`api/index.js:1154`). **여러 차례 튜닝해 확정된 것이라 함부로 바꾸지 마라.**
+`POST /api/generate-daily-comment` (`api/index.js:1153`). **여러 차례 튜닝해 확정된 것이라 함부로 바꾸지 마라.**
 
 - **말투: 담임 교사의 문어체.** 모든 문장 `~니다` 체. 🔴 **`~요`체 완전 금지**(~했어요/~예요/~네요/~더라고요). 느낌표 금지. `~한답니다` 등 유치원톤 금지 — 실제 나쁜 문장을 부정 예시로 프롬프트에 박아 뒀다. **온기는 어미가 아니라 내용(구체적 관찰·절제된 격려)으로.**
 - **호칭은 코드가 만든다.** 성을 떼고 받침을 판별해 확정형태를 주입(재은→재은이는/재은이가, 시우→시우는/시우가). `hasBatchim = (code-0xAC00) % 28 !== 0`.
@@ -44,6 +44,6 @@ tags: [report, gemini, prompt, parent]
 
 ## 관련 코드
 
-`api/index.js:1154`(코멘트 생성) · `:1504`(대시보드 데이터) · `:2657`(`/report` 뷰) · `:2865`(10:20 크론) · `:2798`(22:00 URL 크론) · `:2875`(작성완료 체크)
+`api/index.js:1153`(코멘트 생성) · `:1504`(대시보드 데이터) · `:2657`(`/report` 뷰) · `:2865`(10:20 크론) · `:2798`(22:00 URL 크론) · `:2875`(작성완료 체크)
 
 관련: [[grammar-comment]] · [[homework-automation]] · [[dashboard-cache]] · [[make-migration]] · [[cron-jobs]] · [[external-services]]

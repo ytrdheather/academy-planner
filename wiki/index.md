@@ -69,6 +69,7 @@
 | [textbook-name-whitespace](pitfalls/textbook-name-whitespace.md) | 🔴 교재 제목 끝 **NBSP** 때문에 "목록에 없는 이름입니다". 노션 title을 키로 쓰지 마라 |
 | [role-manager-is-not-owner](pitfalls/role-manager-is-not-owner.md) | 🔴 **`role: 'manager'` 는 5명이다.** 원장 1명은 `loginId === 'manager'` |
 | [local-server-fires-crons](pitfalls/local-server-fires-crons.md) | 🔴 **로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다.** 하네스를 써라 |
+| [grammar-class-rename](pitfalls/grammar-class-rename.md) | 🔴 반 개명(M12B→M1B)에 문법 저장이 막혔다. **select 로 페이지를 찾지 마라** |
 
 ---
 
