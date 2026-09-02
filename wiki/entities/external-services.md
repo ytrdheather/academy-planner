@@ -3,7 +3,7 @@ id: external-services
 title: 외부 서비스
 type: entity
 status: verified
-source: api/index.js:99-109, 342-426, package.json
+source: api/index.js:101-111, 342-426, package.json
 updated: 2026-08-15
 tags: [notion, gemini, solapi, kakaowork, render]
 ---
@@ -23,7 +23,7 @@ tags: [notion, gemini, solapi, kakaowork, render]
 | **카카오톡 채널 + 챗봇** | 학부모 진입점(안내판) | 폼 링크 접근 불가 |
 | **Render** | 호스팅. `https://readitude.onrender.com` | 전부 정지 |
 
-### Gemini 설정 (`api/index.js:101-107`)
+### Gemini 설정 (`api/index.js:103-109`)
 
 ```js
 model: 'gemini-2.5-flash',

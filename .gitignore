@@ -163,3 +163,5 @@ cython_debug/
 .claude/*
 !.claude/commands/
 !.claude/launch.json
+!.claude/settings.json
+!.claude/hooks/

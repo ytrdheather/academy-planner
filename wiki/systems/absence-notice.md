@@ -3,7 +3,7 @@ id: absence-notice
 title: 결석·지각·조퇴 + 공지·학사일정
 type: system
 status: verified
-source: api/index.js:742-925, api/calendarModule.js, api/confirmNotifyModule.js
+source: api/index.js:744-927, api/calendarModule.js, api/confirmNotifyModule.js
 updated: 2026-08-15
 tags: [absence, makeup, notice, calendar, parent]
 ---
@@ -87,7 +87,7 @@ tags: [absence, makeup, notice, calendar, parent]
 
 ## 관련 코드
 
-`api/index.js:742-925`(폼·공지) · `api/calendarModule.js`(달력 GET/POST) · `api/confirmNotifyModule.js`(확정 알림톡·명단·자동마감. **재원생 상담 통화 확정과 같은 모듈**) · 매뉴얼 `/manual` → `🙋 결석·지각·조퇴` 탭
+`api/index.js:744-927`(폼·공지) · `api/calendarModule.js`(달력 GET/POST) · `api/confirmNotifyModule.js`(확정 알림톡·명단·자동마감. **재원생 상담 통화 확정과 같은 모듈**) · 매뉴얼 `/manual` → `🙋 결석·지각·조퇴` 탭
 
 **미도착 알림도 이 채널을 쓴다.** 결석·지각 신청자는 미도착 판정에서 빠진다(조퇴는 등원하므로 안 뺀다) → [[arrival-alert]]
 

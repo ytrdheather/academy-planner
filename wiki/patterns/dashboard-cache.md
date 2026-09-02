@@ -3,7 +3,7 @@ id: dashboard-cache
 title: 대시보드 TTL 캐시
 type: pattern
 status: verified
-source: api/index.js:57-62, 1510-1524, 1634-1711
+source: api/index.js:59-64, 1510-1524, 1634-1711
 updated: 2026-08-15
 tags: [cache, performance, notion]
 ---
@@ -14,7 +14,7 @@ tags: [cache, performance, notion]
 
 ## 해법
 
-프로세스 메모리에 두는 아주 단순한 TTL 캐시 — `api/index.js:57`
+프로세스 메모리에 두는 아주 단순한 TTL 캐시 — `api/index.js:59`
 
 ```js
 const dashboardCache = {
@@ -26,7 +26,7 @@ const dashboardCache = {
 두 가지 무효화 경로:
 
 1. **시간** — `Date.now() - lastFetch < TTL` 이면 캐시 반환
-2. **쓰기 후 강제 무효화** — 데이터를 바꾼 라우트가 `lastFetch = 0`으로 리셋한다. 진도 저장, 숙제 확정, 문법 코멘트 갱신 등 **13곳**에서 이렇게 한다 (`api/index.js:1872, 1892, 1977, 2529, 2853, 3538, 3577, 3632, 3775` 등)
+2. **쓰기 후 강제 무효화** — 데이터를 바꾼 라우트가 `lastFetch = 0`으로 리셋한다. 진도 저장, 숙제 확정, 문법 코멘트 갱신 등 **13곳**에서 이렇게 한다 (`api/index.js:1893, 1892, 1977, 2529, 2853, 3538, 3577, 3632, 3775` 등)
 3. 클라이언트가 `?force=true`를 붙이면 캐시를 건너뛴다
 
 `dailyReport`는 `date`까지 같아야 히트한다 — 날짜가 바뀌면 자동으로 미스.

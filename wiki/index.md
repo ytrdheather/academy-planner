@@ -18,6 +18,7 @@
 | [module-di](patterns/module-di.md) | **새 기능 모듈 추가하는 정석.** `initializeXxx({ ... })` 주입 |
 | [dashboard-cache](patterns/dashboard-cache.md) | TTL 캐시. 쓰기 라우트를 만들면 무효화를 넣어라 |
 | [alimtalk-send](patterns/alimtalk-send.md) | 🔴 학부모 발송. 문자 폴백 금지, 변수 비우지 말 것 |
+| [test-harness](patterns/test-harness.md) | **`npm test`.** 진짜 발송 없이 모듈을 검증하는 가짜 노션·크론·Gemini |
 | [kakaowork-notify](patterns/kakaowork-notify.md) | 내부 알림. 채널 분리 원칙, 담임 DM 폴백 |
 
 ## entities — 구체적 사물
@@ -48,6 +49,7 @@
 | [monthly-report](systems/monthly-report.md) | 🔴 **매월 1일 09시에 지난달** 것을 생성. 월 1회뿐이라 놓치면 한 달 뒤 |
 | [arrival-alert](systems/arrival-alert.md) | 미도착 알림. **출석은 학생이 플래너를 저장하면 자동으로 켜진다** |
 | [kakao-channel-bot](systems/kakao-channel-bot.md) | 🔴 **봇은 안내판이다.** "봇이 안 뜬다"는 상담 연결 모드 때문 |
+| [schema-check](systems/schema-check.md) | 🔴 **노션 속성이 사라지면 07:30 에 잡는다.** 이 저장소 1번 사고 유형의 안전망 |
 | [student-profile](systems/student-profile.md) | 이름을 누르면 뜨는 한 장 요약. 🔴 **연락처는 원장 1명만** |
 
 ## decisions — 왜 그렇게 골랐나
@@ -69,6 +71,7 @@
 | [textbook-name-whitespace](pitfalls/textbook-name-whitespace.md) | 🔴 교재 제목 끝 **NBSP** 때문에 "목록에 없는 이름입니다". 노션 title을 키로 쓰지 마라 |
 | [monthly-report-float-leak](pitfalls/monthly-report-float-leak.md) | 🔴 리포트 점수가 **87.7777777**. 노션 수식은 실수를 돌려준다 — 읽는 즉시 반올림 |
 | [role-manager-is-not-owner](pitfalls/role-manager-is-not-owner.md) | 🔴 **`role: 'manager'` 는 5명이다.** 원장 1명은 `loginId === 'manager'` |
+| [stale-head-line-refs](pitfalls/stale-head-line-refs.md) | 🔴 **코드를 읽기 전에 `git fetch`.** 낡은 HEAD 에서 읽으면 위키의 `file:line` 이 조용히 어긋난다 |
 | [local-server-fires-crons](pitfalls/local-server-fires-crons.md) | 🔴 **로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다.** 하네스를 써라 |
 | [grammar-class-rename](pitfalls/grammar-class-rename.md) | 🔴 반 개명(M12B→M1B)에 문법 저장이 막혔다. **select 로 페이지를 찾지 마라** |
 

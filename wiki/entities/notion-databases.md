@@ -3,7 +3,7 @@ id: notion-databases
 title: Notion 데이터베이스 맵
 type: entity
 status: verified
-source: api/index.js:24-43, 1082-1114, .env
+source: api/index.js:26-45, 1082-1114, .env
 updated: 2026-08-23
 tags: [notion, database, schema]
 ---
@@ -38,12 +38,12 @@ tags: [notion, database, schema]
 
 ## 쓰는 곳
 
-`api/index.js:24-40`에서 한꺼번에 구조분해로 읽고, 모듈에는 `dbIds: { ... }` 객체로 넘긴다 ([[module-di]]).
+`api/index.js:26-42`에서 한꺼번에 구조분해로 읽고, 모듈에는 `dbIds: { ... }` 객체로 넘긴다 ([[module-di]]).
 
 ## 주의
 
-- 🔴 **코드에 UUID가 폴백으로 박힌 곳이 있다.** `PAUSE_DB_ID`(`api/index.js:43`), `COUNSEL_DB_ID`(`:325`), `TEACHER_DB_ID`(`:338`), `COUNSEL_LOG_DB_ID`(`:1037`), `ADMISSION_DB_ID`(`:1112`). env 없이도 돌게 한 의도적 선택이지만, DB를 갈아끼우면 env만 바꿔서는 안 되고 코드도 봐야 한다.
-- ⚠️ **이름이 비슷한 옛 DB가 있다.** `상담신청서 관리`(`18609320…`)는 2025-07-21에 멈춘 폐기 폼이다. 현행은 `ADMISSION_DB_ID`(`1a109320…`) — `api/index.js:1126` 주석 참고.
+- 🔴 **코드에 UUID가 폴백으로 박힌 곳이 있다.** `PAUSE_DB_ID`(`api/index.js:45`), `COUNSEL_DB_ID`(`:327`), `TEACHER_DB_ID`(`:340`), `COUNSEL_LOG_DB_ID`(`:1039`), `ADMISSION_DB_ID`(`:1133`). env 없이도 돌게 한 의도적 선택이지만, DB를 갈아끼우면 env만 바꿔서는 안 되고 코드도 봐야 한다.
+- ⚠️ **이름이 비슷한 옛 DB가 있다.** `상담신청서 관리`(`18609320…`)는 2025-07-21에 멈춘 폐기 폼이다. 현행은 `ADMISSION_DB_ID`(`1a109320…`) — `api/index.js:1147` 주석 참고.
 - **속성 이름이 사람 손으로 바뀐다.** 하드코딩 키 대신 `getPropByKeywords`를 써라 → [[notion-prop-read]]
 - 페이지네이션(100건 상한)을 `fetchNotion`이 처리하지 않는다 → [[notion-fetch]]
 - 🔴 **노션 `title` 을 키로 쓰지 마라.** 교재 제목 끝에 눈에 안 보이는 NBSP가 섞여 배정이 막힌 적이 있다 → [[textbook-name-whitespace]]

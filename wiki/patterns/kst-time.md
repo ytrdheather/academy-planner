@@ -3,7 +3,7 @@ id: kst-time
 title: 한국 시간(KST) 다루기
 type: pattern
 status: verified
-source: api/index.js:131-146
+source: api/index.js:133-148
 updated: 2026-08-15
 tags: [time, kst, cron]
 ---
@@ -14,7 +14,7 @@ tags: [time, kst, cron]
 
 ## 해법
 
-`getKSTTodayRange()` — `api/index.js:131`
+`getKSTTodayRange()` — `api/index.js:133`
 
 UTC에 `+9h`를 더해 날짜 문자열을 뽑고, 그 날짜의 **`+09:00` 오프셋 경계**로 start/end를 만든다:
 
@@ -24,14 +24,14 @@ const { start, end, dateString } = getKSTTodayRange();
 // dateString: '2026-08-15'   ← Notion date 필터에 그대로 씀
 ```
 
-`getKoreanDate(dateString)` (`api/index.js:141`) — `Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul' })`로 "2026년 8월 15일 (금)" 만들기. 사람에게 보여줄 때만.
+`getKoreanDate(dateString)` (`api/index.js:143`) — `Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul' })`로 "2026년 8월 15일 (금)" 만들기. 사람에게 보여줄 때만.
 
 ## 쓰는 법
 
 - Notion 날짜 필터에는 `dateString`을 쓴다 (`{ date: { equals: dateString } }`).
 - 시각 범위 조회에는 `start`/`end`를 쓴다.
 - 화면·알림톡 문구에는 `getKoreanDate`.
-- 모듈에는 주입해서 쓴다 (`api/index.js:1099`).
+- 모듈에는 주입해서 쓴다 (`api/index.js:1120`).
 
 ## 안 되는 경우
 

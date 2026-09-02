@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import cron from 'node-cron';
+import nodeCron from 'node-cron';
+// 크론은 주입받는 게 원칙이다(테스트에서 진짜 스케줄러가 뜨면 안 된다) → wiki/patterns/module-di.md
+// 주입이 없으면 예전처럼 node-cron 을 쓴다.
 
 // ----------------------------------------------------------------------
 // [ 헬퍼 함수 및 변수 ]
@@ -483,6 +485,7 @@ function renderMonthlyReportHTML(res, template, studentName, month, stats, month
 
 export function initializeMonthlyReportRoutes(dependencies) {
     const app = dependencies.app;
+    const cron = dependencies.cron || nodeCron;
     const requireAuth = dependencies.requireAuth || ((req, res, next) => next()); // 인증 미들웨어
     fetchNotion = dependencies.fetchNotion;
     geminiModel = dependencies.geminiModel;

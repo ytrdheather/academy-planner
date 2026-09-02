@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-remote.sh\"",
+            "timeout": 20,
+            "statusMessage": "원격과 어긋났는지 확인 중"
+          }
+        ]
+      }
+    ]
+  }
+}

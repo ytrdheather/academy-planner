@@ -3,7 +3,7 @@ id: daily-report
 title: 데일리 리포트 + AI 코멘트
 type: system
 status: verified
-source: api/index.js:1153-1288, 2798-2874
+source: api/index.js:1067-1199 (AI 코멘트), api/dailyReportModule.js:1-365
 updated: 2026-08-15
 tags: [report, gemini, prompt, parent]
 ---
@@ -26,7 +26,7 @@ tags: [report, gemini, prompt, parent]
 
 ## 계약 — AI 코멘트 프롬프트 (2026-07-12 확정·배포)
 
-`POST /api/generate-daily-comment` (`api/index.js:1153`). **여러 차례 튜닝해 확정된 것이라 함부로 바꾸지 마라.**
+`POST /api/generate-daily-comment` (`api/index.js:1067`). **여러 차례 튜닝해 확정된 것이라 함부로 바꾸지 마라.**
 
 - **말투: 담임 교사의 문어체.** 모든 문장 `~니다` 체. 🔴 **`~요`체 완전 금지**(~했어요/~예요/~네요/~더라고요). 느낌표 금지. `~한답니다` 등 유치원톤 금지 — 실제 나쁜 문장을 부정 예시로 프롬프트에 박아 뒀다. **온기는 어미가 아니라 내용(구체적 관찰·절제된 격려)으로.**
 - **호칭은 코드가 만든다.** 성을 떼고 받침을 판별해 확정형태를 주입(재은→재은이는/재은이가, 시우→시우는/시우가). `hasBatchim = (code-0xAC00) % 28 !== 0`.
@@ -36,7 +36,7 @@ tags: [report, gemini, prompt, parent]
 - **점수 브리핑은 코드가 만들어 주입한다.** 어휘/문법/독해/수행율 중 **실제 입력칸에 값이 있는 것만** — 수식은 빈칸도 `0%`/`PASS`를 내놓으므로 제외. 2문단 제목 `<📢 오늘의 학습 결과와 숙제 수행율 안내>`.
 - **문법 코멘트는 AI를 거치지 않고 코드가 원문 그대로 삽입한다** → [[grammar-comment]]
 
-**모델 설정**: `gemini-2.5-flash`, temperature 0.72, maxOutputTokens 2500, `thinkingBudget: 1024`. 비용은 하루 70원대. 256→1024로 올린 건 품질 때문. (참고: `api/index.js:101`의 전역 `geminiModel`은 temp 0.7 / 1500 / thinking 0 — 이 라우트는 자체 설정을 쓴다.)
+**모델 설정**: `gemini-2.5-flash`, temperature 0.72, maxOutputTokens 2500, `thinkingBudget: 1024`. 비용은 하루 70원대. 256→1024로 올린 건 품질 때문. (참고: `api/index.js:104`의 전역 `geminiModel`은 temp 0.7 / 1500 / thinking 0 — 이 라우트는 자체 설정을 쓴다.)
 
 ## 캐시 주의
 
@@ -44,6 +44,7 @@ tags: [report, gemini, prompt, parent]
 
 ## 관련 코드
 
-`api/index.js:1153`(코멘트 생성) · `:1504`(대시보드 데이터) · `:2657`(`/report` 뷰) · `:2865`(10:20 크론) · `:2798`(22:00 URL 크론) · `:2875`(작성완료 체크)
+`api/index.js:1067`(코멘트 생성) · `api/index.js:1433`(대시보드 데이터) · `api/index.js:2534`(작성완료 체크)
+리포트 화면·크론은 2026-09-01 에 모듈로 빠졌다 → `api/dailyReportModule.js:140`(`/report` 뷰) · `api/dailyReportModule.js:358`(10:20 생성 크론) · `api/dailyReportModule.js:281`(22:00 URL 크론)
 
 관련: [[grammar-comment]] · [[homework-automation]] · [[dashboard-cache]] · [[make-migration]] · [[cron-jobs]] · [[external-services]]

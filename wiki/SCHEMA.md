@@ -36,7 +36,7 @@ id: notion-prop-read          # 파일명과 동일. kebab-case 영어
 title: 노션 속성 값 읽기        # 한국어
 type: pattern                 # system | module | entity | pattern | decision | pitfall
 status: verified              # verified | inferred | stale
-source: api/index.js:147-186  # 근거 위치
+source: api/index.js:149-188  # 근거 위치
 updated: 2026-08-15
 tags: [notion, helper]        # 영어 소문자
 ---
@@ -95,7 +95,7 @@ tags: [notion, helper]        # 영어 소문자
 
 1. `index.md`를 읽는다
 2. 관련 있어 보이는 페이지만 연다 (전부 열지 마라)
-3. 답한다. 근거를 `wiki/patterns/notion-fetch.md` 또는 `api/index.js:65` 형태로 명시
+3. 답한다. 근거를 `wiki/patterns/notion-fetch.md` 또는 `api/index.js:67` 형태로 명시
 4. 위키에 답이 없으면 코드를 판다. **그리고 그 결과를 곧바로 ingest 한다** — 같은 걸 두 번 파지 않기 위해서
 5. 답이 좋았으면 그 자체를 새 페이지로 환원한다
 
@@ -108,7 +108,7 @@ tags: [notion, helper]        # 영어 소문자
 - **끊긴 링크** — `[[id]]` 중 실존 파일이 없는 것
 - **고아 페이지** — 아무도 링크 안 하고 `index.md`에도 없는 것
 - **`index.md` 누락** — `wiki/*/*.md` 는 있는데 index에 없는 것
-- **밀린 `source:`** — `api/index.js:147` 이 실제로 그 함수인지. 코드가 밀리면 라인 번호가 거짓말이 된다
+- **밀린 `source:`** — `api/index.js:149` 이 실제로 그 함수인지. 코드가 밀리면 라인 번호가 거짓말이 된다
 - **`status: inferred`** — 아직 코드로 확인 안 된 페이지 목록
 - **모순** — 두 페이지가 같은 사실을 다르게 말하는 것
 - **오래된 `updated:`** — 오래됐고 그 사이 코드가 바뀐 것

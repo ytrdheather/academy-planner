@@ -3,7 +3,7 @@ id: textbook-name-whitespace
 title: 교재 제목의 안 보이는 공백 — "목록에 없는 이름입니다"
 type: pitfall
 status: verified
-source: api/index.js:2836-2858, public/views/teacher.html:2043, 2279
+source: api/index.js:2567-2599, public/views/teacher.html:2043, 2279
 updated: 2026-08-20
 tags: [notion, textbook, ui]
 ---
@@ -22,7 +22,7 @@ tags: [notion, textbook, ui]
 
 ## 고친 방법
 
-- 서버 `normalizeBookName`(`api/index.js:2836`)·화면 `normBookName`(`teacher.html:2033`)으로 **NBSP·ZWSP·BOM → 공백 후 trim**. 양쪽 같은 규칙.
+- 서버 `normalizeBookName`(`api/index.js:2567`)·화면 `normBookName`(`teacher.html:2033`)으로 **NBSP·ZWSP·BOM → 공백 후 trim**. 양쪽 같은 규칙.
 - 노션 제목을 **첫 조각만 읽던 것**을 조각 전체를 잇도록 고쳤다(서식이 일부만 걸리면 제목이 쪼개져 온다). 현재 해당 교재는 없지만 같은 방식으로 조용히 실패하는 자리였다.
 - 노션 교재 제목 **11권**의 앞뒤 공백을 실제로 정리했다(`유형독해`·`수능실전`·`Advanced Reading Expert 2`·`Bricks Phonics 3 SB/WB` 등).
 - 실데이터 551권 검증: 이름으로 못 찾는 교재 **0건**.
@@ -37,4 +37,5 @@ tags: [notion, textbook, ui]
 - **제목이 빈 행 5건** — `if (!name) continue` 로 목록에서 조용히 빠진다.
 - `Subject Link 1 (2nd Edition)` 은 이름 **가운데**에 NBSP가 있다. 코드가 흡수하므로 동작엔 문제없어 제목은 그대로 뒀다.
 
+- 2026-09-01 부터 **이 유형은 자동으로 잡힌다** — 매일 07:30 스키마 점검이 사라진 속성을 원장 DM 으로 올린다 → [[schema-check]]
 관련: [[homework-track-move]] · [[notion-databases]] · [[notion-prop-read]]

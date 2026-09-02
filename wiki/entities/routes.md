@@ -51,6 +51,7 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 | 교재비 | `/api/textbook/tick` `/send-batch` `/notify-teachers` `/shopping-list` `/shopping-push` |
 | 미도착 | `/api/arrival/tick` (`{dryRun:true}` 면 명단만, 발송·기록 안 함) → [[arrival-alert]] |
 | 학생 프로필 | `GET /api/student-profile` · `POST /api/student-profile/attend-time` · `POST /api/student-profile/counsel-log` → [[student-profile]] |
+| 스키마 점검 | `/api/schema-check/tick` — 지금 어긋난 속성이 있는지 즉시 확인 → [[schema-check]] |
 | 월간 리포트 | `/api/monthly-report/tick` — `?month=YYYY-MM` 없으면 지난달. 🔴 크론이 월 1회라 유일한 복구 수단 → [[monthly-report]] |
 | 확정·발송 | `/api/confirm/auto-close` `/api/makeup/send-confirms` `/api/makeup/roster` `/api/counsel/send-confirms` `/api/counsel/remind` `/api/messages/sent` `/api/admission/tick` |
 | 시험 | `/api/analyze-exam` `/save-exam-analysis` `/exam-list` `/grade-student` `/save-student-result` `/student-results` `/student-result-detail` `/regrade-exam` `/student-report-data` + 학생용 `/api/student/exam-list` `/exam-questions` `/submit-exam` |
@@ -58,10 +59,11 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 
 ## 주의
 
+- `/report` · `/my-report` · `/api/my-*` · `/api/generate-daily-reports` 는 2026-09-01 부터 `api/dailyReportModule.js` 에 있다(경로는 그대로) → [[daily-report]]
 - **`/api/*/tick`, `/send-batch`, `/notify-teachers`, `/auto-close` 등은 크론의 수동 트리거다.** 크론을 기다리지 않고 지금 돌리고 싶을 때 쓴다 → [[cron-jobs]]
 - 🔴 `/api/textbook/act`는 인증 없이 열려 있다. 선생님이 카카오워크 버튼을 누르는 자리라 그렇고, **URL에 실린 JWT가 유일한 방어**다.
 - 화면 라우트는 인증을 안 건다. 보호는 화면이 뜬 뒤 `/api/*`에서 걸린다.
 - 🔴 **`requireAuth` 만으로는 "원장만"이 안 된다.** `role === 'manager'` 는 5명이다. 원장 한 명은 `loginId === 'manager'` → [[role-manager-is-not-owner]]
-- `/manual`(교사용)과 `/install`(공유용)을 헷갈리지 마라 — `api/index.js:221` 주석.
+- `/manual`(교사용)과 `/install`(공유용)을 헷갈리지 마라 — `api/index.js:223` 주석.
 
 관련: [[auth-jwt]] · [[views]] · [[module-di]] · [[cron-jobs]]

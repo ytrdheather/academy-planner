@@ -3,7 +3,7 @@ id: grammar-class-rename
 title: 반 이름을 바꾸면 문법 코멘트 저장이 막힌다 — select 로 페이지를 찾지 마라
 type: pitfall
 status: verified
-source: api/index.js:1620-1662, 1696-1712, 1795-1806, 1860-1866, api/studentProfileModule.js:98-121
+source: api/index.js:1641-1683, 1696-1712, 1795-1806, 1860-1866, api/studentProfileModule.js:98-121
 updated: 2026-08-25
 tags: [notion, grammar, select, query]
 ---
@@ -51,9 +51,9 @@ Available options: "P2", "P3", "5S", "5B", "56B", "M6A", "TM1B", "TM1A",
 
 **찾는 것은 제목으로, `반이름` 은 계속 채우되 옵션을 자동으로 붙인다.**
 
-- 원장 행은 제목(`이름`)이 `{반}-{날짜}` 라 그것만으로 유일하다. `grammarRowFilter()` 하나로 세 곳 통일 (`api/index.js:1620`). 제목 필터에는 옵션 검증이 없다.
+- 원장 행은 제목(`이름`)이 `{반}-{날짜}` 라 그것만으로 유일하다. `grammarRowFilter()` 하나로 세 곳 통일 (`api/index.js:1641`). 제목 필터에는 옵션 검증이 없다.
 - 프로필 카드는 날짜 없이 반만 보므로 `title starts_with "{반}-"`. **하이픈이 `M1B-` 가 `M12B-` 를 무는 것을 막는다.**
-- `ensureGrammarClassOption()` (`api/index.js:1638`) — 쓰기 직전에 `반이름` 옵션에 그 반이 없으면 스키마에 붙인다. 5분 캐시, 기존 옵션은 통째로 되돌려 보낸다(이름만 추리면 색이 날아간다). 속성이 없으면 `false` 를 주고 호출부가 그 칸을 아예 안 쓴다.
+- `ensureGrammarClassOption()` (`api/index.js:1659`) — 쓰기 직전에 `반이름` 옵션에 그 반이 없으면 스키마에 붙인다. 5분 캐시, 기존 옵션은 통째로 되돌려 보낸다(이름만 추리면 색이 날아간다). 속성이 없으면 `false` 를 주고 호출부가 그 칸을 아예 안 쓴다.
 - `findPageIdByTitle` 의 `반이름` select 분기 삭제 — 호출자 없는 죽은 코드였다 → [[notion-find-page]]
 
 ## 규칙
@@ -67,4 +67,5 @@ Available options: "P2", "P3", "5S", "5B", "56B", "M6A", "TM1B", "TM1A",
 - 이름을 바꾸기 전에 쌓인 **`M12B-…` 행들**은 프로필 카드의 "최근 문법 진도"에서 안 잡힌다. 최근 3건만 보는 자리라 감수했다. 필요하면 노션에서 옛 행 제목을 일괄 수정하면 된다.
 - 고친 뒤 **M1B 를 한 번 다시 저장**해야 그날 원장 행이 생긴다. 전체 저장이 조용히 실패하던 동안 학생 행에는 진도가 들어갔지만 원장에는 안 들어갔다.
 
+- 2026-09-01 부터 **이 유형은 자동으로 잡힌다** — 매일 07:30 스키마 점검이 사라진 속성을 원장 DM 으로 올린다 → [[schema-check]]
 관련: [[grammar-comment]] · [[notion-find-page]] · [[notion-databases]] · [[teacher-rollup-name]]

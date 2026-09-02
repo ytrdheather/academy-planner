@@ -3,7 +3,7 @@ id: role-manager-is-not-owner
 title: role 'manager' 는 원장이 아니다 (5명이다)
 type: pitfall
 status: verified
-source: api/index.js:114-122, public/views/teacher.html:453-461
+source: api/index.js:116-124, public/views/teacher.html:453-461
 updated: 2026-08-23
 tags: [auth, permission, privacy]
 ---
@@ -14,7 +14,7 @@ tags: [auth, permission, privacy]
 
 ## 원인
 
-`api/index.js:114` 의 계정 표에서 `role` 은 "원장"이 아니라 **"관리 권한"** 에 가깝다.
+`api/index.js:116` 의 계정 표에서 `role` 은 "원장"이 아니라 **"관리 권한"** 에 가깝다.
 
 | 계정 | loginId | role |
 |---|---|---|
@@ -27,7 +27,7 @@ tags: [auth, permission, privacy]
 
 `const isOwner = req.user?.loginId === 'manager';`
 
-`loginId` 는 JWT payload에 들어 있고(`api/index.js:1930`), `/api/teacher/user-info` 가 그대로 돌려준다(`:1899`). **화면은 이미 이 구분을 하고 있었다** — `teacher.html` 의 `owner-only-link` 가 `loginId === 'manager'`(`:459`), `manager-only-link` 가 `role === 'manager'`(`:453`). 클래스 이름 두 개가 답을 갖고 있었는데 서버 쪽에서만 놓쳤다.
+`loginId` 는 JWT payload에 들어 있고(`api/index.js:1951`), `/api/teacher/user-info` 가 그대로 돌려준다(`:1920`). **화면은 이미 이 구분을 하고 있었다** — `teacher.html` 의 `owner-only-link` 가 `loginId === 'manager'`(`:461`), `manager-only-link` 가 `role === 'manager'`(`:455`). 클래스 이름 두 개가 답을 갖고 있었는데 서버 쪽에서만 놓쳤다.
 
 ## 규칙
 

@@ -3,7 +3,7 @@ id: notion-prop-read
 title: Notion 속성 값 읽기
 type: pattern
 status: verified
-source: api/index.js:148-187
+source: api/index.js:150-189
 updated: 2026-08-15
 tags: [notion, rollup, helper]
 ---
@@ -14,7 +14,7 @@ Notion의 속성 값은 타입마다 모양이 전부 다르다. `title`은 배�
 
 ## 해법
 
-`api/index.js:148-187`의 헬퍼 4종:
+`api/index.js:150-189`의 헬퍼 4종:
 
 | 함수 | 쓰임 |
 |---|---|
@@ -32,7 +32,7 @@ const scores  = getRollupArray(p['점수들']);
 
 - **속성명이 사람 손을 탈 수 있으면 `getPropByKeywords`를 먼저 써라.** 학생/진도 DB가 특히 그렇다.
 - 롤업에서 값 **하나**만 필요하면 `getRollupValue`. 전부 필요하면 `getRollupArray`.
-- 모듈 안에서는 주입받아 쓴다 — `monthlyReportModule`은 `getRollupValue`, `getSimpleText`를 파라미터로 받는다 (`api/index.js:1099`).
+- 모듈 안에서는 주입받아 쓴다 — `monthlyReportModule`은 `getRollupValue`, `getSimpleText`를 파라미터로 받는다 (`api/index.js:1120`).
 
 ## 안 되는 경우
 

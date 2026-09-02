@@ -1,16 +1,16 @@
 ---
 id: cron-jobs
-title: 크론 잡 전체 (14개)
+title: 크론 잡 전체 (15개)
 type: entity
 status: verified
-source: api/index.js, api/confirmNotifyModule.js, api/textbookFeeModule.js, api/monthlyReportModule.js, api/admissionModule.js, api/arrivalAlertModule.js
+source: api/index.js, api/schemaCheckModule.js, api/dailyReportModule.js, api/confirmNotifyModule.js, api/textbookFeeModule.js, api/monthlyReportModule.js, api/admissionModule.js, api/arrivalAlertModule.js
 updated: 2026-08-22
 tags: [cron, schedule, automation]
 ---
 
 ## 정체
 
-`node-cron`으로 서버 프로세스 안에서 도는 스케줄 14개. **전부 `{ timezone: 'Asia/Seoul' }`을 명시**하므로 아래 시각은 한국 시간이다.
+`node-cron`으로 서버 프로세스 안에서 도는 스케줄 15개. **전부 `{ timezone: 'Asia/Seoul' }`을 명시**하므로 아래 시각은 한국 시간이다.
 
 ## 표
 
@@ -20,16 +20,17 @@ tags: [cron, schedule, automation]
 | 5분마다 | `*/5 * * * *` | `admissionModule.js:162` | 신입생 상담 예약확인 알림톡. 노션 `발송` 체크박스가 방아쇠 |
 | 5분마다 | `*/5 * * * *` | `confirmNotifyModule.js:369` | 보강 확정 + 통화 확정 알림톡. 노션 `확정발송` 체크가 방아쇠 |
 | 04:00 매일 | `0 4 * * *` | `confirmNotifyModule.js:386` | 지난 보강·지각·상담 건 자동 마감 |
+| 07:30 매일 | `30 7 * * *` | `schemaCheckModule.js:128` | 노션 속성이 사라졌나 대조. 어긋난 것만 원장 DM → [[schema-check]] |
 | 08:00 매일 | `0 8 * * *` | `confirmNotifyModule.js:378` | 그날 보강 명단 발송 (없으면 조용) |
 | 09:00 매월 1일 | `0 9 1 * *` | `monthlyReportModule.js:757` | **지난달** 월간 리포트 전원 생성. 🔴 월 1회뿐 — 놓치면 다음 기회가 한 달 뒤 |
 | 10:00 월요일 | `0 10 * * 1` | `textbookFeeModule.js:739` | 조교 장보기 목록 → `KAKAOWORK_ASSISTANT_CONV` |
-| 10:20 매일 | `20 10 * * *` | `api/index.js:2913` | 데일리 리포트 행 자동 생성 |
-| 11:00 매일 | `0 11 * * *` | `api/index.js:3637` | 숙제 자동 생성. 정지 기간이면 건너뜀 |
+| 10:20 매일 | `20 10 * * *` | `dailyReportModule.js:358` | 데일리 리포트 행 자동 생성. 정지 기간이면 건너뜀 → [[daily-report]] |
+| 11:00 매일 | `0 11 * * *` | `api/index.js:3322` | 숙제 자동 생성. 정지 기간이면 건너뜀 |
 | 14:00 평일 | `0 14 * * 1-5` | `textbookFeeModule.js:729` | 교재비 담당쌤 알림 — 하루치를 **묶어서 한 통** |
-| 16:00 매일 | `0 16 * * *` | `api/index.js:715` | 방치된 상담 건 리마인드 (담임 → 없으면 원장) |
+| 16:00 매일 | `0 16 * * *` | `api/index.js:717` | 방치된 상담 건 리마인드 (담임 → 없으면 원장) |
 | 21:00 금요일 | `0 21 * * 5` | `textbookFeeModule.js:768` | **교재비 학부모 묶음 발송** |
 | (일회성) | `TEXTBOOK_ONESHOT_AT` | `textbookFeeModule.js:735` | 금 21시를 놓쳤을 때 **한 번만** 묶음 발송. 5분 크론에 얹혀 있다 |
-| 22:00 매일 | `0 22 * * *` | `api/index.js:2846` | 그날 진도 행에 `데일리리포트URL` 채우기 |
+| 22:00 매일 | `0 22 * * *` | `dailyReportModule.js:281` | 그날 진도 행에 `데일리리포트URL` 채우기 |
 | 매시 15·45분 | `15,45 * * * *` | `arrivalAlertModule.js:253` | 미도착 알림 — 등원 시각+15분 지났는데 출석 미체크. 09~23시만, 0명이면 조용 |
 
 ## 쓰는 곳

@@ -3,7 +3,7 @@ id: local-server-fires-crons
 title: 로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다
 type: pitfall
 status: verified
-source: api/index.js:3817, api/textbookFeeModule.js:707, api/admissionModule.js:162, api/confirmNotifyModule.js:369
+source: api/index.js:3502, api/textbookFeeModule.js:707, api/admissionModule.js:162, api/confirmNotifyModule.js:369
 updated: 2026-08-23
 tags: [local, cron, alimtalk, safety]
 ---
@@ -36,4 +36,5 @@ app.listen(5199);
 - 라이브 노션에 **쓰기**를 시험했으면 그 자리에서 되돌리고, **되돌려졌는지 다시 읽어 확인해라.**
 - 발송 경로를 건드리면 하네스로도 부족하다 → `/add-parent-message` 절차. 배포 시각도 같은 이유로 고른다 → [[render-manual-deploy]]
 
+- 2026-09-01 부터 하네스가 저장소에 있다 — `npm test`. 세션마다 새로 짜지 마라 → [[test-harness]]
 관련: [[cron-jobs]] · [[render-manual-deploy]] · [[module-di]] · [[alimtalk-send]]

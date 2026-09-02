@@ -3,7 +3,7 @@ id: grammar-comment
 title: 반별 문법 코멘트
 type: system
 status: verified
-source: api/index.js:1177-1861, api/studentProfileModule.js:98-121
+source: api/index.js:1198-1882, api/studentProfileModule.js:98-121
 updated: 2026-08-25
 tags: [grammar, projection, notion, gemini]
 ---
@@ -58,6 +58,6 @@ PROGRESS 행은 매일 아침 이미 생성돼 있어 **타이밍 구멍이 없�
 
 ## 관련 코드
 
-`api/index.js:1177`(AI 생성) · `:1514`(테스트 태그 옵션) · `:1534`(과거 기록) · `:1628`(`grammarRowFilter` — 원장 행 열쇠) · `:1638`(`ensureGrammarClassOption`) · `:1664`(전체 저장) · `:1782`(코멘트만 저장) · `:1845`(오늘 기록 조회) · `api/studentProfileModule.js:98`(프로필 카드의 최근 문법)
+`api/index.js:1198`(AI 생성) · `:1535`(테스트 태그 옵션) · `:1555`(과거 기록) · `:1649`(`grammarRowFilter` — 원장 행 열쇠) · `:1659`(`ensureGrammarClassOption`) · `:1685`(전체 저장) · `:1803`(코멘트만 저장) · `:1866`(오늘 기록 조회) · `api/studentProfileModule.js:98`(프로필 카드의 최근 문법)
 
 관련: [[daily-report]] · [[dashboard-cache]] · [[grammar-class-rename]] · [[notion-find-page]] · [[notion-latency]] · [[student-profile]]

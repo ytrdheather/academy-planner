@@ -3,7 +3,7 @@ id: views
 title: 화면 (public/views)
 type: entity
 status: verified
-source: public/views/, api/index.js:216-239, 300, 459, 742, 928
+source: public/views/, api/index.js:218-241, 300, 459, 742, 928
 updated: 2026-08-23
 tags: [frontend, html, pwa]
 ---
@@ -53,8 +53,8 @@ tags: [frontend, html, pwa]
 ## 주의
 
 - 🔴 **화면 라우트에는 인증이 없다.** HTML은 누구나 받는다. 실제 보호는 화면이 뜬 뒤 `/api/*`에서 → [[auth-jwt]]
-- `/w/:code`는 **아이디를 URL에 담지 않는다.** 페이지가 열린 뒤 `/api/welcome-info/:code`로 받아온다 (`api/index.js:226` 주석).
-- 목차 스크린샷 업로드 때문에 `express.json({ limit: '25mb' })`가 걸려 있다 (`api/index.js:204`).
+- `/w/:code`는 **아이디를 URL에 담지 않는다.** 페이지가 열린 뒤 `/api/welcome-info/:code`로 받아온다 (`api/index.js:228` 주석).
+- 목차 스크린샷 업로드 때문에 `express.json({ limit: '25mb' })`가 걸려 있다 (`api/index.js:206`).
 - `sw.js`(서비스워커) 때문에 **화면을 고쳐도 학생 폰에 바로 반영 안 될 수 있다.** 캐시 무효화를 확인하라.
 - 🔴 **`/assets/*` 는 cache-first 다** (`public/sw.js:26`). HTML·API 는 항상 네트워크지만 assets 는 한 번 받으면 굳는다. `assets/` 의 JS 를 고치면 부르는 쪽 `?v=` 를 올리거나 `CACHE_VERSION`(`sw.js:4`)을 올려라.
 - `teacher-dashboard.html`, `management.html`, `planner-test.html`은 라우트에 안 걸려 있거나 실험용이다. 지우기 전에 확인 필요.

@@ -3,7 +3,7 @@ id: auth-jwt
 title: 로그인·인증 (JWT)
 type: pattern
 status: verified
-source: api/index.js:111-129, 207-214, 2673-2676
+source: api/index.js:113-131, 207-214, 2673-2676
 updated: 2026-08-23
 tags: [auth, jwt, middleware]
 ---
@@ -14,7 +14,7 @@ tags: [auth, jwt, middleware]
 
 ## 해법
 
-**토큰 수명을 역할로 가른다** — `generateToken(userData)`, `api/index.js:125`
+**토큰 수명을 역할로 가른다** — `generateToken(userData)`, `api/index.js:127`
 
 | 역할 | 수명 | 이유 |
 |---|---|---|
@@ -23,8 +23,8 @@ tags: [auth, jwt, middleware]
 
 미들웨어 2단:
 
-- `requireAuth` (`api/index.js:207`) — `Authorization: Bearer <token>` 검증 → `req.user`에 payload
-- `requireStudent` (`api/index.js:2721`) — `requireAuth` **뒤에** 붙여서 `role === 'student'`만 통과 (403)
+- `requireAuth` (`api/index.js:209`) — `Authorization: Bearer <token>` 검증 → `req.user`에 payload
+- `requireStudent` (`api/dailyReportModule.js:156`) — `requireAuth` **뒤에** 붙여서 `role === 'student'`만 통과 (403)
 
 ```js
 app.get('/api/my-report', requireAuth, requireStudent, handler);
@@ -39,8 +39,8 @@ app.get('/api/my-report', requireAuth, requireStudent, handler);
 
 ## 안 되는 경우
 
-- 🔴 **교사 계정이 `api/index.js:112-120`에 평문 하드코딩돼 있고 비밀번호가 전원 동일하다.** 계정을 추가하려면 코드를 고치고 재배포해야 한다.
-- 🔴 `JWT_SECRET`에 **개발용 기본값 폴백**이 있다 (`api/index.js:25`). Render에 env가 없으면 그 값으로 서명된다.
+- 🔴 **교사 계정이 `api/index.js:114-122`에 평문 하드코딩돼 있고 비밀번호가 전원 동일하다.** 계정을 추가하려면 코드를 고치고 재배포해야 한다.
+- 🔴 `JWT_SECRET`에 **개발용 기본값 폴백**이 있다 (`api/index.js:27`). Render에 env가 없으면 그 값으로 서명된다.
 - 학생 30일 토큰은 무효화 수단이 없다. 잠금·비번 재발급은 다음 로그인부터 적용된다.
 
 관련: [[module-di]] · [[routes]] · [[views]]
