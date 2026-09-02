@@ -51,7 +51,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | `KAKAOWORK_COUNSEL_CONV` | 재원생 상담 |
 | `KAKAOWORK_ABSENCE_CONV` | 결석·보강 |
 | `KAKAOWORK_ADMISSION_CONV` | 신입생 상담 |
-| `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM (폴백 목적지) |
+| `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM. 교재비 승인·스키마 드리프트·담임 미전달이 전부 여기로. Render 에 설정돼 있고, 2026-09-03 부터 코드에도 ID 가 박혀 있다(`api/index.js:339`) — env 가 지워져도 알림이 안 끊긴다 |
 | `KAKAOWORK_ASSISTANT_CONV` | 조교 장보기 |
 | `KAKAOWORK_ARRIVAL_CONV` | 미도착 알림. **없으면 원장 DM 으로 간다**(첫 주 운영). 선생님들께 열 때 결석 채널 ID를 넣는다 → [[arrival-alert]] |
 

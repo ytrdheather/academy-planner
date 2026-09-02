@@ -38,6 +38,7 @@ tags: [notion, schema, cron, safety]
 - 이름이 눈에 안 보이게 다를 때(NBSP·중복 공백)를 **개명 후보로 따로 보고**한다. `teacher-rollup-name` 때 원인 찾는 데 가장 오래 걸린 지점이다.
 - DB 를 못 읽으면(`404`) 그것도 보고한다 — **통합 권한이 빠진 것도 조용한 킬러다.**
 - env 가 없는 DB 는 조용히 건너뛴다(그 기능이 꺼져 있다는 뜻).
+- 알림은 **원장 카카오워크 1:1 DM**(교재비 승인 요청이 오는 그 방, `KAKAOWORK_APPROVAL_CONV`)으로 간다 → [[env-vars]]
 - 배포는 **07:25~07:35 를 피하라** → [[render-manual-deploy]]
 
 ## 주입받는 것

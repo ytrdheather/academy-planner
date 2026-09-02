@@ -253,3 +253,11 @@ Karpathy LLM-wiki 패턴으로 `wiki/` 층 신설. 목적은 세션마다 반복
 - 🔴 **`` `:2657` `` 같은 짧은 표기는 정규식이 안 잡는다.** 27개가 그렇게 숨어 있었고 [[daily-report]] 의 5개는 옛 번호 그대로 틀려 있었다. 페이지의 `source:` 를 문맥으로 삼아 따로 보정했다 — 다만 `source:` 에 파일이 둘이면 그 규칙이 또 틀린다(실제로 [[daily-report]] 를 한 번 잘못 밀었다가 되돌렸다). **짧은 표기 대신 전체 경로를 써라.**
 - 이번 세션에 **현재 파일 기준으로** 적은 참조까지 옛 좌표로 취급해 밀어버린 사고가 하나 있었다([[schema-check]] 1050→1071). 실측으로 되돌렸다. 매핑은 HEAD 시점 참조에만 적용해야 한다.
 - 갱신: [[cron-jobs]] · [[routes]] · [[daily-report]] · [[monthly-report]] · [[module-di]] · [[schema-check]] · env-vars · auth-jwt · textbook-name-whitespace 외 다수
+
+## [2026-09-03] ingest | KAKAOWORK_APPROVAL_CONV 는 Render 에 설정돼 있다 (원장 확인)
+
+- [[schema-check]] 알림이 실제로 어디로 가는지 물어봐서 추적했다. **원장 카카오워크 1:1 DM** — 교재비 승인 요청이 오는 그 방이다.
+- 🔴 확인 중 알게 된 것: `KAKAOWORK_APPROVAL_CONV` 는 **폴백 상수가 없는 유일한 방**이다. 상담(`…560321`)·결석(`…560320`)은 코드에 ID 가 박혀 있어 env 가 비어도 가지만, 승인 방은 `|| ''` 라 비면 `notifyOwner` 가 `null` 이 되고 원장 알림이 전부 Render 로그로만 간다. **조용한 실패를 막으려는 기능이 조용히 실패하는 모양**이라 표에 적어 뒀다.
+- 원장 확인: **설정돼 있다.** 그리고 원장이 ID(`1004769595384591`)를 줘서 **코드에 폴백으로 박았다**(`api/index.js:339`) — 상담·결석 방과 같은 모양이 됐다. 이제 env 가 지워져도 원장 알림이 안 끊긴다.
+- 곁가지: 미도착 알림의 `ARRIVAL || APPROVAL || ABSENCE` 3단 폴백에서 마지막 칸이 죽었다(APPROVAL 이 이제 안 비므로). 의도가 "첫 주는 원장 DM 으로만"이었으니 동작은 그대로다 → [[arrival-alert]]
+- 갱신: [[env-vars]] · [[schema-check]] · `api/index.js`

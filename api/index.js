@@ -333,8 +333,10 @@ const KAKAOWORK_COUNSEL_CONV = process.env.KAKAOWORK_COUNSEL_CONV || '1004426035
 // 재원생 상담 접수 확인 알림톡. 카카오 심사를 통과한 뒤 렌더 환경변수에 넣는다.
 // 없으면 발송만 건너뛴다(서버는 정상 기동).
 const ALIMTALK_TPL_COUNSEL_RECEIPT = process.env.ALIMTALK_TPL_COUNSEL_RECEIPT || '';
-// 원장 1:1 DM. 담임에게 못 닿은 알림이 여기로 모인다.
-const KAKAOWORK_APPROVAL_CONV = process.env.KAKAOWORK_APPROVAL_CONV || '';
+// 원장 1:1 DM. 교재비 승인 요청 · 스키마 드리프트 · 담임에게 못 닿은 알림이 전부 여기로 모인다.
+// 상담·결석 방처럼 ID 를 박아 둔다 — env 가 비면 원장 알림이 통째로 로그로만 가는데,
+// 그건 조용한 실패를 막으려는 알림들이 조용히 실패하는 것이라 가장 나쁜 실패다.
+const KAKAOWORK_APPROVAL_CONV = process.env.KAKAOWORK_APPROVAL_CONV || '1004769595384591';
 
 // 담당쌤 개인 DM. 공용 채널에 뿌리면 각자 훑어야 하고 결국 아무도 안 본다.
 const teacherDm = makeTeacherDm({
