@@ -45,7 +45,7 @@
 | [daily-report](systems/daily-report.md) | 🔴 AI 코멘트 프롬프트 확정안 (`~니다`체, 압축 금지) |
 | [grammar-comment](systems/grammar-comment.md) | 반별 문법을 한 번 쓰면 학생 코멘트에 원문 그대로 삽입 |
 | [exam-analyzer](systems/exam-analyzer.md) | 시험지 분석 + 학생 채점. 원장 전용. **유일하게 Claude 사용** |
-| [monthly-report](systems/monthly-report.md) | ⚠️ `inferred` — 4번째 토요일 자동 생성. 코드 미정독 |
+| [monthly-report](systems/monthly-report.md) | 🔴 **매월 1일 09시에 지난달** 것을 생성. 월 1회뿐이라 놓치면 한 달 뒤 |
 | [arrival-alert](systems/arrival-alert.md) | 미도착 알림. **출석은 학생이 플래너를 저장하면 자동으로 켜진다** |
 | [kakao-channel-bot](systems/kakao-channel-bot.md) | 🔴 **봇은 안내판이다.** "봇이 안 뜬다"는 상담 연결 모드 때문 |
 | [student-profile](systems/student-profile.md) | 이름을 누르면 뜨는 한 장 요약. 🔴 **연락처는 원장 1명만** |
@@ -67,6 +67,7 @@
 | [solapi-sender-typo](pitfalls/solapi-sender-typo.md) | 🔴 발신번호 오타로 문자 6일 전멸. **실패 통지를 실패하는 경로로 보내지 마라** |
 | [notion-latency](pitfalls/notion-latency.md) | 15초 → 1~2초. **노션에 필터를 넘겨라. JS로 거르지 마라** |
 | [textbook-name-whitespace](pitfalls/textbook-name-whitespace.md) | 🔴 교재 제목 끝 **NBSP** 때문에 "목록에 없는 이름입니다". 노션 title을 키로 쓰지 마라 |
+| [monthly-report-float-leak](pitfalls/monthly-report-float-leak.md) | 🔴 리포트 점수가 **87.7777777**. 노션 수식은 실수를 돌려준다 — 읽는 즉시 반올림 |
 | [role-manager-is-not-owner](pitfalls/role-manager-is-not-owner.md) | 🔴 **`role: 'manager'` 는 5명이다.** 원장 1명은 `loginId === 'manager'` |
 | [local-server-fires-crons](pitfalls/local-server-fires-crons.md) | 🔴 **로컬에서 서버를 통째로 띄우면 학부모에게 진짜 발송된다.** 하네스를 써라 |
 | [grammar-class-rename](pitfalls/grammar-class-rename.md) | 🔴 반 개명(M12B→M1B)에 문법 저장이 막혔다. **select 로 페이지를 찾지 마라** |

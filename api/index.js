@@ -951,7 +951,12 @@ try {
         app, fetchNotion, geminiModel, requireAuth,
         dbIds: { STUDENT_DATABASE_ID, PROGRESS_DATABASE_ID, KOR_BOOKS_ID, ENG_BOOKS_ID, MONTHLY_REPORT_DB_ID, GRAMMAR_DB_ID },
         domainUrl: DOMAIN_URL, publicPath,
-        getRollupValue, getSimpleText, getKSTTodayRange, getKoreanDate
+        getRollupValue, getSimpleText, getKSTTodayRange, getKoreanDate, getPropByKeywords,
+        // 월 1회짜리 크론이라 조용히 실패하면 한 달을 통째로 잃는다. 결과를 원장 DM 에 남긴다.
+        notifyOwner: KAKAOWORK_APPROVAL_CONV
+            ? (title, body) => sendKakaoWork(KAKAOWORK_APPROVAL_CONV, `[${title}]\n\n${body}`)
+                .catch(e => console.error('월간 리포트 통지 실패:', e.message))
+            : null,
     });
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
