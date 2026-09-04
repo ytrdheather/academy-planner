@@ -15,6 +15,11 @@
  * 읽기만 하는 속성은 굳이 안 넣어도 된다(없으면 undefined 로 흘러가지 실패하진 않는다).
  * 노션에 속성을 **추가**하는 건 알림이 안 온다 — 사라진 것만 본다.
  *
+ * 🔴 이 목록의 첫 판은 코드에서 기계적으로 뽑았는데, 추출 창(窓)이 넓어 **DB 를 잘못 붙인
+ * 오탐이 3건** 있었다(2026-09-03 첫 07:30 점검에서 드러남). '책제목' 을 영어 원서에,
+ * '문법 숙제 내용' 을 문법 원장에 붙이는 식이었다. **여기 이름을 고칠 때는 그 속성을
+ * 실제로 쓰는 코드 줄을 눈으로 확인하고 고쳐라.** 라이브 점검이 유일한 검증 수단이다.
+ *
  * 점검: 매일 07:30 크론 + `POST /api/schema-check/tick` → api/schemaCheckModule.js
  */
 
@@ -29,8 +34,10 @@ export const REQUIRED_PROPERTIES = {
     },
     GRAMMAR_DB_ID: {
         label: '문법 진도',
-        // 🔴 '반이름'(select)으로 페이지를 찾다가 개명에 막혔다. 지금은 제목으로 찾는다.
-        props: ['제목', '이름', '학생', '날짜', '🕐 날짜', '생성 일시', '오늘 문법 진도', '문법 숙제 내용'],
+        // 🔴 행을 찾는 열쇠는 '이름'(title, "{반}-{날짜}") 이다. '반이름'(select)으로 찾다가
+        // 개명에 막힌 적이 있다 → wiki/pitfalls/grammar-class-rename.md
+        // '문법 숙제 내용' 은 여기가 아니라 학생 진도 행에 쓰는 속성이다. 섞지 마라.
+        props: ['이름', '날짜', '반이름', '오늘 문법 진도', '문법 과제 내용', '문법 테스트 내용', '문법 코멘트'],
     },
     MONTHLY_REPORT_DB_ID: {
         label: '월간 리포트',
@@ -66,6 +73,11 @@ export const REQUIRED_PROPERTIES = {
     },
     ENG_BOOKS_ID: {
         label: '영어 원서',
+        // 영어는 'Title', 국어는 '책제목' — 헷갈리기 쉽다 (api/index.js:2474-2475)
+        props: ['Title'],
+    },
+    KOR_BOOKS_ID: {
+        label: '국어 원서',
         props: ['책제목'],
     },
     TEXTBOOK_UNIT_DB_ID: {
@@ -78,6 +90,6 @@ export const REQUIRED_PROPERTIES = {
     },
     STUDENT_RESULT_DB_ID: {
         label: '학생 채점 결과',
-        props: ['시험', '학생명', '학생결과'],
+        props: ['시험', '학생명'],
     },
 };

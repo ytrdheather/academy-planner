@@ -52,4 +52,6 @@ tags: [notion, database, schema]
 
 - 🔴 **학생 명부(속성 88개)에 열을 더 늘리지 마라.** 상담 기록을 "옆으로 계속" 붙이는 안이 있었는데, 명부를 읽는 모든 기능(숙제 생성·월간 리포트·미도착 알림)이 같이 무거워진다. 그래서 별도 DB로 뺐고, 관계는 **`single_property`** 라 명부 쪽에 역방향 열이 생기지 않는다 → [[student-profile]]
 
+🔴 **영어 원서의 제목 속성은 `Title`, 국어 원서는 `책제목`이다.** 헷갈려서 스키마 선언에 잘못 적힌 적이 있다 (`api/index.js:2474-2475`) → [[schema-check]]
+
 관련: [[notion-fetch]] · [[notion-prop-read]] · [[env-vars]] · [[notion-latency]]
