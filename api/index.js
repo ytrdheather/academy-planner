@@ -980,6 +980,12 @@ try {
         approvalConv: KAKAOWORK_APPROVAL_CONV,
         // 조교 장보기 목록을 밀어넣을 채널. 없으면 목록 페이지만 쓰고 발송은 건너뛴다.
         assistantConv: process.env.KAKAOWORK_ASSISTANT_CONV,
+        // 교재 승인·발송 알림 전용 채널. 원장 DM 에 온갖 알림이 다 모여 파묻히던 걸 떼어냈다.
+        // 없으면 approvalConv(원장 DM)로 간다 — 조용히 안 나가는 것보다 낫다.
+        textbookConv: process.env.KAKAOWORK_TEXTBOOK_CONV,
+        // 교재비 미수금 채널과, 거기에 더해 개인 DM 을 받을 사람(카카오워크 숫자 user_id).
+        unpaidConv: process.env.KAKAOWORK_UNPAID_CONV,
+        unpaidDmUserId: process.env.KAKAOWORK_UNPAID_DM_USER,
     });
 } catch(e) { console.error('Textbook Fee Module Init Error', e); }
 

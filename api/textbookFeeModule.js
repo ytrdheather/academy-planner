@@ -27,6 +27,10 @@ import crypto from 'crypto';
 // 계좌번호가 템플릿 본문에 하드코딩돼 있어서 계좌가 바뀌면 재심사가 필요하다.
 const ALIMTALK_PF_ID = 'KA01PF250113084507284jSE3GEmbOOw';
 const ALIMTALK_TEMPLATE_ID = 'KA01TP2512261533265840etUCdm2j2f';
+// 미입금 안내 템플릿. 심사를 새로 받아야 해서 ID 를 박지 않고 환경변수로 받는다.
+// 없으면 학부모 발송만 건너뛰고 내부 알림(미수금 채널)은 그대로 나간다.
+// 모듈 로드 시점에 상수로 굳히지 않고 보낼 때 읽는다 — 굳혀 두면 값을 넣어도 테스트·재기동 전까지 못 본다.
+const unpaidTemplateId = () => process.env.ALIMTALK_TPL_TEXTBOOK_UNPAID || '';
 
 const STUCK_MINUTES = 30;          // 발송중에서 이만큼 멈춰 있으면 사고로 본다
 const TEACHER_CACHE_MS = 5 * 60 * 1000;
@@ -38,9 +42,25 @@ const plain = p => ((p?.title || p?.rich_text || []).map(t => t.plain_text).join
 // (실제로 8월 5일 새벽에 "· 2026-08-04" 가 찍히는 걸 확인했다)
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
+/**
+ * 미입금 안내를 보낼 기준(일). 안내가 나간 지 이만큼 지났는데 입금 확인이 안 되면 한 번 더 알린다.
+ *
+ * 🔴 이 숫자는 크론 시각과 짝이다. 따로 고치지 마라.
+ *    독촉은 **월요일 11:10 주 1회**만 돈다(2026-09-04 원장 확정). 학부모 발송은 금요일 21시이므로
+ *    두 번째 월요일 11시에 정확히 **9.6일**이 지난다. 여기에 10을 넣으면 그 월요일이 조용히
+ *    건너뛰어지고 다음 월요일(16.6일)까지 밀린다 — 주 1회라 한 번 놓치면 일주일이 통째로 밀린다.
+ *    그래서 9다. 뜻은 "발송 후 두 번째 월요일".
+ *    크론을 매일로 바꾸거나 시각을 옮기면 이 숫자를 다시 계산할 것.
+ */
+const UNPAID_AFTER_DAYS = 9;
+// 담당쌤 주간 알림이 거슬러 올라가는 범위. 주 1회 도는 알림이라 2주면 한 번 걸러도 따라잡는다.
+// 이보다 오래된 건은 이미 지나간 일이라 지금 알려도 선생이 할 게 없다.
+const TEACHER_LOOKBACK_DAYS = 14;
+
 export function initializeTextbookFeeRoutes({
     app, requireAuth, fetchNotion, sendKakaoWork, sendSms,
     jwtSecret, domainUrl, dbIds, approvalConv, assistantConv, cron, publicPath, path,
+    textbookConv, unpaidConv, unpaidDmUserId,
 }) {
     const FEE_DB = dbIds?.TEXTBOOK_FEE_DB_ID;
     const TEACHER_DB = dbIds?.TEACHER_DB_ID;
@@ -51,8 +71,17 @@ export function initializeTextbookFeeRoutes({
         console.warn('⚠️ TEXTBOOK_FEE_DB_ID 없음 — 교재비 기능 비활성화');
         return;
     }
-    if (!approvalConv) {
-        console.warn('⚠️ KAKAOWORK_APPROVAL_CONV 없음 — 원장 승인 알림이 나가지 않는다');
+    // 교재비 알림이 갈 자리. 원장 DM(approvalConv)에 온갖 알림이 다 모여 파묻히는 문제가 있어서
+    // 교재비 전용 채널로 옮긴다(2026-09-04 원장 요청). 채널 ID 가 없으면 예전처럼 원장 DM 으로 간다 —
+    // 조용히 안 나가는 것보다 낫다.
+    const OWNER_CONV = textbookConv || approvalConv;
+    if (!OWNER_CONV) {
+        console.warn('⚠️ KAKAOWORK_TEXTBOOK_CONV / KAKAOWORK_APPROVAL_CONV 둘 다 없음 — 원장 승인 알림이 나가지 않는다');
+    } else if (!textbookConv) {
+        console.log('ℹ️ KAKAOWORK_TEXTBOOK_CONV 없음 — 교재비 알림은 원장 DM 으로 갑니다');
+    }
+    if (!unpaidConv && !unpaidDmUserId) {
+        console.warn('⚠️ KAKAOWORK_UNPAID_CONV / KAKAOWORK_UNPAID_DM_USER 둘 다 없음 — 미입금 내부 알림은 교재비 자리로 갑니다');
     }
 
     // ── 승인/반려 링크 서명 ────────────────────────────────────────
@@ -88,7 +117,10 @@ export function initializeTextbookFeeRoutes({
             요청메모: plain(p['요청 메모']),
             반려사유: plain(p['반려 사유']),
             발송예약: !!p['발송 예약']?.checkbox,
+            발송일시: p['발송 일시']?.date?.start || '',
             입금확인: !!p['입금 확인']?.checkbox,
+            // 미입금 안내를 보낸 시각. 있으면 다시 안 보낸다 — 독촉을 두 번 하는 건 발송 사고에 가깝다.
+            미입금안내일시: p['미입금 안내일시']?.date?.start || '',
             원장알림함: !!p['원장알림함']?.checkbox,
             교사알림함: !!p['교사알림함']?.checkbox,
         };
@@ -210,6 +242,58 @@ export function initializeTextbookFeeRoutes({
         return '문자로';
     }
 
+    /**
+     * 미입금 안내. 입금 안내가 나간 지 UNPAID_AFTER_DAYS 일이 지났는데 입금 확인이 안 된 건에 한 번만 보낸다.
+     *
+     * 🔴 문자 폴백을 두지 않는다. 입금 안내(위)는 안 나가는 것보다 문자가 낫지만, 독촉은 다르다 —
+     *    이미 입금하신 분께 두 번 나가는 쪽이 더 나쁘고, 실패하면 사람이 보고 판단할 일이다.
+     *    실패는 미수금 채널로 올라가고 다음 날 다시 시도한다(안내일시를 안 찍으므로).
+     * 🔴 템플릿 ID 는 환경변수. 카카오 심사를 새로 통과한 것이어야 한다.
+     */
+    async function sendUnpaidAlimtalk({ 연락처, 이름, 교재이름들, 금액 }) {
+        const key = process.env.SOLAPI_API_KEY;
+        const secret = process.env.SOLAPI_API_SECRET;
+        const from = process.env.SOLAPI_SENDER;
+        if (!key || !secret || !from) throw new Error('솔라피 설정 없음');
+        const templateId = unpaidTemplateId();
+        if (!templateId) throw new Error('미입금 템플릿 ID 없음');
+
+        const date = new Date().toISOString();
+        const salt = crypto.randomBytes(16).toString('hex');
+        const signature = crypto.createHmac('sha256', secret).update(date + salt).digest('hex');
+        const 교재정보 = 교재이름들.join('\n');
+        if (!교재정보 || !이름 || !금액) throw new Error('알림톡 변수가 비었다');
+
+        const res = await fetch('https://api.solapi.com/messages/v4/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `HMAC-SHA256 apiKey=${key}, date=${date}, salt=${salt}, signature=${signature}`,
+            },
+            body: JSON.stringify({
+                message: {
+                    to: String(연락처).replace(/[^0-9]/g, ''),
+                    from,
+                    kakaoOptions: {
+                        pfId: ALIMTALK_PF_ID,
+                        templateId,
+                        disableSms: true,
+                        variables: {
+                            '#{학생이름}': 이름,
+                            '#{교재정보}': 교재정보,
+                            '#{교재비}': won(금액),
+                        },
+                    },
+                },
+            }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body?.failedMessageList?.length) {
+            throw new Error(`미입금 알림톡 거부: ${JSON.stringify(body).slice(0, 200)}`);
+        }
+        return true;
+    }
+
     // ── 카카오워크 ─────────────────────────────────────────────────
     async function openDm(userId) {
         const res = await fetch('https://api.kakaowork.com/v1/conversations.open', {
@@ -222,14 +306,23 @@ export function initializeTextbookFeeRoutes({
         return b.conversation.id;
     }
 
-    /** 버튼 달린 메시지. 블록에 description 은 안 먹으므로 text + button 만 쓴다. */
+    /**
+     * 버튼 달린 메시지. 블록에 description 은 안 먹으므로 text + button 만 쓴다.
+     *
+     * 🔴 카카오워크 블록 한계 (2026-09-04 실측): header 20자 · button 20자 · text 500자.
+     *    하나라도 넘기면 `invalid_parameter` 로 **메시지 전체가 거부된다.** 제목 한 글자 때문에
+     *    알림이 통째로 안 나가는 건 이 저장소에서 제일 나쁜 실패라, 자르고서라도 내보낸다.
+     *    (본문은 자르면 내용이 사라지므로 500자마다 블록을 나눈다.)
+     */
+    const 자르기 = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));
+
     async function sendCard(conversationId, title, body, buttons = []) {
-        const blocks = [
-            { type: 'header', text: title, style: 'blue' },
-            { type: 'text', text: body, markdown: false },
-        ];
+        const blocks = [{ type: 'header', text: 자르기(title, 20), style: 'blue' }];
+        for (let i = 0; i < String(body).length; i += 500) {
+            blocks.push({ type: 'text', text: String(body).slice(i, i + 500), markdown: false });
+        }
         for (const b of buttons) {
-            blocks.push({ type: 'button', text: b.text, style: b.style || 'default', action_type: 'open_system_browser', value: b.url });
+            blocks.push({ type: 'button', text: 자르기(b.text, 20), style: b.style || 'default', action_type: 'open_system_browser', value: b.url });
         }
         const res = await fetch('https://api.kakaowork.com/v1/messages.send', {
             method: 'POST',
@@ -242,7 +335,31 @@ export function initializeTextbookFeeRoutes({
     }
 
     const notifyOwner = (title, body, buttons) =>
-        approvalConv ? sendCard(approvalConv, title, body, buttons) : Promise.resolve(false);
+        OWNER_CONV ? sendCard(OWNER_CONV, title, body, buttons) : Promise.resolve(false);
+
+    /**
+     * 미수금 알림. 채널과 이명수님 DM 두 곳에 같은 내용을 넣는다.
+     * 한 곳이 실패해도 다른 곳은 나가야 한다 — 돈 얘기라 조용히 묻히면 안 된다.
+     * 둘 다 설정이 없으면 교재비 자리로라도 보낸다.
+     */
+    async function notifyUnpaidChannels(title, body, buttons) {
+        const 자리 = [];
+        if (unpaidConv) 자리.push(['채널', unpaidConv]);
+        if (unpaidDmUserId) {
+            try { 자리.push(['DM', await openDm(unpaidDmUserId)]); }
+            catch (e) { console.error('미수금 DM 열기 실패:', e.message); }
+        }
+        if (!자리.length) 자리.push(['교재비', OWNER_CONV]);
+
+        const 실패 = [];
+        for (const [어디, conv] of 자리) {
+            if (!conv) continue;
+            try { await sendCard(conv, title, body, buttons); }
+            catch (e) { 실패.push(`${어디}: ${e.message}`); }
+        }
+        if (실패.length) console.error('미수금 알림 실패:', 실패);
+        return 실패;
+    }
 
     /** 선생님 이름 → 카카오워크 숫자 ID. 이메일로 연결해 둔 값을 읽기만 한다. */
     let teacherCache = { at: 0, map: new Map() };
@@ -433,14 +550,34 @@ export function initializeTextbookFeeRoutes({
      * 알림을 닫아 버리고, 그러면 정작 봐야 할 것도 안 본다.
      * 승인과 반려를 한 통에 나눠 담아서 "내가 올린 것들이 어떻게 됐나"를 한눈에 본다.
      */
-    async function notifyTeachers() {
-        const rows = await queryFee({
-            and: [
-                { or: [{ property: '진행상태', select: { equals: '승인됨' } }, { property: '진행상태', select: { equals: '반려' } }] },
-                { property: '교사알림함', checkbox: { equals: false } },
-            ],
-        });
-        const r = { 선생: 0, 건수: rows.length, 실패: [] };
+    /**
+     * `mode` 두 가지 (2026-09-04 원장 확정 — 선생이 주 2통 넘게 받지 않게).
+     *   '반려'  평일 14시. 반려는 빨리 알려야 그 주 안에 고쳐서 다시 올린다.
+     *   '주간'  금요일 학부모 발송 직후. 승인된 건의 결과를 한 통에 몰아 보낸다.
+     *
+     * 🔴 '주간' 이 `발송완료` 까지 대상으로 잡는 이유: 예전에는 `승인됨` 만 봤는데,
+     *    원장이 금요일 오후에 몰아 승인하면 14시 알림은 이미 지났고 21시에 `발송완료` 로 바뀌어
+     *    그 뒤로는 영영 대상이 아니었다. 실제로 이번 주 담당쌤 알림이 통째로 안 나갔다.
+     */
+    async function notifyTeachers(mode = '주간') {
+        const 상태 = mode === '반려' ? ['반려'] : ['승인됨', '발송중', '발송완료'];
+        const 조건 = [
+            { or: 상태.map(s => ({ property: '진행상태', select: { equals: s } })) },
+            { property: '교사알림함', checkbox: { equals: false } },
+        ];
+        // 🔴 최근 것만 본다. 플래그 규칙을 바꾼 첫 회차에 **과거 행이 통째로 쓸려 나오는 것**을 막는다 —
+        //    예전 규칙은 발송완료가 되는 순간 교사알림함을 내렸으므로, 지난 몇 달 치가 전부 미알림 상태다.
+        //    아직 안 나간 승인 건(발송 일시가 빈 행)은 날짜로 거르면 안 되니 같이 받아 준다.
+        if (mode !== '반려') {
+            조건.push({
+                or: [
+                    { property: '발송 일시', date: { is_empty: true } },
+                    { property: '발송 일시', date: { on_or_after: new Date(Date.now() - TEACHER_LOOKBACK_DAYS * 86400000).toISOString() } },
+                ],
+            });
+        }
+        const rows = await queryFee({ and: 조건 });
+        const r = { mode, 선생: 0, 건수: rows.length, 실패: [] };
         if (!rows.length) return r;
 
         // 담당쌤 이름 → 그 선생의 건들
@@ -464,8 +601,9 @@ export function initializeTextbookFeeRoutes({
             const uid = map.get(teacher);
             if (!uid) { 못보냄.push(`${teacher}: ${list.map(x => x._이름).join(', ')}`); continue; }
 
-            const 승인 = list.filter(x => x.진행상태 === '승인됨');
             const 반려 = list.filter(x => x.진행상태 === '반려');
+            const 승인 = list.filter(x => x.진행상태 !== '반려');
+            const 나감 = 승인.filter(x => x.진행상태 === '발송완료');
             const lines = [];
             if (승인.length) {
                 lines.push(`✅ 승인 ${승인.length}건`);
@@ -476,7 +614,11 @@ export function initializeTextbookFeeRoutes({
                 lines.push(`❌ 반려 ${반려.length}건`);
                 for (const x of 반려) lines.push(`· ${x._이름}\n   사유: ${x.반려사유 || '(사유 없음)'}`);
             }
-            lines.push('', '승인된 건은 금요일 밤에 학부모님께 안내가 나갑니다.');
+            lines.push('', mode === '반려'
+                ? '반려된 건은 고쳐서 다시 올려 주세요. 금요일 승인분까지 그 주에 나갑니다.'
+                : 나감.length === 승인.length
+                    ? '승인된 건은 방금 학부모님께 안내가 나갔습니다.'
+                    : '승인된 건 중 안내가 나간 것은 학부모님께 전달됐고, 나머지는 곧 나갑니다.');
 
             try {
                 await sendCard(await openDm(uid), `교재 변경 결과 ${list.length}건`, lines.join('\n'),
@@ -491,7 +633,7 @@ export function initializeTextbookFeeRoutes({
             if (설정오류.length) {
                 lines.push('🔴 담임쌤 롤업을 읽지 못했습니다 (노션 설정 문제)',
                     '   교재비 DB 에 `담임쌤` 롤업이 있는지, 이름이 바뀌지 않았는지 확인해 주세요.',
-                    '   고치면 다음 평일 14시에 자동으로 다시 나갑니다.',
+                    '   고치면 다음 회차에 자동으로 다시 나갑니다(반려는 평일 14시, 승인은 금요일 발송 뒤).',
                     ...설정오류.map(x => `· ${x._이름}`));
             }
             if (못보냄.length) {
@@ -519,6 +661,113 @@ export function initializeTextbookFeeRoutes({
         return r;
     }
 
+    // ── 미입금 ─────────────────────────────────────────────────────
+    /** 교재 이름만 따로 읽는다. `교재 목록` 수식을 쉼표로 쪼개면 이름에 쉼표가 든 교재가 잘린다. */
+    async function bookNames(row) {
+        const names = [];
+        for (const id of row.변경교재Ids) {
+            try {
+                const book = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
+                names.push(plain(book.properties?.['교재이름']) || '(이름없음)');
+            } catch { /* 이름 하나 못 읽었다고 발송을 막지는 않는다. 아래에서 교재목록으로 폴백한다 */ }
+        }
+        return names;
+    }
+
+    let 템플릿경고함 = false;   // 같은 경고를 매일 도배하지 않으려고 기동당 한 번만 올린다
+
+    /**
+     * 입금 안내가 나간 지 UNPAID_AFTER_DAYS 일이 지났는데 `입금 확인` 이 안 된 건.
+     * 학부모께 한 번 더 안내하고, 미수금 채널과 이명수님께 명단을 올린다.
+     *
+     * 🔴 한 건당 딱 한 번이다. 판정은 체크박스가 아니라 `미입금 안내일시` 타임스탬프로 한다 —
+     *    체크를 껐다 켜도, 크론이 하루 두 번 돌아도 두 번 나가지 않는다.
+     * 🔴 실패한 건에는 타임스탬프를 찍지 않는다. 고치면 다음 회차에 나가야 한다
+     *    → wiki/pitfalls/teacher-rollup-name.md
+     */
+    async function notifyUnpaid() {
+        const r = { 대상: 0, 발송: 0, 실패: [] };
+        const 기준 = new Date(Date.now() - UNPAID_AFTER_DAYS * 86400000).toISOString();
+        const rows = await queryFee({
+            and: [
+                { property: '진행상태', select: { equals: '발송완료' } },
+                { property: '입금 확인', checkbox: { equals: false } },
+                { property: '미입금 안내일시', date: { is_empty: true } },
+                { property: '발송 일시', date: { on_or_before: 기준 } },
+            ],
+        });
+        r.대상 = rows.length;
+        if (!rows.length) return r;
+
+        // 템플릿이 아직 없으면 아무것도 찍지 않고 물러난다. 심사가 끝나면 그대로 나간다.
+        if (!unpaidTemplateId()) {
+            r.실패.push('ALIMTALK_TPL_TEXTBOOK_UNPAID 없음 — 미입금 안내가 나가지 못했습니다');
+            if (!템플릿경고함) {
+                템플릿경고함 = true;
+                await notifyOwner('미입금 안내가 안 나갑니다',
+                    `미입금 ${rows.length}건이 기준(${UNPAID_AFTER_DAYS}일)을 넘겼는데 알림톡 템플릿 ID 가 없습니다.\n\n`
+                    + 'Render 환경변수 ALIMTALK_TPL_TEXTBOOK_UNPAID 에 심사 통과한 템플릿 ID 를 넣어 주세요.\n'
+                    + '넣으면 이 건들은 다음 회차에 자동으로 나갑니다(지금은 아무것도 기록하지 않았습니다).',
+                    [{ text: '노션에서 열기', url: FEE_DB_URL }]).catch(() => { });
+            }
+            return r;
+        }
+
+        // 🔴 한 학생에 미입금 행이 둘이면 학부모는 독촉을 두 통 받는다. 실제로 첫 회차 10건 중
+        //    유준서 학생이 2건이었다. "한 건으로 여러 통 받지 않는다"가 이 학원의 원칙이라
+        //    학생 단위로 묶어서 한 통만 보내고, 묶인 행 전부에 안내일시를 찍는다.
+        const 묶음 = new Map();
+        for (const row of rows) {
+            const 키 = row.학생Id || row.연락처 || row.id;
+            if (!묶음.has(키)) 묶음.set(키, []);
+            묶음.get(키).push(row);
+        }
+
+        const 보냄 = [], 못보냄 = [];
+        for (const list of 묶음.values()) {
+            const 이름 = await studentName(list[0].학생Id) || '(이름없음)';
+            const 금액 = list.reduce((s, x) => s + Number(x.청구금액 || 0), 0);
+            const 꼬리 = list.length > 1 ? `  (${list.length}건 합산)` : '';
+            try {
+                // 변수가 비면 자리표시자가 그대로 학부모 폰에 찍힌다. 번호가 없으면 아예 안 보낸다.
+                const 연락처 = list.find(x => x.연락처)?.연락처;
+                if (!연락처) throw new Error('학부모 연락처 없음');
+
+                const 교재이름들 = [];
+                for (const row of list) {
+                    const 이름들 = await bookNames(row);
+                    교재이름들.push(...(이름들.length ? 이름들 : [row.교재목록]));
+                }
+
+                await sendUnpaidAlimtalk({ 연락처, 이름, 교재이름들, 금액 });
+                // 한 통으로 알렸으니 묶인 행 전부에 찍는다. 안 찍으면 내일 또 나간다.
+                for (const row of list) {
+                    await patch(row.id, { '미입금 안내일시': { date: { start: new Date().toISOString() } } });
+                }
+                보냄.push(`· ${이름}  ${won(금액)}${꼬리}`);
+                r.발송++;
+            } catch (e) {
+                못보냄.push(`· ${이름}  ${won(금액)}${꼬리} — ${e.message}`);
+                r.실패.push(`미입금/${list.map(x => x.id).join(',')}: ${e.message}`);
+            }
+        }
+
+        const 합계 = rows.reduce((s, x) => s + Number(x.청구금액 || 0), 0);
+        const lines = [];
+        if (보냄.length) lines.push(`학부모님께 안내를 보냈습니다 ${보냄.length}건`, ...보냄);
+        if (못보냄.length) {
+            if (lines.length) lines.push('');
+            lines.push(`🔴 못 보낸 건 ${못보냄.length}건 — 고치면 다음 회차에 다시 나갑니다`, ...못보냄);
+        }
+        lines.push('', `미수금 합계 ${won(합계)}`,
+            `기준: 안내 발송 후 ${UNPAID_AFTER_DAYS}일이 지났는데 입금 확인이 안 된 건`,
+            '입금이 확인되면 노션에서 `입금 확인` 을 체크해 주세요.');
+
+        await notifyUnpaidChannels(`교재비 미입금 ${rows.length}건`, lines.join('\n'),
+            [{ text: '노션에서 열기', url: FEE_DB_URL }]);
+        return r;
+    }
+
     // ── 크론 한 바퀴 ───────────────────────────────────────────────
     async function tick() {
         const r = { 원장알림: 0, 교사알림: 0, 발송: 0, 보류: 0, 정리: 0, 실패: [] };
@@ -536,12 +785,18 @@ export function initializeTextbookFeeRoutes({
                     { property: '진행상태', select: { does_not_equal: '승인대기' } },
                 ],
             }],
-            // 승인됨·반려가 아닌데 교사알림함이 켜져 있다 → 마찬가지
+            // 교사알림함은 "결과를 담당쌤에게 알렸는가"다. 결과가 난 뒤의 상태
+            // (승인됨 → 발송중 → 발송완료, 보류 포함)에서는 **켜진 채로 둔다.**
+            // 🔴 예전에는 `승인됨·반려가 아니면` 내렸는데, 금요일 21시에 발송완료로 바뀌는 순간
+            //    플래그가 내려가고 상태도 대상 밖이 돼서 담당쌤 알림이 영영 안 나갔다(2026-09-04).
+            //    되돌아간 상태(다시 승인이 필요한 상태)일 때만 내린다.
             ['교사알림함', {
                 and: [
                     { property: '교사알림함', checkbox: { equals: true } },
-                    { property: '진행상태', select: { does_not_equal: '승인됨' } },
-                    { property: '진행상태', select: { does_not_equal: '반려' } },
+                    { or: [
+                        { property: '진행상태', select: { equals: '승인대기' } },
+                        { property: '진행상태', select: { equals: '작성중' } },
+                    ] },
                 ],
             }],
         ]) {
@@ -682,9 +937,15 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
-    // 평일 14시를 못 기다릴 때 담당쌤 알림을 손으로 돌린다
+    // 담당쌤 알림을 손으로 돌린다. ?mode=반려 면 반려 건만, 기본은 주간(승인·발송완료).
     app.post('/api/textbook/notify-teachers', requireAuth, async (req, res) => {
-        try { res.json({ success: true, ...(await notifyTeachers()) }); }
+        try { res.json({ success: true, ...(await notifyTeachers(req.query.mode === '반려' ? '반려' : '주간')) }); }
+        catch (e) { res.status(500).json({ success: false, message: e.message }); }
+    });
+
+    // 미입금 안내를 손으로 돌린다. 크론과 같은 조건이라 두 번 눌러도 두 번 나가지 않는다.
+    app.post('/api/textbook/notify-unpaid', requireAuth, async (req, res) => {
+        try { res.json({ success: true, ...(await notifyUnpaid()) }); }
         catch (e) { res.status(500).json({ success: false, message: e.message }); }
     });
 
@@ -757,6 +1018,8 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         try {
             const r = await sendBatch();
             console.log(`📚 교재비 일회성 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+            // 금요일 21시 배치를 대신하는 자리다. 담당쌤 알림도 같이 따라가야 짝이 맞는다.
+            await runTeacherWeekly();
         } catch (e) {
             // 실패해도 다시 시도하지 않는다. 반쯤 나간 상태에서 또 돌면 학부모가 두 번 받을 수 있다.
             console.error('교재비 일회성 발송 Cron Error', e);
@@ -775,16 +1038,41 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
             const r = await sendBatch();
             console.log(`📚 교재비 묶음 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
         } catch (e) { console.error('교재비 묶음 발송 Cron Error', e); }
+
+        // 학부모 발송이 끝난 뒤에 담당쌤 알림을 몰아서 보낸다(2026-09-04 원장 확정).
+        // 같은 콜백 안에서 이어서 도는 이유: 크론을 하나 더 늘리지 않으면서 "발송 뒤"를 보장한다.
+        // 발송이 실패해도 알림은 나가야 한다 — 선생이 결과를 모르는 게 더 나쁘다.
+        try { await runTeacherWeekly(); } catch (e) { console.error('교재비 주간 교사 알림 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    // 평일 오후 2시 담당쌤 알림. 건별로 보내면 한 선생이 하루에 대여섯 통을 받고,
-    // 그러면 알림을 닫아 버려서 정작 봐야 할 것도 안 본다. 하루치를 묶어 한 통으로 보낸다.
+    async function runTeacherWeekly() {
+        const r = await notifyTeachers('주간');
+        if (r.건수) console.log(`📚 교재비 주간 교사 알림: ${r.건수}건 → 선생 ${r.선생}명 / 실패 ${r.실패.length}`);
+        if (r.실패.length) console.error('교사 알림 실패:', r.실패);
+    }
+
+    // 평일 오후 2시 — **반려된 건만.** 반려는 빨리 알려야 선생이 그 주 안에 고쳐서 다시 올린다.
+    // 승인된 건은 여기서 보내지 않는다. 금요일 학부모 발송 뒤에 한 통으로 몰아 나간다.
     cron.schedule('0 14 * * 1-5', async () => {
         try {
-            const r = await notifyTeachers();
-            if (r.건수) console.log(`📚 교재비 교사 알림: ${r.건수}건 → 선생 ${r.선생}명 / 실패 ${r.실패.length}`);
+            const r = await notifyTeachers('반려');
+            if (r.건수) console.log(`📚 교재비 반려 알림: ${r.건수}건 → 선생 ${r.선생}명 / 실패 ${r.실패.length}`);
             if (r.실패.length) console.error('교사 알림 실패:', r.실패);
-        } catch (e) { console.error('교재비 교사 알림 Cron Error', e); }
+        } catch (e) { console.error('교재비 반려 알림 Cron Error', e); }
+    }, { timezone: 'Asia/Seoul' });
+
+    // 월요일 오전 11시 10분, 1차 미입금 독촉 (2026-09-04 원장 확정).
+    // 주 1회인 이유: 매일 돌면 같은 학부모에게 나가는 날만 달라질 뿐 독촉이 흩어져 관리가 안 된다.
+    // 월요일인 이유: 주말을 온전히 넘기고 은행 일을 볼 수 있는 첫 평일이다.
+    // 🔴 11:00 정각이 아니라 11:10 인 이유: 11:00 에 숙제 자동 생성이 95명치를 돌린다(`api/index.js`).
+    //    겹치면 노션 요청이 몰린다 → wiki/entities/cron-jobs.md
+    // 🔴 기준일(UNPAID_AFTER_DAYS)과 짝이다. 시각을 옮기면 그 숫자를 다시 계산할 것.
+    cron.schedule('10 11 * * 1', async () => {
+        try {
+            const r = await notifyUnpaid();
+            if (r.대상) console.log(`💸 교재비 미입금: 대상 ${r.대상} / 발송 ${r.발송} / 실패 ${r.실패.length}`);
+            if (r.실패.length) console.error('미입금 안내 실패:', r.실패);
+        } catch (e) { console.error('교재비 미입금 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
     // 월요일 오전 10시 장보기 목록. 금요일 밤 발송 뒤 주말이 지나 입금이 들어온 상태다.
@@ -798,7 +1086,8 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('장보기 목록 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 교사알림 + 금 21시 발송 + 월 10시 장보기)');
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 반려알림 + 평일 15시 미입금 + 금 21시 발송·교사알림 + 월 10시 장보기)');
+    if (!unpaidTemplateId()) console.log('ℹ️ ALIMTALK_TPL_TEXTBOOK_UNPAID 없음 — 미입금 학부모 안내는 건너뜁니다(심사 통과 후 환경변수에 넣으면 자동으로 나갑니다)');
     // 예약을 걸어 뒀는데 조용히 안 나가는 것이 제일 나쁘다. 기동할 때 확실히 찍어 준다.
     if (ONESHOT_AT) {
         const at = kstStampToMs(ONESHOT_AT);
