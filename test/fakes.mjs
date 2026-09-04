@@ -71,6 +71,17 @@ export function fakeNotion(databases = {}) {
             writes.push({ op: 'patch', id: url.split('/').pop(), properties: body.properties });
             return { id: url.split('/').pop() };
         }
+        // 페이지 한 장 읽기(GET). 어느 DB 의 rows 에 있든 id 로 찾아 준다.
+        // 🔴 이게 없어서 /report 렌더를 검사하지 못했고, 주입 누락을 놓쳤다(2026-09-03).
+        if (/\/v1\/pages\/[^/]+$/.test(url) && !opts.method) {
+            const id = url.split('/').pop();
+            for (const db of Object.values(databases)) {
+                if (db instanceof Error || typeof db?.rows === 'function') continue;
+                const hit = (db?.rows || []).find(r => r.id === id);
+                if (hit) return hit;
+            }
+            throw new Error('404 object_not_found: ' + id);
+        }
         if (/\/v1\/pages$/.test(url)) {
             writes.push({ op: 'create', db: body.parent?.database_id, properties: body.properties });
             return { id: 'new-page-' + (writes.length) };

@@ -14,7 +14,7 @@ const PROGRESS = 'db-progress';
  * api/index.js 에서 통째로 옮긴 모듈이다. 옮기면서 깨지지 않았는지 —
  * 라우트·크론이 그대로 달리고 생성 로직이 그대로 도는지 — 를 본다.
  */
-function setup({ students = [], existingRows = [], pause = null } = {}) {
+function setup({ students = [], existingRows = [], pause = null, parsed = null } = {}) {
     const app = fakeApp();
     const cron = fakeCron();
     const notion = fakeNotion({ [PROGRESS]: { rows: existingRows } });
@@ -31,6 +31,22 @@ function setup({ students = [], existingRows = [], pause = null } = {}) {
         getActivePause: async () => pause,
         readStudentConfigs: async () => students,
         dashboardCache: { dailyReport: { lastFetch: Date.now(), data: null, date: null } },
+        // buildReportHtml 이 실제로 읽는 모양 그대로 (parsed.* 참조를 코드에서 뽑아 맞췄다)
+        parseDailyReportData: async () => ({
+            studentName: '김리디',
+            date: '2026-09-03',
+            teachers: ['헤더쌤'],
+            completionRate: 100,
+            comment: { grammarTopic: 'to부정사', grammarHomework: 'p.30', teacherComment: '오늘 잘했습니다.' },
+            homework: { grammar: '숙제 함', vocabCards: '숙제 함', readingCards: '숙제 함',
+                        dailyReading: '숙제 함', diary: '숙제 함', summary: '숙제 함' },
+            assignedHw: { vocab: 'Day 3', mainR: 'Unit 2', subR: '-' },
+            reading: { bookTitle: 'Holes', bookAR: 4.6, bookLexile: '660L',
+                       englishBooks: ['Holes'], readingStatus: '완료', writingStatus: '완료' },
+            listening: { study: '' },
+            tests: { vocabScore: 90, grammarScore: 88, readingResult: 'PASS' },
+            ...(parsed || {}),
+        }),
     });
     return { app, cron, notion };
 }
@@ -122,4 +138,27 @@ test('URL 이 이미 맞으면 다시 쓰지 않는다 (노션 쓰기 아끼기)
 
     await cron.jobs.find(j => j.expression === '0 22 * * *').run();
     assert.equal(notion.writes.length, 0);
+});
+
+/**
+ * 🔴 2026-09-03 사고: 모듈을 분리하면서 parseDailyReportData 주입을 빠뜨렸다.
+ * /report 가 ReferenceError 를 던졌고 라우트의 catch 가 그걸 500 'Report Error' 로 삼켜
+ * 학부모가 리포트를 열 때마다 에러를 봤다. 라우트가 '존재하는지'만 보던 테스트는 이걸 못 잡는다.
+ * 그래서 실제로 그려보는 테스트를 둔다.
+ */
+test('/report 가 실제로 HTML 을 그린다 (주입 누락이면 500 이 된다)', async () => {
+    const { app } = setup({ existingRows: [page('p-1', {})] });
+    const res = fakeRes();
+    await app.routes['GET /report']({ query: { pageId: 'p-1' } }, res);
+
+    assert.notEqual(res.code, 500, '/report 가 500 을 뱉었다 — 주입 누락이나 렌더 오류다');
+    assert.ok(res.sent, 'HTML 이 안 나왔다');
+    assert.match(res.sent, /<html|<!DOCTYPE|<div/i, 'HTML 이 아니다');
+});
+
+test('pageId 가 없으면 400 (500 이 아니라)', async () => {
+    const { app } = setup();
+    const res = fakeRes();
+    await app.routes['GET /report']({ query: {} }, res);
+    assert.equal(res.code, 400);
 });

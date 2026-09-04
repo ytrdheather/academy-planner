@@ -13,7 +13,7 @@ export function initializeDailyReportRoutes(dependencies) {
         app, cron, requireAuth, fetchNotion, fs, path, publicPath,
         DOMAIN_URL, PROGRESS_DATABASE_ID,
         getKSTTodayRange, getKoreanDate, getSimpleText,
-        getActivePause, readStudentConfigs, dashboardCache,
+        getActivePause, readStudentConfigs, dashboardCache, parseDailyReportData,
     } = dependencies;
 
     let reportTemplate = '';

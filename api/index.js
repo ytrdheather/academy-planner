@@ -2526,7 +2526,7 @@ try {
         app, cron, requireAuth, fetchNotion, fs, path, publicPath,
         DOMAIN_URL, PROGRESS_DATABASE_ID,
         getKSTTodayRange, getKoreanDate, getSimpleText,
-        getActivePause, readStudentConfigs, dashboardCache,
+        getActivePause, readStudentConfigs, dashboardCache, parseDailyReportData,
     });
 } catch(e) { console.error('Daily Report Module Init Error', e); }
 
