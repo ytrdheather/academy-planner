@@ -4,7 +4,7 @@ title: 내부 알림 (KakaoWork)
 type: pattern
 status: verified
 source: api/index.js:344-361, api/teacherDm.js
-updated: 2026-08-15
+updated: 2026-09-04
 tags: [kakaowork, notify, internal]
 ---
 
@@ -27,6 +27,8 @@ tags: [kakaowork, notify, internal]
 | `KAKAOWORK_ADMISSION_CONV` | 신입생 상담 예약·발송 결과 |
 | `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM. **담임에게 못 닿은 알림이 여기로 모인다** |
 | `KAKAOWORK_ASSISTANT_CONV` | 조교 장보기 목록 |
+| `KAKAOWORK_TEXTBOOK_CONV` | 교재 승인·발송·보류. **없으면 `KAKAOWORK_APPROVAL_CONV` 로 폴백** |
+| `KAKAOWORK_UNPAID_CONV` | 교재비 미수금. `KAKAOWORK_UNPAID_DM_USER` 개인 DM 과 **양쪽에 같이** 보낸다 |
 
 **개인 DM** — `makeTeacherDm({ fetchNotion, teacherDbId, appKey })` (`api/index.js:338`, `api/teacherDm.js`). 공용 채널에 뿌리면 각자 훑어야 하고 결국 아무도 안 본다. 담당쌤 건은 개인 DM으로.
 
@@ -38,7 +40,7 @@ tags: [kakaowork, notify, internal]
 
 ## 안 되는 경우
 
-- 🔴 **봇은 채널을 못 만든다. 사람이 UI에서 만든 채널에는 봇이 못 들어간다.** 봇이 만든 `channel_type: public` 채널만 쓸 수 있다 → [[kakaowork-platform-limits]]
+- 🔴 **봇이 채널을 만들 수 있다. 다만 이름은 못 붙인다** — `conversations.open` 에 `user_ids` 를 주면 `group/public` 방이 생기지만 `name` 은 무시된다. 만든 뒤 사람에게 이름을 바꿔 달라고 한다 → [[kakaowork-platform-limits]]
 - conversation ID가 코드에 폴백 상수로 박혀 있는 곳이 있다 (`api/index.js:330`, `1114`). env가 우선이지만, 값이 안 맞으면 엉뚱한 방으로 간다.
 - 마크다운 꺼짐(`markdown: false`)으로 보낸다. 서식 안 먹는다.
 

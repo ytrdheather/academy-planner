@@ -42,6 +42,7 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | `SOLAPI_SENDER` | 🔴 등록된 발신번호. 오타 사고 이력 → [[solapi-sender-typo]] |
 | `ALIMTALK_PF_ID` | 폴백 상수 있음 (`api/index.js:374`) |
 | `ALIMTALK_TPL_COUNSEL_RECEIPT` | 없으면 발송만 건너뜀 |
+| `ALIMTALK_TPL_TEXTBOOK_UNPAID` | 교재비 **미입금 안내**. 없으면 학부모 발송만 건너뛰고 **아무 것도 기록하지 않는다** — 넣으면 밀린 건이 다음 회차에 그대로 나간다 → [[textbook-fee]] |
 
 **KakaoWork (내부 알림)** → [[kakaowork-notify]]
 
@@ -53,6 +54,9 @@ Render 대시보드의 환경변수가 진실이다. 로컬은 `.env`(git 제외
 | `KAKAOWORK_ADMISSION_CONV` | 신입생 상담 |
 | `KAKAOWORK_APPROVAL_CONV` | 원장 1:1 DM. 교재비 승인·스키마 드리프트·담임 미전달이 전부 여기로. Render 에 설정돼 있고, 2026-09-03 부터 코드에도 ID 가 박혀 있다(`api/index.js:339`) — env 가 지워져도 알림이 안 끊긴다 |
 | `KAKAOWORK_ASSISTANT_CONV` | 조교 장보기 |
+| `KAKAOWORK_TEXTBOOK_CONV` | 교재 승인·발송 알림 전용 채널 = `교재 승인 알림톡_BOT` (`1015986061844749`, 원장 1명). **없으면 `KAKAOWORK_APPROVAL_CONV`(원장 DM)로 폴백** — 원장 DM 에 다 몰려 파묻히던 걸 떼어냈다(2026-09-04) |
+| `KAKAOWORK_UNPAID_CONV` | `교재 미수금 알림_ BOT` (`1015985973616879`, 원장·이명수). 없으면 교재비 자리로 폴백 |
+| `KAKAOWORK_UNPAID_DM_USER` | 미수금 알림을 개인 DM 으로도 받을 사람. **카카오워크 숫자 user_id**(이메일·이름 아님) — 이명수 = `12031915`. `node scripts/kakaowork-ids.mjs` 로 찾는다 |
 | `KAKAOWORK_ARRIVAL_CONV` | 미도착 알림. **없으면 원장 DM 으로 간다**(첫 주 운영). 선생님들께 열 때 결석 채널 ID를 넣는다 → [[arrival-alert]] |
 
 **폼 링크 / 기타**

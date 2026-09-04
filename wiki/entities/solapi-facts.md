@@ -4,7 +4,7 @@ title: Solapi 실측 사실 + 승인 템플릿
 type: entity
 status: verified
 source: memory/solapi-facts.md (2026-08-10 API 직접 확인)
-updated: 2026-08-15
+updated: 2026-09-04
 tags: [solapi, alimtalk, template, reference]
 ---
 
@@ -31,6 +31,7 @@ tags: [solapi, alimtalk, template, reference]
 | 이름 | ID | 용도 |
 |---|---|---|
 | 교재비 입금 안내_12.27.25 | `KA01TP2512261533265840etUCdm2j2f` | [[textbook-fee]] |
+| 교재비 **미입금** 안내 | ⏳ 심사 신청 필요 → `ALIMTALK_TPL_TEXTBOOK_UNPAID` | 발송 후 두 번째 월요일에 미입금 1회. 변수 3개는 입금 안내와 **같은 이름**(`#{학생이름}` `#{교재정보}` `#{교재비}`) |
 | 상담예약 안내확인 | `KA01TP250223163830368xwWO2Ze1CcQ` | 신입생 상담 → [[counsel]] |
 | NEW daily report 26.03.06 | `KA01TP260306103448601CbxWHWGzEZN` | [[daily-report]] |
 | 결석/보강 신청 접수 안내 | `KA01TP260802174214130nJ0CJZnJI9g` | **승인됐지만 안 쓴다** (접수 확인 전면 폐지) |
