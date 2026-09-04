@@ -56,12 +56,16 @@ export function makeTeacherDm({ fetchNotion, teacherDbId, appKey }) {
             : typeof url === 'string' ? [{ text: '노션에서 열기', url }]
                 : url.filter(b => b && b.url);
 
-        const blocks = [
-            { type: 'header', text: title, style: 'blue' },
-            { type: 'text', text: body, markdown: false },
-        ];
+        // 🔴 카카오워크 블록 한계 (2026-09-04 실측): header 20자 · button 20자 · text 500자.
+        //    하나라도 넘기면 invalid_parameter 로 메시지 전체가 거부된다 — 제목 한 글자 때문에
+        //    담당쌤 알림이 통째로 안 나가면 안 되므로 자르고서라도 내보낸다.
+        const 자르기 = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + '…' : String(s));
+        const blocks = [{ type: 'header', text: 자르기(title, 20), style: 'blue' }];
+        for (let i = 0; i < String(body).length; i += 500) {
+            blocks.push({ type: 'text', text: String(body).slice(i, i + 500), markdown: false });
+        }
         for (const b of buttons) {
-            blocks.push({ type: 'button', text: b.text, style: b.style || 'default', action_type: 'open_system_browser', value: b.url });
+            blocks.push({ type: 'button', text: 자르기(b.text, 20), style: b.style || 'default', action_type: 'open_system_browser', value: b.url });
         }
         // 카카오워크 앱이 아닌 곳(알림 미리보기 등)에서는 text 만 보이므로 주소도 같이 실어 준다.
         const tail = buttons.map(b => `\n${b.text}: ${b.url}`).join('');
