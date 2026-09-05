@@ -321,3 +321,16 @@ Karpathy LLM-wiki 패턴으로 `wiki/` 층 신설. 목적은 세션마다 반복
 `test/textbook-fee.test.mjs` 신설(7건, `npm test` 34건 전부 통과). 진짜 발송 없이 — 발송완료 건을 주간 알림이 잡는가, 독촉이 한 번만 나가는가, 템플릿이 없을 때 아무것도 안 찍는가, 노션에 넘기는 필터 모양, 새 크론의 timezone 까지 → [[test-harness]]
 
 - 갱신: `api/textbookFeeModule.js` · `api/index.js` · `scripts/add-unpaid-property.mjs`(신규) · `scripts/kakaowork-ids.mjs`(신규) · [[textbook-fee]] · [[cron-jobs]] · [[env-vars]] · [[solapi-facts]] · [[kakaowork-notify]] · [[kakaowork-platform-limits]] · [[render-manual-deploy]]
+
+## [2026-09-05] ingest | 교재비 DB 를 07:30 스키마 감시망에 넣었다 (`aebbaed`)
+
+학부모에게 입금 안내가 나가는 모듈인데 감시 대상 14개에 **교재비만 빠져 있었다.** 속성 하나가 사라지면 노션이 필터를 400 으로 거절해 금요일 21시 일괄 발송과 월요일 11:10 독촉이 통째로 멈춘다.
+
+- 🔴 **구멍이 두 겹이었다.** `notionSchema.js` 의 선언뿐 아니라 `api/index.js:1061-1068` 의 `dbIds` 주입도 빠져 있었다. 선언만 넣었으면 `dbIds[dbKey]` 가 `undefined` 라 `unconfigured` 로 **조용히 건너뛰어**, 감시되는 줄 알고 넘어갔을 것이다 → [[schema-check]] 계약에 추가
+- 선언 20개는 `readRow()` · `queryFee()` 필터 · `PATCH` 쓰기를 코드 줄로 확인해 넣었다. `담임쌤` 으로 적었다 — 만든 스크립트와 설계 문서 §2 표는 `담당쌤` 이지만 2026-08-13 개명 이전 이름이다 → [[teacher-rollup-name]]
+- `scripts/notion-inspect.mjs` 의 `schema` 모드가 교재 마스터·학생 명부만 덤프해서 **교재비 DB 를 볼 수 없었다.** 선언을 검증할 유일한 수단이라 같이 붙였다. `.env` 는 저장소 루트에 있고 워크트리엔 없다 — `NOTION_ENV_FILE` 로 가리킨다.
+- **라이브 대조 완료**: 선언 20개 전부 실재, 사라짐·개명 0건. 선언된 DB 전체(로컬 env 로 볼 수 있는 14개)도 이상 없다. 2026-09-03 오탐 3건 같은 일은 없다.
+
+🔴 **작업 중 [[stale-head-line-refs]] 를 다시 밟았다.** HEAD 가 `origin/main` 보다 3커밋 뒤인 채로 읽어서, 원장이 지정한 `미입금 안내일시` 를 "저장소 어디에도 없다"고 근거까지 붙여 반박했다. 그 속성은 전날 커밋(`50f1ad8`)이 넣은 **필터 의존 속성**이라, 빠뜨렸으면 독촉 크론이 죽는다. `git fetch` 는 했지만 워크트리 브랜치에 upstream 이 없어 `@{u}` 비교가 실패한 걸 "최신"으로 읽은 게 원인. 그 페이지에 재발 사례와 규칙을 추가했다.
+
+- 갱신: `api/notionSchema.js` · `api/index.js` · `scripts/notion-inspect.mjs` · [[schema-check]] · [[textbook-fee]] · [[stale-head-line-refs]]

@@ -4,7 +4,7 @@ title: 낡은 HEAD 에서 읽고 위키에 라인 번호를 적었다
 type: pitfall
 status: verified
 source: .claude/hooks/check-remote.sh, .claude/settings.json
-updated: 2026-09-01
+updated: 2026-09-05
 tags: [git, wiki, workflow, hook]
 ---
 
@@ -37,10 +37,17 @@ tags: [git, wiki, workflow, hook]
 
 앞서 있거나 같으면 **아무것도 출력하지 않는다.** 네트워크·인증이 막혀도 `exit 0` 이라 세션은 그냥 시작된다.
 
+## 재발 (2026-09-05) — 이번엔 라인 번호가 아니라 **사실 판단**이 틀렸다
+
+교재비를 스키마 감시망에 넣는 작업에서 HEAD 가 `origin/main` 보다 **3커밋 뒤**인 채로 읽었는데, 그 3커밋이 `미입금 안내일시` 와 그걸 쓰는 필터를 넣은 커밋(`50f1ad8`)이었다. 그래서 원장이 넣으라고 지정한 속성을 **"저장소 어디에도 없다"고 근거까지 붙여 반박했다.** 그대로 갔으면 독촉 크론을 죽이는 필터 의존 속성이 감시 밖에 남았다 → [[schema-check]]
+
+🔴 원인은 `git fetch` 를 하고도 **"업스트림 없음"을 최신으로 읽은 것**이다. 워크트리 브랜치는 upstream 이 없어 `@{u}` 비교가 그냥 실패한다. `git rev-list --left-right --count origin/main...HEAD` 로 **`origin/main` 과 직접 대라**(`3  0` = 3커밋 뒤처짐).
+
 ## 규칙
 
 - **코드를 읽기 전에 맞춘다.** push 직전이 아니라 read 직전이다. 오염은 읽는 순간 들어온다.
 - 🔴 **훅이 `pull` 을 대신 해주지 않는다.** 작업 트리가 더러운 채로 `pull` 하면 상태가 섞인다(이 저장소는 서브모듈이 상시 더럽다). 뒤처졌다고 알려만 주고 판단은 사람이 한다.
 - 리베이스한 뒤에는 **그 세션에 쓴 `file:line` 을 다시 실측한다.** 병합이 조용히 성공해도 번호는 밀려 있다.
+- 🔴 **"없다"고 단정하기 전에 원격과 맞았는지 본다.** 낡은 HEAD 는 틀린 라인 번호뿐 아니라 **틀린 결론**을 만든다. 특히 사용자가 "있다"고 말한 것을 반박하려 할 때 먼저 확인할 것.
 
 관련: [[teacher-rollup-name]] · [[render-manual-deploy]] · [[monthly-report]]
