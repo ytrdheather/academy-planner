@@ -49,6 +49,9 @@ const env = loadEnv();
 const TOKEN = env.NOTION_ACCESS_TOKEN;
 const TEXTBOOK = env.TEXTBOOK_DB_ID || '18f09320bce2800aac09c7856bf17e7d';
 const STUDENT = env.STUDENT_DATABASE_ID || '25409320-bce2-80f8-ace1-ddcdd022b360';
+// 교재비 관리 DB — env 가 없으면 건너뛴다. 폴백 상수를 두지 않는 건 이 DB 만 사람이 만든 게
+// 아니라 scripts/create-textbook-fee-db.mjs 가 만들어서, id 가 환경마다 다를 수 있어서다.
+const FEE = env.TEXTBOOK_FEE_DB_ID;
 if (!TOKEN) { console.error('NOTION_ACCESS_TOKEN 이 비어 있습니다.'); process.exit(1); }
 
 // ── 노션 호출 ────────────────────────────────────────────────────
@@ -180,6 +183,10 @@ const mode = process.argv[2] || 'all';
     if (mode === 'all' || mode === 'schema') {
         await schema(TEXTBOOK, '교재 마스터');
         await schema(STUDENT, '학생 명부');
+        // api/notionSchema.js 의 TEXTBOOK_FEE_DB_ID 선언을 검증할 유일한 수단이다.
+        // 알림이 왔을 때 노션을 고치기 전에 여기부터 볼 것 → wiki/systems/schema-check.md
+        if (FEE) await schema(FEE, '교재비 관리');
+        else console.log('\n(교재비 관리: TEXTBOOK_FEE_DB_ID 가 env 에 없어 건너뜀)');
     }
     if (mode === 'all' || mode === 'price') await price();
     if (mode === 'all' || mode === 'workflow') await workflow();
