@@ -451,9 +451,15 @@ export function initializeTextbookFeeRoutes({
      * 알림톡 자체는 학부모별로 각각 나간다 — 묶는 것은 발송 작업이지 메시지가 아니다.
      * 완료 알림도 건별로 보내면 열 통씩 쌓이므로 요약 한 통만 보낸다.
      */
-    async function sendBatch() {
+    /**
+     * `조용히` — 나갈 게 없을 때 요약을 보내지 않는다. 토요일 재발송용.
+     * 금요일 배치는 0건이어도 요약을 보낸다(배치가 조용히 안 도는 걸 잡으려고). 토요일은 그 금요일
+     * 요약이 이미 "배치가 살아 있다"는 증거이므로, 매주 "나갈 게 없습니다"를 한 번 더 받을 이유가 없다.
+     */
+    async function sendBatch({ 조용히 = false, 제목 = '교재비 묶음 발송' } = {}) {
         const rows = await queryFee({ property: '진행상태', select: { equals: '승인됨' } });
         const 보냄 = [], 보류 = [], 실패 = [];
+        if (조용히 && !rows.length) return { 대상: 0, 발송: 0, 보류: 0, 실패: 0 };
 
         for (const row of rows) {
             const res = await sendOne(row, { 개별알림: false });
@@ -469,8 +475,8 @@ export function initializeTextbookFeeRoutes({
         if (실패.length) lines.push('', '🔴 실패 — 확인이 필요합니다', ...실패);
         if (!rows.length) lines[0] = '오늘 나갈 교재비 안내가 없습니다.';
 
-        // 0건이어도 보낸다. 배치가 조용히 안 도는 것을 아무도 모르는 게 제일 나쁘다.
-        await notifyOwner('교재비 묶음 발송', lines.join('\n'));
+        // 0건이어도 보낸다(조용히 모드가 아니면). 배치가 조용히 안 도는 것을 아무도 모르는 게 제일 나쁘다.
+        await notifyOwner(제목, lines.join('\n'));
         return { 대상: rows.length, 발송: 합계, 보류: 보류.length, 실패: 실패.length };
     }
 
@@ -1045,6 +1051,23 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         try { await runTeacherWeekly(); } catch (e) { console.error('교재비 주간 교사 알림 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
+    // 토요일 오전 11시 10분 — 금요일 밤 승인이 늦어 21시 배치를 놓친 건을 쓸어 보낸다.
+    //
+    // 세 번째다: 8/7 22:45 승인, 8/21 전부 승인대기, 9/11 23:45 승인(19건). 매번 TEXTBOOK_ONESHOT_AT 을
+    // 손으로 걸었는데, 원장이 금요일 밤에 몰아 승인하는 것이 실제 리듬이라 크론으로 굳힌다(2026-09-13 원장 확정).
+    // 승인됨인 행만 나가고 중복 방지 3겹은 그대로라, 금요일에 이미 나간 건은 다시 나가지 않는다.
+    // 나갈 게 없으면 조용하다. 11:00 정각이 아닌 이유는 숙제 자동 생성(매일 11:00)과 겹치기 때문.
+    cron.schedule('10 11 * * 6', async () => {
+        let 대상 = 0;
+        try {
+            const r = await sendBatch({ 조용히: true, 제목: '교재비 토요일 재발송' });
+            대상 = r.대상;
+            if (r.대상) console.log(`📚 교재비 토요일 재발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+        } catch (e) { console.error('교재비 토요일 재발송 Cron Error', e); }
+        // 금요일과 같은 이유로 담당쌤 알림을 이어서 보낸다. 나간 게 없으면 알림도 대상이 없어 조용하다.
+        if (대상) { try { await runTeacherWeekly(); } catch (e) { console.error('교재비 토요일 교사 알림 Cron Error', e); } }
+    }, { timezone: 'Asia/Seoul' });
+
     async function runTeacherWeekly() {
         const r = await notifyTeachers('주간');
         if (r.건수) console.log(`📚 교재비 주간 교사 알림: ${r.건수}건 → 선생 ${r.선생}명 / 실패 ${r.실패.length}`);
@@ -1086,7 +1109,7 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('장보기 목록 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 반려알림 + 평일 15시 미입금 + 금 21시 발송·교사알림 + 월 10시 장보기)');
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 반려알림 + 금 21시 발송·교사알림 + 토 11:10 재발송 + 월 10시 장보기 + 월 11:10 미입금)');
     if (!unpaidTemplateId()) console.log('ℹ️ ALIMTALK_TPL_TEXTBOOK_UNPAID 없음 — 미입금 학부모 안내는 건너뜁니다(심사 통과 후 환경변수에 넣으면 자동으로 나갑니다)');
     // 예약을 걸어 뒀는데 조용히 안 나가는 것이 제일 나쁘다. 기동할 때 확실히 찍어 준다.
     if (ONESHOT_AT) {

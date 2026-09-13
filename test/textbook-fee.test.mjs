@@ -230,8 +230,29 @@ test('크론 등록: 새 스케줄에도 timezone 이 붙어 있다', async () =
         const { cron } = 세우기({ feeRows: () => [] });
         const 표 = cron.jobs.map(j => j.expression);
         assert.ok(표.includes('10 11 * * 1'), '월요일 11:10 미입금 독촉');
+        assert.ok(표.includes('10 11 * * 6'), '토요일 11:10 재발송 — 금요일 밤 늦은 승인을 쓸어 보낸다');
         assert.ok(!표.includes('0 11 * * 1'), '11:00 정각은 숙제 자동 생성과 겹친다');
         assert.ok(표.includes('0 14 * * 1-5'), '평일 14시 반려 알림');
         for (const j of cron.jobs) assert.equal(j.options?.timezone, 'Asia/Seoul', `timezone 없음: ${j.expression}`);
+    } finally { f.restore(); }
+});
+
+test('토요일 재발송: 승인됨이 없으면 아무 알림도 안 보낸다 (매주 "없습니다"를 받을 이유가 없다)', async () => {
+    const f = stubFetch();
+    try {
+        const { cron } = 세우기({ feeRows: () => [] });
+        const 토 = cron.jobs.find(j => j.expression === '10 11 * * 6');
+        await 토.run();
+        assert.equal(f.kakaowork.length, 0, '0건이면 조용해야 한다');
+    } finally { f.restore(); }
+});
+
+test('금요일 배치: 승인됨이 없어도 요약은 보낸다 (배치가 안 도는 걸 잡으려고)', async () => {
+    const f = stubFetch();
+    try {
+        const { cron } = 세우기({ feeRows: () => [] });
+        const 금 = cron.jobs.find(j => j.expression === '0 21 * * 5');
+        await 금.run();
+        assert.ok(f.kakaowork.some(x => x.text.includes('나갈 교재비 안내가 없습니다')), '금요일은 0건 요약을 보낸다');
     } finally { f.restore(); }
 });
