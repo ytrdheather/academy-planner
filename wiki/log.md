@@ -352,3 +352,8 @@ Karpathy LLM-wiki 패턴으로 `wiki/` 층 신설. 목적은 세션마다 반복
 - `kstStampToMs`·`oneshotDue`·`oneshotExpired` 를 모듈 최상위 순수 함수로 빼서 고정 시각으로 테스트한다(`npm test` 41건). 11:05 에 배포한 경우가 테스트에 박혀 있다 — 예전 창이면 놓쳤을 시각.
 - 곁가지: 오늘 독촉 6명 중 3명(김채윤·형단희·오지훈)이 독촉 3시간 반 뒤 `입금 확인` 체크됐다. 독촉이 먹힌 것인지 이미 입금돼 있었는데 체크가 늦은 것인지는 원장만 안다. 후자면 **월요일 11시 전에 입금 확인을 정리**해야 한다.
 - 갱신: `api/textbookFeeModule.js` · `test/textbook-fee.test.mjs` · [[cron-jobs]] · [[render-manual-deploy]]
+
+## [2026-09-15] 교재비 | 미입금 독촉을 화요일 20시로 (원장 확정)
+
+- 월요일 11:10 → **화요일 20:00**. 기준일은 9 → **10**으로 되돌렸다. 금 21시 발송 기준 두 번째 화요일이 10.96일이라 10이 딱 맞는다(월요일 때는 9.6일이라 9로 낮춰야 했다). 시각을 옮길 때마다 이 짝을 다시 계산한다는 규칙이 코드 주석에 있다.
+- 갱신: `api/textbookFeeModule.js` · `test/textbook-fee.test.mjs` · [[cron-jobs]] · [[textbook-fee]] · [[render-manual-deploy]] · [[solapi-facts]]

@@ -229,7 +229,8 @@ test('크론 등록: 새 스케줄에도 timezone 이 붙어 있다', async () =
     try {
         const { cron } = 세우기({ feeRows: () => [] });
         const 표 = cron.jobs.map(j => j.expression);
-        assert.ok(표.includes('10 11 * * 1'), '월요일 11:10 미입금 독촉');
+        assert.ok(표.includes('0 20 * * 2'), '화요일 20:00 미입금 독촉');
+        assert.ok(!표.includes('10 11 * * 1'), '월요일 것은 없어졌다');
         assert.ok(표.includes('10 11 * * 6'), '토요일 11:10 재발송 — 금요일 밤 늦은 승인을 쓸어 보낸다');
         assert.ok(!표.includes('0 11 * * 1'), '11:00 정각은 숙제 자동 생성과 겹친다');
         assert.ok(표.includes('0 14 * * 1-5'), '평일 14시 반려 알림');
