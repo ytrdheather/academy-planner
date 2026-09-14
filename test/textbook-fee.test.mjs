@@ -289,3 +289,21 @@ test('일회성: 형식 — 끝에 개행·공백이 붙어도 trim 뒤엔 읽�
     assert.equal(kstStampToMs('2026-9-14T10:30'), null);
     assert.equal(kstStampToMs(''), null);
 });
+
+test('화요일 20시: 승인됨 묶음 발송을 먼저 돌리고 독촉을 돌린다 — 0건이면 둘 다 조용', async () => {
+    process.env.ALIMTALK_TPL_TEXTBOOK_UNPAID = 'KA01TP_TEST_UNPAID';
+    const f = stubFetch();
+    try {
+        const { notion, cron } = 세우기({ feeRows: () => [] });
+        const 화 = cron.jobs.find(j => j.expression === '0 20 * * 2');
+        await 화.run();
+        const 질의들 = notion.queries.map(x => JSON.stringify(x.filter));
+        const 승인idx = 질의들.findIndex(s => s.includes('"승인됨"') && !s.includes('교사알림함'));
+        const 독촉idx = 질의들.findIndex(s => s.includes('미입금 안내일시'));
+        assert.ok(승인idx >= 0, '승인됨 묶음을 물어야 한다 (9/11 의 19건이 여기로 나간다)');
+        assert.ok(독촉idx >= 0, '독촉도 물어야 한다');
+        assert.ok(승인idx < 독촉idx, '순서: 첫 안내가 먼저, 독촉이 뒤');
+        assert.equal(f.kakaowork.length, 0, '둘 다 0건이면 아무 알림도 없다');
+        assert.equal(f.solapi.length, 0);
+    } finally { f.restore(); }
+});

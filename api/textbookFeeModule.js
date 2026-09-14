@@ -1099,11 +1099,25 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('교재비 반려 알림 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    // 화요일 저녁 8시, 1차 미입금 독촉 (2026-09-15 원장 확정 — 월요일 11:10 에서 옮김).
-    // 주 1회인 이유: 매일 돌면 같은 학부모에게 나가는 날만 달라질 뿐 독촉이 흩어져 관리가 안 된다.
+    // 화요일 저녁 8시 — ① 승인됨 묶음 발송 → ② 1차 미입금 독촉 (2026-09-15 원장 확정).
+    //
+    // ①은 원장 요청: 금요일 밤에 몰아 승인하고 토요일 재발송까지 놓친 건(9/11 의 19건)을
+    //    일회성 환경변수로 처리하는 대신, 독촉이 나가는 저녁에 같이 실어 보낸다. 0건이면 조용하다.
+    //    이로써 첫 안내가 나가는 자리는 금 21시 · 토 11:10 · 화 20:00 세 곳이다.
+    // ②는 월요일 11:10 에서 옮겼다. 주 1회인 이유: 매일 돌면 독촉이 흩어져 관리가 안 된다.
+    //    ①에서 방금 나간 건은 발송 일시가 오늘이라 ②의 10일 기준에 안 걸린다 — 같은 저녁에 안내와 독촉을
+    //    둘 다 받는 학부모는 없다.
     // 20시엔 겹치는 크론이 없다(21시 금요일 발송, 22시 리포트 URL 뿐).
     // 🔴 기준일(UNPAID_AFTER_DAYS)과 짝이다. 시각을 옮기면 그 숫자를 다시 계산할 것.
     cron.schedule('0 20 * * 2', async () => {
+        let 대상 = 0;
+        try {
+            const r = await sendBatch({ 조용히: true, 제목: '교재비 화요일 발송' });
+            대상 = r.대상;
+            if (r.대상) console.log(`📚 교재비 화요일 발송: 대상 ${r.대상} / 발송 ${r.발송} / 보류 ${r.보류} / 실패 ${r.실패}`);
+        } catch (e) { console.error('교재비 화요일 발송 Cron Error', e); }
+        if (대상) { try { await runTeacherWeekly(); } catch (e) { console.error('교재비 화요일 교사 알림 Cron Error', e); } }
+
         try {
             const r = await notifyUnpaid();
             if (r.대상) console.log(`💸 교재비 미입금: 대상 ${r.대상} / 발송 ${r.발송} / 실패 ${r.실패.length}`);
@@ -1122,7 +1136,7 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
         } catch (e) { console.error('장보기 목록 Cron Error', e); }
     }, { timezone: 'Asia/Seoul' });
 
-    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 반려알림 + 금 21시 발송·교사알림 + 토 11:10 재발송 + 월 10시 장보기 + 화 20시 미입금)');
+    console.log('✅ 교재비 관리 모듈 로드됨 (5분 크론 + 평일 14시 반려알림 + 금 21시 발송·교사알림 + 토 11:10 재발송 + 월 10시 장보기 + 화 20시 발송·미입금)');
     if (!unpaidTemplateId()) console.log('ℹ️ ALIMTALK_TPL_TEXTBOOK_UNPAID 없음 — 미입금 학부모 안내는 건너뜁니다(심사 통과 후 환경변수에 넣으면 자동으로 나갑니다)');
     // 예약을 걸어 뒀는데 조용히 안 나가는 것이 제일 나쁘다. 기동할 때 확실히 찍어 준다.
     if (ONESHOT_AT) {
