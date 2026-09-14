@@ -32,6 +32,29 @@ const ALIMTALK_TEMPLATE_ID = 'KA01TP2512261533265840etUCdm2j2f';
 // 모듈 로드 시점에 상수로 굳히지 않고 보낼 때 읽는다 — 굳혀 두면 값을 넣어도 테스트·재기동 전까지 못 본다.
 const unpaidTemplateId = () => process.env.ALIMTALK_TPL_TEXTBOOK_UNPAID || '';
 
+// ── 일회성 발송 시각 계산 (순수 함수 — 테스트가 고정 시각으로 검사한다) ─────────
+const KST_MS = 9 * 3600 * 1000;
+/** 이 시각(KST) 이후로는 그날 것도 보내지 않는다. 밤에 입금 안내가 가면 안 된다. */
+export const ONESHOT_CUTOFF_HOUR = 21;
+const kstDay = ms => Math.floor((ms + KST_MS) / 86400000);
+const kstHour = ms => ((ms + KST_MS) % 86400000) / 3600000;
+
+/**
+ * 'YYYY-MM-DDTHH:mm' 을 **KST 벽시계**로 읽어 절대시각(ms)으로 바꾼다.
+ * 🔴 맨 `new Date(문자열)` 을 쓰면 서버 시간대로 해석된다(Render 는 UTC).
+ */
+export function kstStampToMs(stamp) {
+    const m = String(stamp).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/);
+    if (!m) return null;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - KST_MS;
+}
+/** 지금 나가도 되나 — 지정 시각이 지났고, 같은 날(KST)이고, 21시 전 */
+export const oneshotDue = (at, now) =>
+    now >= at && kstDay(now) === kstDay(at) && kstHour(now) < ONESHOT_CUTOFF_HOUR;
+/** 기회가 아예 지났나 — 날이 바뀌었거나, 그날 21시를 넘겼다 */
+export const oneshotExpired = (at, now) =>
+    kstDay(now) > kstDay(at) || (kstDay(now) === kstDay(at) && kstHour(now) >= ONESHOT_CUTOFF_HOUR);
+
 const STUCK_MINUTES = 30;          // 발송중에서 이만큼 멈춰 있으면 사고로 본다
 const TEACHER_CACHE_MS = 5 * 60 * 1000;
 
@@ -993,30 +1016,22 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
     //
     //   TEXTBOOK_ONESHOT_AT=2026-08-23T11:05   (KST 벽시계, 분까지)
     //
-    // 지정 시각부터 30분 안에 5분 크론이 잡아서 sendBatch() 를 한 번 돌린다.
-    // 30분 창을 두는 이유: 배포·재시작으로 한두 틱을 놓쳐도 그날 안에 나가야 하기 때문이다.
-    // 다 쓰면 환경변수를 지운다. 안 지워도 시각이 지나면 다시 안 돈다.
-    const ONESHOT_AT = process.env.TEXTBOOK_ONESHOT_AT || '';
-    const ONESHOT_WINDOW_MS = 30 * 60 * 1000;
+    // 지정 시각이 지나면 5분 크론이 잡아서 sendBatch() 를 한 번 돌린다.
+    //
+    // 🔴 원래는 "지정 시각부터 30분 안"이었다. 2026-09-14 에 원장이 10:30 으로 걸어 뒀는데
+    //    서버가 그 30분 사이에 그 값을 들고 떠 있지 않아 안 나갔고, 19가정 안내가 하루 더 밀렸다.
+    //    지금은 **그날 안이면, 21시 전이면** 서버가 뜬 첫 틱에 나간다. 아침에 배포가 좀 늦어도 그날 나가고,
+    //    밤에는 안 나간다 — 일요일 밤 10시 40분에 입금 안내가 가는 걸 원장이 실제로 걱정했다.
+    // 다 쓰면 환경변수를 지운다. 안 지워도 날이 지나면 다시 안 돈다.
+    const ONESHOT_AT = (process.env.TEXTBOOK_ONESHOT_AT || '').trim();   // 끝에 붙은 공백·개행으로 형식이 틀리지 않게
     let oneshotDone = false;
-
-    /**
-     * 'YYYY-MM-DDTHH:mm' 을 **KST 벽시계**로 읽어 절대시각(ms)으로 바꾼다.
-     * 🔴 맨 `new Date(문자열)` 을 쓰면 서버 시간대로 해석된다(Render 는 UTC).
-     */
-    function kstStampToMs(stamp) {
-        const m = String(stamp).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/);
-        if (!m) return null;
-        return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - 9 * 3600 * 1000;
-    }
 
     async function runOneShot() {
         if (!ONESHOT_AT || oneshotDone) return;
         const at = kstStampToMs(ONESHOT_AT);
         if (at == null) return;   // 형식이 틀리면 조용히 넘어간다(기동 로그에서 이미 경고했다)
 
-        const now = Date.now();
-        if (now < at || now >= at + ONESHOT_WINDOW_MS) return;
+        if (!oneshotDue(at, Date.now())) return;
 
         // 먼저 막아 둔다. sendBatch 가 오래 걸리면 다음 틱이 겹쳐 들어올 수 있다.
         oneshotDone = true;
@@ -1115,7 +1130,8 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;backgr
     if (ONESHOT_AT) {
         const at = kstStampToMs(ONESHOT_AT);
         if (at == null) console.error(`🔴 TEXTBOOK_ONESHOT_AT 형식이 틀렸습니다: "${ONESHOT_AT}" — 2026-08-23T11:05 처럼 적어 주세요. 일회성 발송은 돌지 않습니다`);
-        else if (Date.now() >= at + ONESHOT_WINDOW_MS) console.warn(`⚠️ TEXTBOOK_ONESHOT_AT(${ONESHOT_AT} KST) 가 이미 지났습니다 — 일회성 발송은 돌지 않습니다`);
-        else console.log(`⏰ 교재비 일회성 발송 예약됨: ${ONESHOT_AT} KST (이후 30분 안에 한 번)`);
+        else if (kstHour(at) >= ONESHOT_CUTOFF_HOUR) console.error(`🔴 TEXTBOOK_ONESHOT_AT(${ONESHOT_AT} KST) 는 ${ONESHOT_CUTOFF_HOUR}시 이후라 걸 수 없습니다 — 밤에는 입금 안내를 보내지 않습니다`);
+        else if (oneshotExpired(at, Date.now())) console.warn(`⚠️ TEXTBOOK_ONESHOT_AT(${ONESHOT_AT} KST) 가 이미 지났습니다 — 일회성 발송은 돌지 않습니다. 날짜를 다시 걸고 재배포해 주세요`);
+        else console.log(`⏰ 교재비 일회성 발송 예약됨: ${ONESHOT_AT} KST (그날 ${ONESHOT_CUTOFF_HOUR}시 전까지, 지정 시각 이후 첫 틱에 한 번)`);
     }
 }

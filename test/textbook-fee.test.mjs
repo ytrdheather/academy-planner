@@ -256,3 +256,35 @@ test('금요일 배치: 승인됨이 없어도 요약은 보낸다 (배치가 �
         assert.ok(f.kakaowork.some(x => x.text.includes('나갈 교재비 안내가 없습니다')), '금요일은 0건 요약을 보낸다');
     } finally { f.restore(); }
 });
+
+// ── 일회성 발송 시각 — 순수 함수라 고정 시각으로 검사한다 ──────────────────
+import { kstStampToMs, oneshotDue, oneshotExpired } from '../api/textbookFeeModule.js';
+const KST = (s) => new Date(s + '+09:00').getTime();
+
+test('일회성: 지정 시각이 지났으면 그날 21시 전까지는 언제든 나간다 (30분 창에 갇히지 않는다)', () => {
+    const at = kstStampToMs('2026-09-14T10:30');
+    assert.equal(at, KST('2026-09-14T10:30'), 'KST 벽시계로 읽어야 한다');
+    assert.equal(oneshotDue(at, KST('2026-09-14T10:29')), false, '아직 전');
+    assert.equal(oneshotDue(at, KST('2026-09-14T10:35')), true, '직후');
+    assert.equal(oneshotDue(at, KST('2026-09-14T11:05')), true, '🔴 예전 30분 창이면 여기서 놓쳤다 — 9/14 실제 사고');
+    assert.equal(oneshotDue(at, KST('2026-09-14T15:00')), true, '오후에 배포해도 그날 나간다');
+    assert.equal(oneshotDue(at, KST('2026-09-14T20:59')), true);
+});
+
+test('일회성: 밤에는 안 나가고, 날이 바뀌면 안 나간다', () => {
+    const at = kstStampToMs('2026-09-14T10:30');
+    assert.equal(oneshotDue(at, KST('2026-09-14T21:00')), false, '21시부터는 그날 것도 안 보낸다 — 밤 10시 40분 입금 안내 걱정');
+    assert.equal(oneshotDue(at, KST('2026-09-14T22:40')), false);
+    assert.equal(oneshotDue(at, KST('2026-09-15T09:00')), false, '다음 날엔 안 나간다 — 낡은 환경변수가 며칠 뒤 터지면 안 된다');
+    assert.equal(oneshotExpired(at, KST('2026-09-14T20:59')), false);
+    assert.equal(oneshotExpired(at, KST('2026-09-14T21:00')), true);
+    assert.equal(oneshotExpired(at, KST('2026-09-15T00:01')), true);
+});
+
+test('일회성: 형식 — 끝에 개행·공백이 붙어도 trim 뒤엔 읽힌다, 틀린 건 null', () => {
+    assert.equal(kstStampToMs('2026-09-14T10:30\n'), null, 'trim 전엔 못 읽는다 — 그래서 모듈이 trim 한다');
+    assert.equal(kstStampToMs('2026-09-14T10:30\n'.trim()), KST('2026-09-14T10:30'));
+    assert.equal(kstStampToMs('2026-09-14 10:30'), KST('2026-09-14T10:30'), '공백 구분도 받는다');
+    assert.equal(kstStampToMs('2026-9-14T10:30'), null);
+    assert.equal(kstStampToMs(''), null);
+});

@@ -40,7 +40,7 @@ Starter 플랜이라 서버가 잠들지 않아 크론이 정상 동작한다. *
 | 매일 07:25~07:35 | 노션 스키마 점검 → [[schema-check]] |
 | 매일 07:55~08:05 | 그날 보강 명단 |
 | 수업 시간대 매시 13~17분·43~47분 | 미도착 알림 — 놓치면 그 시간대 아이는 30분 뒤에야 잡힌다 → [[arrival-alert]] |
-| `TEXTBOOK_ONESHOT_AT` 걸린 시각 ±30분 | 일회성 교재비 발송 — **창을 통째로 놓치면 그날 안 나간다** |
+| `TEXTBOOK_ONESHOT_AT` 걸린 시각 ±10분 | 일회성 교재비 발송. 놓쳐도 그날 21시 전 첫 틱에 나간다 |
 
 겹쳐서 놓친 크론은 대부분 화면의 수동 버튼이나 `POST /api/textbook/tick`·`/send-batch`·`/notify-teachers`·`/notify-unpaid`·`/shopping-push`·`/api/monthly-report/tick`으로 복구할 수 있다(멱등) → [[cron-jobs]]
 
