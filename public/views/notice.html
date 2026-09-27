@@ -91,7 +91,10 @@
   .tag.ev{background:var(--accent-wash); color:var(--accent-ink); margin-right:6px}
   /* 보강은 달력 점 색(#ef9ec4)과 맞춰 학부모가 위아래를 같은 것으로 읽게 한다 */
   .tag.mk{background:#fce4ee; color:#b03a68; margin-right:6px}
-  @media (prefers-color-scheme:dark){.tag.mk{background:rgba(239,158,196,.16); color:#f2a8c8}}
+  /* 시험기간도 달력 색(#8fb4e6)과 맞춘다 */
+  .tag.ex{background:#e3edfb; color:#2f5f9e; margin-right:6px}
+  @media (prefers-color-scheme:dark){.tag.mk{background:rgba(239,158,196,.16); color:#f2a8c8}
+    .tag.ex{background:rgba(143,180,230,.16); color:#a9c7ef}}
   .post .t{font-weight:700; font-size:15.5px; letter-spacing:-.2px}
   .post .date{color:var(--ink-faint); font-size:12.5px; margin-left:auto; flex:0 0 auto}
   .post .b{color:var(--ink-soft); font-size:14.5px; white-space:pre-wrap; margin-top:5px}
@@ -202,14 +205,14 @@ function fmtShort(iso){
 }
 
 // ── 학사일정 달력 ─────────────────────────────
-// 원장이 /calendar 에서 찍은 휴강·이벤트·보강일을 학부모 화면에도 그대로 그린다.
+// 원장이 /calendar 에서 찍은 휴강·이벤트·시험기간·보강일을 학부모 화면에도 그대로 그린다.
 // 달력 이미지를 매달 만들어 올리지 않아도 되게 하려는 것이다.
 const CAL_FILL = { 2:'#a9d6c4', 4:'#a9d6c4', 1:'#fbd4d9', 3:'#fbd4d9', 5:'#fbd4d9' };
-const CAL_MARK = { '휴강':'#e0b64a', '이벤트':'#b89ad6', '보강일':'#ef9ec4' };
+const CAL_MARK = { '휴강':'#e0b64a', '이벤트':'#b89ad6', '시험기간':'#8fb4e6', '보강일':'#ef9ec4' };
 const CAL_LEGEND = [
   { c:'#a9d6c4', t:'화 · 목 수업' }, { c:'#fbd4d9', t:'월 · 수 · 금 수업' },
   { c:CAL_MARK['휴강'], t:'휴강' }, { c:CAL_MARK['이벤트'], t:'학원 행사' },
-  { c:CAL_MARK['보강일'], t:'토요 보강일' },
+  { c:CAL_MARK['시험기간'], t:'시험기간' }, { c:CAL_MARK['보강일'], t:'토요 보강일' },
 ];
 
 let NOTICE_ITEMS = [];
@@ -296,7 +299,7 @@ function renderSchedule(){
     // 이름을 지어 준 휴강·행사는 설명이 없어도 띄운다.
     // 달력의 점만으로는 "학원방학"인지 알 수 없어서 결국 학원에 물어보게 된다.
     .filter(it => (it.type === '학사일정' && !it.image)
-      || ((it.type === '휴강' || it.type === '이벤트') && (it.body || (it.title && it.title !== it.type)))
+      || ((it.type === '휴강' || it.type === '이벤트' || it.type === '시험기간') && (it.body || (it.title && it.title !== it.type)))
       || (it.type === '보강일' && (it.time || it.body)))
     .sort((a,b) => a.start.localeCompare(b.start));
 
@@ -305,6 +308,7 @@ function renderSchedule(){
       const isToday = it.start <= today && (it.end || it.start) >= today;
       const badge = it.type === '휴강' ? '<span class="tag off">휴강</span>'
         : it.type === '이벤트' ? '<span class="tag ev">행사</span>'
+        : it.type === '시험기간' ? '<span class="tag ex">시험</span>'
         : it.type === '보강일' ? '<span class="tag mk">보강</span>' : '';
       // 달력에서 찍은 표시는 제목이 유형 이름 그대로("휴강")라 다시 보여줄 필요가 없다
       const label = (it.title === it.type) ? '' : esc(it.title);

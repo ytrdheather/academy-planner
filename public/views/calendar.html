@@ -90,7 +90,7 @@
 
   <h1>학사일정 달력</h1>
   <p class="lede">
-    휴강일을 고르면 트랙별 수업 시수를 바로 다시 셉니다. 휴강·이벤트는 <b>시작일과 종료일을 차례로 누르면</b> 기간으로 묶입니다.
+    휴강일을 고르면 트랙별 수업 시수를 바로 다시 셉니다. 휴강·이벤트·시험기간은 <b>시작일과 종료일을 차례로 누르면</b> 기간으로 묶입니다.
     저장하면 학부모 안내 페이지와 결석·보강 폼에도 반영됩니다.
   </p>
 
@@ -142,10 +142,11 @@ const TRACKS = [
 const MARKS = {
   '휴강':   { color: '#e0b64a', label: '휴강' },
   '이벤트': { color: '#b89ad6', label: '이벤트' },
+  '시험기간': { color: '#8fb4e6', label: '시험기간' },
   '보강일': { color: '#ef9ec4', label: '토요보강' },
 };
 // 기간으로 묶을 수 있는 유형. 보강일은 결석 신청 폼의 선택지라 하루 단위로 둔다.
-const RANGE_TYPES = ['휴강', '이벤트'];
+const RANGE_TYPES = ['휴강', '이벤트', '시험기간'];
 // 수업 요일 기본 색 (원래 쓰시던 달력과 같은 구분)
 const WEEKDAY_FILL = { 2: '#a9d6c4', 4: '#a9d6c4', 1: '#fbd4d9', 3: '#fbd4d9', 5: '#fbd4d9' };
 const WD = ['일','월','화','수','목','금','토'];
@@ -350,6 +351,7 @@ function drawCalendar(){
     { c: '#fbd4d9', t: '월 · 수 · 금 수업' },
     { c: MARKS['휴강'].color, t: '휴강' },
     { c: MARKS['이벤트'].color, t: '학원 행사' },
+    { c: MARKS['시험기간'].color, t: '시험기간' },
     { c: MARKS['보강일'].color, t: '토요 보강일' },
   ];
   legend.forEach((L, i) => {
@@ -396,7 +398,7 @@ function onDayClick(date){
     return;
   }
 
-  // 휴강·이벤트 — 첫 클릭은 시작일, 두 번째 클릭은 종료일
+  // 휴강·이벤트·시험기간 — 첫 클릭은 시작일, 두 번째 클릭은 종료일
   if (!pending){
     if (hit && hit.type === tool){ items = items.filter(it => it !== hit); markDirty(); redraw(); return; }
     pending = { type: tool, start: date };
@@ -442,7 +444,7 @@ function drawNames(){
   if (!list.length){ box.innerHTML = ''; box.hidden = true; return; }
   box.hidden = false;
 
-  let s = '<h3>휴강 · 행사 이름</h3><p class="sub">여기에 적은 이름이 <b>학부모 안내 페이지와 달력 이미지에</b> 그대로 나갑니다. 비워 두면 색깔만 표시되고 이름은 안 보입니다.</p>';
+  let s = '<h3>휴강 · 행사 · 시험 이름</h3><p class="sub">여기에 적은 이름이 <b>학부모 안내 페이지와 달력 이미지에</b> 그대로 나갑니다. 비워 두면 색깔만 표시되고 이름은 안 보입니다.</p>';
   list.forEach(it => {
     s += '<label class="trow">'
       + '<span class="kind" style="background:' + MARKS[it.type].color + '"></span>'
