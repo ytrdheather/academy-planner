@@ -74,6 +74,18 @@ function reply(text, button) {
     return { version: '2.0', template: { outputs } };
 }
 
+/**
+ * 못 알아들은 문의를 botUserKey 별로 잠깐 들고 있다가, 다음 말(학생 이름)과 묶어 원장에게 넘긴다.
+ * 메모리에만 둔다 — 서버가 재시작되면 잊는다. 그때는 이름이 새 문의로 전달되고 이름을 한 번 더 묻게 되지만,
+ * 원장에게는 두 알림이 다 가므로 놓치지는 않는다.
+ *
+ * 이름을 받은 사람은 반나절 기억한다. 이어서 "감사합니다" 같은 말을 해도 이름을 또 묻지 않고 이름을 붙여 넘긴다.
+ */
+const PENDING_MS = 30 * 60 * 1000;
+const NAMED_MS = 12 * 60 * 60 * 1000;
+const pendingByUser = new Map();   // botUserKey → { utterance, at }
+const namedByUser = new Map();     // botUserKey → { name, at }
+
 export function initializeKakaoSkill({ app, domainUrl, sendKakaoWork, ownerConv }) {
     // 오픈빌더 스킬 설정에서 커스텀 헤더를 넣을 수 있다. 넣어 두면 아무나 못 부른다.
     const SECRET = process.env.KAKAO_SKILL_SECRET || '';
@@ -94,17 +106,43 @@ export function initializeKakaoSkill({ app, domainUrl, sendKakaoWork, ownerConv 
             ));
         }
 
+        const userKey = String(req.body?.userRequest?.user?.id || '');
+        const now = Date.now();
+        for (const [k, v] of pendingByUser) if (now - v.at > PENDING_MS) pendingByUser.delete(k);
+        for (const [k, v] of namedByUser) if (now - v.at > NAMED_MS) namedByUser.delete(k);
+        const pending = userKey && pendingByUser.get(userKey);
+        const named = userKey && namedByUser.get(userKey);
+
+        // 앞서 못 알아들은 문의에 이름을 물었고, 그 답이 왔다. 둘을 묶어 넘긴다.
+        if (pending) {
+            pendingByUser.delete(userKey);
+            namedByUser.set(userKey, { name: utterance.slice(0, 100), at: now });
+            console.log(`💬 챗봇: [보낸 사람] "${utterance.slice(0, 40)}"`);
+            await toOwner(`[채널 문의 — 보낸 사람]\n\n"${utterance.slice(0, 100)}"\n\n앞서 온 문의:\n"${pending.utterance.slice(0, 300)}"\n\n채널에서 직접 답해 주세요.`);
+            return res.json(reply('감사합니다. 선생님께 전달했습니다.\n수업이 끝난 뒤 확인하고 답장드립니다.\n\n급한 일이면 학원으로 전화 주세요. 031-273-6737'));
+        }
+
         // 못 알아들었다. 답을 지어내지 말고 사람에게 넘긴다.
         console.log(`💬 챗봇: [미분류] "${utterance.slice(0, 60)}"`);
-        try {
-            if (ownerConv) {
-                await sendKakaoWork(ownerConv,
-                    `[채널 문의 — 봇이 못 알아들음]\n\n"${utterance.slice(0, 300)}"\n\n채널에서 직접 답해 주세요.`);
-            }
-        } catch (e) { console.error('채널 문의 전달 실패:', e.message); }
 
-        res.json(reply('선생님께 전달했습니다.\n수업이 끝난 뒤 확인하고 답장드립니다.\n\n급한 일이면 학원으로 전화 주세요. 031-273-6737'));
+        // 조금 전에 이름을 받은 사람이다. 또 묻지 않는다.
+        if (named) {
+            await toOwner(`[채널 문의 — ${named.name}]\n\n"${utterance.slice(0, 300)}"\n\n채널에서 직접 답해 주세요.`);
+            return res.json(reply('선생님께 전달했습니다.\n수업이 끝난 뒤 확인하고 답장드립니다.\n\n급한 일이면 학원으로 전화 주세요. 031-273-6737'));
+        }
+
+        // 봇은 누가 보냈는지 모르므로 학생 이름을 한 번 더 받는다.
+        if (userKey) pendingByUser.set(userKey, { utterance, at: now });
+        await toOwner(`[채널 문의 — 봇이 못 알아들음]\n\n"${utterance.slice(0, 300)}"\n\n학부모에게 학생 이름을 물었습니다. 답이 오면 다시 알려드립니다.`);
+
+        res.json(reply('선생님께 전달해 드리려면 어느 학생 학부모님이신지 알아야 합니다.\n학생 이름을 한 번 더 남겨 주세요.\n\n급한 일이면 학원으로 전화 주세요. 031-273-6737'));
     });
+
+    async function toOwner(text) {
+        try {
+            if (ownerConv) await sendKakaoWork(ownerConv, text);
+        } catch (e) { console.error('채널 문의 전달 실패:', e.message); }
+    }
 
     console.log('✅ 카카오 챗봇 스킬 로드됨 (POST /api/kakao/skill)');
 }
