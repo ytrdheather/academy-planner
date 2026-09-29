@@ -1696,6 +1696,22 @@ async function ensureGrammarClassOption(className) {
     }
 }
 
+// 그날 PROGRESS 행 전부. 노션은 한 번에 100건까지만 주므로 커서를 끝까지 돈다.
+// 🔴 한 번만 부르면 학생이 100명을 넘는 날 뒤쪽 반이 통째로 잘려 "해당 반의 학생 데이터를 찾을 수 없습니다"가 뜬다(2026-09-29 LS).
+async function queryProgressByDate(date) {
+    const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
+    const results = [];
+    let cursor;
+    do {
+        const page = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, {
+            method: 'POST', body: JSON.stringify({ filter, page_size: 100, start_cursor: cursor })
+        });
+        results.push(...page.results);
+        cursor = page.has_more ? page.next_cursor : undefined;
+    } while (cursor);
+    return results;
+}
+
 app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     const { className, topic, homework, testContent, comment, date } = req.body;
     if (!className || !date) { return res.status(400).json({ success: false, message: 'Missing info' }); }
@@ -1705,10 +1721,7 @@ app.post('/api/update-grammar-by-class', requireAuth, async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
 
     try {
-        const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
-        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
-        
-        const students = query.results;
+        const students = await queryProgressByDate(date);
         
         // [신규 로직] 노션 DB 설정이 '단일 선택'인지 '다중 선택'인지 자동 감지!
         let isMultiSelect = false;
@@ -1840,9 +1853,7 @@ app.post('/api/update-grammar-comment-by-class', requireAuth, async (req, res) =
         }
 
         // ② 그 반 PROGRESS 그날 행 전원에 코멘트 투사
-        const filter = { "and": [ { property: '🕐 날짜', date: { equals: date } } ] };
-        const query = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter }) });
-        const targetStudents = query.results.filter(page => {
+        const targetStudents = (await queryProgressByDate(date)).filter(page => {
             const studentClass = getRollupValue(page.properties['문법클래스']);
             return studentClass && studentClass.trim() === className.trim();
         });

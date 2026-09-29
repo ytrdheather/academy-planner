@@ -373,3 +373,12 @@ Karpathy LLM-wiki 패턴으로 `wiki/` 층 신설. 목적은 세션마다 반복
 - `api/kakaoSkill.js` — 미분류면 학부모에게 학생 이름을 묻고, `botUserKey`별로 30분 대기. 다음 말을 이름으로 보고 앞 문의와 묶어 다시 DM. 이름은 12시간 기억해 이후 미분류에 붙인다
 - 메모리에만 둔다 — 재시작하면 잊는다(이름을 한 번 더 묻는 정도의 손해)
 - `wiki/systems/kakao-channel-bot.md` 계약 갱신
+
+## [2026-09-29] fix | 문법 반별 저장 — "해당 반의 학생 데이터를 찾을 수 없습니다" (LS)
+
+LS 반 문법 숙제를 저장하니 이 메시지가 떴다. 화면에는 LS 학생 행이 멀쩡히 있었다.
+
+- 원인(추정, 노션 직접 확인은 못 함): 반별 문법 저장 두 곳이 그날 PROGRESS 행을 **커서 없이 한 번만** 읽었다. 노션은 100건까지만 준다. 그날 학생이 100명을 넘으면 뒤쪽 반은 통째로 잘린다. 명부가 95명이던 게 8월이다 → [[notion-fetch]]
+- `api/index.js` — `queryProgressByDate()` 새로 둠. `/api/update-grammar-by-class` · `/api/update-grammar-comment-by-class` 둘 다 이걸 쓴다
+- `api/dailyReportModule.js` 22:00 리포트 URL 크론도 같은 버그라 커서를 돌게 했다(뒤쪽 학생 `데일리리포트URL`이 비었을 것)
+- 🔴 **PROGRESS 를 날짜로 조회하면 이제 100건을 넘는다.** `page_size` 없이 한 번 부르는 코드는 전부 의심하라

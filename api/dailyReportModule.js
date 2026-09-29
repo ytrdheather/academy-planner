@@ -282,12 +282,17 @@ export function initializeDailyReportRoutes(dependencies) {
         try {
             const { start, end, dateString } = getKSTTodayRange();
             const filter = { "and": [ { property: '🕐 날짜', date: { equals: dateString } } ] };
-            const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter }) });
-            for (const page of data.results) {
-                const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
-                const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
-                if (page.properties['데일리리포트URL']?.url === url) continue;
-                await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) });
+            // 100건 넘는 날은 커서를 끝까지 돈다 — 안 돌면 뒤쪽 학생의 리포트 URL이 비었다
+            let hasMore = true; let startCursor = undefined;
+            while (hasMore) {
+                const data = await fetchNotion(`https://api.notion.com/v1/databases/${PROGRESS_DATABASE_ID}/query`, { method: 'POST', body: JSON.stringify({ filter: filter, page_size: 100, start_cursor: startCursor }) });
+                for (const page of data.results) {
+                    const cleanDomain = DOMAIN_URL.replace(/^https?:\/\//, '');
+                    const url = `${cleanDomain}/report?pageId=${page.id}&date=${dateString}`;
+                    if (page.properties['데일리리포트URL']?.url === url) continue;
+                    await fetchNotion(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', body: JSON.stringify({ properties: { '데일리리포트URL': { url } } }) });
+                }
+                hasMore = data.has_more; startCursor = data.next_cursor;
             }
         } catch (e) { console.error('Cron Error', e); }
     }, { timezone: "Asia/Seoul" });
