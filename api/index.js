@@ -272,12 +272,22 @@ async function loadNotices() {
 
     // 노션 쪽 필터·정렬을 쓰지 않는다. 속성 이름이 하나라도 다르면 400이 나서
     // 학부모 화면이 통째로 비는데, 건수가 적어 전부 읽어와 걸러도 부담이 없다.
-    const data = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
-        method: 'POST',
-        body: JSON.stringify({ page_size: 100 }),
-    });
+    // 🔴 끝까지 넘겨 읽는다. 달력 표시·시수 안내가 달마다 쌓여 100건을 넘으면
+    //    뒤쪽이 조용히 잘려 학부모 달력에서 휴강이 사라진다.
+    const pages = [];
+    let cursor;
+    do {
+        const body = { page_size: 100 };
+        if (cursor) body.start_cursor = cursor;
+        const data = await fetchNotion(`https://api.notion.com/v1/databases/${NOTICE_DB_ID}/query`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
+        pages.push(...(data.results || []));
+        cursor = data.has_more ? data.next_cursor : null;
+    } while (cursor);
 
-    const items = (data.results || []).map(page => {
+    const items = pages.map(page => {
         const p = page.properties || {};
         return {
             title: noticePlainText(p['제목']),

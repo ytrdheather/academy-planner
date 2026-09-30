@@ -382,3 +382,13 @@ LS 반 문법 숙제를 저장하니 이 메시지가 떴다. 화면에는 LS �
 - `api/index.js` — `queryProgressByDate()` 새로 둠. `/api/update-grammar-by-class` · `/api/update-grammar-comment-by-class` 둘 다 이걸 쓴다
 - `api/dailyReportModule.js` 22:00 리포트 URL 크론도 같은 버그라 커서를 돌게 했다(뒤쪽 학생 `데일리리포트URL`이 비었을 것)
 - 🔴 **PROGRESS 를 날짜로 조회하면 이제 100건을 넘는다.** `page_size` 없이 한 번 부르는 코드는 전부 의심하라
+
+## [2026-09-30] change | 학부모 학사일정 달력 단순화 + 트랙별 시수 안내 문구
+
+학부모가 학사일정이 너무 복잡하다고 했다. 모든 일정이 날짜 동그라미 색을 바꿔서 수업일이 가려졌다.
+
+- `public/assets/readi-calendar.js` 새로 둠 — `/calendar`와 `/notice`가 같은 그림을 쓴다. 동그라미는 수업일·휴강만, 시험·행사·보강은 숫자 밑 색 선 + 이름, 오른쪽 위 트랙별 횟수
+- 트랙별 안내 문구: 공지 DB `유형=시수메모` (`api/calendarModule.js` `syncNotes`). `notionSchema` 공지 DB에 `내용` 추가
+- `loadNotices()` 커서 페이징 — 100건에서 잘리던 것
+- `wiki/systems/absence-notice.md` "달력 그림" 절
+

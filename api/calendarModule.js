@@ -16,6 +16,12 @@
 const CALENDAR_TYPES = ['휴강', '이벤트', '시험기간', '보강일'];
 const RANGE_TYPES = ['휴강', '이벤트', '시험기간'];   // 기간을 쓸 수 있는 유형
 
+// 트랙별 학부모 안내 문구 (2026-09-30). 목표 횟수(12·8·12)를 못 채우는 달에 원장이
+// "월수금 1회 수업은 11월에 13회 수업하도록 하겠습니다" 처럼 적으면 학부모 달력 오른쪽 위에 나간다.
+// 공지 DB 한 행 = 한 달·한 트랙 (제목=트랙, 내용=문구, 날짜=그 달 1일). 위 네 유형과 따로 맞춘다.
+const NOTE_TYPE = '시수메모';
+const NOTE_TRACKS = ['월수금', '화목', '화목금'];   // public/assets/readi-calendar.js 의 TRACKS 와 같게
+
 const isYm = (s) => /^\d{4}-\d{2}$/.test(String(s || ''));
 const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 const monthOf = (ymd) => String(ymd || '').slice(0, 7);
@@ -113,7 +119,7 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
 
     // 공지 DB는 건수가 적다. 노션 날짜 필터가 기간 속성의 시작·종료 중 무엇을 보는지
     // 애매해서, 전부 읽어 와 JS에서 정확히 거른다. loadNotices() 도 같은 방식이다.
-    async function readAllMarks() {
+    async function readAllRows(types) {
         const out = [];
         let cursor;
         do {
@@ -126,7 +132,7 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
                 const p = page.properties || {};
                 const type = p['유형']?.select?.name || '';
                 const start = p['날짜']?.date?.start || '';
-                if (!CALENDAR_TYPES.includes(type) || !isYmd(start)) return;
+                if (!types.includes(type) || !isYmd(start)) return;
                 out.push({
                     id: page.id,
                     type,
@@ -135,11 +141,55 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
                     end: p['날짜']?.date?.end || start,
                     title: plainText(p['제목']),
                     time: plainText(p['보강시간']),
+                    body: plainText(p['내용']),
                 });
             });
             cursor = data.has_more ? data.next_cursor : null;
         } while (cursor);
         return out;
+    }
+
+    // 그 달 트랙별 안내 문구를 맞춘다. 비운 트랙은 archived, 바뀐 트랙은 내용만 고친다.
+    async function syncNotes(month, notes, existing) {
+        const mine = existing.filter(r => r.start === month + '-01');
+        let changed = 0;
+        for (const track of NOTE_TRACKS) {
+            const want = String(notes?.[track] || '').trim().slice(0, 200);
+            const rows = mine.filter(r => r.title === track);
+            const keep = want ? rows[0] : null;
+            // 같은 트랙 행이 둘 이상이면 하나만 남긴다
+            for (const r of rows) {
+                if (r === keep) continue;
+                await fetchNotion(`https://api.notion.com/v1/pages/${r.id}`, {
+                    method: 'PATCH', body: JSON.stringify({ archived: true }),
+                });
+                changed++;
+            }
+            if (!want) continue;
+            const content = { rich_text: [{ text: { content: want } }] };
+            if (keep) {
+                if (keep.body === want) continue;
+                await fetchNotion(`https://api.notion.com/v1/pages/${keep.id}`, {
+                    method: 'PATCH', body: JSON.stringify({ properties: { '내용': content } }),
+                });
+            } else {
+                await fetchNotion('https://api.notion.com/v1/pages', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        parent: { database_id: NOTICE_DB_ID },
+                        properties: {
+                            '제목': { title: [{ text: { content: track } }] },
+                            '유형': { select: { name: NOTE_TYPE } },
+                            '날짜': { date: { start: month + '-01' } },
+                            '내용': content,
+                            '게시': { checkbox: true },
+                        },
+                    }),
+                });
+            }
+            changed++;
+        }
+        return { changed };
     }
 
     // 한 건을 무엇으로 "같다"고 볼지. 이름이 생겼으므로 이름까지 본다.
@@ -155,7 +205,11 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
         if (!NOTICE_DB_ID) return res.json({ marks: [], configured: false });
 
         try {
-            const all = await readAllMarks();
+            const rows = await readAllRows([...CALENDAR_TYPES, NOTE_TYPE]);
+            const all = rows.filter(r => r.type !== NOTE_TYPE);
+            const notes = {};
+            rows.filter(r => r.type === NOTE_TYPE && r.start === month + '-01' && r.body)
+                .forEach(r => { notes[r.title] = r.body; });
             const marks = all
                 .filter(m => overlapsMonth(m.start, m.end, month))
                 .map(m => ({
@@ -165,7 +219,7 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
                     owner: monthOf(m.start),
                     editable: monthOf(m.start) === month,
                 }));
-            res.json({ marks, configured: true });
+            res.json({ marks, notes, configured: true });
         } catch (e) {
             console.error('달력 조회 실패:', e.message);
             res.status(502).json({ error: '노션에서 읽지 못했습니다' });
@@ -174,7 +228,7 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
 
     // 그 달이 주인인 표시만 통째로 맞춘다. 다른 달에서 넘어온 것은 손대지 않는다.
     app.post('/api/calendar', requireAuth, async (req, res) => {
-        const { month, marks } = req.body || {};
+        const { month, marks, notes } = req.body || {};
         if (!isYm(String(month || ''))) return res.status(400).json({ error: '월 형식은 YYYY-MM' });
         if (!Array.isArray(marks)) return res.status(400).json({ error: 'marks 배열이 필요합니다' });
         if (!NOTICE_DB_ID) return res.status(500).json({ error: 'NOTICE_DB_ID 미설정' });
@@ -202,7 +256,8 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
         }
 
         try {
-            const all = await readAllMarks();
+            const rows = await readAllRows([...CALENDAR_TYPES, NOTE_TYPE]);
+            const all = rows.filter(r => r.type !== NOTE_TYPE);
             const existing = all.filter(m => monthOf(m.start) === month);
 
             const wantedKeys = new Set(wanted.map(keyOf));
@@ -253,6 +308,18 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
                 retimed++;
             }
 
+            // 안내 문구. 예전 화면이 notes 없이 보내면 건드리지 않는다.
+            // 실패해도 달력 저장은 성공으로 둔다(아래 정지 기간과 같은 이유).
+            let noteResult = null;
+            if (notes && typeof notes === 'object') {
+                try {
+                    noteResult = await syncNotes(month, notes, rows.filter(r => r.type === NOTE_TYPE));
+                } catch (e) {
+                    console.error('시수 안내 문구 저장 실패:', e.message);
+                    noteResult = { error: true };
+                }
+            }
+
             invalidateNoticeCache?.();   // 학부모 페이지가 바로 반영되도록
 
             // 🔴 정지 기간 반영이 실패해도 달력 저장은 성공으로 둔다.
@@ -265,7 +332,7 @@ export function initializeCalendarRoutes({ app, requireAuth, fetchNotion, plainT
                 pause = { error: true };
             }
 
-            res.json({ success: true, added, removed, retimed, pause });
+            res.json({ success: true, added, removed, retimed, pause, notes: noteResult });
         } catch (e) {
             console.error('달력 저장 실패:', e.message);
             res.status(502).json({ error: '노션에 저장하지 못했습니다' });

@@ -65,7 +65,7 @@ export const REQUIRED_PROPERTIES = {
     },
     NOTICE_DB_ID: {
         label: '공지·달력',
-        props: ['제목', '유형', '날짜', '게시', '보강시간'],
+        props: ['제목', '유형', '날짜', '게시', '보강시간', '내용'],
     },
     PAUSE_DB_ID: {
         label: '숙제 정지 기간',

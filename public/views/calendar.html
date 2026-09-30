@@ -54,6 +54,11 @@
   .cal svg{display:block; width:100%; height:auto}
   .cal svg .cell{cursor:pointer}
   .cal svg .cell:hover .hit{stroke:#0a6c62; stroke-width:2}
+  .notes{margin-top:12px}
+  .notes label{display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin:8px 0 4px}
+  .notes textarea{width:100%; font:inherit; font-size:13.5px; padding:7px 9px; resize:vertical; min-height:52px;
+    border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--ink)}
+  .notes textarea:focus{outline:2px solid var(--accent); outline-offset:-1px}
   .cal svg .cell.locked{cursor:not-allowed}
 
   .panel{background:var(--surface); border:1px solid var(--border); border-radius:14px;
@@ -117,6 +122,7 @@
       <h2>수업 시수</h2>
       <div id="tracks"></div>
       <div id="verdict" class="hint good">—</div>
+      <div id="notes" class="notes" hidden></div>
       <p class="note">
         같은 날이 여러 트랙에 함께 들어갑니다. 예를 들어 금요일을 쉬면 월수금과 화목금이 같이 줄어듭니다.
         그래서 한 날만 쉬어서는 세 트랙이 잘 안 맞습니다.
@@ -130,13 +136,9 @@
 
 </div>
 
+<script src="/assets/readi-calendar.js"></script>
 <script>
-// ── 트랙 정의 (요일: 0=일 … 6=토) ─────────────────────────
-const TRACKS = [
-  { name: '월수금', days: [1, 3, 5], target: 12 },
-  { name: '화목',   days: [2, 4],    target: 8  },
-  { name: '화목금', days: [2, 4, 5], target: 12 },
-];
+// 트랙 정의·시수 계산·달력 그림은 학부모 안내(/notice)와 같은 코드를 쓴다 → /assets/readi-calendar.js
 
 // 표시 종류. color 는 달력에 쓴다.
 const MARKS = {
@@ -147,8 +149,6 @@ const MARKS = {
 };
 // 기간으로 묶을 수 있는 유형. 보강일은 결석 신청 폼의 선택지라 하루 단위로 둔다.
 const RANGE_TYPES = ['휴강', '이벤트', '시험기간'];
-// 수업 요일 기본 색 (원래 쓰시던 달력과 같은 구분)
-const WEEKDAY_FILL = { 2: '#a9d6c4', 4: '#a9d6c4', 1: '#fbd4d9', 3: '#fbd4d9', 5: '#fbd4d9' };
 const WD = ['일','월','화','수','목','금','토'];
 
 let cur = new Date();
@@ -162,6 +162,8 @@ let pending = null;    // { type, start } — 시작일만 누른 상태
 let tool = '휴강';
 let dirty = false;
 let focusName = '';    // 방금 만든 기간의 이름칸에 커서를 둔다
+// 트랙별 학부모 안내 문구 { 월수금: '…' }. 목표 횟수에 못 미치는 달에 어떻게 채울지 적는다.
+let notes = {};
 
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
@@ -173,16 +175,7 @@ const uid = it => it.type + '|' + it.start + '|' + it.end;
 function setMsg(t, bad){ $('msg').textContent = t || ''; $('msg').style.color = bad ? '#b4342b' : ''; }
 function markDirty(){ dirty = true; setMsg('저장 안 됨', true); }
 
-// 기간을 날짜 배열로 펼친다
-function daysOf(it){
-  const out = [];
-  const a = new Date(it.start + 'T00:00:00');
-  const b = new Date((it.end || it.start) + 'T00:00:00');
-  for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)){
-    out.push(iso(d.getFullYear(), d.getMonth(), d.getDate()));
-  }
-  return out;
-}
+const daysOf = ReadiCal.daysOf;
 
 // 날짜 → 그 날을 덮는 건. 같은 날 여러 건이면 휴강을 우선한다(취소선 때문).
 function dayIndex(){
@@ -225,24 +218,9 @@ function drawPending(){
 function cancelPending(){ pending = null; drawPending(); }
 
 // ── 시수 계산 ─────────────────────────────────────────────
-// 휴강만 수업일에서 뺀다. 이벤트는 수업을 하는 날이고, 토요보강은 결석생 보강이라 시수와 무관하다.
-// 다른 달에서 넘어온 휴강도 이 달 수업일을 지우므로 함께 센다.
 function countSessions(){
   const [y, m] = month.split('-').map(Number);
-  const off = new Set();
-  items.filter(it => it.type === '휴강').forEach(it => daysOf(it).forEach(d => off.add(d)));
-
-  const byDay = {};
-  for (let d = 1; d <= 31; d++){
-    const dt = new Date(y, m - 1, d);
-    if (dt.getMonth() !== m - 1) break;
-    if (off.has(iso(y, m - 1, d))) continue;
-    byDay[dt.getDay()] = (byDay[dt.getDay()] || 0) + 1;
-  }
-  return TRACKS.map(t => {
-    const n = t.days.reduce((a, d) => a + (byDay[d] || 0), 0);
-    return { name: t.name, n, target: t.target, diff: n - t.target };
-  });
+  return ReadiCal.countSessions(y, m - 1, items);
 }
 
 function drawTracks(){
@@ -264,105 +242,39 @@ function drawTracks(){
     v.className = 'hint';
     v.textContent = bad.map(r => r.name + ' ' + (r.diff > 0 ? r.diff + '회 초과' : (-r.diff) + '회 부족')).join(' · ');
   }
+  drawNotes(rows);
+}
+
+// 목표와 안 맞는 트랙만 문구 칸을 연다. 맞게 된 트랙이라도 적어 둔 문구가 있으면 칸을 남겨
+// 지울 수 있게 한다 — 안 그러면 지난 문구가 학부모 달력에 계속 남는다.
+function drawNotes(rows){
+  const box = $('notes');
+  const show = rows.filter(r => r.diff !== 0 || (notes[r.name] || '').trim());
+  if (!show.length){ box.innerHTML = ''; box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '<p class="sub" style="margin:0;color:var(--ink-faint);font-size:12.5px">학부모 달력 오른쪽 위, 횟수 밑에 그대로 나갑니다. 비워 두면 안 나갑니다.</p>'
+    + show.map(r =>
+      '<label for="note-' + r.name + '">' + r.name + ' (' + r.n + '회) 안내</label>'
+      + '<textarea id="note-' + r.name + '" data-track="' + r.name + '" maxlength="200" '
+      + 'placeholder="예: ' + r.name + ' 1회 수업은 다음 달에 13회 수업하도록 하겠습니다.">' + esc(notes[r.name] || '') + '</textarea>'
+    ).join('');
+  [...box.querySelectorAll('textarea')].forEach(ta => {
+    ta.oninput = () => { notes[ta.dataset.track] = ta.value; markDirty(); drawCalendar(); };
+  });
 }
 
 // ── 달력 그리기 (SVG) ─────────────────────────────────────
+// 학부모 화면과 같은 그림이다. "이미지로 저장"하면 이게 그대로 학부모께 간다.
 function drawCalendar(){
   const [y, m] = month.split('-').map(Number);
-  const first = new Date(y, m - 1, 1);
-  const days = new Date(y, m, 0).getDate();
-  const lead = first.getDay();
-  const rows = Math.ceil((lead + days) / 7);
+  const locked = new Set();
+  items.filter(it => it.editable === false).forEach(it => daysOf(it).forEach(d => locked.add(d)));
 
-  const W = 1080, PAD = 70, HEAD = 250, CELL = (W - PAD * 2) / 7;
-  const ROW = 108, H = HEAD + rows * ROW + 200;
-  const cellX = idx => PAD + CELL * (idx % 7) + CELL / 2;
-  const cellY = idx => HEAD + Math.floor(idx / 7) * ROW + 34;
-  const idxOf = d => lead + d - 1;
-
-  const index = dayIndex();
-
-  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="Pretendard, sans-serif">';
-  s += '<rect width="' + W + '" height="' + H + '" fill="#e9eff1"/>';
-  s += '<text x="' + W/2 + '" y="120" text-anchor="middle" font-size="76" font-weight="800" fill="#3a4047">' + y + '</text>';
-  s += '<text x="' + W/2 + '" y="180" text-anchor="middle" font-size="34" font-weight="700" fill="#5b656e">· ' + m + '월 ·</text>';
-
-  for (let i = 0; i < 7; i++){
-    s += '<text x="' + cellX(i) + '" y="' + (HEAD - 20) + '" text-anchor="middle" font-size="26" fill="#5b656e">' + WD[i] + '</text>';
-  }
-
-  // 1) 기간을 먼저 알약 모양으로 깔아 준다. 주 단위로 끊어 그린다.
-  //    이게 원장님이 말씀하신 "줄표시"다 — 18일부터 20일까지가 한 덩어리로 보인다.
-  items.forEach(it => {
-    const inMonth = daysOf(it).filter(d => d.slice(0, 7) === month).map(d => Number(d.slice(8)));
-    if (!inMonth.length) return;
-    const isRange = (it.end && it.end !== it.start);
-    const color = MARKS[it.type].color;
-
-    // 같은 주에 붙어 있는 날들을 한 덩어리로
-    let seg = [];
-    const flush = () => {
-      if (!seg.length) return;
-      const x1 = cellX(idxOf(seg[0])), x2 = cellX(idxOf(seg[seg.length - 1]));
-      const cy = cellY(idxOf(seg[0]));
-      s += '<rect x="' + (x1 - 30) + '" y="' + (cy - 30) + '" width="' + (x2 - x1 + 60) + '" height="60" rx="30" fill="' + color + '"/>';
-      seg = [];
-    };
-    inMonth.forEach(d => {
-      const prev = seg[seg.length - 1];
-      const sameRow = prev != null && Math.floor(idxOf(prev) / 7) === Math.floor(idxOf(d) / 7);
-      if (prev != null && (d !== prev + 1 || !sameRow)) flush();
-      seg.push(d);
-    });
-    flush();
-
-    // 이름이 유형 그대로면 적지 않는다. "학원방학" 처럼 따로 지은 것만 보여 준다.
-    if (it.title && it.title !== it.type){
-      const firstD = inMonth[0], lastSameRow = inMonth.filter(d => Math.floor(idxOf(d) / 7) === Math.floor(idxOf(firstD) / 7));
-      const x1 = cellX(idxOf(firstD)), x2 = cellX(idxOf(lastSameRow[lastSameRow.length - 1]));
-      s += '<text x="' + ((x1 + x2) / 2) + '" y="' + (cellY(idxOf(firstD)) + 56) + '" text-anchor="middle" ' +
-           'font-size="' + (isRange ? 21 : 19) + '" font-weight="700" fill="#4a545c">' + esc(it.title) + '</text>';
-    }
+  $('calBox').innerHTML = ReadiCal.draw({
+    year: y, month: m - 1, items,
+    counts: countSessions(), notes, title: true,
+    pending: pending ? pending.start : '', locked,
   });
-
-  // 2) 그 위에 날짜 숫자와 클릭 영역
-  for (let d = 1; d <= days; d++){
-    const idx = idxOf(d), cx = cellX(idx), cy = cellY(idx);
-    const key = iso(y, m - 1, d);
-    const dow = new Date(y, m - 1, d).getDay();
-    const it = index[key];
-    const strike = it && it.type === '휴강';
-    const locked = it && it.editable === false;
-
-    s += '<g class="cell' + (locked ? ' locked' : '') + '" data-date="' + key + '">';
-    // 표시가 없는 날만 수업 요일 색을 깐다. 있으면 위 알약이 이미 색을 갖고 있다.
-    if (!it && WEEKDAY_FILL[dow]) s += '<circle cx="' + cx + '" cy="' + cy + '" r="30" fill="' + WEEKDAY_FILL[dow] + '"/>';
-    if (pending && pending.start === key) s += '<circle cx="' + cx + '" cy="' + cy + '" r="33" fill="none" stroke="#0a6c62" stroke-width="4" stroke-dasharray="7 5"/>';
-    s += '<circle class="hit" cx="' + cx + '" cy="' + cy + '" r="34" fill="transparent" stroke="none"/>';
-    s += '<text x="' + cx + '" y="' + (cy + 11) + '" text-anchor="middle" font-size="30" ' +
-         'fill="' + (strike ? '#8a7320' : '#3a4047') + '" ' +
-         (strike ? 'text-decoration="line-through" ' : '') + '>' + d + '</text>';
-    s += '</g>';
-  }
-
-  // 범례 — 이벤트도 넣는다. 이미지를 그대로 학부모께 보내기 때문에 보라색이 뭔지 알려야 한다.
-  const legend = [
-    { c: '#a9d6c4', t: '화 · 목 수업' },
-    { c: '#fbd4d9', t: '월 · 수 · 금 수업' },
-    { c: MARKS['휴강'].color, t: '휴강' },
-    { c: MARKS['이벤트'].color, t: '학원 행사' },
-    { c: MARKS['시험기간'].color, t: '시험기간' },
-    { c: MARKS['보강일'].color, t: '토요 보강일' },
-  ];
-  legend.forEach((L, i) => {
-    const lx = PAD + (i % 2) * ((W - PAD * 2) / 2);
-    const ly = HEAD + rows * ROW + 40 + Math.floor(i / 2) * 48;
-    s += '<circle cx="' + (lx + 16) + '" cy="' + ly + '" r="15" fill="' + L.c + '"/>';
-    s += '<text x="' + (lx + 45) + '" y="' + (ly + 9) + '" font-size="25" fill="#4a545c">' + esc(L.t) + '</text>';
-  });
-
-  s += '</svg>';
-  $('calBox').innerHTML = s;
 
   [...$('calBox').querySelectorAll('.cell')].forEach(g => {
     g.onclick = () => onDayClick(g.dataset.date);
@@ -444,7 +356,7 @@ function drawNames(){
   if (!list.length){ box.innerHTML = ''; box.hidden = true; return; }
   box.hidden = false;
 
-  let s = '<h3>휴강 · 행사 · 시험 이름</h3><p class="sub">여기에 적은 이름이 <b>학부모 안내 페이지와 달력 이미지에</b> 그대로 나갑니다. 비워 두면 색깔만 표시되고 이름은 안 보입니다.</p>';
+  let s = '<h3>휴강 · 행사 · 시험 이름</h3><p class="sub">여기에 적은 이름이 <b>학부모 안내 페이지와 달력 이미지에</b> 숫자 밑 색 선과 함께 나갑니다. 비워 두면 “행사”·“시험기간”·“휴강”처럼 종류 이름이 나갑니다.</p>';
   list.forEach(it => {
     s += '<label class="trow">'
       + '<span class="kind" style="background:' + MARKS[it.type].color + '"></span>'
@@ -519,7 +431,7 @@ function redraw(){ drawCalendar(); drawTracks(); drawNames(); drawTimes(); drawC
 async function load(){
   month = ym(cur);
   $('monthLabel').textContent = cur.getFullYear() + '년 ' + (cur.getMonth() + 1) + '월';
-  items = []; dirty = false; setMsg('불러오는 중…');
+  items = []; notes = {}; dirty = false; setMsg('불러오는 중…');
   redraw();
 
   try{
@@ -531,6 +443,7 @@ async function load(){
       title: m.title || m.type, time: m.time || '',
       editable: m.editable !== false, owner: m.owner,
     }));
+    notes = d.notes || {};
     setMsg(d.configured === false ? 'NOTICE_DB_ID 미설정' : '');
   }catch(e){
     setMsg('불러오지 못했습니다', true);
@@ -562,6 +475,7 @@ async function save(){
           title: it.title || it.type,
           ...(it.type === '보강일' ? { time: it.time || '' } : {}),
         })),
+        notes,
       }),
     });
     if(r.status === 401){ localStorage.removeItem('teacher_auth_token'); location.href = '/teacher-login?next=/calendar'; return; }
@@ -571,9 +485,10 @@ async function save(){
     // 휴강을 찍으면 숙제·리포트 생성을 멈추는 정지 기간에도 자동으로 들어간다.
     // 그 결과를 같이 보여줘야 "찍었는데 왜 숙제가 나갔지" 를 막을 수 있다.
     let extra = '';
-    if (d.pause && d.pause.error) extra = ' · ⚠ 정지 기간 반영 실패 (노션에서 직접 확인하세요)';
+    if (d.notes && d.notes.error) extra += ' · ⚠ 안내 문구 저장 실패';
+    if (d.pause && d.pause.error) extra += ' · ⚠ 정지 기간 반영 실패 (노션에서 직접 확인하세요)';
     else if (d.pause && (d.pause.added || d.pause.removed)) {
-      extra = ' · 휴무 등록 ' + (d.pause.added || 0) + (d.pause.removed ? ' · 휴무 해제 ' + d.pause.removed : '');
+      extra += ' · 휴무 등록 ' + (d.pause.added || 0) + (d.pause.removed ? ' · 휴무 해제 ' + d.pause.removed : '');
     }
     setMsg('저장됨 (추가 ' + d.added + ' · 삭제 ' + d.removed
       + (d.retimed ? ' · 시간수정 ' + d.retimed : '') + ')' + extra);

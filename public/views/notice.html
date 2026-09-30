@@ -161,6 +161,7 @@
 
 </div>
 
+<script src="/assets/readi-calendar.js"></script>
 <script>
 const WD = ['일','월','화','수','목','금','토'];
 
@@ -207,72 +208,16 @@ function fmtShort(iso){
 // ── 학사일정 달력 ─────────────────────────────
 // 원장이 /calendar 에서 찍은 휴강·이벤트·시험기간·보강일을 학부모 화면에도 그대로 그린다.
 // 달력 이미지를 매달 만들어 올리지 않아도 되게 하려는 것이다.
-const CAL_FILL = { 2:'#a9d6c4', 4:'#a9d6c4', 1:'#fbd4d9', 3:'#fbd4d9', 5:'#fbd4d9' };
-const CAL_MARK = { '휴강':'#e0b64a', '이벤트':'#b89ad6', '시험기간':'#8fb4e6', '보강일':'#ef9ec4' };
-const CAL_LEGEND = [
-  { c:'#a9d6c4', t:'화 · 목 수업' }, { c:'#fbd4d9', t:'월 · 수 · 금 수업' },
-  { c:CAL_MARK['휴강'], t:'휴강' }, { c:CAL_MARK['이벤트'], t:'학원 행사' },
-  { c:CAL_MARK['시험기간'], t:'시험기간' }, { c:CAL_MARK['보강일'], t:'토요 보강일' },
-];
+// 그리는 코드는 /assets/readi-calendar.js — 원장 달력의 "이미지로 저장"과 같은 그림이다.
+const CAL_TYPES = ['휴강', '이벤트', '시험기간', '보강일'];
 
 let NOTICE_ITEMS = [];
 let calCursor = new Date();
-
-function drawMonthSvg(year, month, marks){
-  const first = new Date(year, month, 1);
-  const days = new Date(year, month + 1, 0).getDate();
-  const lead = first.getDay();
-  const rows = Math.ceil((lead + days) / 7);
-
-  const W = 1080, PAD = 60, HEAD = 120, CELL = (W - PAD*2) / 7, ROW = 108;
-  const H = HEAD + rows*ROW + 150;
-
-  let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" font-family="Pretendard, sans-serif">';
-  s += '<rect width="'+W+'" height="'+H+'" fill="#e9eff1"/>';
-  for(let i=0;i<7;i++){
-    s += '<text x="'+(PAD+CELL*i+CELL/2)+'" y="'+(HEAD-24)+'" text-anchor="middle" font-size="26" fill="#5b656e">'+WD[i]+'</text>';
-  }
-  for(let d=1; d<=days; d++){
-    const idx = lead + d - 1;
-    const cx = PAD + CELL*(idx%7) + CELL/2;
-    const cy = HEAD + Math.floor(idx/7)*ROW + 34;
-    const dow = new Date(year, month, d).getDay();
-    const mk = marks[year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0')];
-    const fill = mk ? CAL_MARK[mk] : (CAL_FILL[dow] || '');
-    const off = mk === '휴강';
-    if(fill) s += '<circle cx="'+cx+'" cy="'+cy+'" r="30" fill="'+fill+'"/>';
-    s += '<text x="'+cx+'" y="'+(cy+11)+'" text-anchor="middle" font-size="30" fill="'
-      + (off ? '#8a7320' : '#3a4047') + '"' + (off ? ' text-decoration="line-through"' : '') + '>'+d+'</text>';
-  }
-  CAL_LEGEND.forEach((L,i) => {
-    const lx = PAD + (i%2) * ((W-PAD*2)/2);
-    const ly = HEAD + rows*ROW + 40 + Math.floor(i/2)*48;
-    s += '<circle cx="'+(lx+16)+'" cy="'+ly+'" r="15" fill="'+L.c+'"/>';
-    s += '<text x="'+(lx+45)+'" y="'+(ly+9)+'" font-size="25" fill="#4a545c">'+esc(L.t)+'</text>';
-  });
-  return s + '</svg>';
-}
 
 function renderSchedule(){
   const y = calCursor.getFullYear(), m = calCursor.getMonth();
   const prefix = y + '-' + String(m+1).padStart(2,'0');
   const today = ymd(new Date());
-
-  // 기간 일정(18일~20일 학원방학)은 걸치는 날을 모두 칠한다.
-  // 시작일만 칠하면 학부모가 하루짜리로 읽는다.
-  const marks = {};
-  NOTICE_ITEMS.forEach(it => {
-    if(!CAL_MARK[it.type] || !it.start) return;
-    const a = new Date(it.start + 'T00:00:00');
-    const b = new Date((it.end || it.start) + 'T00:00:00');
-    if(isNaN(a) || isNaN(b)) return;
-    for(let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)){
-      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-      if(key.slice(0,7) !== prefix) continue;
-      // 같은 날에 여러 개면 휴강을 우선한다 — 취소선이 붙는 쪽이라 눈에 먼저 들어와야 한다.
-      if(!marks[key] || it.type === '휴강') marks[key] = it.type;
-    }
-  });
 
   // 원장이 손으로 만든 달력 이미지를 올렸으면 그것을 우선한다.
   const cal = NOTICE_ITEMS
@@ -286,7 +231,15 @@ function renderSchedule(){
       + '<img src="'+esc(src)+'" alt="'+esc(cal.title || '학사일정')+'"></a>';
     if(cal.title) html += '<p class="calcap">'+esc(cal.title)+' · 눌러서 크게 보기</p>';
   } else {
-    html += '<div class="calbox">' + drawMonthSvg(y, m, marks) + '</div>';
+    // 오른쪽 위 트랙별 횟수와, 목표에 못 미치는 달에 원장이 남긴 안내 문구
+    const notes = {};
+    NOTICE_ITEMS.filter(it => it.type === ReadiCal.NOTE_TYPE && it.start === prefix + '-01' && it.body)
+      .forEach(it => { notes[it.title] = it.body; });
+    const calItems = NOTICE_ITEMS.filter(it => CAL_TYPES.includes(it.type) && it.start);
+    html += '<div class="calbox">' + ReadiCal.draw({
+      year: y, month: m, items: calItems,
+      counts: ReadiCal.countSessions(y, m, calItems), notes,
+    }) + '</div>';
   }
 
   // 그 달에 적힌 설명(휴강 사유 등)과 제목이 따로 있는 일정만 아래에 덧붙인다.
