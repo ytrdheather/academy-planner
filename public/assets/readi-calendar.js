@@ -62,11 +62,23 @@
   // SVG 에는 글자 폭 측정이 없어서 어림한다. 한글은 글자 크기만큼, 영문·숫자는 그 절반쯤.
   const charW = (ch, fs) => (/[\u0000-ÿ]/.test(ch) ? fs * 0.56 : fs * 0.98);
   const textW = (s, fs) => [...s].reduce((a, ch) => a + charW(ch, fs), 0);
-  function fit(s, fs, max) {
-    if (textW(s, fs) <= max) return s;
-    let out = '';
-    for (const ch of s) { if (textW(out + ch + '…', fs) > max) break; out += ch; }
-    return out + '…';
+  // 일정 이름은 자르지 않고 줄을 바꾼다. "국어 문해…" 로 잘리면 학부모가 무슨 일정인지 모른다.
+  // 띄어쓰기에서 먼저 끊고, 한 낱말이 칸보다 길 때만 글자 단위로 끊는다.
+  function wrapWords(s, fs, max) {
+    const lines = [];
+    let line = '';
+    String(s).split(/\s+/).filter(Boolean).forEach(word => {
+      const tryLine = line ? line + ' ' + word : word;
+      if (textW(tryLine, fs) <= max) { line = tryLine; return; }
+      if (line) lines.push(line);
+      line = '';
+      for (const ch of word) {
+        if (line && textW(line + ch, fs) > max) { lines.push(line); line = ch; }
+        else line += ch;
+      }
+    });
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
   }
   function wrap(s, fs, max) {
     const lines = [];
@@ -114,7 +126,41 @@
       x.days.forEach(d => used[lane].add(d));
       x.lane = lane;
     });
-    const laneCount = used.length;
+
+    // 선 조각(같은 주에 붙은 날끼리)과 조각마다 이름 줄을 미리 구한다. 줄 수만큼 레인 높이가 늘어난다.
+    const LABEL_FS = 23, LABEL_MIN_FS = 16;
+    lanes.forEach(x => {
+      const it = x.it;
+      x.label = (it.title && it.title !== it.type) ? it.title : DEFAULT_LABEL[it.type];
+      x.segs = [];
+      if (it.type === '휴강') return;
+      x.days.forEach(d => {
+        const seg = x.segs[x.segs.length - 1];
+        const prev = seg && seg.days[seg.days.length - 1];
+        if (seg && d === prev + 1 && rowOf(d) === rowOf(prev)) seg.days.push(d);
+        else x.segs.push({ days: [d] });
+      });
+      x.segs.forEach(seg => {
+        seg.x1 = PAD + CELL * colOf(seg.days[0]) + 9;
+        seg.x2 = PAD + CELL * (colOf(seg.days[seg.days.length - 1]) + 1) - 9;
+        // 두 줄 안에 다 들어갈 때까지 글자를 줄인다. 가장 작게 해도 넘치면 세 줄 이상으로 둔다 —
+        // 잘라서 "…" 을 붙이는 일은 없다.
+        seg.fs = LABEL_FS;
+        seg.lines = wrapWords(x.label, seg.fs, seg.x2 - seg.x1 + 8);
+        while (seg.lines.length > 2 && seg.fs > LABEL_MIN_FS) {
+          seg.fs--;
+          seg.lines = wrapWords(x.label, seg.fs, seg.x2 - seg.x1 + 8);
+        }
+        seg.lh = seg.fs + 4;
+      });
+      x.h = Math.max(...x.segs.map(g => g.lines.length * g.lh));
+    });
+    // 레인 높이는 달 전체에서 그 레인의 가장 긴 이름에 맞춘다(행 높이를 고르게 두려고)
+    const laneH = [];
+    lanes.forEach(x => { laneH[x.lane] = Math.max(laneH[x.lane] || 0, 14 + (x.it.type === '휴강' ? 27 : x.h)); });
+    const laneOffset = [];
+    laneH.reduce((acc, h, i) => { laneOffset[i] = acc; return acc + (h || 0); }, 0);
+    const lanesTotal = laneH.reduce((a, h) => a + (h || 0), 0);
     const offDays = new Set();
     lanes.filter(x => x.it.type === '휴강').forEach(x => x.days.forEach(d => offDays.add(d)));
 
@@ -136,8 +182,7 @@
     const weekTop = cy0 + 50;
     const gridTop = weekTop + 26;
 
-    const LANE = 42;
-    const ROW = Math.max(104, 74 + laneCount * LANE + 8);
+    const ROW = Math.max(104, 74 + lanesTotal + 18);
     const legendY = gridTop + rows * ROW + 38;
     const H = legendY + 44;
 
@@ -180,12 +225,10 @@
     // ── 숫자 밑 줄과 이름 ──
     s += '<g pointer-events="none">';
     lanes.forEach(x => {
-      const it = x.it;
-      const label = (it.title && it.title !== it.type) ? it.title : DEFAULT_LABEL[it.type];
-      const laneTop = (d) => gridTop + rowOf(d) * ROW + 72 + x.lane * LANE;
+      const laneTop = (d) => gridTop + rowOf(d) * ROW + 72 + laneOffset[x.lane];
 
       // 휴강은 선 없이 날마다 "휴강" 글씨. 노란 동그라미와 함께 한눈에 쉬는 날로 읽힌다.
-      if (it.type === '휴강') {
+      if (x.it.type === '휴강') {
         x.days.forEach(d => {
           s += '<text x="' + (PAD + CELL * colOf(d) + CELL / 2) + '" y="' + (laneTop(d) + 26) + '" text-anchor="middle" font-size="23" font-weight="800" fill="#9a7412">휴강</text>';
         });
@@ -193,20 +236,13 @@
       }
 
       // 같은 주에 붙은 날끼리 한 선으로. 주가 바뀌면 끊고 이름을 다시 적는다.
-      const segs = [];
-      x.days.forEach(d => {
-        const seg = segs[segs.length - 1];
-        const prev = seg && seg[seg.length - 1];
-        if (seg && d === prev + 1 && rowOf(d) === rowOf(prev)) seg.push(d);
-        else segs.push([d]);
-      });
-      segs.forEach(seg => {
-        const x1 = PAD + CELL * colOf(seg[0]) + 9;
-        const x2 = PAD + CELL * (colOf(seg[seg.length - 1]) + 1) - 9;
-        const lt = laneTop(seg[0]);
-        s += '<rect x="' + x1 + '" y="' + (lt + 2) + '" width="' + (x2 - x1) + '" height="7" rx="3.5" fill="' + LINE_COLOR[it.type] + '"/>';
-        s += '<text x="' + ((x1 + x2) / 2) + '" y="' + (lt + 33) + '" text-anchor="middle" font-size="23" font-weight="700" fill="#3a4047">'
-          + esc(fit(label, 23, x2 - x1 + 8)) + '</text>';
+      x.segs.forEach(seg => {
+        const lt = laneTop(seg.days[0]);
+        s += '<rect x="' + seg.x1 + '" y="' + (lt + 2) + '" width="' + (seg.x2 - seg.x1) + '" height="7" rx="3.5" fill="' + LINE_COLOR[x.it.type] + '"/>';
+        seg.lines.forEach((ln, i) => {
+          s += '<text x="' + ((seg.x1 + seg.x2) / 2) + '" y="' + (lt + 10 + seg.fs + i * seg.lh) + '" text-anchor="middle" font-size="' + seg.fs + '" font-weight="700" fill="#3a4047">'
+            + esc(ln) + '</text>';
+        });
       });
     });
     s += '</g>';
