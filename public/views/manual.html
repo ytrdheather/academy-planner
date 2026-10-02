@@ -190,6 +190,7 @@
         <button class="sw" onclick="showGuide('notice',this)">📅 공지사항·학사일정</button>
         <button class="sw" onclick="showGuide('absence',this)">🙋 결석·지각·조퇴</button>
         <button class="sw" onclick="showGuide('counsel',this)">💬 재원생 상담</button>
+        <button class="sw" onclick="showGuide('exam',this)">📝 시험 분석 리포트</button>
       </div>
     </header>
 
@@ -1380,6 +1381,135 @@
         </div>
       </section>
     </div><!-- /guide-counsel -->
+
+    <!-- ============ 가이드 · 시험 분석 리포트 ============ -->
+    <div id="guide-exam" class="guide" hidden>
+
+      <section class="glance">
+        <h2>먼저, 이것만 기억하세요</h2>
+        <p class="sub">학교 내신 시험이 끝나면 <b>학생마다 개인 분석 리포트</b>를 만들어 학부모님께 <b>링크로</b> 보냅니다. 문장은 AI가 먼저 쓰고, <b>선생님이 읽고 고친 뒤 공개</b>합니다. <b>manager 계정으로 로그인해야</b> 열립니다.</p>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">🛠 선생님이 하는 것</div>
+            <div class="twhen">시험 끝난 뒤</div>
+            <p>정답지 만들기 → 학생 채점 → 리포트 열기 → <b>문장 검토·수정</b> → <b>학부모 공개</b> → 링크 복사.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">📨 학부모님이 받는 것</div>
+            <div class="twhen">카톡 링크</div>
+            <p>로그인 없이 휴대폰에서 바로 열립니다. 선생님이 <b>공개한 순간의 화면 그대로</b> 보입니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="flow" style="margin-left:0">
+        <span class="tab">📄 정답지</span><span class="arrow">→</span>
+        <span class="tab">✍️ 채점</span><span class="arrow">→</span>
+        <span class="tab">🔎 리포트 검토</span><span class="arrow">→</span>
+        <span class="tab">📤 학부모 공개</span><span class="arrow">→</span>
+        <span class="tab">💬 링크 전송</span>
+      </div>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 1</span><h2>정답지 만들기 — 시험마다 한 번만</h2></div>
+        <p class="phase-sub">학교·학년·시험마다 <b>딱 한 번</b> 만듭니다. 그 뒤로는 학생 답안을 아무리 올려도 정답지는 바뀌지 않습니다.</p>
+        <ol class="steps">
+          <li><div class="st"><b>readitude.onrender.com/exam-analyzer</b> 에 시험지 이미지·PDF를 올립니다</div>
+            <div class="sd">여러 장 올릴 수 있습니다. [분석하기]를 누르면 문항마다 유형·출제범위·문법 포인트·배점·<b>난이도</b>·정답을 표로 만들어 줍니다.</div></li>
+          <li><div class="st">표를 <b>한 줄씩 확인하고 고칩니다</b></div>
+            <div class="sd"><b>출제범위</b>(교과서 본문·외부지문·대화문·학습지)는 이미지로는 AI가 구분할 수 없어서 <b>직접 골라야</b> 합니다. 지문이 안 잡힌 독해 문항은 정답이 틀릴 수 있으니 꼭 보세요.</div></li>
+          <li><div class="st"><b>난이도</b>를 한 번 더 봅니다</div>
+            <div class="sd">AI는 애매하면 <b>“중”으로 몰아 주는</b> 버릇이 있습니다. 교과서 본문 그대로 묻는 문항, 단순 어휘 확인은 <b>“하”</b>로 고쳐 주세요. 리포트 코멘트가 이 값으로 “쉬운 문제 실수”와 “어려운 문제 해결”을 구분합니다.</div></li>
+          <li><div class="st">학교·학년·학기·시험종류를 고르고 <b>저장</b>합니다</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span><b>같은 시험을 두 번 저장하지 마세요.</b> 덮어쓰지 않고 시험이 <b>하나 더</b> 생겨서, 채점 목록에 같은 이름이 두 개 뜨고 학생마다 다른 정답지로 채점될 수 있습니다.</div>
+        <div class="note tip"><span class="lbl">참고</span>저장한 뒤 정답·난이도를 고치려면 <b>노션 “시험 문항” DB</b>에서 직접 고칩니다. <b>정답</b>을 고쳤다면 결과 보기 화면의 <b>🔄 이 시험 전체 재채점</b>을 눌러야 점수에 반영됩니다. 난이도만 고쳤다면 재채점은 필요 없습니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 2</span><h2>학생 채점</h2></div>
+        <ol class="steps">
+          <li><div class="st"><b>readitude.onrender.com/student-grader</b> 에서 시험을 고르고 <b>학생 이름</b>을 입력합니다</div>
+            <div class="sd">🔴 <b>이름은 노션 진도 기록의 이름과 글자 하나까지 똑같이</b> 써 주세요. 리포트의 “시험 기간 학습 브리핑”이 이 이름으로 진도 기록을 찾습니다. 띄어쓰기가 다르면 그 칸이 안 나옵니다.</div></li>
+          <li><div class="st">학생 답안지를 올리면 AI가 <b>학생 답만</b> 읽고, 정답지와 대조해 채점합니다</div></li>
+          <li><div class="st"><b>서술형은 직접 O/X</b>를 고릅니다</div>
+            <div class="sd">서술형은 자동 채점하지 않습니다. 학생 답과 모범답안이 나란히 나오니 보고 정해 주세요. 점수·리포트는 선생님이 고른 결과로 계산됩니다.</div></li>
+          <li><div class="st"><b>저장</b>합니다</div></li>
+        </ol>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 3</span><h2>리포트 열고 검토하기</h2></div>
+        <p class="phase-sub"><b>readitude.onrender.com/results-viewer</b> → 시험 → 학생 → <b>📄 분석 리포트</b>. 처음 열 때 AI가 문장을 쓰느라 <b>몇 초</b> 걸립니다. 두 번째부터는 바로 열립니다.</p>
+        <ol class="steps">
+          <li><div class="st">리포트는 위에서부터 이렇게 나옵니다</div>
+            <div class="sd">점수와 성취수준 막대(중학교만 A~E) → <b>실점 문항</b>(학생 답 → 정답 · 난이도 · 오답 요인) → <b>핵심 진단</b> → <b>시험 기간 학습 브리핑</b> → <b>선생님 코멘트</b> → <b>다음 시험 대처 방안</b>.</div></li>
+          <li><div class="st"><b>문장을 눌러서 고칩니다</b></div>
+            <div class="sd">오답 요인·진단·브리핑 네 칸·코멘트·대처 방안은 모두 바로 고칠 수 있습니다(연한 테두리가 고칠 수 있는 칸). <b>고친 내용은 STEP 4에서 공개할 때 함께 저장</b>됩니다.</div></li>
+          <li><div class="st">특히 <b>이 세 가지</b>는 꼭 읽어 보세요</div>
+            <div class="sd"><b>① 오답 요인</b> — AI는 문제 원문을 모르고 유형·문법·답만 보고 <b>추정</b>합니다. 실제와 다르면 고쳐 주세요.<br>
+              <b>② 학습 브리핑</b> — 채점한 날 기준 <b>최근 30일</b>의 출석·숙제·단어 점수와 선생님들의 <b>❤ Today's Notice!</b> 코멘트를 모아 씁니다. 아이를 직접 본 선생님 생각과 맞는지 확인해 주세요.<br>
+              <b>③ 선생님 코멘트</b> — 어려운(상) 문항을 맞힌 것은 칭찬하고, 쉬운(하) 문항을 틀린 것은 원인과 개선법을 따로 짚습니다.</div></li>
+        </ol>
+        <div class="note warn"><span class="lbl">주의</span>화면 위에 <b>“서술형 채점이 아직 끝나지 않았습니다”</b>가 뜨면 공개하지 마세요. 점수가 달라질 수 있습니다.</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">STEP 4</span><h2>학부모 공개 → 링크 보내기</h2></div>
+        <ol class="steps">
+          <li><div class="st">오른쪽 위 <b>📤 학부모 공개</b>를 누릅니다</div>
+            <div class="sd">확인창이 한 번 뜹니다. 누르는 순간 <b>지금 화면 그대로(고친 문장 포함)</b> 저장되고, 링크가 <b>자동으로 복사</b>됩니다.</div></li>
+          <li><div class="st">카톡 학부모님 1:1 채팅방에 <b>붙여넣어 보냅니다</b></div>
+            <div class="sd">링크는 <b>readitude.onrender.com/exam-report?id=…</b> 모양입니다. 툴바에 <b>“공개됨 · 날짜 시각”</b>이 표시됩니다.</div></li>
+        </ol>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">🔗 링크 복사</div>
+            <div class="twhen">언제든</div>
+            <p>공개한 뒤 링크를 <b>다시 복사</b>할 때.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">📤 다시 공개</div>
+            <div class="twhen">보낸 뒤 고칠 때</div>
+            <p>문장을 더 고쳤으면 꼭 다시 누르세요. <b>이미 링크를 받은 학부모님도 바뀐 내용</b>을 보게 됩니다. 다시 보낼 필요는 없습니다.</p>
+          </div>
+        </div>
+        <div class="note warn"><span class="lbl">주의</span><b>링크가 곧 열쇠입니다.</b> 로그인 없이 열리므로 해당 학부모님께 <b>1:1로만</b> 보내고, 단톡방·공지에는 올리지 마세요.</div>
+        <div class="note tip"><span class="lbl">참고</span>링크 대신 그림으로 보내고 싶으면 <b>🖼️ 이미지로 저장</b>을 누르세요. 리포트가 PNG 파일로 저장됩니다(편집 테두리는 찍히지 않습니다).</div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">알아두기</span><h2>공개가 풀리는 경우</h2></div>
+        <div class="twotab">
+          <div class="tabcard">
+            <div class="tname">🔄 재채점했을 때</div>
+            <div class="twhen">자동</div>
+            <p>정답지를 고쳐 재채점하면 점수가 바뀌었을 수 있어 <b>그 시험 학생 전원의 공개가 풀립니다.</b> 리포트를 다시 열어 확인하고 공개해 주세요. <b>같은 링크</b>가 다시 살아납니다.</p>
+          </div>
+          <div class="tabcard">
+            <div class="tname">🚫 공개 취소</div>
+            <div class="twhen">선생님이 직접</div>
+            <p>잘못 보냈거나 내용을 거둬야 할 때. 보낸 링크는 <b>“준비 중입니다, 학원으로 문의해 주세요”</b>로 바뀝니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="phase">
+        <div class="phase-head"><span class="pnum">도움말</span><h2>안 될 때 · 자주 묻는 것</h2></div>
+        <div class="faq">
+          <details><summary>학부모님이 “준비 중”이라고 뜬대요</summary>
+            <div class="ans">공개가 안 됐거나 풀린 상태입니다. 재채점을 했다면 공개가 자동으로 풀립니다. 리포트를 열어 툴바가 <b>“미공개”</b>인지 보고 <b>📤 학부모 공개</b>를 다시 눌러 주세요. 링크는 같아서 새로 보낼 필요는 없습니다.</div></details>
+          <details><summary>“시험 기간 학습 브리핑” 칸이 안 나와요</summary>
+            <div class="ans">그 기간의 진도 기록을 못 찾은 경우입니다. 대부분 <b>채점할 때 쓴 이름이 노션 진도 기록의 이름과 달라서</b>입니다(띄어쓰기·동명이인 표기). 진도 기록이 아예 없는 학생도 이 칸을 숨깁니다. 기록에 없는 내용을 AI가 지어내지 않도록 일부러 그렇게 했습니다.</div></details>
+          <details><summary>학습 브리핑 기간이 시험 기간과 안 맞아요</summary>
+            <div class="ans">시험 날짜가 따로 저장되어 있지 않아서 <b>채점한 날부터 30일 전까지</b>로 잡습니다. 시험 뒤 오래 지나서 채점하면 기간이 그만큼 밀리니, <b>시험 끝나고 되도록 빨리 채점</b>해 주세요.</div></details>
+          <details><summary>AI 문장이 마음에 안 들어요</summary>
+            <div class="ans">그 자리에서 눌러 고치고 <b>📤 학부모 공개</b>하시면 고친 문장이 그대로 나갑니다. 원래 AI 문장은 노션에 남아 있어서 리포트를 다시 열면 AI 문장이 다시 보이지만, <b>학부모 링크는 공개할 때 저장한 문장</b>을 보여 줍니다.</div></details>
+          <details><summary>“이 학교가 자주 내는 문법” 같은 내용은 없나요?</summary>
+            <div class="ans">리디테스트의 기출 분석과 연결하는 작업을 준비 중입니다. 지금은 학교당 기출이 한 회차씩만 쌓여 있어서 “자주 낸다”고 말할 근거가 부족합니다. 데이터가 쌓이면 추가합니다.</div></details>
+        </div>
+      </section>
+    </div><!-- /guide-exam -->
 
     <hr class="div">
     <footer>리디튜드 · 선생님 사용 설명서</footer>

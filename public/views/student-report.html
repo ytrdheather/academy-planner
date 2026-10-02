@@ -24,6 +24,11 @@
         .btn.primary:hover { background: var(--teal-deep); }
         .btn.ghost { background: #fff; color: var(--muted); border: 1px solid #cdd9db; }
         .btn:disabled { opacity: .6; cursor: default; }
+        .btn.beige { background: var(--beige); color: var(--beige-ink); border: 1px solid var(--beige-line); }
+        .pub { font-size: 13px; font-weight: 700; color: var(--muted); }
+        .pub.on { color: var(--teal-deep); }
+        body.public .toolbar, body.public #notices { display: none; }
+        body.public .card { margin-top: 0; }
         .notice { max-width: 640px; margin: 12px auto 0; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
         .notice.info { background: var(--beige); color: var(--beige-ink); border-color: var(--beige-line); }
 
@@ -108,7 +113,11 @@
         <span class="left">📄 학부모용 시험 분석 리포트</span>
         <button class="btn ghost" onclick="window.close()">닫기</button>
         <button class="btn ghost" onclick="window.print()">🖨️ 인쇄</button>
-        <button class="btn primary" id="saveBtn" onclick="saveImage()" disabled>🖼️ 이미지로 저장</button>
+        <button class="btn ghost" id="saveBtn" onclick="saveImage()" disabled>🖼️ 이미지로 저장</button>
+        <span class="pub" id="pubState"></span>
+        <button class="btn beige" id="unpubBtn" onclick="unpublish()" style="display:none">공개 취소</button>
+        <button class="btn ghost" id="copyBtn" onclick="copyLink()" style="display:none">🔗 링크 복사</button>
+        <button class="btn primary" id="pubBtn" onclick="publish()" disabled>📤 학부모 공개</button>
     </div>
     <div id="notices"></div>
     <div class="card" id="card">
@@ -116,9 +125,15 @@
     </div>
 
     <script>
-        const authToken = localStorage.getItem('teacher_auth_token');
-        const resultId = new URLSearchParams(location.search).get('resultId');
+        // 같은 화면을 두 모드로 쓴다: /student-report?resultId= (원장, 편집·공개) · /exam-report?id= (학부모, 공개된 사본만 읽기)
+        const PUBLIC = location.pathname.startsWith('/exam-report');
+        const qs = new URLSearchParams(location.search);
+        const resultId = PUBLIC ? qs.get('id') : qs.get('resultId');
+        const authToken = PUBLIC ? null : localStorage.getItem('teacher_auth_token');
         let fileBase = '시험분석리포트';
+        let current = null;       // 마지막으로 그린 리포트 데이터 (공개할 때 고친 문장을 덧입힌다)
+        let publishedAt = null;
+        if (PUBLIC) document.body.className = 'public';
 
         function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
         // 객관식 답 1~5는 시험지처럼 ①~⑤로 보여 준다
@@ -127,6 +142,7 @@
         function band(pct) { return pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'E'; }
 
         async function load() {
+            if (PUBLIC) return loadPublic();
             if (!authToken) { location.href = '/teacher-login'; return; }
             if (!resultId) { document.getElementById('card').innerHTML = '<p style="padding:40px">resultId가 없습니다.</p>'; return; }
             try {
@@ -135,12 +151,28 @@
                 if (!data.success) { document.getElementById('card').innerHTML = `<p style="padding:40px">오류: ${esc(data.message)}</p>`; return; }
                 render(data);
                 document.getElementById('saveBtn').disabled = false;
+                document.getElementById('pubBtn').disabled = false;
+                setPublished(data.publishedAt);
             } catch (e) {
                 document.getElementById('card').innerHTML = `<p style="padding:40px">불러오기 오류: ${esc(e.message)}</p>`;
             }
         }
 
+        async function loadPublic() {
+            const fail = (msg) => { document.getElementById('card').innerHTML = `<p style="text-align:center; padding:60px 20px; color:#485a68; line-height:1.7; white-space:pre-line;">${esc(msg)}</p>`; };
+            if (!resultId) return fail('주소가 올바르지 않습니다.');
+            try {
+                const res = await fetch('/api/public/exam-report?id=' + encodeURIComponent(resultId));
+                const data = await res.json();
+                if (!data.success) return fail('리포트를 찾을 수 없거나 아직 준비 중입니다.\n학원으로 문의해 주세요.');
+                render(data);
+                document.title = `${data.student.name} 시험 분석 리포트 - 리디튜드`;
+            } catch (e) { fail('리포트를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.'); }
+        }
+
         function render(d) {
+            current = d;
+            const ce = PUBLIC ? '' : ' contenteditable="true"'; // 학부모 모드에선 고칠 수 없다
             const s = d.student, sum = d.summary, pr = d.parentReport || { diagnosis: '', reasons: {}, plan: [] };
             const title = s.examTitle || [s.school, s.grade, s.examType].filter(Boolean).join(' ');
             const isMiddle = /중/.test(s.school || '');
@@ -149,7 +181,7 @@
 
             const notices = [];
             if (sum.essayStatus === '대기') notices.push('<div class="notice">⚠️ 서술형 채점이 아직 끝나지 않았습니다. 지금 저장하면 점수가 달라질 수 있습니다 — 채점을 마친 뒤 보내 주세요.</div>');
-            notices.push('<div class="notice info">✏️ 진단·오답 요인·코멘트·대처 방안 문장은 눌러서 고칠 수 있습니다. 고친 내용은 이 화면에서 저장하는 이미지에만 반영됩니다.</div>');
+            notices.push('<div class="notice info">✏️ 진단·오답 요인·브리핑·코멘트·대처 방안 문장은 눌러서 고칠 수 있습니다. 고친 내용은 [학부모 공개]를 누를 때 함께 저장되어 링크에 그대로 보입니다. 공개 뒤에 고쳤으면 다시 [학부모 공개]를 눌러 주세요.</div>');
             document.getElementById('notices').innerHTML = notices.join('');
 
             const subParts = [];
@@ -174,7 +206,7 @@
                         <div class="top"><span>${esc(q.number)}번 · ${esc(q.type || '문항')}${q.verdict === '부분' ? ' (부분점수)' : ''}</span><span class="minus">−${lost}점</span></div>
                         ${tags ? `<div class="tags">${tags}</div>` : ''}
                         ${ansLine}
-                        ${why ? `<div class="why" contenteditable="true">${esc(why)}</div>` : ''}
+                        ${why ? `<div class="why" data-f="reason:${esc(q.number)}"${ce}>${esc(why)}</div>` : ''}
                     </div>`;
                 }).join('')
                 : '<div class="allright">전 문항 정답입니다.</div>';
@@ -186,13 +218,13 @@
                     <h2>시험 기간 학습 브리핑</h2>
                     <div class="study-meta">${esc(md(at.from))} ~ ${esc(md(at.to))} · 수업 ${at.classDays}회 · 숙제 수행률 ${at.hwAvg}%${at.vocabAvg ? ` · 단어 테스트 평균 ${at.vocabAvg}점` : ''}</div>
                     <div class="att">
-                        <div class="it good"><div class="k">잘 대응한 점</div><div class="v" contenteditable="true">${esc(at.good)}</div></div>
-                        <div class="it regret"><div class="k">아쉬웠던 점</div><div class="v" contenteditable="true">${esc(at.regret)}</div></div>
-                        <div class="it self"><div class="k">${esc(s.name)} 학생이 주도적으로 개선할 점</div><div class="v" contenteditable="true">${esc(at.selfImprove)}</div></div>
-                        <div class="it acad"><div class="k">학원에서 신경 써 지도할 점</div><div class="v" contenteditable="true">${esc(at.academyFocus)}</div></div>
+                        <div class="it good"><div class="k">잘 대응한 점</div><div class="v" data-f="attitude:good"${ce}>${esc(at.good)}</div></div>
+                        <div class="it regret"><div class="k">아쉬웠던 점</div><div class="v" data-f="attitude:regret"${ce}>${esc(at.regret)}</div></div>
+                        <div class="it self"><div class="k">${esc(s.name)} 학생이 주도적으로 개선할 점</div><div class="v" data-f="attitude:selfImprove"${ce}>${esc(at.selfImprove)}</div></div>
+                        <div class="it acad"><div class="k">학원에서 신경 써 지도할 점</div><div class="v" data-f="attitude:academyFocus"${ce}>${esc(at.academyFocus)}</div></div>
                     </div>` : '';
 
-            const plan = (pr.plan || []).map((p, i) => `<li><span class="n">${i + 1}</span><span contenteditable="true">${esc(p)}</span></li>`).join('');
+            const plan = (pr.plan || []).map((p, i) => `<li><span class="n">${i + 1}</span><span data-f="plan:${i}"${ce}>${esc(p)}</span></li>`).join('');
 
             document.getElementById('card').innerHTML = `
                 <div class="hd">
@@ -215,12 +247,12 @@
                     ${wrongs}
 
                     <h2>핵심 진단</h2>
-                    <div class="diag"><div class="lab">DIAGNOSIS</div><div class="txt" contenteditable="true">${esc(pr.diagnosis)}</div></div>
+                    <div class="diag"><div class="lab">DIAGNOSIS</div><div class="txt" data-f="diagnosis"${ce}>${esc(pr.diagnosis)}</div></div>
 
                     ${attitudeSec}
 
                     <h2>선생님 코멘트</h2>
-                    <div class="comment" contenteditable="true">${esc(d.overallComment)}</div>
+                    <div class="comment" data-f="overallComment"${ce}>${esc(d.overallComment)}</div>
 
                     <h2>다음 시험 대처 방안</h2>
                     <ol class="plan">${plan}</ol>
@@ -229,6 +261,87 @@
                 </div>
                 <div class="ft"><b>리디튜드 영어학원</b> · 시험 분석 리포트</div>
             `;
+        }
+
+        // 화면에서 고친 문장을 리포트 데이터에 덧입힌다 — 공개할 때 이 사본이 그대로 학부모 링크가 된다
+        function withEdits(d) {
+            const out = JSON.parse(JSON.stringify(d));
+            out.parentReport = out.parentReport || { diagnosis: '', reasons: {}, plan: [] };
+            document.querySelectorAll('#card [data-f]').forEach(el => {
+                const v = el.innerText.trim();
+                const [k, sub] = el.dataset.f.split(':');
+                if (k === 'overallComment') out.overallComment = v;
+                else if (k === 'diagnosis') out.parentReport.diagnosis = v;
+                else if (k === 'reason') out.parentReport.reasons[sub] = v;
+                else if (k === 'plan') out.parentReport.plan[Number(sub)] = v;
+                else if (k === 'attitude' && out.parentReport.attitude) out.parentReport.attitude[sub] = v;
+            });
+            // 학부모 화면에 필요 없는 원장용 값은 사본에 넣지 않는다
+            delete out.success; delete out.publishedAt; delete out.recommendations; delete out.strengths; delete out.weaknesses;
+            return out;
+        }
+
+        function linkUrl() { return `${location.origin}/exam-report?id=${resultId}`; }
+
+        function setPublished(at) {
+            publishedAt = at || null;
+            const st = document.getElementById('pubState');
+            if (publishedAt) {
+                const t = new Date(publishedAt);
+                st.textContent = `공개됨 · ${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+                st.className = 'pub on';
+            } else { st.textContent = '미공개'; st.className = 'pub'; }
+            document.getElementById('pubBtn').textContent = publishedAt ? '📤 다시 공개' : '📤 학부모 공개';
+            document.getElementById('copyBtn').style.display = publishedAt ? '' : 'none';
+            document.getElementById('unpubBtn').style.display = publishedAt ? '' : 'none';
+        }
+
+        async function publish() {
+            if (!current) return;
+            if (current.summary?.essayStatus === '대기' && !confirm('서술형 채점이 끝나지 않았습니다. 그래도 공개할까요?')) return;
+            if (!confirm(publishedAt
+                ? '지금 화면 내용으로 학부모 링크를 바꿉니다. 이미 링크를 받은 학부모도 바뀐 내용을 보게 됩니다. 진행할까요?'
+                : '지금 화면 내용 그대로 학부모 링크를 엽니다. 공개 뒤에 링크를 복사해 보내 주세요. 진행할까요?')) return;
+            const btn = document.getElementById('pubBtn');
+            btn.disabled = true; btn.textContent = '공개 중...';
+            try {
+                const res = await fetch('/api/exam-report/publish', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resultId, report: withEdits(current) })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                setPublished(data.publishedAt);
+                await copyLink(true);
+            } catch (e) {
+                alert('공개 실패: ' + e.message);
+                setPublished(publishedAt);
+            } finally { btn.disabled = false; }
+        }
+
+        async function unpublish() {
+            if (!confirm('공개를 취소하면 이미 보낸 링크가 열리지 않습니다. 취소할까요?')) return;
+            try {
+                const res = await fetch('/api/exam-report/unpublish', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + authToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resultId })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                setPublished(null);
+            } catch (e) { alert('공개 취소 실패: ' + e.message); }
+        }
+
+        async function copyLink(afterPublish) {
+            const url = linkUrl();
+            try {
+                await navigator.clipboard.writeText(url);
+                alert((afterPublish ? '공개했습니다. ' : '') + '링크를 복사했습니다. 카카오톡에 붙여넣어 보내 주세요.\n\n' + url);
+            } catch (e) {
+                prompt((afterPublish ? '공개했습니다. ' : '') + '아래 링크를 복사해 보내 주세요.', url);
+            }
         }
 
         async function saveImage() {

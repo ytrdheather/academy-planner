@@ -27,6 +27,7 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 | `/counsel` `/absence` `/calendar` | 상담·결석 신청 폼, 달력 | **학부모** |
 | `/past-grammar` | 과거 문법 기록 | 교사 |
 | `/exam-analyzer` `/student-grader` `/results-viewer` `/student-report` | 시험지 분석 4종 | 교사 |
+| `/exam-report?id=결과ID` | 학부모용 시험 분석 리포트 (`student-report.html` 공개 모드) | 🔓 공개 |
 | `/textbook-toc` `/shopping` | 교재 목차 파싱 / 장보기 목록 | 교사·조교 |
 | `/messages` | 발송함 | 교사 |
 | `/monthly-report` `/my-report` `/report` | 리포트 뷰 | 학생·학부모 |
@@ -34,7 +35,7 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 
 ## API — 공개 🔓 (학부모가 로그인 없이 쓰는 것만)
 
-`GET /api/notice` · `POST /api/counsel` · `GET /api/counsel/done` · `GET /api/absence/options` · `POST /api/absence` · `GET /api/calendar` · `GET /api/welcome-info/:code` · `POST /api/kakao/skill`(챗봇 웹훅) · `GET /api/search-books` · `GET /api/search-sayu-books` · `GET|POST /api/textbook/act`(선생 승인 버튼, 토큰이 URL에) · `GET /api/student-history` · `GET /api/monthly-report-url`
+`GET /api/notice` · `POST /api/counsel` · `GET /api/counsel/done` · `GET /api/absence/options` · `POST /api/absence` · `GET /api/calendar` · `GET /api/welcome-info/:code` · `POST /api/kakao/skill`(챗봇 웹훅) · `GET /api/search-books` · `GET /api/search-sayu-books` · `GET|POST /api/textbook/act`(선생 승인 버튼, 토큰이 URL에) · `GET /api/student-history` · `GET /api/monthly-report-url` · `GET /api/public/exam-report?id=`(공개된 시험 리포트 사본만)
 
 ## API — 인증 필요
 
@@ -54,7 +55,7 @@ Express 라우트 전체. 🔓 = 인증 없음(공개), 그 외는 `requireAuth`
 | 스키마 점검 | `/api/schema-check/tick` — 지금 어긋난 속성이 있는지 즉시 확인 → [[schema-check]] |
 | 월간 리포트 | `/api/monthly-report/tick` — `?month=YYYY-MM` 없으면 지난달. 🔴 크론이 월 1회라 유일한 복구 수단 → [[monthly-report]] |
 | 확정·발송 | `/api/confirm/auto-close` `/api/makeup/send-confirms` `/api/makeup/roster` `/api/counsel/send-confirms` `/api/counsel/remind` `/api/messages/sent` `/api/admission/tick` |
-| 시험 | `/api/analyze-exam` `/save-exam-analysis` `/exam-list` `/grade-student` `/save-student-result` `/student-results` `/student-result-detail` `/regrade-exam` `/student-report-data` + 학생용 `/api/student/exam-list` `/exam-questions` `/submit-exam` |
+| 시험 | `/api/analyze-exam` `/save-exam-analysis` `/exam-list` `/grade-student` `/save-student-result` `/student-results` `/student-result-detail` `/regrade-exam` `/student-report-data` `/exam-report/publish` `/exam-report/unpublish` + 학생용 `/api/student/exam-list` `/exam-questions` `/submit-exam` |
 | 기타 | `/api/calendar`(POST) `/api/prefill-holidays` `/api/manual-monthly-report-gen` |
 
 ## 주의

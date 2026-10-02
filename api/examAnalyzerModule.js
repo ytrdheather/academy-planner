@@ -1,5 +1,6 @@
 import multer from 'multer';
 import Anthropic from '@anthropic-ai/sdk';
+import fs from 'fs';
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -153,7 +154,39 @@ async function loadAnswerKey(fetchNotion, questionDbId, examPageId) {
 }
 
 // 리포트 AI 문구(AI코멘트·리포트AI)의 프롬프트 버전. 프롬프트를 바꾸면 올린다 → 예전 캐시는 다시 만들어진다.
-const REPORT_PROMPT_VERSION = 2;
+const REPORT_PROMPT_VERSION = 3;
+
+// ===== 리디테스트 대비 범위 =====
+// 리디테스트(별도 저장소 Desktop/Readitest)가 학교·시험마다 분석한 어법 포인트로 동형 모의고사를 만들어 학생들이 전부 풀었다.
+// 그래서 "분석한 포인트 = 학생이 학원에서 동형으로 연습한 포인트"로 본다(원장 확정 2026-10-02).
+// 리디테스트가 뽑아 준 data/readitest-coverage.json 을 읽는다. 파일이 없거나 그 시험이 없으면 조용히 빠진다.
+const COVERAGE_PATH = new URL('../data/readitest-coverage.json', import.meta.url);
+let coverageCache = { mtimeMs: -1, data: null };
+function defaultLoadCoverage() {
+    try {
+        const st = fs.statSync(COVERAGE_PATH);
+        if (st.mtimeMs !== coverageCache.mtimeMs) {
+            coverageCache = { mtimeMs: st.mtimeMs, data: JSON.parse(fs.readFileSync(COVERAGE_PATH, 'utf8')) };
+        }
+        return coverageCache.data;
+    } catch (e) { return null; }
+}
+
+// 리디플랜 시험 정보(영덕중학교 / 2학년 / 2026 / 2학기 / 중간고사) → 리디테스트 표기(영덕중 / 2 / 2026 / 2 / 중간)로 맞춰 찾는다.
+// 다른 학교·고등학교는 억지로 비슷한 학교에 붙이지 않는다.
+function findCoverage(coverage, examInfo) {
+    if (!coverage?.exams?.length) return null;
+    const school = String(examInfo.school || '').replace(/\s+/g, '').replace(/중학교$/, '중');
+    const grade = Number(String(examInfo.grade || '').replace(/[^0-9]/g, '')) || null;
+    const semester = Number(String(examInfo.semester || '').replace(/[^0-9]/g, '')) || null;
+    const sitting = /기말/.test(examInfo.examType || '') ? '기말' : /중간/.test(examInfo.examType || '') ? '중간' : '';
+    if (!school || !grade || !sitting) return null;
+    return coverage.exams.find(e =>
+        String(e.school).replace(/\s+/g, '') === school && Number(e.grade) === grade && e.sitting === sitting
+        && (!examInfo.year || !e.year || Number(e.year) === Number(examInfo.year))
+        && (!semester || !e.semester || Number(e.semester) === semester)
+    ) || null;
+}
 
 // 난이도(상/중/하)별 정오 요약 — AI 코멘트가 "쉬운 문제 실수"와 "어려운 문제 해결"을 구분해 쓰게 한다
 function summarizeByDifficulty(questions) {
@@ -409,7 +442,7 @@ function requireStudent(req, res, next) {
     next();
 }
 
-export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, dbIds }) {
+export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, loadCoverage = defaultLoadCoverage, dbIds }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
         anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -836,6 +869,8 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             // 캐시된 AI 코멘트를 비울 수 있도록 속성 보장(없으면 추가). 권한 없으면 무시하고 진행.
             try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, 'AI코멘트', { rich_text: {} }); } catch (e) { /* noop */ }
             try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '리포트AI', { rich_text: {} }); } catch (e) { /* noop */ }
+            try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '학부모리포트', { rich_text: {} }); } catch (e) { /* noop */ }
+            try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '공개일시', { date: {} }); } catch (e) { /* noop */ }
 
             // 이 시험의 모든 학생 결과
             let results = [];
@@ -908,6 +943,9 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 const resultProps = buildResultProps(sum, {});
                 resultProps['AI코멘트'] = { rich_text: [] };
                 resultProps['리포트AI'] = { rich_text: [] };
+                // 점수가 바뀌었을 수 있으니 학부모 공개도 푼다 — 원장이 다시 확인하고 [학부모 공개]
+                resultProps['학부모리포트'] = { rich_text: [] };
+                resultProps['공개일시'] = { date: null };
                 await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
                     method: 'PATCH',
                     body: JSON.stringify({ properties: resultProps })
@@ -1030,13 +1068,19 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             if (!cacheFresh) parentReport = null;
             let overallComment = cacheFresh ? (RP['AI코멘트']?.rich_text?.[0]?.plain_text || '') : '';
             const difficultyLines = summarizeByDifficulty(questions);
+            const cov = findCoverage(loadCoverage(), examInfo);
+            const coveragePoints = (cov?.points || []).map(p => p.label || p.code).filter(Boolean);
+            const coverageLine = cov && coveragePoints.length
+                ? `학원에서 이 시험 대비로 동형 모의고사 ${cov.mock_sets || 5}세트를 만들어 학생이 모두 풀었다. 그 세트가 집중 연습시킨 어법 포인트: ${coveragePoints.join(', ')}`
+                : '';
             const brief = `학생: ${studentName} / 시험: ${examInfo.examTitle || (examInfo.school + ' ' + examInfo.grade)} `
                 + `/ 점수: ${summary.score}점(만점 ${summary.fullScore}, ${summary.percent}%) `
                 + `/ 강점 유형: ${strengths.join(', ') || '없음'} `
                 + `/ 약점 유형: ${weakTypes.map(w => w.type).join(', ') || '없음'} `
                 + `/ 약점 어법(문법): ${weakGrammar.join(', ') || '없음'} `
                 + `/ 약점 출제범위: ${weakSources.join(', ') || '없음'}`
-                + (difficultyLines ? `\n[난이도별 결과]\n${difficultyLines}` : '');
+                + (difficultyLines ? `\n[난이도별 결과]\n${difficultyLines}` : '')
+                + (coverageLine ? `\n[학원 내신 대비]\n${coverageLine}` : '');
             if (!overallComment && geminiModel) {
                 try {
                     const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이며, 학부모님께 보내는 시험 분석 코멘트를 작성한다. 아래 [요약]을 바탕으로 진지하고 전문적인 어조의 코멘트를 작성해라.\n`
@@ -1052,6 +1096,13 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                               + `  · 하 난이도 문항을 틀린 것이 있으면 따로 분석한다. 쉬운 문항의 실점은 개념 부족보다 문제·선택지를 끝까지 확인하지 않은 실수, 본문·어휘 암기 누락, 시간 배분 같은 원인일 가능성이 크다. 유형·출제범위·문법포인트를 근거로 왜 그런 일이 생겼을지 추정하되 단정하지 말고, 어떻게 개선할지(검토 습관·암기 점검 등)를 구체적으로 제시한다.\n`
                               + `  · 하·중 난이도에서의 실점은 점수와 직결되므로, 이를 줄이기 위한 보완책을 따로 한 두 문장으로 밝힌다.\n`
                               + `  · 하 난이도 오답이 없으면 기본 문항을 안정적으로 처리했다고 짚는다.\n`
+                            : '')
+                        + (coverageLine
+                            ? `- [학원 내신 대비]를 반드시 반영한다. 틀린 문항의 문법(약점 어법)이 대비 포인트와 같은 내용이면(표현이 달라도 같은 문법이면 같은 것으로 본다):\n`
+                              + `  · "학원에서 동형 모의고사로 반복해 풀어 본 포인트인데 실전에서 실점했다 — 알고는 있으나 완전히 숙지하지 못했다"는 취지로 분명히 짚는다.\n`
+                              + `  · 학생 탓으로만 끝내지 말고, 기말 대비에서 학원이 그 포인트를 어떻게 다시 굳힐지(실전 시간 재기·변형 반복·오답 재풀이 등)를 바로 이어 쓴다.\n`
+                              + `  · 대비 포인트에 없던 문법을 틀렸다면 학교가 새롭게 낸 부분으로 보고, 다음 대비 자료에 반영하겠다고 쓴다.\n`
+                              + `  · 대비 포인트 문항을 맞혔다면 대비 학습이 실전으로 이어졌다고 짧게 짚을 수 있다.\n`
                             : '')
                         + `- 점수 숫자를 단순 나열하지 말고, 별표(*)나 따옴표 강조는 쓰지 않는다.\n`
                         + `- ${difficultyLines ? '7~9' : '5~7'}문장 분량의 자연스러운 문단으로 작성한다.\n\n[요약]\n${brief}`;
@@ -1107,7 +1158,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                     ).join('\n') || '(틀린 문항 없음)';
                     const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이다. 학부모님께 보내는 내신 시험 개인 분석 리포트의 문구를 JSON으로 작성한다.\n`
                         + `- diagnosis: 핵심 진단 한두 문장(80자 안팎). 무엇을 잘했고 무엇이 다음 시험의 열쇠인지. 예) "21문항 정답 — 독해는 안정적. 분사 어형 판단 한 가지가 다음 시험의 열쇠입니다."\n`
-                        + `- reasons: 틀린 문항 번호를 키로, 오답 요인을 한두 문장으로. 난이도 하 문항이면 실수·확인 부족 가능성도 함께 짚는다. 우리는 문제 원문을 모르고 유형·문법포인트·정답·학생답만 안다. 아는 범위에서 그럴듯한 원인을 짚되 단정하지 말고 "~로 보입니다" 처럼 추정으로 쓴다. 선택지 번호만 보고 내용을 지어내지 마라.\n`
+                        + `- reasons: 틀린 문항 번호를 키로, 오답 요인을 한두 문장으로. 난이도 하 문항이면 실수·확인 부족 가능성도 함께 짚는다.${coverageLine ? ' [학원 내신 대비] 포인트에 해당하는 문법이면 "동형 모의고사로 연습한 포인트인데 숙지가 미흡했던 것으로 보입니다"처럼 짚는다.' : ''} 우리는 문제 원문을 모르고 유형·문법포인트·정답·학생답만 안다. 아는 범위에서 그럴듯한 원인을 짚되 단정하지 말고 "~로 보입니다" 처럼 추정으로 쓴다. 선택지 번호만 보고 내용을 지어내지 마라.\n`
                         + `- plan: 다음 시험 대처 방안 3~4개. 각 항목은 한 줄(40자 안팎), 구체적인 학습 행동으로. 학원에서 할 지도와 학생이 할 일을 섞는다.\n`
                         + `- 정중한 존댓말, 차분한 전문가 어조. 별표·따옴표 강조·이모지 금지.\n`
                         + (hasStudy
@@ -1164,11 +1215,82 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 recommendations: dedupRecs,
                 overallComment,
                 parentReport,
-                split
+                split,
+                publishedAt: RP['공개일시']?.date?.start || null
             });
         } catch (error) {
             console.error('학생 리포트 데이터 오류:', error);
             res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // ===== 학부모 링크 (2026-10-02) =====
+    // 원장이 [학부모 공개]를 누른 순간의 리포트 화면 데이터를 결과행 '학부모리포트' 칸에 통째로 저장하고('공개일시' 기록),
+    // 학부모 링크(/exam-report?id=결과ID)는 그 사본만 읽는다 — 노션 1회 조회, AI 호출 없음, 재채점해도 보낸 내용이 바뀌지 않는다.
+    // 재채점하면 공개가 풀린다(점수가 바뀌었을 수 있으니 원장이 다시 확인하고 공개).
+
+    app.post('/api/exam-report/publish', requireAuth, requireOwner, async (req, res) => {
+        const { resultId, report } = req.body || {};
+        if (!resultId || !report || typeof report !== 'object') {
+            return res.status(400).json({ success: false, message: 'resultId와 리포트 내용이 필요합니다.' });
+        }
+        if (!report.student?.name || !report.summary) {
+            return res.status(400).json({ success: false, message: '리포트 내용이 비어 있습니다.' });
+        }
+        const json = JSON.stringify({ v: 1, report });
+        if (json.length > 95 * 1900) {
+            return res.status(400).json({ success: false, message: '리포트가 너무 깁니다. 코멘트를 줄여 주세요.' });
+        }
+        try {
+            await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '학부모리포트', { rich_text: {} });
+            await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '공개일시', { date: {} });
+            const publishedAt = new Date().toISOString();
+            await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties: {
+                    '학부모리포트': { rich_text: richTextChunks(json) },
+                    '공개일시': { date: { start: publishedAt } }
+                } })
+            });
+            res.json({ success: true, publishedAt, path: `/exam-report?id=${resultId}` });
+        } catch (error) {
+            console.error('학부모 리포트 공개 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    app.post('/api/exam-report/unpublish', requireAuth, requireOwner, async (req, res) => {
+        const { resultId } = req.body || {};
+        if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
+        try {
+            await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ properties: { '학부모리포트': { rich_text: [] }, '공개일시': { date: null } } })
+            });
+            res.json({ success: true });
+        } catch (error) {
+            console.error('학부모 리포트 공개 취소 오류:', error);
+            res.status(500).json({ success: false, message: error.message });
+        }
+    });
+
+    // 🔓 로그인 없음 — 학부모가 여는 주소. 32자리 노션 ID 가 열쇠다(데일리 리포트 /report?pageId= 와 같은 수준).
+    //    학생 응시 결과 DB 의 행이고, 공개된 것만 내준다. 사본 외의 노션 데이터는 돌려주지 않는다.
+    app.get('/api/public/exam-report', async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        const id = String(req.query.id || '').trim();
+        const notFound = () => res.status(404).json({ success: false, message: '리포트를 찾을 수 없거나 아직 공개되지 않았습니다.' });
+        if (!/^[0-9a-f-]{32,36}$/i.test(id)) return notFound();
+        try {
+            const page = await fetchNotion(`https://api.notion.com/v1/pages/${id}`);
+            const sameDb = (page.parent?.database_id || '').replace(/-/g, '') === String(dbIds.STUDENT_RESULT_DB_ID || '').replace(/-/g, '');
+            if (!sameDb || page.archived || !page.properties?.['공개일시']?.date?.start) return notFound();
+            const saved = JSON.parse(readRichText(page.properties['학부모리포트']) || 'null');
+            if (!saved?.report) return notFound();
+            res.json({ success: true, ...saved.report, publishedAt: page.properties['공개일시'].date.start });
+        } catch (error) {
+            console.error('학부모 리포트 조회 오류:', error.message);
+            notFound();
         }
     });
 }

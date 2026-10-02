@@ -241,6 +241,7 @@ app.get('/exam-analyzer', (req, res) => res.sendFile(path.join(publicPath, 'view
 app.get('/student-grader', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-grader.html')));
 app.get('/results-viewer', (req, res) => res.sendFile(path.join(publicPath, 'views', 'results-viewer.html')));
 app.get('/student-report', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-report.html')));
+app.get('/exam-report', (req, res) => res.sendFile(path.join(publicPath, 'views', 'student-report.html'))); // 🔓 학부모 링크 — 같은 화면을 공개 모드로
 
 // ------------------------------------------------------------------
 // [공지사항 허브] 카카오톡 채널 홈 메뉴에서 학부모가 여는 공개 페이지.
