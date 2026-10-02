@@ -65,7 +65,8 @@ tags: [exam, grading, claude, vision, notion]
 
 - `data/readitest-coverage.json`(리디테스트 `tools/export_readiplan_coverage.py` 산출물을 복사)을 `findCoverage`가 학교(○○중학교→○○중)·학년·연도·학기·회차로 찾는다. 파일·행이 없으면 조용히 빠진다.
 - 찾으면 프롬프트에 `[학원 내신 대비]`를 넣는다 → 틀린 문법이 대비 포인트면 "동형으로 반복해 풀어 본 포인트인데 실전에서 숙지가 미흡" + 학원이 이어서 할 일, 대비 밖이면 "학교가 새롭게 낸 부분 → 다음 대비 자료에 반영". 포인트 표기가 달라도 같은 문법이면 AI가 같은 것으로 본다(코드 통일을 기다리지 않는다).
-- 🔴 파일은 **시험 시즌마다 리디테스트에서 다시 뽑아 복사하고 커밋·배포**해야 Render 에 반영된다. 리포트 문구를 바꾸면 `REPORT_PROMPT_VERSION`(지금 3)을 올린다.
+- **현재 파일(2026-10-02 생성):** 중2 2026-2학기 **중간** 4개교만 — 영덕(동형 3세트·4포인트)·영일(5·5)·청명(5·5)·태장(5·6). 포인트는 목적격 관계대명사·so~that 류·지각동사·used to 공통 + 학교별 전치사/-ing 구별. 중1·기말은 아직 없다.
+- 🔴 파일은 **시험 시즌마다 리디테스트에서 다시 뽑아 복사하고 커밋·배포**해야 Render 에 반영된다. 뽑는 법: Readitest 에서 `python tools/export_readiplan_coverage.py` → `data/export/readiplan_coverage.json` 을 이 저장소 `data/readitest-coverage.json` 으로 복사. 내보낼 시험 목록은 그 스크립트의 `EXAMS` 에 손으로 적혀 있다(새 시험이면 거기 추가). 리포트 문구를 바꾸면 `REPORT_PROMPT_VERSION`(지금 3)을 올린다.
 
 ## 리디테스트 연동 (조사만, 미착수)
 

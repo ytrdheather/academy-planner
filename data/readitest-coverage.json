@@ -1,0 +1,142 @@
+{
+  "generated_at": "2026-10-02T23:56:35+09:00",
+  "source": "Readitest tools/export_readiplan_coverage.py",
+  "exams": [
+    {
+      "school": "영덕중",
+      "grade": 2,
+      "year": 2026,
+      "semester": 2,
+      "sitting": "중간",
+      "lessons": [
+        "Lesson 5",
+        "Lesson 6"
+      ],
+      "mock_sets": 3,
+      "points": [
+        {
+          "code": "SO_SUCH_TOO_ENOUGH",
+          "label": "so ~ that / such ~ that / too ~ to / enough to"
+        },
+        {
+          "code": "PERCEPTION_VERB_OC",
+          "label": "지각동사 + 목적어 + 동사원형/-ing"
+        },
+        {
+          "code": "REL_OBJECT",
+          "label": "목적격 관계대명사 (which·that·whom, 생략)"
+        },
+        {
+          "code": "VERB_USED_TO",
+          "label": "used to (과거의 습관·상태) / be used to 구별"
+        }
+      ]
+    },
+    {
+      "school": "영일중",
+      "grade": 2,
+      "year": 2026,
+      "semester": 2,
+      "sitting": "중간",
+      "lessons": [
+        "Lesson 5",
+        "Lesson 6"
+      ],
+      "mock_sets": 5,
+      "points": [
+        {
+          "code": "REL_OBJECT",
+          "label": "목적격 관계대명사 (which·that·whom, 생략)"
+        },
+        {
+          "code": "SO_SUCH_TOO_ENOUGH",
+          "label": "so ~ that / such ~ that / too ~ to / enough to"
+        },
+        {
+          "code": "PERCEPTION_VERB_OC",
+          "label": "지각동사 + 목적어 + 동사원형/-ing"
+        },
+        {
+          "code": "VERB_USED_TO",
+          "label": "used to (과거의 습관·상태) / be used to 구별"
+        },
+        {
+          "code": "PREP_USAGE",
+          "label": "전치사 쓰임 (by subway, get off at ~ Station 등)"
+        }
+      ]
+    },
+    {
+      "school": "청명중",
+      "grade": 2,
+      "year": 2026,
+      "semester": 2,
+      "sitting": "중간",
+      "lessons": [
+        "Lesson 5",
+        "Lesson 6"
+      ],
+      "mock_sets": 5,
+      "points": [
+        {
+          "code": "REL_OBJECT",
+          "label": "목적격 관계대명사 (which·that·whom, 생략)"
+        },
+        {
+          "code": "PERCEPTION_VERB_OC",
+          "label": "지각동사 + 목적어 + 동사원형/-ing"
+        },
+        {
+          "code": "SO_SUCH_TOO_ENOUGH",
+          "label": "so ~ that / such ~ that / too ~ to / enough to"
+        },
+        {
+          "code": "VERB_USED_TO",
+          "label": "used to (과거의 습관·상태) / be used to 구별"
+        },
+        {
+          "code": null,
+          "label": "-ing 쓰임 구별 (현재분사 vs 동명사)"
+        }
+      ]
+    },
+    {
+      "school": "태장중",
+      "grade": 2,
+      "year": 2026,
+      "semester": 2,
+      "sitting": "중간",
+      "lessons": [
+        "Lesson 5",
+        "Lesson 6"
+      ],
+      "mock_sets": 5,
+      "points": [
+        {
+          "code": "SO_SUCH_TOO_ENOUGH",
+          "label": "so ~ that / such ~ that / too ~ to / enough to"
+        },
+        {
+          "code": "REL_OBJECT",
+          "label": "목적격 관계대명사 (which·that·whom, 생략)"
+        },
+        {
+          "code": "PERCEPTION_VERB_OC",
+          "label": "지각동사 + 목적어 + 동사원형/-ing"
+        },
+        {
+          "code": "VERB_USED_TO",
+          "label": "used to (과거의 습관·상태) / be used to 구별"
+        },
+        {
+          "code": "PREP_USAGE",
+          "label": "전치사 쓰임 (by subway, get off at ~ Station 등)"
+        },
+        {
+          "code": null,
+          "label": "-ing 쓰임 구별 (현재분사 vs 동명사)"
+        }
+      ]
+    }
+  ]
+}
