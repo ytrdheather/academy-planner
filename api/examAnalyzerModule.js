@@ -442,7 +442,7 @@ function requireStudent(req, res, next) {
     next();
 }
 
-export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, loadCoverage = defaultLoadCoverage, dbIds }) {
+export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, loadCoverage = defaultLoadCoverage, dbIds, warmDelayMs = 3000 }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
         anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -737,6 +737,8 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 registeredBy: req.user.name || req.user.loginId
             }, graded);
             res.json({ success: true, ...saved });
+            // 서술형 채점이 남았으면 점수가 바뀔 수 있으니 미리 만들지 않는다(그땐 원장이 열 때 만든다)
+            if (!graded.some(g => g.verdict === '채점대기')) warmReport(saved.pageId, graded.length);
         } catch (error) {
             console.error('학생 결과 저장 오류:', error);
             res.status(500).json({ success: false, message: error.message });
@@ -886,6 +888,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             } while (cursor);
 
             let regradedCount = 0;
+            const regradedIds = [];
             for (const rp of results) {
                 const resultId = rp.id;
 
@@ -951,9 +954,12 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                     body: JSON.stringify({ properties: resultProps })
                 });
                 regradedCount++;
+                regradedIds.push([resultId, ansRows.length]);
             }
 
             res.json({ success: true, regradedCount });
+            // 재채점으로 비운 리포트 문구를 뒤에서 한 명씩 다시 만들어 둔다(Gemini 를 한꺼번에 몰지 않는다)
+            (async () => { for (const [id, n] of regradedIds) await warmReport(id, n); })();
         } catch (error) {
             console.error('재채점 오류:', error);
             res.status(500).json({ success: false, message: error.message });
@@ -961,16 +967,36 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
     });
 
     // 학생·학부모용 분석 리포트 데이터 (규칙 기반 대책 + AI 종합 코멘트)
-    app.get('/api/student-report-data', requireAuth, requireOwner, async (req, res) => {
-        const { resultId } = req.query;
-        if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
-        if (!dbIds?.STUDENT_ANSWER_DB_ID || !dbIds?.QUESTION_DB_ID) {
-            return res.status(500).json({ success: false, message: 'DB ID가 설정되지 않았습니다.' });
-        }
-
-        try {
-            // 1) 결과 페이지
-            const resultPage = await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`);
+    // 리포트 데이터를 만든다 — 화면(/api/student-report-data)과 채점 저장 뒤 미리 만들기(warmReport)가 같이 쓴다.
+    // 속도(2026-10-03, 처음 열 때 8~10초였다): 서로 기다릴 필요 없는 노션 읽기·Gemini 두 번을 동시에 돌리고,
+    // AI 문구 저장은 한 번의 PATCH 로 묶어 화면을 띄운 뒤에 한다(waitForSave=false).
+    async function buildReport(resultId, { waitForSave = false, expectedCount = null } = {}) {
+            const t0 = Date.now();
+            // 1) 결과 페이지 + 학생 문항 응답 — 둘 다 resultId 만 있으면 되니 동시에
+            const loadAnswers = async () => {
+                let rows = [];
+                let cursor;
+                do {
+                    const body = { filter: { property: '학생결과', relation: { contains: resultId } }, page_size: 100 };
+                    if (cursor) body.start_cursor = cursor;
+                    const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_ANSWER_DB_ID}/query`, {
+                        method: 'POST', body: JSON.stringify(body)
+                    });
+                    rows = rows.concat(data.results);
+                    cursor = data.has_more ? data.next_cursor : undefined;
+                } while (cursor);
+                return rows;
+            };
+            const [resultPage, ansRows] = await Promise.all([
+                fetchNotion(`https://api.notion.com/v1/pages/${resultId}`),
+                loadAnswers()
+            ]);
+            // 막 저장한 결과는 노션 검색에 늦게 잡힐 수 있다 — 문항이 덜 읽혔으면 AI 를 부르지 않고 멈춘다(미리 만들기 전용)
+            if (expectedCount != null && ansRows.length < expectedCount) {
+                const err = new Error(`문항 ${ansRows.length}/${expectedCount} — 아직 노션에 다 안 잡혔다`);
+                err.incomplete = true;
+                throw err;
+            }
             const RP = resultPage.properties;
             const studentName = RP['학생명']?.title?.[0]?.plain_text || '';
             const examPageId = RP['시험']?.relation?.[0]?.id || '';
@@ -990,35 +1016,24 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 examType: RP['시험종류']?.select?.name || '',
                 examTitle: '', semester: '', year: null
             };
-            if (examPageId) {
-                try {
-                    const examPage = await fetchNotion(`https://api.notion.com/v1/pages/${examPageId}`);
-                    const EP = examPage.properties;
-                    examInfo.examTitle = EP['시험명']?.title?.[0]?.plain_text || '';
-                    examInfo.semester = EP['학기']?.select?.name || '';
-                    examInfo.year = EP['시험년도']?.number || null;
-                } catch (e) { /* 시험 페이지 없으면 결과행 정보로 대체 */ }
+            // 2) 시험 정보 + 정답지(출제범위·난이도) — 둘 다 시험 ID 만 있으면 되니 동시에
+            const [examPage, key] = examPageId
+                ? await Promise.all([
+                    fetchNotion(`https://api.notion.com/v1/pages/${examPageId}`).catch(() => null), // 없으면 결과행 정보로 대체
+                    loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId)
+                ])
+                : [null, []];
+            if (examPage) {
+                const EP = examPage.properties;
+                examInfo.examTitle = EP['시험명']?.title?.[0]?.plain_text || '';
+                examInfo.semester = EP['학기']?.select?.name || '';
+                examInfo.year = EP['시험년도']?.number || null;
             }
 
-            // 3) 학생 문항 응답 + 정답지 출제범위 조인
-            let ansRows = [];
-            let cursor;
-            do {
-                const body = { filter: { property: '학생결과', relation: { contains: resultId } }, page_size: 100 };
-                if (cursor) body.start_cursor = cursor;
-                const data = await fetchNotion(`https://api.notion.com/v1/databases/${dbIds.STUDENT_ANSWER_DB_ID}/query`, {
-                    method: 'POST', body: JSON.stringify(body)
-                });
-                ansRows = ansRows.concat(data.results);
-                cursor = data.has_more ? data.next_cursor : undefined;
-            } while (cursor);
-
+            // 3) 학생 문항 응답 + 정답지 조인
             const sourceByNumber = {};
             const difficultyByNumber = {};
-            if (examPageId) {
-                const key = await loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId);
-                key.forEach(k => { sourceByNumber[k.number] = k.source_type; difficultyByNumber[k.number] = k.difficulty; });
-            }
+            key.forEach(k => { sourceByNumber[k.number] = k.source_type; difficultyByNumber[k.number] = k.difficulty; });
 
             const questions = ansRows.map(p => {
                 const P = p.properties;
@@ -1081,6 +1096,8 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 + `/ 약점 출제범위: ${weakSources.join(', ') || '없음'}`
                 + (difficultyLines ? `\n[난이도별 결과]\n${difficultyLines}` : '')
                 + (coverageLine ? `\n[학원 내신 대비]\n${coverageLine}` : '');
+            const aiSaves = {}; // 이번에 새로 만든 AI 문구 — 끝에서 PATCH 한 번으로 저장
+            const commentTask = (async () => {
             if (!overallComment && geminiModel) {
                 try {
                     const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이며, 학부모님께 보내는 시험 분석 코멘트를 작성한다. 아래 [요약]을 바탕으로 진지하고 전문적인 어조의 코멘트를 작성해라.\n`
@@ -1111,19 +1128,12 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                         generationConfig: { temperature: 0.4, maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 512 } }
                     });
                     overallComment = result.response.text().trim();
-
                     // 생성 성공 시 결과 페이지에 저장 → 다음 조회부터 재사용(추가 AI 호출 없음)
-                    if (overallComment && dbIds.STUDENT_RESULT_DB_ID) {
-                        try {
-                            await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, 'AI코멘트', { rich_text: {} });
-                            await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
-                                method: 'PATCH',
-                                body: JSON.stringify({ properties: { 'AI코멘트': { rich_text: [{ text: { content: overallComment.slice(0, 1900) } }] } } })
-                            });
-                        } catch (saveErr) { console.error('AI 코멘트 저장 실패:', saveErr.message); }
-                    }
+                    if (overallComment) aiSaves['AI코멘트'] = { rich_text: [{ text: { content: overallComment.slice(0, 1900) } }] };
                 } catch (e) { console.error('리포트 AI 코멘트 오류:', e.message); }
             }
+            })();
+            const commentFallback = () => {
             if (!overallComment) {
                 // Gemini 미사용/실패 시 규칙 기반 폴백 (동일한 전문가 톤)
                 const hardRight = questions.filter(q => q.difficulty === '상' && q.verdict === '정답');
@@ -1136,15 +1146,17 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                     + `${weakSources.length ? weakSources.join(', ') + ' 영역의 학습을 한 번 더 점검할 것을 권합니다. ' : ''}`
                     + `${weakTypes.length ? weakTypes.map(w => w.type).join(', ') + ' 유형을 중심으로 반복 학습하여 완전한 이해에 이르도록 학원에서 지도하겠습니다.' : '전반적으로 안정적인 결과이며, 현재 수준을 꾸준히 유지하도록 지도하겠습니다.'}`;
             }
+            };
 
-            // 7) 학부모 발송용 리포트 문구 — 핵심 진단 한 줄 + 틀린 문항별 오답 요인(추정) + 대처 방안.
+
+            // 7) 학부모 발송용 리포트 문구 — 핵심 진단 한 줄 + 틀린 문항별 오답 요인(추정) + 대처 방안 + 학습 브리핑.
             //    AI코멘트와 같은 방식으로 처음 1번만 만들어 '리포트AI' 칸에 저장하고 재사용한다(재채점 시 비워짐).
-
-            // 시험 기간 학습 태도 — 채점일 기준 최근 30일의 진도 기록(출석·숙제·테스트)과 선생님 일일 코멘트.
-            // 시험일은 따로 저장하지 않아서 채점일을 끝으로 잡는다. 캐시가 있으면 노션을 다시 읽지 않는다.
-            let study = null;
+            //    시험 기간 학습 태도 — 채점일 기준 최근 30일의 진도 기록과 선생님 일일 코멘트. 시험일은 따로 저장하지 않아서
+            //    채점일을 끝으로 잡는다. 진도 읽기 → Gemini 순서지만, 종합 코멘트와는 동시에 돈다.
             const studyTo = (resultPage.created_time || new Date().toISOString()).slice(0, 10);
             const studyFrom = new Date(new Date(studyTo + 'T00:00:00Z').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+            const reportTask = (async () => {
+            let study = null;
             if (!parentReport && loadStudyPeriod && studentName) {
                 try { study = await loadStudyPeriod(studentName, studyFrom, studyTo); }
                 catch (e) { console.error('시험 기간 진도 읽기 실패:', e.message); }
@@ -1183,18 +1195,29 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                                 from: studyFrom, to: studyTo, classDays: study.classDays, hwAvg: study.stats.hwAvg, vocabAvg: study.stats.vocabAvg }
                             : null;
                         parentReport = { v: REPORT_PROMPT_VERSION, diagnosis: parsed.diagnosis.trim(), reasons: parsed.reasons || {}, plan: parsed.plan.filter(Boolean).slice(0, 4), attitude };
-                        if (dbIds.STUDENT_RESULT_DB_ID) {
-                            try {
-                                await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '리포트AI', { rich_text: {} });
-                                await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
-                                    method: 'PATCH',
-                                    body: JSON.stringify({ properties: { '리포트AI': { rich_text: richTextChunks(JSON.stringify(parentReport)) } } })
-                                });
-                            } catch (saveErr) { console.error('리포트AI 저장 실패:', saveErr.message); }
-                        }
+                        aiSaves['리포트AI'] = { rich_text: richTextChunks(JSON.stringify(parentReport)) };
                     }
                 } catch (e) { console.error('학부모 리포트 AI 문구 오류:', e.message); }
             }
+            })();
+
+            await Promise.all([commentTask, reportTask]);
+            commentFallback();
+
+            // 새로 만든 AI 문구를 PATCH 한 번으로 저장. 칸이 이미 있으면 DB 스키마 확인(PATCH)을 건너뛴다.
+            const aiCached = !!aiSaves['리포트AI']; // 리포트AI 가 저장돼야 다음 조회가 캐시로 끝난다
+            const saveTask = (async () => {
+                if (!Object.keys(aiSaves).length || !dbIds.STUDENT_RESULT_DB_ID) return;
+                try {
+                    for (const name of Object.keys(aiSaves)) {
+                        if (!(name in RP)) await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, name, { rich_text: {} });
+                    }
+                    await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                        method: 'PATCH', body: JSON.stringify({ properties: aiSaves })
+                    });
+                } catch (saveErr) { console.error('리포트 AI 문구 저장 실패:', saveErr.message); }
+            })();
+            if (waitForSave) await saveTask;
             // 폴백은 학습 태도를 지어내지 않는다(attitude: null → 화면에서 그 칸을 숨긴다)
             if (!parentReport) parentReport = { ...buildParentReportFallback(wrongQuestions, dedupRecs), attitude: null };
 
@@ -1205,7 +1228,8 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 b.earned += q.earned; b.score += q.score; b.count++;
             });
 
-            res.json({
+            console.log(`[시험 리포트] ${studentName} ${Date.now() - t0}ms ${cacheFresh ? '(캐시)' : aiCached ? '(AI 생성)' : '(AI 실패·규칙 문구)'}`);
+            return {
                 success: true,
                 student: { name: studentName, ...examInfo, date: (resultPage.created_time || '').slice(0, 10) },
                 summary,
@@ -1217,7 +1241,31 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 parentReport,
                 split,
                 publishedAt: RP['공개일시']?.date?.start || null
-            });
+            };
+    }
+
+    // 채점을 저장한 직후 뒤에서 리포트 AI 문구를 미리 만들어 둔다 → 원장이 열 때는 캐시로 바로 뜬다.
+    // 막 만든 노션 행이 검색에 늦게 잡힐 수 있어 잠깐 기다렸다가, 문항 수가 다 맞을 때만 만든다(덜 읽힌 채로 캐시하면 안 된다).
+    async function warmReport(resultId, expectedCount) {
+        if (!geminiModel) return;
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            await new Promise(r => setTimeout(r, warmDelayMs * attempt));
+            try { await buildReport(resultId, { waitForSave: true, expectedCount }); return; }
+            catch (e) {
+                if (!e.incomplete) { console.error('리포트 미리 만들기 실패:', e.message); return; }
+            }
+        }
+        console.error('리포트 미리 만들기 포기 — 문항이 노션에 다 안 잡혔다:', resultId);
+    }
+
+    app.get('/api/student-report-data', requireAuth, requireOwner, async (req, res) => {
+        const { resultId } = req.query;
+        if (!resultId) return res.status(400).json({ success: false, message: 'resultId가 필요합니다.' });
+        if (!dbIds?.STUDENT_ANSWER_DB_ID || !dbIds?.QUESTION_DB_ID) {
+            return res.status(500).json({ success: false, message: 'DB ID가 설정되지 않았습니다.' });
+        }
+        try {
+            res.json(await buildReport(resultId));
         } catch (error) {
             console.error('학생 리포트 데이터 오류:', error);
             res.status(500).json({ success: false, message: error.message });

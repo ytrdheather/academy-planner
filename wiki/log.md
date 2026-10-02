@@ -402,3 +402,4 @@ LS 반 문법 숙제를 저장하니 이 메시지가 떴다. 화면에는 LS �
 - 사용 설명서에 "📝 시험 분석 리포트" 탭 추가. 리디테스트 Supabase 조사 결과 요약을 exam-analyzer 에 흡수(단골 판정 불가·시험일 부족·코드 선택 권장). → [[exam-analyzer]]
 - 리포트 코멘트에 리디테스트 대비 범위 반영("동형으로 연습한 포인트인데 숙지 미흡"/"대비 밖 새 유형"), `data/readitest-coverage.json` 대기. 프롬프트 v3. → [[exam-analyzer]]
 - `data/readitest-coverage.json` 반입(중2 2026-2 중간 4개교). 학교 표기 매칭 확인. → [[exam-analyzer]]
+- 시험 리포트 속도: 노션·Gemini 병렬화, 저장 1회·응답 뒤로, 채점 저장 시 미리 만들기(warmReport), 대기 문구. 테스트 4건 추가(55). → [[exam-analyzer]]

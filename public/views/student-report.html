@@ -145,8 +145,13 @@
             if (PUBLIC) return loadPublic();
             if (!authToken) { location.href = '/teacher-login'; return; }
             if (!resultId) { document.getElementById('card').innerHTML = '<p style="padding:40px">resultId가 없습니다.</p>'; return; }
+            // 미리 만들어 둔 리포트는 1~2초면 뜬다. 오래 걸리면 처음 만드는 중이라고 알려 준다
+            const slow = setTimeout(() => {
+                document.getElementById('card').innerHTML = '<p style="text-align:center; padding:60px 20px; color:#485a68; line-height:1.8;">AI가 리포트를 작성하고 있습니다.<br><span style="font-size:13px;">처음 한 번만 걸리는 시간입니다 (5초 정도). 다음부터는 바로 열립니다.</span></p>';
+            }, 1500);
             try {
                 const res = await fetch('/api/student-report-data?resultId=' + encodeURIComponent(resultId), { headers: { 'Authorization': 'Bearer ' + authToken } });
+                clearTimeout(slow);
                 const data = await res.json();
                 if (!data.success) { document.getElementById('card').innerHTML = `<p style="padding:40px">오류: ${esc(data.message)}</p>`; return; }
                 render(data);
@@ -154,6 +159,7 @@
                 document.getElementById('pubBtn').disabled = false;
                 setPublished(data.publishedAt);
             } catch (e) {
+                clearTimeout(slow);
                 document.getElementById('card').innerHTML = `<p style="padding:40px">불러오기 오류: ${esc(e.message)}</p>`;
             }
         }

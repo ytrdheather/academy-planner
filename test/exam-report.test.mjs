@@ -50,11 +50,11 @@ function gemini() {
     };
 }
 
-function setup({ coverage = null, result = resultPage(), study = { classDays: 12, stats: { hwAvg: 92, vocabAvg: 91, grammarAvg: 80, readingPassRate: 100 }, comments: '[2026-09-20] 본문 암기 재시험' } } = {}) {
+function setup({ coverage = null, extraResults = [], result = resultPage(), study = { classDays: 12, stats: { hwAvg: 92, vocabAvg: 91, grammarAvg: 80, readingPassRate: 100 }, comments: '[2026-09-20] 본문 암기 재시험' } } = {}) {
     const app = fakeApp();
     const g = gemini();
     const notion = fakeNotion({
-        'db-result': { rows: [result] },
+        'db-result': { rows: [result, ...extraResults] },
         'db-exam': { rows: [page('exam-1', { '시험명': prop.title('영덕중학교 2학년 2026 2학기 중간고사'), '학기': prop.select('2학기'), '시험년도': prop.number(2026) })] },
         'db-answer': { rows: [
             answer('14', '정답', 5, 5, '어휘추론', '3', '3'),
@@ -68,6 +68,7 @@ function setup({ coverage = null, result = resultPage(), study = { classDays: 12
         app, requireAuth: (req, res, next) => next(), fetchNotion: notion.fetchNotion, geminiModel: g.model,
         loadStudyPeriod: async (...args) => { studyCalls.push(args); return study; },
         loadCoverage: () => coverage,
+        warmDelayMs: 0,
         dbIds: DB,
     });
     const call = async (key, req) => { const res = fakeRes(); res.set = () => res; await app.routes[key]({ ...owner, ...req }, res); return res; };
@@ -189,4 +190,48 @@ test('리디테스트 대비 범위: 맞는 시험이 없으면(다른 회차·�
     await call('GET /api/student-report-data', { query: { resultId: 'res-1' } });
     assert.ok(g.prompts.length > 0);
     for (const p of g.prompts) assert.doesNotMatch(p, /학원 내신 대비/);
+});
+
+test('속도: 새로 만든 AI 문구 두 개를 PATCH 한 번으로 저장하고, 칸이 있으면 DB 스키마는 건드리지 않는다', async () => {
+    const { call, notion } = setup({ result: resultPage({ 'AI코멘트': prop.text(''), '리포트AI': prop.text('') }) });
+    const res = await call('GET /api/student-report-data', { query: { resultId: 'res-1' } });
+    assert.equal(res.body.success, true);
+    await new Promise(r => setTimeout(r, 10)); // 저장은 화면을 띄운 뒤에 한다
+    const patches = notion.writes.filter(w => w.op === 'patch' && w.id === 'res-1');
+    assert.equal(patches.length, 1);
+    assert.ok(patches[0].properties['AI코멘트']);
+    assert.ok(patches[0].properties['리포트AI']);
+});
+
+test('미리 만들기: 채점을 저장하면 뒤에서 리포트 AI 문구를 만들어 둔다', async () => {
+    const saved = { ...resultPage(), id: 'new-page-1' };
+    const { call, g, notion } = setup({ extraResults: [saved] });
+    const graded = [
+        { number: '14', type: '어휘추론', answer: '3', student_answer: '3', verdict: '정답', score: 5, earned: 5 },
+        { number: '15', type: '내용일치', answer: '5', student_answer: '1', verdict: '오답', score: 5, earned: 0 },
+        { number: '16', type: '어법이해', answer: '2', student_answer: '2', verdict: '정답', score: 5, earned: 5 },
+    ];
+    const res = await call('POST /api/save-student-result', { body: { examPageId: 'exam-1', studentName: '조은서', graded } });
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(g.prompts.length, 0); // 응답은 AI 를 기다리지 않는다
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(g.prompts.length, 2);
+    assert.ok(notion.writes.some(w => w.op === 'patch' && w.id === 'new-page-1' && w.properties['리포트AI']));
+});
+
+test('미리 만들기: 서술형 채점이 남았으면 만들지 않는다', async () => {
+    const { call, g } = setup({ extraResults: [{ ...resultPage(), id: 'new-page-1' }] });
+    const graded = [{ number: '4', type: '서술형', answer: 'Will you', student_answer: 'You will', verdict: '채점대기', score: 5, earned: 0 }];
+    await call('POST /api/save-student-result', { body: { examPageId: 'exam-1', studentName: '조은서', graded } });
+    await new Promise(r => setTimeout(r, 30));
+    assert.equal(g.prompts.length, 0);
+});
+
+test('미리 만들기: 문항이 노션에 덜 잡혔으면 AI 를 부르지 않는다(덜 읽힌 채로 캐시하지 않는다)', async () => {
+    const { call, g } = setup({ extraResults: [{ ...resultPage(), id: 'new-page-1' }] });
+    // 노션 검색에는 3문항만 잡히는데 10문항을 저장했다
+    const graded = Array.from({ length: 10 }, (_, i) => ({ number: String(i + 1), type: '어법이해', answer: '1', student_answer: '1', verdict: '정답', score: 5, earned: 5 }));
+    await call('POST /api/save-student-result', { body: { examPageId: 'exam-1', studentName: '조은서', graded } });
+    await new Promise(r => setTimeout(r, 50));
+    assert.equal(g.prompts.length, 0);
 });
