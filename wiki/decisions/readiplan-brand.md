@@ -4,7 +4,7 @@ title: 브랜드와 테마 — 리디플랜(Readiplan)
 type: decision
 status: verified
 source: memory/readiplan-brand.md (2026-07-21)
-updated: 2026-08-15
+updated: 2026-10-02
 tags: [brand, design, theme, logo]
 ---
 
@@ -28,6 +28,7 @@ tags: [brand, design, theme, logo]
 
 - **`teacher.html`의 숙제생성·확정·문법코멘트 버튼만 의도적으로 보라(`#7c3aed`)·바이올렛(`#8b5cf6`)이다.** 잔재가 아니라 의도된 강조색. 유지할 것.
 - **`exam-analyzer` · `student-grader` · `results-viewer` · `textbook-toc` · `management` · 데일리/먼슬리 리포트는 옛 보라 톤을 그대로 둔다.** "가끔 쓰는 특수 기능이라 그대로 둔다"고 사용자가 결정했다.
+- **예외: `student-report`(학부모용 시험 분석 카드)는 대시보드 팔레트를 쓴다** (2026-10-02 원장 지시). **원장이 말하는 "대시보드 색"은 숙제 표의 네 색이다** — 헤더 틸 `#2bb1a7`(`.styled-table th`), 학생이름 칸 라이트 민트 `#f1faf8`(`.student-name`), 필터줄 회색 `#eef3f3`(`.filter-bar`), 공지줄 베이지 `#fdf0dd`(글자 `#a15b06`, `.notice-wrapper`) — 모두 `assets/teacher.css`. 🔴 `#0d9488`/`#0a6c62`(manual.html 토큰)로 칠했다가 "강한 녹색이 이상하다"고 지적받았다 — 넓은 면에 짙은 틸을 쓰지 마라. Pretendard, 머리에 리디튜드 로고(`assets/logo.png`). **학부모에게 나가는 화면은 보라를 쓰지 않는다.**
 
 ## 🔴 라이브가 아닌 폴더
 

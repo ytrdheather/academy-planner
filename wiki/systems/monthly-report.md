@@ -41,6 +41,8 @@ tags: [report, monthly, gemini, cron]
 - 학생 한 명이 실패해도 루프는 계속 돈다. 예전엔 거기서 전체가 멈췄다.
 - 배포는 **매월 1일 08:55~09:10을 피하라** → [[render-manual-deploy]]
 
+- **`loadStudyPeriod(이름, 시작일, 끝일)`을 export 한다** — 시험 분석 리포트의 학습 브리핑이 이 모듈의 읽기·통계 함수를 그대로 쓴다. `fetchMonthPages`/`computeMonthlyStats`를 바꾸면 그쪽도 바뀐다 → [[exam-analyzer]]
+
 ## 남은 것
 
 - **1일 00:00~09:00 사이에는 지난달 리포트가 아직 없다.** 그 시간대에 선생님이 `📅 월간` 을 누르면 404 → "월간 리포트 로드 실패". `/api/monthly-report-url` 은 항상 **지난달**을 찾는다 (`:626`).

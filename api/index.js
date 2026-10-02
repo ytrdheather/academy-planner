@@ -10,7 +10,7 @@ import cron from 'node-cron';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // [모듈 Import]
-import { initializeMonthlyReportRoutes } from './monthlyReportModule.js';
+import { initializeMonthlyReportRoutes, loadStudyPeriod } from './monthlyReportModule.js';
 import { initializeSchemaCheck } from './schemaCheckModule.js';
 import { initializeDailyReportRoutes } from './dailyReportModule.js';
 import { initializeBookRoutes, processBookRelations } from './bookModule.js';
@@ -975,7 +975,7 @@ try {
 } catch(e) { console.error('Monthly Report Module Init Error', e); }
 
 try {
-    initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, dbIds: { EXAM_DB_ID, QUESTION_DB_ID, STUDENT_RESULT_DB_ID, STUDENT_ANSWER_DB_ID } });
+    initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, dbIds: { EXAM_DB_ID, QUESTION_DB_ID, STUDENT_RESULT_DB_ID, STUDENT_ANSWER_DB_ID } });
 } catch(e) { console.error('Exam Analyzer Module Init Error', e); }
 
 // 교재비 관리 — 신청/승인/발송. 설계: docs/교재비관리-설계.md

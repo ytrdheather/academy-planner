@@ -146,9 +146,28 @@ async function loadAnswerKey(fetchNotion, questionDbId, examPageId) {
             source_type: P['출제범위']?.select?.name || '',
             grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
             answer: P['정답']?.rich_text?.[0]?.plain_text || '',
-            score: P['배점']?.number || 0
+            score: P['배점']?.number || 0,
+            difficulty: P['난이도']?.select?.name || ''
         };
     }).sort((a, b) => naturalNumberSort(a.number, b.number));
+}
+
+// 리포트 AI 문구(AI코멘트·리포트AI)의 프롬프트 버전. 프롬프트를 바꾸면 올린다 → 예전 캐시는 다시 만들어진다.
+const REPORT_PROMPT_VERSION = 2;
+
+// 난이도(상/중/하)별 정오 요약 — AI 코멘트가 "쉬운 문제 실수"와 "어려운 문제 해결"을 구분해 쓰게 한다
+function summarizeByDifficulty(questions) {
+    const label = q => `${q.number}번(${[q.type, q.source_type, q.grammar_point].filter(Boolean).join(', ')})`;
+    const lines = ['상', '중', '하'].map(d => {
+        const qs = questions.filter(q => q.difficulty === d);
+        if (!qs.length) return null;
+        const right = qs.filter(q => q.verdict === '정답');
+        const wrong = qs.filter(q => q.verdict === '오답' || q.verdict === '부분');
+        return `${d} 난이도 ${qs.length}문항 중 ${right.length}문항 정답`
+            + (d === '상' && right.length ? ` — 맞힌 상 문항: ${right.map(label).join(', ')}` : '')
+            + (wrong.length ? ` — 틀린 문항: ${wrong.map(label).join(', ')}` : '');
+    }).filter(Boolean);
+    return lines.length ? lines.join('\n') : '';
 }
 
 // 저장된 시험(정답지) 목록 조회 — 교사용/학생용 공통
@@ -349,6 +368,31 @@ const SOURCE_ADVICE = {
     '학습지': '학교에서 나눠준 학습지를 한 번 더 꼼꼼히 확인·복습하세요.'
 };
 
+// 노션 rich_text 칸은 조각 하나에 2000자까지라, 긴 문자열은 나눠 쓰고 읽을 때 이어 붙인다.
+function richTextChunks(str) {
+    const out = [];
+    for (let i = 0; i < str.length && out.length < 100; i += 1900) out.push({ text: { content: str.slice(i, i + 1900) } });
+    return out;
+}
+function readRichText(prop) {
+    return (prop?.rich_text || []).map(t => t.plain_text || '').join('');
+}
+
+// 학부모용 리포트 문구(핵심 진단·문항별 오답 요인·대처 방안)의 규칙 기반 폴백 — AI 실패 시에도 빈칸이 나가지 않게
+function buildParentReportFallback(wrongQuestions, recommendations) {
+    const reasons = {};
+    wrongQuestions.forEach(q => {
+        reasons[q.number] = q.grammar_point
+            ? `${q.grammar_point} 판단에서 혼동이 있었던 것으로 보입니다.`
+            : (TYPE_ADVICE[q.type] || TYPE_ADVICE['기타']);
+    });
+    const diagnosis = wrongQuestions.length
+        ? `${wrongQuestions.length}문항에서 실점했습니다. ${[...new Set(wrongQuestions.map(q => q.type).filter(Boolean))].join('·')} 유형의 보완이 다음 시험의 열쇠입니다.`
+        : '전 문항 정답 — 개념과 독해 모두 안정적인 결과입니다.';
+    const plan = recommendations.length ? recommendations.slice(0, 4) : ['현재의 학습 습관을 유지하며 다음 시험 범위를 미리 예습합니다.'];
+    return { diagnosis, reasons, plan };
+}
+
 // 이 기능은 원장(manager 계정) 전용 — 다른 선생님 계정(teacher1/teacher2 등, role은 같은 'manager'라도 loginId가 다름)은 접근 불가
 function requireOwner(req, res, next) {
     if (req.user?.loginId !== 'manager') {
@@ -365,7 +409,7 @@ function requireStudent(req, res, next) {
     next();
 }
 
-export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, dbIds }) {
+export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, geminiModel, loadStudyPeriod, dbIds }) {
     let anthropic = null;
     if (process.env.ANTHROPIC_API_KEY) {
         anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -791,6 +835,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
 
             // 캐시된 AI 코멘트를 비울 수 있도록 속성 보장(없으면 추가). 권한 없으면 무시하고 진행.
             try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, 'AI코멘트', { rich_text: {} }); } catch (e) { /* noop */ }
+            try { await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '리포트AI', { rich_text: {} }); } catch (e) { /* noop */ }
 
             // 이 시험의 모든 학생 결과
             let results = [];
@@ -862,6 +907,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 // 결과 총점 갱신 + 캐시된 AI 코멘트 비우기(정답지 바뀌었으니 리포트 재생성되도록)
                 const resultProps = buildResultProps(sum, {});
                 resultProps['AI코멘트'] = { rich_text: [] };
+                resultProps['리포트AI'] = { rich_text: [] };
                 await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
                     method: 'PATCH',
                     body: JSON.stringify({ properties: resultProps })
@@ -930,9 +976,10 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             } while (cursor);
 
             const sourceByNumber = {};
+            const difficultyByNumber = {};
             if (examPageId) {
                 const key = await loadAnswerKey(fetchNotion, dbIds.QUESTION_DB_ID, examPageId);
-                key.forEach(k => { sourceByNumber[k.number] = k.source_type; });
+                key.forEach(k => { sourceByNumber[k.number] = k.source_type; difficultyByNumber[k.number] = k.difficulty; });
             }
 
             const questions = ansRows.map(p => {
@@ -942,6 +989,7 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                     number,
                     type: P['유형']?.select?.name || '',
                     source_type: sourceByNumber[number] || '',
+                    difficulty: difficultyByNumber[number] || '',
                     grammar_point: P['문법포인트']?.rich_text?.[0]?.plain_text || '',
                     answer: P['정답']?.rich_text?.[0]?.plain_text || '',
                     student_answer: P['학생답']?.rich_text?.[0]?.plain_text || '',
@@ -975,13 +1023,20 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             const dedupRecs = [...new Set(recommendations)];
 
             // 6) AI 종합 코멘트 — 처음 1번만 생성해 저장하고, 이후엔 캐시 재사용(AI 호출 비용 절감·문구 고정)
-            let overallComment = RP['AI코멘트']?.rich_text?.[0]?.plain_text || '';
+            //    리포트AI 의 프롬프트 버전이 지금과 다르면 두 캐시를 모두 버리고 새 프롬프트로 다시 만든다.
+            let parentReport = null;
+            try { parentReport = JSON.parse(readRichText(RP['리포트AI']) || 'null'); } catch (e) { parentReport = null; }
+            const cacheFresh = !!(parentReport && parentReport.v === REPORT_PROMPT_VERSION);
+            if (!cacheFresh) parentReport = null;
+            let overallComment = cacheFresh ? (RP['AI코멘트']?.rich_text?.[0]?.plain_text || '') : '';
+            const difficultyLines = summarizeByDifficulty(questions);
             const brief = `학생: ${studentName} / 시험: ${examInfo.examTitle || (examInfo.school + ' ' + examInfo.grade)} `
                 + `/ 점수: ${summary.score}점(만점 ${summary.fullScore}, ${summary.percent}%) `
                 + `/ 강점 유형: ${strengths.join(', ') || '없음'} `
                 + `/ 약점 유형: ${weakTypes.map(w => w.type).join(', ') || '없음'} `
                 + `/ 약점 어법(문법): ${weakGrammar.join(', ') || '없음'} `
-                + `/ 약점 출제범위: ${weakSources.join(', ') || '없음'}`;
+                + `/ 약점 출제범위: ${weakSources.join(', ') || '없음'}`
+                + (difficultyLines ? `\n[난이도별 결과]\n${difficultyLines}` : '');
             if (!overallComment && geminiModel) {
                 try {
                     const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이며, 학부모님께 보내는 시험 분석 코멘트를 작성한다. 아래 [요약]을 바탕으로 진지하고 전문적인 어조의 코멘트를 작성해라.\n`
@@ -991,11 +1046,18 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                         + `- 약점 어법(문법)이 있으면 어떤 문법에서 어려움을 보였는지 구체적으로 언급하고, 그 부분을 다음 시험에서 헷갈리지 않도록 학원에서 어떻게 지도할지(반복 점검·개념 재정리 등)를 밝힌다.\n`
                         + `- 약점 출제범위(교과서 본문/외부 지문/대화문/학습지)가 있으면 어느 영역의 학습이 부족한지 짚고 보완 방향을 제시한다.\n`
                         + `- 학생이 해당 부분을 꾸준히 반복 학습하여 완전 학습에 이르도록 독려하는 내용을 포함한다.\n`
+                        + (difficultyLines
+                            ? `- [난이도별 결과]를 반드시 반영한다.\n`
+                              + `  · 상 난이도 문항을 맞힌 것이 있으면 어떤 영역(유형·문법)의 어려운 문항을 해결했는지 구체적으로 짚어 칭찬한다.\n`
+                              + `  · 하 난이도 문항을 틀린 것이 있으면 따로 분석한다. 쉬운 문항의 실점은 개념 부족보다 문제·선택지를 끝까지 확인하지 않은 실수, 본문·어휘 암기 누락, 시간 배분 같은 원인일 가능성이 크다. 유형·출제범위·문법포인트를 근거로 왜 그런 일이 생겼을지 추정하되 단정하지 말고, 어떻게 개선할지(검토 습관·암기 점검 등)를 구체적으로 제시한다.\n`
+                              + `  · 하·중 난이도에서의 실점은 점수와 직결되므로, 이를 줄이기 위한 보완책을 따로 한 두 문장으로 밝힌다.\n`
+                              + `  · 하 난이도 오답이 없으면 기본 문항을 안정적으로 처리했다고 짚는다.\n`
+                            : '')
                         + `- 점수 숫자를 단순 나열하지 말고, 별표(*)나 따옴표 강조는 쓰지 않는다.\n`
-                        + `- 5~7문장 분량의 자연스러운 문단으로 작성한다.\n\n[요약]\n${brief}`;
+                        + `- ${difficultyLines ? '7~9' : '5~7'}문장 분량의 자연스러운 문단으로 작성한다.\n\n[요약]\n${brief}`;
                     const result = await geminiModel.generateContent({
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.4, maxOutputTokens: 1200, thinkingConfig: { thinkingBudget: 512 } }
+                        generationConfig: { temperature: 0.4, maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 512 } }
                     });
                     overallComment = result.response.text().trim();
 
@@ -1013,12 +1075,84 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
             }
             if (!overallComment) {
                 // Gemini 미사용/실패 시 규칙 기반 폴백 (동일한 전문가 톤)
-                overallComment = `${studentName} 학생은 `
+                const hardRight = questions.filter(q => q.difficulty === '상' && q.verdict === '정답');
+                const easyWrong = wrongQuestions.filter(q => q.difficulty === '하');
+                overallComment = `${hardRight.length ? `난이도가 높은 ${hardRight.map(q => q.number + '번').join(', ')} 문항을 정확히 해결한 점은 높이 평가할 만합니다. ` : ''}`
+                    + `${easyWrong.length ? `다만 비교적 쉬운 ${easyWrong.map(q => q.number + '번').join(', ')} 문항의 실점은 끝까지 확인하는 습관으로 충분히 줄일 수 있는 부분입니다. ` : ''}`
+                    + `${studentName} 학생은 `
                     + `${strengths.length ? strengths.join(', ') + ' 유형에서는 안정적인 이해를 보였습니다. ' : ''}`
                     + `${weakGrammar.length ? '다만 ' + weakGrammar.join(', ') + ' 등의 어법에서 보완이 필요합니다. ' : ''}`
                     + `${weakSources.length ? weakSources.join(', ') + ' 영역의 학습을 한 번 더 점검할 것을 권합니다. ' : ''}`
                     + `${weakTypes.length ? weakTypes.map(w => w.type).join(', ') + ' 유형을 중심으로 반복 학습하여 완전한 이해에 이르도록 학원에서 지도하겠습니다.' : '전반적으로 안정적인 결과이며, 현재 수준을 꾸준히 유지하도록 지도하겠습니다.'}`;
             }
+
+            // 7) 학부모 발송용 리포트 문구 — 핵심 진단 한 줄 + 틀린 문항별 오답 요인(추정) + 대처 방안.
+            //    AI코멘트와 같은 방식으로 처음 1번만 만들어 '리포트AI' 칸에 저장하고 재사용한다(재채점 시 비워짐).
+
+            // 시험 기간 학습 태도 — 채점일 기준 최근 30일의 진도 기록(출석·숙제·테스트)과 선생님 일일 코멘트.
+            // 시험일은 따로 저장하지 않아서 채점일을 끝으로 잡는다. 캐시가 있으면 노션을 다시 읽지 않는다.
+            let study = null;
+            const studyTo = (resultPage.created_time || new Date().toISOString()).slice(0, 10);
+            const studyFrom = new Date(new Date(studyTo + 'T00:00:00Z').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+            if (!parentReport && loadStudyPeriod && studentName) {
+                try { study = await loadStudyPeriod(studentName, studyFrom, studyTo); }
+                catch (e) { console.error('시험 기간 진도 읽기 실패:', e.message); }
+            }
+            const hasStudy = !!(study && study.classDays > 0);
+
+            if (!parentReport && geminiModel) {
+                try {
+                    const wrongLines = wrongQuestions.map(q =>
+                        `- ${q.number}번 | 난이도: ${q.difficulty || '-'} | 유형: ${q.type || '-'} | 출제범위: ${q.source_type || '-'} | 문법포인트: ${q.grammar_point || '-'} | 정답: ${q.answer || '-'} | 학생답: ${q.student_answer || '(무응답)'} | ${q.verdict}`
+                    ).join('\n') || '(틀린 문항 없음)';
+                    const prompt = `너는 '리디튜드' 영어학원의 담임 선생님이다. 학부모님께 보내는 내신 시험 개인 분석 리포트의 문구를 JSON으로 작성한다.\n`
+                        + `- diagnosis: 핵심 진단 한두 문장(80자 안팎). 무엇을 잘했고 무엇이 다음 시험의 열쇠인지. 예) "21문항 정답 — 독해는 안정적. 분사 어형 판단 한 가지가 다음 시험의 열쇠입니다."\n`
+                        + `- reasons: 틀린 문항 번호를 키로, 오답 요인을 한두 문장으로. 난이도 하 문항이면 실수·확인 부족 가능성도 함께 짚는다. 우리는 문제 원문을 모르고 유형·문법포인트·정답·학생답만 안다. 아는 범위에서 그럴듯한 원인을 짚되 단정하지 말고 "~로 보입니다" 처럼 추정으로 쓴다. 선택지 번호만 보고 내용을 지어내지 마라.\n`
+                        + `- plan: 다음 시험 대처 방안 3~4개. 각 항목은 한 줄(40자 안팎), 구체적인 학습 행동으로. 학원에서 할 지도와 학생이 할 일을 섞는다.\n`
+                        + `- 정중한 존댓말, 차분한 전문가 어조. 별표·따옴표 강조·이모지 금지.\n`
+                        + (hasStudy
+                            ? `- attitude: [시험 기간 학습 기록]과 [선생님 일일 코멘트]만 근거로, 시험 기간 학습 태도를 네 항목으로 간결하게 브리핑한다. 각 항목은 1~2문장. 코멘트에 없는 일을 지어내지 말고, 근거가 부족한 항목은 기록에서 확인되는 범위로만 짧게 쓴다.\n`
+                              + `  good: 시험 기간 중 잘 대응한 점 / regret: 시험 기간 학습 중 아쉬웠던 점 / selfImprove: 앞으로 학생이 더 주도적으로 개선해야 할 점(학생 이름을 넣어 "OO이가 ~" 형태로) / academyFocus: 학원에서 앞으로 신경 써서 지도할 점\n`
+                            : `- attitude: 학습 기록이 없으므로 null.\n`)
+                        + `JSON 형식: {"diagnosis": "...", "reasons": {"14": "..."}, "plan": ["...", "..."], "attitude": ${hasStudy ? '{"good": "...", "regret": "...", "selfImprove": "...", "academyFocus": "..."}' : 'null'}}\n\n`
+                        + `[요약]\n${brief}\n\n[틀린 문항]\n${wrongLines}`
+                        + (hasStudy
+                            ? `\n\n[시험 기간 학습 기록] ${studyFrom}~${studyTo} · 수업 ${study.classDays}회 · 숙제 수행률 평균 ${study.stats.hwAvg}% · 단어 테스트 평균 ${study.stats.vocabAvg}점 · 문법 테스트 평균 ${study.stats.grammarAvg}점 · 독해 통과율 ${study.stats.readingPassRate}%`
+                              + `\n\n[선생님 일일 코멘트]\n${study.comments || '(코멘트 없음)'}`
+                            : '');
+                    const result = await geminiModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.4, maxOutputTokens: 3000, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 512 } }
+                    });
+                    const parsed = JSON.parse(result.response.text());
+                    if (parsed && typeof parsed.diagnosis === 'string' && Array.isArray(parsed.plan)) {
+                        const a = parsed.attitude;
+                        const attitude = hasStudy && a && a.good && a.regret && a.selfImprove && a.academyFocus
+                            ? { good: a.good, regret: a.regret, selfImprove: a.selfImprove, academyFocus: a.academyFocus,
+                                from: studyFrom, to: studyTo, classDays: study.classDays, hwAvg: study.stats.hwAvg, vocabAvg: study.stats.vocabAvg }
+                            : null;
+                        parentReport = { v: REPORT_PROMPT_VERSION, diagnosis: parsed.diagnosis.trim(), reasons: parsed.reasons || {}, plan: parsed.plan.filter(Boolean).slice(0, 4), attitude };
+                        if (dbIds.STUDENT_RESULT_DB_ID) {
+                            try {
+                                await ensureDbProperty(fetchNotion, dbIds.STUDENT_RESULT_DB_ID, '리포트AI', { rich_text: {} });
+                                await fetchNotion(`https://api.notion.com/v1/pages/${resultId}`, {
+                                    method: 'PATCH',
+                                    body: JSON.stringify({ properties: { '리포트AI': { rich_text: richTextChunks(JSON.stringify(parentReport)) } } })
+                                });
+                            } catch (saveErr) { console.error('리포트AI 저장 실패:', saveErr.message); }
+                        }
+                    }
+                } catch (e) { console.error('학부모 리포트 AI 문구 오류:', e.message); }
+            }
+            // 폴백은 학습 태도를 지어내지 않는다(attitude: null → 화면에서 그 칸을 숨긴다)
+            if (!parentReport) parentReport = { ...buildParentReportFallback(wrongQuestions, dedupRecs), attitude: null };
+
+            // 선택형/서술형 나눠 보기 (리포트 상단 "선택형 85/90 · 서술형 10/10")
+            const split = { objective: { earned: 0, score: 0, count: 0 }, essay: { earned: 0, score: 0, count: 0 } };
+            questions.forEach(q => {
+                const b = q.type === '서술형' ? split.essay : split.objective;
+                b.earned += q.earned; b.score += q.score; b.count++;
+            });
 
             res.json({
                 success: true,
@@ -1028,7 +1162,9 @@ export function initializeExamAnalyzerRoutes({ app, requireAuth, fetchNotion, ge
                 weaknesses: { types: weakTypes, sources: weakSources, grammar: weakGrammar },
                 wrongQuestions,
                 recommendations: dedupRecs,
-                overallComment
+                overallComment,
+                parentReport,
+                split
             });
         } catch (error) {
             console.error('학생 리포트 데이터 오류:', error);

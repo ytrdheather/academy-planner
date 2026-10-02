@@ -4,155 +4,251 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>시험 분석 리포트 - 리디튜드</title>
-    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-round.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
+        /* 선생님 대시보드 숙제 표(teacher.css)와 같은 네 색 — 헤더 틸, 학생이름 칸 라이트 민트, 필터줄 회색, 공지줄 베이지 */
+        :root {
+            --teal: #2bb1a7; --teal-deep: #1f9c93;          /* .styled-table th */
+            --mint: #f1faf8; --mint-line: #dbe7e6;          /* .student-name */
+            --gray: #eef3f3;                                /* .filter-bar */
+            --beige: #fdf0dd; --beige-line: #f4d9b0; --beige-ink: #a15b06;   /* .notice-wrapper */
+            --ink: #17242e; --muted: #485a68; --line: #e0e8ea;
+        }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'NanumSquareRound', -apple-system, sans-serif; background: #f1f5f9; color: #1e293b; }
-        .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
-        .toolbar .left { margin-right: auto; font-weight: 800; color: #7c3aed; }
-        .btn { border: none; border-radius: 8px; padding: 9px 18px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px; }
-        .btn.print { background: #7c3aed; color: #fff; }
-        .btn.back { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
-        .page { max-width: 800px; margin: 20px auto; background: #fff; padding: 40px 44px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-        .rep-head { text-align: center; border-bottom: 3px solid #7c3aed; padding-bottom: 16px; margin-bottom: 22px; }
-        .rep-head .brand { color: #7c3aed; font-weight: 800; letter-spacing: 1px; }
-        .rep-head h1 { font-size: 24px; margin: 8px 0 4px; }
-        .rep-head .meta { color: #64748b; font-size: 14px; }
-        .score-row { display: flex; gap: 14px; margin: 20px 0; flex-wrap: wrap; }
-        .score-box { flex: 1 1 0; min-width: 120px; text-align: center; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
-        .score-box .num { font-size: 26px; font-weight: 800; color: #7c3aed; }
-        .score-box .lab { font-size: 13px; color: #64748b; margin-top: 2px; }
-        section { margin: 22px 0; }
-        section h2 { font-size: 17px; border-left: 4px solid #7c3aed; padding-left: 10px; margin-bottom: 10px; }
-        .chips span { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; margin: 2px 4px 2px 0; }
-        .chip-good { background: #dcfce7; color: #15803d; }
-        .chip-weak { background: #fee2e2; color: #b91c1c; }
-        .comment { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 16px; line-height: 1.7; white-space: pre-wrap; }
-        ol.recs { margin: 0; padding-left: 20px; line-height: 1.9; }
-        table.wrongs { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
-        table.wrongs th, table.wrongs td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
-        table.wrongs th { background: #f8fafc; }
-        .muted { color: #64748b; }
-        .foot { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 26px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+        body { margin: 0; font-family: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: var(--gray); color: var(--ink); letter-spacing: -.01em; }
+        .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .toolbar .left { margin-right: auto; font-weight: 800; color: var(--teal-deep); }
+        .btn { border: none; border-radius: 8px; padding: 9px 16px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px; }
+        .btn.primary { background: var(--teal); color: #fff; }
+        .btn.primary:hover { background: var(--teal-deep); }
+        .btn.ghost { background: #fff; color: var(--muted); border: 1px solid #cdd9db; }
+        .btn:disabled { opacity: .6; cursor: default; }
+        .notice { max-width: 640px; margin: 12px auto 0; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .notice.info { background: var(--beige); color: var(--beige-ink); border-color: var(--beige-line); }
+
+        /* ===== 학부모에게 나가는 카드 (이 영역만 이미지로 저장된다) ===== */
+        .card { width: 640px; max-width: 100%; margin: 14px auto 40px; background: #fff; box-shadow: 0 1px 2px rgba(20,40,55,.04), 0 6px 20px rgba(20,40,55,.08); }
+        .hd { background: #fff; padding: 22px 28px 20px; border-bottom: 4px solid var(--teal); }
+        .hd .logo { display: block; height: 64px; width: auto; margin-left: -10px; }
+        .hd h1 { margin: 14px 0 6px; font-size: 23px; font-weight: 800; line-height: 1.35; color: var(--ink); letter-spacing: -.02em; }
+        .hd .meta { color: var(--muted); font-size: 13px; }
+        .bd { padding: 26px 28px 8px; }
+
+        .who { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .who .name { font-size: 30px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .badge { display: inline-block; background: var(--beige); color: var(--beige-ink); border: 1px solid var(--beige-line); font-size: 18px; padding: 3px 11px; border-radius: 8px; }
+        .who .sub { color: var(--muted); font-size: 14px; margin-top: 8px; line-height: 1.7; }
+        .score { text-align: right; white-space: nowrap; }
+        .score .num { font-size: 64px; font-weight: 800; line-height: 1; color: var(--teal-deep); letter-spacing: -2px; }
+        .score .unit { font-size: 18px; color: var(--muted); font-weight: 700; }
+
+        .bar { position: relative; margin: 26px 0 34px; height: 14px; border-radius: 7px; background: var(--gray); }
+        .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; background: var(--teal); }
+        .bar .tick { position: absolute; top: -3px; width: 2px; height: 20px; background: var(--beige-ink); }
+        .bar .tick span { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: var(--beige-ink); text-align: center; line-height: 1.25; white-space: nowrap; }
+
+        h2 { font-size: 17px; font-weight: 800; border-left: 4px solid var(--teal); padding-left: 10px; margin: 26px 0 12px; }
+        .q { border: 1px solid var(--mint-line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+        .q .top { background: var(--mint); margin: -14px -16px 0; padding: 10px 16px; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 15px; }
+        .q .minus { color: #dc2626; white-space: nowrap; }
+        .q .tags { margin-top: 10px; }
+        .q .tags span { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--gray); color: var(--muted); margin: 2px 4px 2px 0; }
+        .q .ans { margin-top: 8px; font-size: 14px; }
+        .q .ans .stu { color: #dc2626; font-weight: 800; }
+        .q .ans .key { font-weight: 800; color: var(--teal-deep); }
+        .q .why { margin-top: 6px; font-size: 14px; line-height: 1.7; color: #334155; }
+        .allright { font-size: 16px; font-weight: 800; padding: 6px 0; color: var(--teal-deep); }
+
+        .diag { background: var(--teal); color: #fff; border-radius: 12px; padding: 18px 22px; }
+        .diag .lab { color: var(--beige); font-size: 12px; font-weight: 800; letter-spacing: 2px; }
+        .diag .txt { margin-top: 6px; font-size: 17px; font-weight: 800; line-height: 1.55; }
+        .study-meta { font-size: 13px; color: var(--muted); margin: -4px 0 10px; }
+        .att { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .att .it { border-radius: 10px; padding: 12px 14px; border: 1px solid var(--line); }
+        .att .it .k { font-size: 13px; font-weight: 800; margin-bottom: 4px; }
+        .att .it .v { font-size: 14px; line-height: 1.65; }
+        .att .good { background: var(--mint); border-color: var(--mint-line); }
+        .att .good .k { color: var(--teal-deep); }
+        .att .regret { background: var(--beige); border-color: var(--beige-line); }
+        .att .regret .k { color: var(--beige-ink); }
+        .att .self { background: #fff; }
+        .att .acad { background: var(--gray); }
+        .att .acad .k, .att .self .k { color: var(--ink); }
+        @media (max-width: 560px) { .att { grid-template-columns: 1fr; } }
+        .comment { background: var(--beige); border: 1px solid var(--beige-line); border-radius: 10px; padding: 16px; line-height: 1.8; font-size: 14px; white-space: pre-wrap; }
+        ol.plan { list-style: none; margin: 0; padding: 0; }
+        ol.plan li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: 15px; line-height: 1.6; }
+        ol.plan li .n { flex: 0 0 26px; height: 26px; border-radius: 50%; background: var(--teal); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+        .fine { color: #94a3b8; font-size: 11.5px; margin: 14px 0 20px; line-height: 1.6; }
+        .ft { background: var(--gray); color: var(--muted); text-align: center; padding: 16px; font-size: 13px; }
+        .ft b { color: var(--teal-deep); }
+
+        [contenteditable="true"] { outline: none; border-radius: 4px; }
+        body.editing [contenteditable="true"] { box-shadow: 0 0 0 1px var(--teal); background: rgba(43,177,167,.05); }
+        body.editing .diag [contenteditable="true"] { background: rgba(255,255,255,.08); }
+
+        @media (max-width: 640px) {
+            .card { margin: 0 0 30px; }
+            .hd, .bd { padding-left: 16px; padding-right: 16px; }
+            .score .num { font-size: 48px; }
+            .who .name { font-size: 24px; }
+        }
         @media print {
             body { background: #fff; }
-            .toolbar { display: none; }
-            .page { box-shadow: none; margin: 0; max-width: none; padding: 0 10px; }
-            section { page-break-inside: avoid; }
+            .toolbar, .notice { display: none; }
+            .card { box-shadow: none; margin: 0 auto; }
+            .q, .diag, ol.plan li { page-break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
-<body>
+<body class="editing">
     <div class="toolbar">
-        <span class="left">📄 시험 분석 리포트</span>
-        <button class="btn back" onclick="window.close()">닫기</button>
-        <button class="btn print" onclick="window.print()">🖨️ 인쇄 / PDF로 저장</button>
+        <span class="left">📄 학부모용 시험 분석 리포트</span>
+        <button class="btn ghost" onclick="window.close()">닫기</button>
+        <button class="btn ghost" onclick="window.print()">🖨️ 인쇄</button>
+        <button class="btn primary" id="saveBtn" onclick="saveImage()" disabled>🖼️ 이미지로 저장</button>
     </div>
-
-    <div class="page" id="page">
-        <p class="muted" style="text-align:center; padding:60px 0;">리포트를 불러오는 중입니다...</p>
+    <div id="notices"></div>
+    <div class="card" id="card">
+        <p style="text-align:center; padding:60px 0; color:#485a68;">리포트를 불러오는 중입니다...</p>
     </div>
 
     <script>
         const authToken = localStorage.getItem('teacher_auth_token');
         const resultId = new URLSearchParams(location.search).get('resultId');
+        let fileBase = '시험분석리포트';
 
-        function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+        function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
+        // 객관식 답 1~5는 시험지처럼 ①~⑤로 보여 준다
+        function ans(a) { const s = String(a ?? '').trim(); return /^[1-5]$/.test(s) ? '①②③④⑤'[Number(s) - 1] : s; }
+        // 중학교 성취평가(A~E) 경계 — 고등학교는 상대평가라 등급을 매기지 않는다
+        function band(pct) { return pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'E'; }
 
         async function load() {
             if (!authToken) { location.href = '/teacher-login'; return; }
-            if (!resultId) { document.getElementById('page').innerHTML = '<p class="muted">resultId가 없습니다.</p>'; return; }
+            if (!resultId) { document.getElementById('card').innerHTML = '<p style="padding:40px">resultId가 없습니다.</p>'; return; }
             try {
                 const res = await fetch('/api/student-report-data?resultId=' + encodeURIComponent(resultId), { headers: { 'Authorization': 'Bearer ' + authToken } });
                 const data = await res.json();
-                if (!data.success) { document.getElementById('page').innerHTML = `<p class="muted">오류: ${escapeHtml(data.message)}</p>`; return; }
+                if (!data.success) { document.getElementById('card').innerHTML = `<p style="padding:40px">오류: ${esc(data.message)}</p>`; return; }
                 render(data);
+                document.getElementById('saveBtn').disabled = false;
             } catch (e) {
-                document.getElementById('page').innerHTML = `<p class="muted">불러오기 오류: ${escapeHtml(e.message)}</p>`;
+                document.getElementById('card').innerHTML = `<p style="padding:40px">불러오기 오류: ${esc(e.message)}</p>`;
             }
         }
 
         function render(d) {
-            const s = d.student;
-            const sum = d.summary;
-            const title = s.examTitle || `${s.school} ${s.grade} ${s.examType}`;
+            const s = d.student, sum = d.summary, pr = d.parentReport || { diagnosis: '', reasons: {}, plan: [] };
+            const title = s.examTitle || [s.school, s.grade, s.examType].filter(Boolean).join(' ');
+            const isMiddle = /중/.test(s.school || '');
+            const pct = sum.percent;
+            fileBase = `${s.name}_${title}_분석리포트`.replace(/[\\/:*?"<>|\s]+/g, '_');
 
-            const strengthChips = d.strengths.length
-                ? d.strengths.map(t => `<span class="chip-good">${escapeHtml(t)}</span>`).join('')
-                : '<span class="muted">이번 시험에서 특별히 두드러진 강점 유형은 집계되지 않았어요.</span>';
+            const notices = [];
+            if (sum.essayStatus === '대기') notices.push('<div class="notice">⚠️ 서술형 채점이 아직 끝나지 않았습니다. 지금 저장하면 점수가 달라질 수 있습니다 — 채점을 마친 뒤 보내 주세요.</div>');
+            notices.push('<div class="notice info">✏️ 진단·오답 요인·코멘트·대처 방안 문장은 눌러서 고칠 수 있습니다. 고친 내용은 이 화면에서 저장하는 이미지에만 반영됩니다.</div>');
+            document.getElementById('notices').innerHTML = notices.join('');
 
-            const weakChips = d.weaknesses.types.length
-                ? d.weaknesses.types.map(w => `<span class="chip-weak">${escapeHtml(w.type)} (${w.wrong}문항)</span>`).join('')
-                : '<span class="muted">약점으로 분류된 유형이 없어요. 훌륭합니다!</span>';
+            const subParts = [];
+            if (d.split?.essay?.count) subParts.push(`선택형 ${d.split.objective.earned}/${d.split.objective.score} · 서술형 ${d.split.essay.earned}/${d.split.essay.score}`);
+            subParts.push(`정답 ${sum.correctCount}문항 · 오답 ${sum.wrongCount}문항`);
+            if (isMiddle) subParts.push(`성취수준 ${band(pct)}`);
 
-            const grammarLine = d.weaknesses.grammar.length
-                ? `<div style="margin-top:6px;"><b>보완할 문법:</b> ${d.weaknesses.grammar.map(g => `<span class="chip-weak">${escapeHtml(g)}</span>`).join('')}</div>`
+            const ticks = isMiddle
+                ? [['D', 60], ['C', 70], ['B', 80], ['A', 90]].map(([g, v]) => `<div class="tick" style="left:${v}%"><span>${g}<br>${v}</span></div>`).join('')
                 : '';
 
-            const recs = d.recommendations.length
-                ? `<ol class="recs">${d.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ol>`
-                : '<p class="muted">모든 문항을 잘 풀어 특별한 보완 대책이 필요하지 않아요.</p>';
+            const wrongs = d.wrongQuestions.length
+                ? d.wrongQuestions.map(q => {
+                    const lost = Math.max(0, (q.score || 0) - (q.earned || 0));
+                    const tags = [q.difficulty ? `난이도 ${q.difficulty}` : '', q.source_type, q.grammar_point].filter(Boolean).map(t => `<span>${esc(t)}</span>`).join('');
+                    const essay = q.type === '서술형';
+                    const ansLine = essay
+                        ? '' // 서술형은 학생 답이 길어 카드에 옮기지 않는다
+                        : `<div class="ans">학생 답 <span class="stu">${esc(ans(q.student_answer) || '무응답')}</span> → 정답 <span class="key">${esc(ans(q.answer))}</span></div>`;
+                    const why = pr.reasons?.[q.number] || '';
+                    return `<div class="q">
+                        <div class="top"><span>${esc(q.number)}번 · ${esc(q.type || '문항')}${q.verdict === '부분' ? ' (부분점수)' : ''}</span><span class="minus">−${lost}점</span></div>
+                        ${tags ? `<div class="tags">${tags}</div>` : ''}
+                        ${ansLine}
+                        ${why ? `<div class="why" contenteditable="true">${esc(why)}</div>` : ''}
+                    </div>`;
+                }).join('')
+                : '<div class="allright">전 문항 정답입니다.</div>';
 
-            const wrongsRows = d.wrongQuestions.length
-                ? d.wrongQuestions.map(q => `<tr>
-                        <td>${escapeHtml(q.number)}</td>
-                        <td>${escapeHtml(q.type)}</td>
-                        <td>${escapeHtml(q.source_type)}</td>
-                        <td>${escapeHtml(q.grammar_point)}</td>
-                        <td>${escapeHtml(q.answer)}</td>
-                        <td>${escapeHtml(q.student_answer)}</td>
-                    </tr>`).join('')
-                : '<tr><td colspan="6" class="muted">틀린 문항이 없습니다.</td></tr>';
+            // 시험 기간 학습 태도 — 진도 기록이 없거나 AI가 못 만들었으면 칸을 통째로 숨긴다
+            const at = pr.attitude;
+            const md = (d8) => (d8 || '').slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/');
+            const attitudeSec = at ? `
+                    <h2>시험 기간 학습 브리핑</h2>
+                    <div class="study-meta">${esc(md(at.from))} ~ ${esc(md(at.to))} · 수업 ${at.classDays}회 · 숙제 수행률 ${at.hwAvg}%${at.vocabAvg ? ` · 단어 테스트 평균 ${at.vocabAvg}점` : ''}</div>
+                    <div class="att">
+                        <div class="it good"><div class="k">잘 대응한 점</div><div class="v" contenteditable="true">${esc(at.good)}</div></div>
+                        <div class="it regret"><div class="k">아쉬웠던 점</div><div class="v" contenteditable="true">${esc(at.regret)}</div></div>
+                        <div class="it self"><div class="k">${esc(s.name)} 학생이 주도적으로 개선할 점</div><div class="v" contenteditable="true">${esc(at.selfImprove)}</div></div>
+                        <div class="it acad"><div class="k">학원에서 신경 써 지도할 점</div><div class="v" contenteditable="true">${esc(at.academyFocus)}</div></div>
+                    </div>` : '';
 
-            const pendingNote = sum.essayStatus === '대기'
-                ? '<p class="muted" style="margin-top:4px;">※ 서술형은 아직 채점 대기 중인 문항이 있어 점수가 달라질 수 있어요.</p>' : '';
+            const plan = (pr.plan || []).map((p, i) => `<li><span class="n">${i + 1}</span><span contenteditable="true">${esc(p)}</span></li>`).join('');
 
-            document.getElementById('page').innerHTML = `
-                <div class="rep-head">
-                    <div class="brand">READITUDE 리디튜드 영어학원</div>
-                    <h1>${escapeHtml(s.name)} 학생 시험 분석 리포트</h1>
-                    <div class="meta">${escapeHtml(title)}${s.date ? ' · ' + escapeHtml(s.date) : ''}</div>
+            document.getElementById('card').innerHTML = `
+                <div class="hd">
+                    <img class="logo" src="/assets/logo.png" alt="리디튜드">
+                    <h1>${esc(title)}<br>영어 개인 분석 리포트</h1>
+                    <div class="meta">${esc([s.school, s.grade, s.semester, s.date].filter(Boolean).join(' · '))}</div>
                 </div>
+                <div class="bd">
+                    <div class="who">
+                        <div>
+                            <div class="name">${esc(s.name)}${isMiddle ? ` <span class="badge">${band(pct)}</span>` : ''}</div>
+                            <div class="sub">${subParts.map(esc).join('<br>')}</div>
+                        </div>
+                        <div class="score"><span class="num">${sum.score}</span><span class="unit"> / ${sum.fullScore}점</span></div>
+                    </div>
 
-                <div class="score-row">
-                    <div class="score-box"><div class="num">${sum.score}<span style="font-size:15px;color:#94a3b8;"> / ${sum.fullScore}</span></div><div class="lab">점수</div></div>
-                    <div class="score-box"><div class="num">${sum.percent}%</div><div class="lab">득점률</div></div>
-                    <div class="score-box"><div class="num">${sum.correctCount}</div><div class="lab">맞은 문항</div></div>
-                    <div class="score-box"><div class="num">${sum.wrongCount}</div><div class="lab">틀린 문항</div></div>
+                    <div class="bar"><div class="fill" style="width:${Math.min(100, pct)}%"></div>${ticks}</div>
+
+                    <h2>실점 문항 · 오답 요인</h2>
+                    ${wrongs}
+
+                    <h2>핵심 진단</h2>
+                    <div class="diag"><div class="lab">DIAGNOSIS</div><div class="txt" contenteditable="true">${esc(pr.diagnosis)}</div></div>
+
+                    ${attitudeSec}
+
+                    <h2>선생님 코멘트</h2>
+                    <div class="comment" contenteditable="true">${esc(d.overallComment)}</div>
+
+                    <h2>다음 시험 대처 방안</h2>
+                    <ol class="plan">${plan}</ol>
+
+                    <div class="fine">※ ${isMiddle ? '성취수준 경계는 90/80/70/60점 기준입니다. ' : ''}오답 요인은 학생 답안을 바탕으로 한 추정입니다.${at ? ' 학습 브리핑은 해당 기간 수업 기록과 담당 선생님 코멘트를 종합한 것입니다.' : ''}</div>
                 </div>
-                ${pendingNote}
-
-                <section>
-                    <h2>💬 종합 코멘트</h2>
-                    <div class="comment">${escapeHtml(d.overallComment)}</div>
-                </section>
-
-                <section>
-                    <h2>✅ 강점</h2>
-                    <div class="chips">${strengthChips}</div>
-                </section>
-
-                <section>
-                    <h2>⚠️ 약점</h2>
-                    <div class="chips">${weakChips}</div>
-                    ${grammarLine}
-                </section>
-
-                <section>
-                    <h2>📌 다음 시험 대비 학습 대책</h2>
-                    ${recs}
-                </section>
-
-                <section>
-                    <h2>📝 틀린 문항 요약</h2>
-                    <table class="wrongs">
-                        <thead><tr><th>번호</th><th>유형</th><th>출제범위</th><th>문법</th><th>정답</th><th>학생답</th></tr></thead>
-                        <tbody>${wrongsRows}</tbody>
-                    </table>
-                </section>
-
-                <div class="foot">본 리포트는 리디튜드 영어학원 시험 분석 시스템으로 자동 생성되었습니다.</div>
+                <div class="ft"><b>리디튜드 영어학원</b> · 시험 분석 리포트</div>
             `;
+        }
+
+        async function saveImage() {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true; btn.textContent = '저장 중...';
+            document.body.classList.remove('editing'); // 편집 표시 테두리가 이미지에 찍히지 않게
+            try {
+                if (document.fonts?.ready) await document.fonts.ready;
+                const card = document.getElementById('card');
+                const canvas = await html2canvas(card, { backgroundColor: '#ffffff', scale: 2, useCORS: true, windowWidth: 700 });
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = fileBase + '.png';
+                a.click();
+            } catch (e) {
+                alert('이미지 저장 실패: ' + e.message);
+            } finally {
+                document.body.classList.add('editing');
+                btn.disabled = false; btn.textContent = '🖼️ 이미지로 저장';
+            }
         }
 
         load();

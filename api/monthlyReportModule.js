@@ -231,13 +231,27 @@ function computeMonthlyStats(monthPages) {
     };
 }
 
-/** 일일 코멘트를 프롬프트에 넣을 만큼만 모은다. [비용 절감] 최근 1500자만 */
-function collectComments(monthPages) {
+/** 일일 코멘트를 프롬프트에 넣을 만큼만 모은다. [비용 절감] 최근 maxChars자만 */
+function collectComments(monthPages, maxChars = 1500) {
     const comments = monthPages
         .map(p => `[${p.date}] ${p.teacherComment}`)
         .filter(c => c.trim().length > 15)
         .join('\n');
-    return comments.length > 1500 ? comments.slice(-1500) : comments;
+    return comments.length > maxChars ? comments.slice(-maxChars) : comments;
+}
+
+/**
+ * 임의 기간의 진도 기록 → 통계 + 선생님 일일 코멘트. 시험 분석 리포트의 "시험 기간 학습 태도"가 쓴다.
+ * 월간 리포트와 같은 읽기·통계 함수를 그대로 쓴다 — 두 벌로 복사하지 마라. initializeMonthlyReportRoutes 이후에만 부를 수 있다.
+ */
+export async function loadStudyPeriod(studentName, firstDay, lastDay, maxCommentChars = 3000) {
+    if (!fetchNotion || !dbIds?.PROGRESS_DATABASE_ID) return null;
+    const pages = await fetchMonthPages(studentName, firstDay, lastDay);
+    return {
+        classDays: pages.length,
+        stats: computeMonthlyStats(pages),
+        comments: collectComments(pages, maxCommentChars)
+    };
 }
 
 function buildReportPrompt({ studentName, month, stats, grammarDetailsString, comments }) {
